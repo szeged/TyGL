@@ -69,27 +69,34 @@ void PathData::addArc(const FloatPoint& center, const FloatSize& radius, float s
     if (m_lastElement->end() != start)
         addLineTo(start);
 
-    if (anticlockwise && startAngle - endAngle >= 2 * piFloat) {
-        startAngle = fmod(startAngle, 2 * piFloat);
-        endAngle = startAngle - 2 * piFloat;
-    } else if(!anticlockwise && endAngle - startAngle >= 2 * piFloat) {
-        startAngle = fmod(startAngle, 2 * piFloat);
-        endAngle = startAngle + 2 * piFloat;
+    const float twoPiFloat = 2 * piFloat;
+    if (anticlockwise && startAngle - endAngle >= twoPiFloat) {
+        startAngle = fmod(startAngle, twoPiFloat);
+        endAngle = startAngle - twoPiFloat;
+    } else if (!anticlockwise && endAngle - startAngle >= twoPiFloat) {
+        startAngle = fmod(startAngle, twoPiFloat);
+        endAngle = startAngle + twoPiFloat;
     } else {
-        startAngle = fmod(startAngle, 2 * piFloat);
-        if (startAngle < 2 * piFloat)
-            startAngle += 2 * piFloat;
+        bool equal = startAngle == endAngle;
 
-        endAngle = fmod(endAngle, 2 * piFloat);
-        if (endAngle < 2 * piFloat)
-            endAngle += 2 * piFloat;
+        startAngle = fmod(startAngle, twoPiFloat);
+        if (startAngle < 0)
+            startAngle += twoPiFloat;
 
-        if (anticlockwise) {
-            if (startAngle < endAngle)
-                endAngle -= 2 * piFloat;
+        endAngle = fmod(endAngle, twoPiFloat);
+        if (endAngle < 0)
+            endAngle += twoPiFloat;
+
+        if (!anticlockwise) {
+            if (startAngle > endAngle || (startAngle == endAngle && !equal))
+                endAngle += twoPiFloat;
+            ASSERT(0 <= startAngle && startAngle <= twoPiFloat);
+            ASSERT(startAngle <= endAngle && endAngle - startAngle <= twoPiFloat);
         } else {
-            if (startAngle > endAngle)
-                endAngle += 2 * piFloat;
+            if (startAngle < endAngle || (startAngle == endAngle && !equal))
+                endAngle -= twoPiFloat;
+            ASSERT(0 <= startAngle && startAngle <= twoPiFloat);
+            ASSERT(endAngle <= startAngle && startAngle - endAngle <= twoPiFloat);
         }
     }
 
