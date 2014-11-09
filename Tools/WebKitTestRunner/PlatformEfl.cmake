@@ -4,9 +4,26 @@ add_custom_target(forwarding-headersEflForWebKitTestRunner
 )
 set(ForwardingHeadersForWebKitTestRunner_NAME forwarding-headersEflForWebKitTestRunner)
 
-list(APPEND WebKitTestRunner_SOURCES
-    ${WEBKIT_TESTRUNNER_DIR}/cairo/TestInvocationCairo.cpp
+if (WTF_USE_TYGL)
+    list(APPEND WebKitTestRunner_SOURCES
+        ${WEBKIT_TESTRUNNER_DIR}/tygl/TestInvocationTyGL.cpp
+    )
+    list(APPEND WebKitTestRunner_INCLUDE_DIRECTORIES
+        ${WEBKIT2_DIR}/Shared/API/c/tygl
+    )
+else()
+    list(APPEND WebKitTestRunner_SOURCES
+        ${WEBKIT_TESTRUNNER_DIR}/cairo/TestInvocationCairo.cpp
+    )
+    list(APPEND WebKitTestRunner_INCLUDE_DIRECTORIES
+        ${CAIRO_INCLUDE_DIRS}
+    )
+    list(APPEND WebKitTestRunner_LIBRARIES
+        ${CAIRO_LIBRARIES}
+    )
+endif()
 
+list(APPEND WebKitTestRunner_SOURCES
     ${WEBKIT_TESTRUNNER_DIR}/efl/EventSenderProxyEfl.cpp
     ${WEBKIT_TESTRUNNER_DIR}/efl/PlatformWebViewEfl.cpp
     ${WEBKIT_TESTRUNNER_DIR}/efl/TestControllerEfl.cpp
@@ -19,11 +36,9 @@ list(APPEND WebKitTestRunner_INCLUDE_DIRECTORIES
     ${DERIVED_SOURCES_WEBKIT2_DIR}/include
 
     ${WEBKIT2_DIR}/UIProcess/API/C/efl
-
     ${WEBKIT2_DIR}/UIProcess/API/efl
     "${WTF_DIR}/wtf/gobject"
     ${WEBCORE_DIR}/platform/network/soup
-    ${CAIRO_INCLUDE_DIRS}
     ${ECORE_EVAS_INCLUDE_DIRS}
     ${ECORE_FILE_INCLUDE_DIRS}
     ${ECORE_INCLUDE_DIRS}
@@ -34,15 +49,23 @@ list(APPEND WebKitTestRunner_INCLUDE_DIRECTORIES
 )
 
 list(APPEND WebKitTestRunner_LIBRARIES
-    ${CAIRO_LIBRARIES}
     ${ECORE_LIBRARIES}
     ${ECORE_EVAS_LIBRARIES}
     ${EINA_LIBRARIES}
     ${EO_LIBRARIES}
     ${EVAS_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     WTF
 )
+
+if (ENABLE_GLES2)
+    list(APPEND WebKitTestRunner_LIBRARIES
+        ${OPENGLES2_LIBRARY}
+    )
+else ()
+    list(APPEND WebKitTestRunner_LIBRARIES
+        ${OPENGL_LIBRARIES}
+    )
+endif ()
 
 list(APPEND WebKitTestRunnerInjectedBundle_LIBRARIES
     ${ATK_LIBRARIES}

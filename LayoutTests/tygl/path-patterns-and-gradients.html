@@ -1,0 +1,334 @@
+<html>
+<head>
+<script>
+var tileImageVertical;
+var tileImage2;
+var tileImageHorizontal;
+var numTileImagesToLoad = 3;
+var tileWidth = 50; // TODO - remove this when Issue 150 is fixed.
+var tileHeight = 50; // TODO - remove this when Issue 150 is fixed.
+
+function createStar(ctx, centreX, centreY)
+{
+    ctx.beginPath();
+    var moved = false;
+    var longRadius = 90;
+    var shortRadius = 30;
+    for (var i = 0; i < 5; i++) {
+        var longAngle = 2 * Math.PI * i / 5;
+        var xLong = centreX + longRadius * Math.sin(longAngle);
+        var yLong = centreY + longRadius * Math.cos(longAngle);
+        var shortAngle = 2 * Math.PI * (i + 0.5) / 5;
+        var xShort = centreX + shortRadius * Math.sin(shortAngle);
+        var yShort = centreY + shortRadius * Math.cos(shortAngle);
+        if (!moved) {
+            ctx.moveTo(xLong, yLong);
+            moved = true;
+        }
+        else
+            ctx.lineTo(xLong, yLong);
+        ctx.lineTo(xShort, yShort);
+    }
+    ctx.closePath();
+}
+
+function drawGradients()
+{
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+
+    ctx.beginPath();
+    ctx.arc(60, 60, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, 60, 60);
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat');
+    ctx.fill();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(160, 60, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, 160, 60);
+    ctx.fillStyle = ctx.createPattern(tileImage2, 'repeat');
+    ctx.fill();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(260, 60, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, 260, 60);
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat');
+    ctx.rotate(Math.PI * 30 / 180);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(360, 60, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, 360, 60);
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat');
+    ctx.rotate(Math.PI * 45 / 180);
+    ctx.scale(0.5, 0.2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(460, 60, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, 460, 60);
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat');
+    ctx.translate(25, 12);
+    ctx.rotate(Math.PI * 45 / 180);
+    ctx.scale(0.5, 0.2);
+    ctx.fill();
+    ctx.restore();
+
+    var offsetX = 10;
+    var offsetY = 110;
+    var width = 100;
+    var height = 100;
+
+    // Begin test with no horizontal tiling.
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat-y');
+    ctx.translate(offsetX, offsetY);
+    ctx.fill();
+    ctx.restore();
+
+    offsetX += width + 10;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.translate(offsetX + tileWidth / 2, offsetY);
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat-y');
+    ctx.fill();
+    ctx.restore();
+
+    offsetX += width + 10;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.translate(offsetX + tileWidth, offsetY);
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat-y');
+    ctx.fill();
+    ctx.restore();
+
+    offsetX += width + 10;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.translate(offsetX + tileWidth + tileWidth / 2, offsetY);
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat-y');
+    ctx.fill();
+    ctx.restore();
+
+    offsetX += width + 10;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.translate(offsetX - tileWidth / 2, offsetY);
+    ctx.fillStyle = ctx.createPattern(tileImageVertical, 'repeat-y');
+    ctx.fill();
+    ctx.restore();
+
+    // Begin test with no vertical tiling.
+    offsetX = 10;
+    offsetY += height + 10;
+
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.fillStyle = ctx.createPattern(tileImageHorizontal, 'repeat-x');
+    ctx.translate(offsetX, offsetY);
+    ctx.fill();
+    ctx.restore();
+
+    offsetX += width + 10;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.translate(offsetX, offsetY + tileHeight / 2);
+    ctx.fillStyle = ctx.createPattern(tileImageHorizontal, 'repeat-x');
+    ctx.fill();
+    ctx.restore();
+
+    offsetX += width + 10;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.translate(offsetX, offsetY + tileHeight);
+    ctx.fillStyle = ctx.createPattern(tileImageHorizontal, 'repeat-x');
+    ctx.fill();
+    ctx.restore();
+
+    offsetX += width + 10;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.translate(offsetX, offsetY + tileHeight + tileHeight / 2);
+    ctx.fillStyle = ctx.createPattern(tileImageHorizontal, 'repeat-x');
+    ctx.fill();
+    ctx.restore();
+
+    offsetX += width + 10;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(offsetX, offsetY, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, width, height);
+    ctx.clip();
+    ctx.translate(offsetX, offsetY - tileHeight / 2);
+    ctx.fillStyle = ctx.createPattern(tileImageHorizontal, 'repeat-x');
+    ctx.fill();
+    ctx.restore();
+
+    // Begin tests including stroking as well as filling.
+    offsetX = 10;
+    offsetY += height + 10;
+    ctx.lineWidth = 20;
+    var radialGradient = ctx.createRadialGradient(offsetX + 3 * width, offsetY + height / 2, 10, offsetX + 3 * width, offsetY + height / 2, width);
+    radialGradient.addColorStop(0, "red");
+    radialGradient.addColorStop(0.5, "blue");
+    radialGradient.addColorStop(1, "green");
+
+    var linearGradient = ctx.createLinearGradient(offsetX + 3 * width, offsetY, offsetX - 3 * width, offsetY + height);
+    linearGradient.addColorStop(0, "yellow");
+    linearGradient.addColorStop(0.5, "red");
+    linearGradient.addColorStop(1, "grey");
+
+    ctx.beginPath();
+    ctx.arc(offsetX + width / 2, offsetY + height / 2, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, offsetX + width / 2, offsetY + height / 2);
+    ctx.strokeStyle = linearGradient;
+    ctx.fillStyle = ctx.createPattern(tileImage2, 'repeat');
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    offsetX += 10 + width;
+    ctx.beginPath();
+    ctx.arc(offsetX + width / 2, offsetY + height / 2, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, offsetX + width / 2, offsetY + height / 2);
+    ctx.fillStyle = linearGradient;
+    ctx.strokeStyle = ctx.createPattern(tileImage2, 'repeat');
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    offsetX += 10 + width;
+    ctx.beginPath();
+    ctx.arc(offsetX + width / 2, offsetY + height / 2, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, offsetX + width / 2, offsetY + height / 2);
+    ctx.fillStyle = ctx.createPattern(tileImage2, 'repeat');
+    ctx.strokeStyle = radialGradient;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    offsetX += 10 + width;
+    ctx.beginPath();
+    ctx.arc(offsetX + width / 2, offsetY + height / 2, 50, 0, 2 * Math.PI);
+    ctx.save();
+    ctx.clip();
+    createStar(ctx, offsetX + width / 2, offsetY + height / 2);
+    ctx.fillStyle = radialGradient;
+    ctx.strokeStyle = ctx.createPattern(tileImage2, 'repeat');
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Simple rects.
+    offsetX = 10;
+    offsetY += 10 + height;
+
+    radialGradient = ctx.createRadialGradient(offsetX + 3 * width, offsetY + height / 2, 10, offsetX + 3 * width, offsetY + height / 2, width);
+    radialGradient.addColorStop(0, "red");
+    radialGradient.addColorStop(0.5, "blue");
+    radialGradient.addColorStop(1, "green");
+
+    linearGradient = ctx.createLinearGradient(offsetX, offsetY, offsetX, offsetY + height / 2);
+    linearGradient.addColorStop(0, "yellow");
+    linearGradient.addColorStop(0.5, "red");
+    linearGradient.addColorStop(1, "grey");
+
+    ctx.fillStyle = linearGradient;
+    ctx.fillRect(offsetX, offsetY, 0.75 * width, 0.75 * height);
+
+    offsetX += 10 + width;
+    ctx.fillStyle = ctx.createPattern(tileImage2, 'repeat');
+    ctx.fillRect(offsetX, offsetY, 0.75 * width, 0.75 * height);
+
+    offsetX += 10 + width;
+    ctx.fillStyle = radialGradient;
+    ctx.fillRect(offsetX, offsetY, 0.75 * width, 0.75 * height);
+
+}
+
+function imageLoaded()
+{
+    numTileImagesToLoad--;
+    if (numTileImagesToLoad == 0)
+        drawGradients();
+}
+
+function drawStuff()
+{
+    tileImageVertical = new Image();
+    tileImageVertical.onload = imageLoaded;
+    tileImageVertical.src = "resources/simple-tile-vertical.png";
+
+    tileImageHorizontal = new Image();
+    tileImageHorizontal.onload = imageLoaded;
+    tileImageHorizontal.src = "resources/simple-tile-horizontal.png";
+
+    tileImage2 = new Image();
+    tileImage2.onload = imageLoaded;
+    tileImage2.src = "resources/winding-stripes-background-pattern-small.jpg";
+}
+</script>
+</head>
+<body onload='drawStuff()'>
+<canvas width=600px height=500px id='canvas'>
+</canvas>
+</body>
+</html>

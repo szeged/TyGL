@@ -27,4 +27,8 @@
 #include "ImageBufferDataCG.h"
 #elif USE(CAIRO)
 #include "ImageBufferDataCairo.h"
+#elif USE(TYGL)
+#include "ImageBufferDataTyGL.h"
+#elif USE(WINGDI)
+#include "ImageBufferDataWince.h"
 #endif

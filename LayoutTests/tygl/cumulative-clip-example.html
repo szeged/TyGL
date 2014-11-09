@@ -1,0 +1,34 @@
+<html>
+<script>
+function drawStuff()
+{
+	var canvas = document.getElementById('canvas');
+	var ctx = canvas.getContext('2d');
+
+	ctx.rotate(Math.PI / 180 * 10);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(100, 100, 100, 100);
+        ctx.clip();
+        ctx.fillStyle = 'red';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.beginPath();
+        ctx.rect(120, 120, 60, 60);
+        ctx.clip();
+        ctx.fillStyle = 'blue';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.beginPath();
+        ctx.rect(140, 140, 20, 20);
+        ctx.clip();
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+}
+</script>
+<body onload='drawStuff()'>
+<canvas width=512px height=512px id='canvas'/>
+
+</body>
+</html>

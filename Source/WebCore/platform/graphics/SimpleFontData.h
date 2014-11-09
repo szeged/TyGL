@@ -166,7 +166,7 @@ public:
         m_adjustedSpaceWidth = spaceWidth;
     }
 
-#if USE(CG) || USE(CAIRO)
+#if USE(CG) || USE(CAIRO) || USE(TYGL)
     float syntheticBoldOffset() const { return m_syntheticBoldOffset; }
 #endif
 
@@ -325,7 +325,7 @@ private:
 
     mutable OwnPtr<DerivedFontData> m_derivedFontData;
 
-#if USE(CG) || USE(CAIRO)
+#if USE(CG) || USE(CAIRO) || USE(TYGL)
     float m_syntheticBoldOffset;
 #endif
 
@@ -379,7 +379,7 @@ ALWAYS_INLINE float SimpleFontData::widthForGlyph(Glyph glyph) const
         width = m_fontData->widthForSVGGlyph(glyph, m_platformData.size());
 #if ENABLE(OPENTYPE_VERTICAL)
     else if (m_verticalData)
-#if USE(CG) || USE(CAIRO)
+#if USE(CG) || USE(CAIRO) || USE(TYGL)
         width = m_verticalData->advanceHeight(this, glyph) + m_syntheticBoldOffset;
 #else
         width = m_verticalData->advanceHeight(this, glyph);

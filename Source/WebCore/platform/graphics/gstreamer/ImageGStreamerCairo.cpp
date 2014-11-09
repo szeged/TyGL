@@ -24,7 +24,9 @@
 
 #include "GStreamerUtilities.h"
 
+#if USE(CAIRO)
 #include <cairo.h>
+#endif
 #include <gst/gst.h>
 #include <gst/video/gstvideometa.h>
 
@@ -42,6 +44,7 @@ ImageGStreamer::ImageGStreamer(GstBuffer* buffer, GstCaps* caps)
     // Right now the TextureMapper only supports chromas with one plane
     ASSERT(GST_VIDEO_INFO_N_PLANES(&videoInfo) == 1);
 
+#if USE(CAIRO)
     if (!gst_video_frame_map(&m_videoFrame, &videoInfo, buffer, GST_MAP_READ))
         return;
 
@@ -61,6 +64,7 @@ ImageGStreamer::ImageGStreamer(GstBuffer* buffer, GstCaps* caps)
     RefPtr<cairo_surface_t> surface = adoptRef(cairo_image_surface_create_for_data(bufferData, cairoFormat, width, height, stride));
     ASSERT(cairo_surface_status(surface.get()) == CAIRO_STATUS_SUCCESS);
     m_image = BitmapImage::create(surface.release());
+#endif // CAIRO
 
     if (GstVideoCropMeta* cropMeta = gst_buffer_get_video_crop_meta(buffer))
         setCropRect(FloatRect(cropMeta->x, cropMeta->y, cropMeta->width, cropMeta->height));
@@ -75,6 +79,8 @@ ImageGStreamer::~ImageGStreamer()
 
     // We keep the buffer memory mapped until the image is destroyed because the internal
     // cairo_surface_t was created using cairo_image_surface_create_for_data().
+#if USE(CAIRO)
     gst_video_frame_unmap(&m_videoFrame);
+#endif
 }
 #endif // USE(GSTREAMER)

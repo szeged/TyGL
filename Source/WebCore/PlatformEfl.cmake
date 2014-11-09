@@ -73,8 +73,6 @@ list(APPEND WebCore_SOURCES
     platform/audio/gstreamer/FFTFrameGStreamer.cpp
     platform/audio/gstreamer/WebKitWebAudioSourceGStreamer.cpp
 
-    platform/cairo/WidgetBackingStoreCairo.cpp
-
     platform/efl/BatteryProviderEfl.cpp
     platform/efl/CursorEfl.cpp
     platform/efl/DragDataEfl.cpp
@@ -95,9 +93,7 @@ list(APPEND WebCore_SOURCES
     platform/efl/PlatformMouseEventEfl.cpp
     platform/efl/PlatformScreenEfl.cpp
     platform/efl/PlatformWheelEventEfl.cpp
-    platform/efl/RenderThemeEfl.cpp
     platform/efl/ScrollbarEfl.cpp
-    platform/efl/ScrollbarThemeEfl.cpp
     platform/efl/SharedTimerEfl.cpp
     platform/efl/SoundEfl.cpp
     platform/efl/TemporaryLinkStubs.cpp
@@ -109,39 +105,16 @@ list(APPEND WebCore_SOURCES
     platform/graphics/ImageSource.cpp
     platform/graphics/WOFFFileFormat.cpp
 
-    platform/graphics/cairo/BitmapImageCairo.cpp
-    platform/graphics/cairo/CairoUtilities.cpp
-    platform/graphics/cairo/DrawingBufferCairo.cpp
-    platform/graphics/cairo/FontCairo.cpp
-    platform/graphics/cairo/FontCairoHarfbuzzNG.cpp
-    platform/graphics/cairo/GradientCairo.cpp
-    platform/graphics/cairo/GraphicsContextCairo.cpp
-    platform/graphics/cairo/ImageBufferCairo.cpp
-    platform/graphics/cairo/ImageCairo.cpp
-    platform/graphics/cairo/IntRectCairo.cpp
-    platform/graphics/cairo/OwnPtrCairo.cpp
-    platform/graphics/cairo/PathCairo.cpp
-    platform/graphics/cairo/PatternCairo.cpp
-    platform/graphics/cairo/PlatformContextCairo.cpp
-    platform/graphics/cairo/PlatformPathCairo.cpp
-    platform/graphics/cairo/RefPtrCairo.cpp
-    platform/graphics/cairo/TransformationMatrixCairo.cpp
-
-    platform/graphics/efl/CairoUtilitiesEfl.cpp
     platform/graphics/efl/EvasGLContext.cpp
     platform/graphics/efl/EvasGLSurface.cpp
-    platform/graphics/efl/GraphicsContext3DEfl.cpp
-    platform/graphics/efl/GraphicsContext3DPrivate.cpp
     platform/graphics/efl/IconEfl.cpp
     platform/graphics/efl/ImageEfl.cpp
     platform/graphics/efl/IntPointEfl.cpp
     platform/graphics/efl/IntRectEfl.cpp
+    platform/graphics/efl/GraphicsContext3DPrivate.cpp
 
     platform/graphics/freetype/FontCacheFreeType.cpp
-    platform/graphics/freetype/FontCustomPlatformDataFreeType.cpp
     platform/graphics/freetype/FontPlatformDataFreeType.cpp
-    platform/graphics/freetype/GlyphPageTreeNodeFreeType.cpp
-    platform/graphics/freetype/SimpleFontDataFreeType.cpp
 
     platform/graphics/gstreamer/AudioTrackPrivateGStreamer.cpp
     platform/graphics/gstreamer/GRefPtrGStreamer.cpp
@@ -161,13 +134,12 @@ list(APPEND WebCore_SOURCES
     platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp
 
     platform/graphics/harfbuzz/HarfBuzzFace.cpp
-    platform/graphics/harfbuzz/HarfBuzzFaceCairo.cpp
     platform/graphics/harfbuzz/HarfBuzzShaper.cpp
 
     platform/graphics/opengl/Extensions3DOpenGLCommon.cpp
+    platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp
     platform/graphics/opengl/GLPlatformContext.cpp
     platform/graphics/opengl/GLPlatformSurface.cpp
-    platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp
     platform/graphics/opengl/TemporaryOpenGLSetting.cpp
 
     platform/graphics/opentype/OpenTypeVerticalData.cpp
@@ -195,8 +167,6 @@ list(APPEND WebCore_SOURCES
 
     platform/image-decoders/bmp/BMPImageDecoder.cpp
     platform/image-decoders/bmp/BMPImageReader.cpp
-
-    platform/image-decoders/cairo/ImageDecoderCairo.cpp
 
     platform/image-decoders/gif/GIFImageDecoder.cpp
     platform/image-decoders/gif/GIFImageReader.cpp
@@ -256,6 +226,112 @@ if (WTF_USE_GEOCLUE2)
     add_custom_command(
          OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/Geoclue2Interface.c ${DERIVED_SOURCES_WEBCORE_DIR}/Geoclue2Interface.h
          COMMAND gdbus-codegen --interface-prefix org.freedesktop.GeoClue2. --c-namespace Geoclue --generate-c-code ${DERIVED_SOURCES_WEBCORE_DIR}/Geoclue2Interface ${GEOCLUE_DBUS_INTERFACE}
+    )
+endif ()
+
+if (WTF_USE_TYGL)
+    list(APPEND WebCore_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/platform/graphics/tygl"
+        "${WEBCORE_DIR}/platform/image-encoders"
+        "${WEBCORE_DIR}/platform/tygl"
+    )
+    list(APPEND WebCore_SOURCES
+        platform/graphics/harfbuzz/HarfBuzzFaceFreeType.cpp
+
+        platform/graphics/tygl/ArenaTyGL.cpp
+        platform/graphics/tygl/BitmapImageTyGL.cpp
+        platform/graphics/tygl/ClipRectTyGL.cpp
+        platform/graphics/tygl/ClippedTransformedQuadTyGL.cpp
+        platform/graphics/tygl/DrawingBufferTyGL.cpp
+        platform/graphics/tygl/FontCustomPlatformData.cpp
+        platform/graphics/tygl/FontTextureAtlasTyGL.cpp
+        platform/graphics/tygl/FontTyGL.cpp
+        platform/graphics/tygl/GlyphPageTreeNodeTyGL.cpp
+        platform/graphics/tygl/GradientTyGL.cpp
+        platform/graphics/tygl/GraphicsContext3DTyGL.cpp
+        platform/graphics/tygl/GraphicsContextTyGL.cpp
+        platform/graphics/tygl/ImageBufferTyGL.cpp
+        platform/graphics/tygl/ImageDecoderTyGL.cpp
+        platform/graphics/tygl/ImageTyGL.cpp
+        platform/graphics/tygl/NativeImageTyGL.cpp
+        platform/graphics/tygl/PathTyGL.cpp
+        platform/graphics/tygl/PlatformContextTyGL.cpp
+        platform/graphics/tygl/ScaledFontTyGL.cpp
+        platform/graphics/tygl/ShaderBlendTyGL.cpp
+        platform/graphics/tygl/ShaderBorderLineTyGL.cpp
+        platform/graphics/tygl/ShaderBulletPointTyGL.cpp
+        platform/graphics/tygl/ShaderClipTyGL.cpp
+        platform/graphics/tygl/ShaderFontTyGL.cpp
+        platform/graphics/tygl/ShaderGradientTyGL.cpp
+        platform/graphics/tygl/ShaderImageTyGL.cpp
+        platform/graphics/tygl/ShaderPatternTyGL.cpp
+        platform/graphics/tygl/ShaderPathTyGL.cpp
+        platform/graphics/tygl/ShaderPipelineTyGL.cpp
+        platform/graphics/tygl/ShaderRectTyGL.cpp
+        platform/graphics/tygl/ShaderSolidColorTyGL.cpp
+        platform/graphics/tygl/ShaderUITyGL.cpp
+        platform/graphics/tygl/SimpleFontDataTyGL.cpp
+        platform/graphics/tygl/StrokePathTyGL.cpp
+        platform/graphics/tygl/TextureFontTyGL.cpp
+        platform/graphics/tygl/TileTyGL.cpp
+        platform/graphics/tygl/TransformTyGL.cpp
+        platform/graphics/tygl/TrapezoidBuilderTyGL.cpp
+        platform/graphics/tygl/TrapezoidListTyGL.cpp
+
+        platform/graphics/OpenGLShims.cpp
+
+        platform/image-encoders/JPEGImageEncoder.cpp
+        platform/image-encoders/PNGImageEncoder.cpp
+
+        platform/tygl/RenderThemeTyGL.cpp
+        platform/tygl/ScrollbarThemeTyGL.cpp
+    )
+
+    file(COPY "${WEBCORE_DIR}/Resources/tygl/uiElements.png" DESTINATION "${CMAKE_BINARY_DIR}/images")
+    add_definitions(-DIMAGE_DIRECTORY="${CMAKE_BINARY_DIR}/images")
+
+else()
+    list(APPEND WebCore_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/platform/cairo"
+        "${WEBCORE_DIR}/platform/graphics/cairo"
+        ${CAIRO_INCLUDE_DIRS}
+    )
+    list(APPEND WebCore_SOURCES
+        platform/cairo/WidgetBackingStoreCairo.cpp
+
+        platform/graphics/cairo/BitmapImageCairo.cpp
+        platform/graphics/cairo/CairoUtilities.cpp
+        platform/graphics/cairo/DrawingBufferCairo.cpp
+        platform/graphics/cairo/FontCairo.cpp
+        platform/graphics/cairo/GradientCairo.cpp
+        platform/graphics/cairo/GraphicsContextCairo.cpp
+        platform/graphics/cairo/ImageBufferCairo.cpp
+        platform/graphics/cairo/ImageCairo.cpp
+        platform/graphics/cairo/IntRectCairo.cpp
+        platform/graphics/cairo/OwnPtrCairo.cpp
+        platform/graphics/cairo/PathCairo.cpp
+        platform/graphics/cairo/PatternCairo.cpp
+        platform/graphics/cairo/PlatformContextCairo.cpp
+        platform/graphics/cairo/PlatformPathCairo.cpp
+        platform/graphics/cairo/RefPtrCairo.cpp
+        platform/graphics/cairo/TransformationMatrixCairo.cpp
+
+        platform/graphics/efl/CairoUtilitiesEfl.cpp
+        platform/graphics/efl/GraphicsContext3DEfl.cpp
+        platform/graphics/cairo/FontCairoHarfbuzzNG.cpp
+        platform/graphics/freetype/FontCustomPlatformDataFreeType.cpp
+        platform/graphics/freetype/GlyphPageTreeNodeFreeType.cpp
+        platform/graphics/freetype/SimpleFontDataFreeType.cpp
+        platform/graphics/harfbuzz/HarfBuzzFaceCairo.cpp
+
+        platform/image-decoders/cairo/ImageDecoderCairo.cpp
+
+        platform/efl/RenderThemeEfl.cpp
+        platform/efl/ScrollbarThemeEfl.cpp
+
+    )
+    list(APPEND WebCore_LIBRARIES
+        ${CAIRO_LIBRARIES}
     )
 endif ()
 
@@ -405,6 +481,9 @@ if (WTF_USE_OPENGL_ES_2)
         platform/graphics/opengl/Extensions3DOpenGLES.cpp
         platform/graphics/opengl/GraphicsContext3DOpenGLES.cpp
     )
+    list(INSERT WebCore_INCLUDE_DIRECTORIES 0 ${OPENGLES2_INCLUDE_DIR})
+    list(APPEND WebCore_LIBRARIES ${OPENGLES2_LIBRARY})
+    add_definitions(${OPENGLES2_DEFINITIONS})
 else ()
     list(APPEND WebCore_SOURCES
         platform/graphics/OpenGLShims.cpp

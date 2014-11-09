@@ -1,0 +1,99 @@
+<html>
+<head>
+<script>
+function addStops(gradient)
+{
+    gradient.addColorStop(0, "red");
+    gradient.addColorStop(0.25, "blue");
+    gradient.addColorStop(0.5, "orange");
+    gradient.addColorStop(0.75, "yellow");
+    gradient.addColorStop(1, "green");
+}
+
+function drawGradients()
+{
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+
+    var offsetX = 10;
+    var offsetY = 10;
+    var rectWidth = 100;
+    var rectHeight = 60;
+
+    // Radial.
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.rotate(20 * Math.PI / 180);
+    var radialGradient = ctx.createRadialGradient(offsetX +  rectWidth / 2, offsetY +  rectHeight / 2, 10, offsetX +  rectWidth / 2, offsetY + rectHeight / 2, rectWidth);
+    addStops(radialGradient);
+    ctx.fillStyle = radialGradient;
+    ctx.fillRect(offsetX, offsetY, rectWidth, rectHeight);
+    ctx.restore();
+
+    offsetX += 30;
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.rotate(30 * Math.PI / 180);
+    ctx.scale(3.0, 1.5);
+    var radialGradient = ctx.createRadialGradient(offsetX +  rectWidth / 2, offsetY +  rectHeight / 2, 10, offsetX +  rectWidth / 2, offsetY + rectHeight / 2, rectWidth);
+    addStops(radialGradient);
+    ctx.fillStyle = radialGradient;
+    ctx.fillRect(offsetX, offsetY, rectWidth, rectHeight);
+    ctx.restore();
+
+    offsetX += 30;
+
+    ctx.save();
+    // Skew, rotate, scale; a bit of everything!
+    ctx.setTransform( 1.597533, 2.203612, -0.369585, 2.620026, 320.000000, -180.0000);
+    var radialGradient = ctx.createRadialGradient(offsetX +  rectWidth / 2, offsetY +  rectHeight / 2, 10, offsetX +  rectWidth / 2, offsetY + rectHeight / 2, rectWidth);
+    addStops(radialGradient);
+    ctx.fillStyle = radialGradient;
+    ctx.fillRect(offsetX, offsetY, rectWidth, rectHeight);
+    ctx.restore();
+
+    offsetX = 10;
+    offsetY += 100;
+
+    // Linear.
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.rotate(20 * Math.PI / 180);
+    var linearGradient = ctx.createLinearGradient(offsetX + 10, offsetY + 10, offsetX + rectWidth - 10, offsetY + rectHeight - 10);
+    addStops(linearGradient);
+    ctx.fillStyle = linearGradient;
+    ctx.fillRect(offsetX, offsetY, rectWidth, rectHeight);
+    ctx.restore();
+
+    offsetX += 30;
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.rotate(30 * Math.PI / 180);
+    ctx.scale(3.0, 1.5);
+    var linearGradient = ctx.createLinearGradient(offsetX + 10, offsetY + 10, offsetX + rectWidth - 10, offsetY + rectHeight - 10);
+    addStops(linearGradient);
+    ctx.fillStyle = linearGradient;
+    ctx.fillRect(offsetX, offsetY, rectWidth, rectHeight);
+    ctx.restore();
+
+    offsetX += 30;
+
+    ctx.save();
+    // Skew, rotate, scale; a bit of everything!
+    ctx.setTransform( 1.597533, 2.203612, -0.369585, 2.620026, 320.000000, -180.0000);
+    var linearGradient = ctx.createLinearGradient(offsetX + 10, offsetY + 10, offsetX + rectWidth - 10, offsetY + rectHeight - 10);
+    addStops(linearGradient);
+    ctx.fillStyle = linearGradient;
+    ctx.fillRect(offsetX, offsetY, rectWidth, rectHeight);
+    ctx.restore();
+}
+
+</script>
+</head>
+<body onload='drawGradients()'>
+<canvas width=600px height=500px id='canvas'>
+</canvas>
+</body>
+</html>

@@ -32,6 +32,8 @@
 typedef struct CGImage* CGImageRef;
 #elif USE(CAIRO)
 #include "RefPtrCairo.h"
+#elif USE(TYGL)
+#include "NativeImageTyGL.h"
 #elif USE(WINGDI)
 #include "SharedBitmap.h"
 #endif
@@ -45,11 +47,14 @@ typedef CGImageRef NativeImagePtr;
 #elif USE(CAIRO)
 typedef RefPtr<cairo_surface_t> NativeImagePtr;
 typedef PassRefPtr<cairo_surface_t> PassNativeImagePtr;
+#elif USE(TYGL)
+typedef RefPtr<WebCore::NativeImageTyGL> NativeImagePtr;
+typedef PassRefPtr<WebCore::NativeImageTyGL> PassNativeImagePtr;
 #elif USE(WINGDI)
 typedef RefPtr<SharedBitmap> NativeImagePtr;
 #endif
 
-#if !USE(CAIRO)
+#if !USE(CAIRO) && !USE(TYGL)
 typedef NativeImagePtr PassNativeImagePtr;
 #endif
 

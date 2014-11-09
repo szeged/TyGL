@@ -100,6 +100,8 @@ class IntRect;
 class IntSize;
 #if USE(CAIRO)
 class PlatformContextCairo;
+#elif USE(TYGL)
+class PlatformContextTyGL;
 #endif
 
 typedef WTF::HashMap<CString, uint64_t> ShaderNameHash;
@@ -831,12 +833,15 @@ public:
     void drawElementsInstanced(GC3Denum mode, GC3Dsizei count, GC3Denum type, GC3Dintptr offset, GC3Dsizei primcount);
     void vertexAttribDivisor(GC3Duint index, GC3Duint divisor);
 
-#if PLATFORM(GTK) || PLATFORM(EFL) || USE(CAIRO)
+#if PLATFORM(GTK) || USE(CAIRO)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, PlatformContextCairo* context);
 #elif USE(CG)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, GraphicsContext*);
+#elif USE(TYGL)
+    void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
+                       int canvasWidth, int canvasHeight, PlatformContextTyGL* context);
 #endif
 
     void markContextChanged();

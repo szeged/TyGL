@@ -142,6 +142,21 @@ if (WTF_USE_3D_GRAPHICS)
         "${THIRDPARTY_DIR}/ANGLE/include/KHR"
         "${THIRDPARTY_DIR}/ANGLE/include/GLSLANG"
     )
+    if (OPENGL_FOUND)
+        list(APPEND WebCore_INCLUDE_DIRECTORIES
+            ${OPENGL_INCLUDE_DIR}
+        )
+        list(APPEND WebCore_LIBRARIES
+            ${OPENGL_gl_LIBRARY}
+        )
+    elseif (OPENGLES2_FOUND)
+        list(APPEND WebCore_INCLUDE_DIRECTORIES
+            ${OPENGLES2_INCLUDE_DIR}
+        )
+        list(APPEND WebCore_LIBRARIES
+            ${OPENGLES2_LIBRARIES}
+        )
+    endif ()
 endif ()
 
 set(WebKit2_SOURCES

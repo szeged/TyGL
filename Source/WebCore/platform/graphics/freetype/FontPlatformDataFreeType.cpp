@@ -4,6 +4,7 @@
  * Copyright (C) 2007, 2008 Alp Toker <alp@atoker.com>
  * Copyright (C) 2007 Holger Hans Peter Freyther
  * Copyright (C) 2009, 2010 Igalia S.L.
+ * Copyright (C) 2014 University of Szeged
  * All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -26,11 +27,16 @@
 #include "FontPlatformData.h"
 
 #include "FontDescription.h"
+#if USE(CAIRO)
 #include <cairo-ft.h>
 #include <cairo.h>
+#elif USE(TYGL)
+#include "ScaledFontTyGL.h"
+#include "TextureFontTyGL.h"
+#endif
 #include <fontconfig/fcfreetype.h>
 #include <ft2build.h>
-#include FT_TRUETYPE_TABLES_H
+#include <freetype/tttables.h>
 #include <wtf/text/WTFString.h>
 
 #if !PLATFORM(EFL)
@@ -39,6 +45,7 @@
 
 namespace WebCore {
 
+#if USE(CAIRO)
 cairo_subpixel_order_t convertFontConfigSubpixelOrder(int fontConfigOrder)
 {
     switch (fontConfigOrder) {
@@ -123,6 +130,7 @@ static void rotateCairoMatrixForVerticalOrientation(cairo_matrix_t* matrix)
     cairo_matrix_rotate(matrix, -M_PI_2);
     cairo_matrix_translate(matrix, 0.0, 1.0);
 }
+#endif // USE(CAIRO)
 
 FontPlatformData::FontPlatformData(FcPattern* pattern, const FontDescription& fontDescription)
     : m_pattern(pattern)
@@ -134,8 +142,14 @@ FontPlatformData::FontPlatformData(FcPattern* pattern, const FontDescription& fo
     , m_scaledFont(0)
     , m_orientation(fontDescription.orientation())
 {
+#if USE(CAIRO)
     RefPtr<cairo_font_face_t> fontFace = adoptRef(cairo_ft_font_face_create_for_pattern(m_pattern.get()));
     initializeWithFontFace(fontFace.get(), fontDescription);
+#elif USE(TYGL)
+    m_scaledFont = ScaledFont::create(m_pattern.get());
+    m_textureFont = TyGL::TextureFont::create(m_scaledFont);
+    initializeWithFontFace(m_scaledFont->fontFace(), fontDescription);
+#endif
 
     int spacing;
     if (FcPatternGetInteger(pattern, FC_SPACING, 0, &spacing) == FcResultMatch && spacing == FC_MONO)
@@ -166,7 +180,11 @@ FontPlatformData::FontPlatformData(float size, bool bold, bool italic)
     // We cannot create a scaled font here.
 }
 
+#if USE(CAIRO)
 FontPlatformData::FontPlatformData(cairo_font_face_t* fontFace, float size, bool bold, bool italic, FontOrientation orientation)
+#elif USE(TYGL)
+FontPlatformData::FontPlatformData(FT_Face fontFace, float size, bool bold, bool italic, FontOrientation orientation)
+#endif
     : m_fallbacks(0)
     , m_size(size)
     , m_syntheticBold(bold)
@@ -175,13 +193,21 @@ FontPlatformData::FontPlatformData(cairo_font_face_t* fontFace, float size, bool
     , m_scaledFont(0)
     , m_orientation(orientation)
 {
+#if USE(TYGL)
+    RefPtr<FcPattern> pattern = adoptRef(FcPatternCreate());
+    FcPatternAddFTFace(pattern.get(), FC_FT_FACE, fontFace);
+    m_scaledFont = ScaledFont::create(pattern.get());
+    m_textureFont = TyGL::TextureFont::create(m_scaledFont);
+#endif
     initializeWithFontFace(fontFace);
 
+#if USE(CAIRO)
     FT_Face fontConfigFace = cairo_ft_scaled_font_lock_face(m_scaledFont);
     if (fontConfigFace) {
         m_fixedWidth = fontConfigFace->face_flags & FT_FACE_FLAG_FIXED_WIDTH;
         cairo_ft_scaled_font_unlock_face(m_scaledFont);
     }
+#endif
 }
 
 FontPlatformData& FontPlatformData::operator=(const FontPlatformData& other)
@@ -196,7 +222,9 @@ FontPlatformData& FontPlatformData::operator=(const FontPlatformData& other)
     m_fixedWidth = other.m_fixedWidth;
     m_pattern = other.m_pattern;
     m_orientation = other.m_orientation;
-    m_horizontalOrientationMatrix = other.m_horizontalOrientationMatrix;
+#if USE(HARFBUZZ)
+    m_harfBuzzFace = other.m_harfBuzzFace;
+#endif
 
     if (m_fallbacks) {
         FcFontSetDestroy(m_fallbacks);
@@ -204,11 +232,15 @@ FontPlatformData& FontPlatformData::operator=(const FontPlatformData& other)
         m_fallbacks = 0;
     }
 
+#if USE(CAIRO)
     if (m_scaledFont && m_scaledFont != hashTableDeletedFontValue())
         cairo_scaled_font_destroy(m_scaledFont);
     m_scaledFont = cairo_scaled_font_reference(other.m_scaledFont);
-
-    m_harfBuzzFace = other.m_harfBuzzFace;
+    m_horizontalOrientationMatrix = other.m_horizontalOrientationMatrix;
+#elif USE(TYGL)
+    m_scaledFont = other.m_scaledFont;
+    m_textureFont = other.m_textureFont;
+#endif
 
     return *this;
 }
@@ -222,14 +254,26 @@ FontPlatformData::FontPlatformData(const FontPlatformData& other)
 }
 
 FontPlatformData::FontPlatformData(const FontPlatformData& other, float size)
+#if USE(HARFBUZZ)
     : m_harfBuzzFace(other.m_harfBuzzFace)
+#endif
 {
     *this = other;
 
     // We need to reinitialize the instance, because the difference in size 
     // necessitates a new scaled font instance.
     m_size = size;
+
+#if USE(CAIRO)
     initializeWithFontFace(cairo_scaled_font_get_font_face(m_scaledFont));
+#elif USE(TYGL)
+    FT_Face fontFace = m_scaledFont->fontFace();
+    RefPtr<FcPattern> pattern = adoptRef(FcPatternCreate());
+    FcPatternAddFTFace(pattern.get(), FC_FT_FACE, fontFace);
+    m_scaledFont = ScaledFont::create(pattern.get());
+    m_textureFont = TyGL::TextureFont::create(m_scaledFont);
+    initializeWithFontFace(fontFace);
+#endif
 }
 
 FontPlatformData::~FontPlatformData()
@@ -240,9 +284,14 @@ FontPlatformData::~FontPlatformData()
     }
 
     if (m_scaledFont && m_scaledFont != hashTableDeletedFontValue())
+#if USE(CAIRO)
         cairo_scaled_font_destroy(m_scaledFont);
+#elif USE(TYGL)
+        m_scaledFont->deref();
+#endif
 }
 
+#if USE(HARFBUZZ)
 HarfBuzzFace* FontPlatformData::harfBuzzFace() const
 {
     if (!m_harfBuzzFace)
@@ -250,6 +299,7 @@ HarfBuzzFace* FontPlatformData::harfBuzzFace() const
 
     return m_harfBuzzFace.get();
 }
+#endif
 
 bool FontPlatformData::isFixedPitch()
 {
@@ -264,11 +314,18 @@ bool FontPlatformData::operator==(const FontPlatformData& other) const
         || (m_pattern != other.m_pattern && !FcPatternEqual(m_pattern.get(), other.m_pattern.get())))
         return false;
 
-    return m_scaledFont == other.m_scaledFont
+    bool scaledFontsAreEqual = m_scaledFont == other.m_scaledFont;
+
+#if USE(TYGL)
+    scaledFontsAreEqual = (!m_scaledFont && !other.m_scaledFont)
+        || ((m_scaledFont && other.m_scaledFont) && (*m_scaledFont == *other.m_scaledFont) && (m_textureFont == other.m_textureFont));
+#endif
+
+    return scaledFontsAreEqual
         && m_size == other.m_size
         && m_syntheticOblique == other.m_syntheticOblique
         && m_orientation == other.m_orientation
-        && m_syntheticBold == other.m_syntheticBold; 
+        && m_syntheticBold == other.m_syntheticBold;
 }
 
 #ifndef NDEBUG
@@ -278,6 +335,7 @@ String FontPlatformData::description() const
 }
 #endif
 
+#if USE(CAIRO)
 void FontPlatformData::initializeWithFontFace(cairo_font_face_t* fontFace, const FontDescription& fontDescription)
 {
     cairo_font_options_t* options = getDefaultFontOptions();
@@ -328,15 +386,60 @@ void FontPlatformData::initializeWithFontFace(cairo_font_face_t* fontFace, const
     m_scaledFont = cairo_scaled_font_create(fontFace, &fontMatrix, &ctm, options);
     cairo_font_options_destroy(options);
 }
+#elif USE(TYGL)
+void FontPlatformData::initializeWithFontFace(FT_Face fontFace, const FontDescription& fontDescription)
+{
+    TyGL::AffineTransform fontTransform;
+    if (m_pattern)
+    {
+        // FontConfig may return a list of transformation matrices with the pattern, for instance,
+        // for fonts that are oblique. We use that to initialize the font matrix.
+        FcMatrix fontConfigMatrix, *tempFontConfigMatrix;
+        FcMatrixInit(&fontConfigMatrix);
+
+        // These matrices may be stacked in the pattern, so it's our job to get them all and multiply them.
+        for (int i = 0; FcPatternGetMatrix(m_pattern.get(), FC_MATRIX, i, &tempFontConfigMatrix) == FcResultMatch; i++)
+            FcMatrixMultiply(&fontConfigMatrix, &fontConfigMatrix, tempFontConfigMatrix);
+
+        TyGL::AffineTransform::Transform matrix = { { fontConfigMatrix.xx, -fontConfigMatrix.yx, -fontConfigMatrix.yx, fontConfigMatrix.yy, 0, 0 } };
+        fontTransform = matrix;
+
+        // We requested an italic font, but Fontconfig gave us one that was neither oblique nor italic.
+        int actualFontSlant;
+        if (fontDescription.italic() && FcPatternGetInteger(m_pattern.get(), FC_SLANT, 0, &actualFontSlant) == FcResultMatch)
+            m_syntheticOblique = actualFontSlant == FC_SLANT_ROMAN;
+    }
+
+    if (syntheticOblique()) {
+        static const float syntheticObliqueSkew = -tanf(14 * acosf(0) / 90);
+        TyGL::AffineTransform::Transform matrix = {1, 0, syntheticObliqueSkew, 1, 0, 0};
+        fontTransform.multiply(matrix);
+    }
+
+    m_horizontalOrientationTransform = fontTransform;
+    m_textureFont->setTransform(m_horizontalOrientationTransform);
+    if (m_orientation == Vertical) {
+        TyGL::AffineTransform::Transform matrix = { { cos(-M_PI_2), sin(-M_PI_2), -sin(-M_PI_2), cos(-M_PI_2), -1, 0 } };
+        fontTransform.multiply(matrix);
+        m_textureFont->setTransform(fontTransform);
+    }
+}
+#endif
 
 bool FontPlatformData::hasCompatibleCharmap()
 {
     ASSERT(m_scaledFont);
+#if USE(CAIRO)
     FT_Face freeTypeFace = cairo_ft_scaled_font_lock_face(m_scaledFont);
+#elif USE(TYGL)
+    FT_Face freeTypeFace = m_scaledFont->fontFace();
+#endif
     bool hasCompatibleCharmap = !(FT_Select_Charmap(freeTypeFace, ft_encoding_unicode)
                                 && FT_Select_Charmap(freeTypeFace, ft_encoding_symbol)
                                 && FT_Select_Charmap(freeTypeFace, ft_encoding_apple_roman));
+#if USE(CAIRO)
     cairo_ft_scaled_font_unlock_face(m_scaledFont);
+#endif
     return hasCompatibleCharmap;
 }
 
@@ -348,7 +451,11 @@ PassRefPtr<OpenTypeVerticalData> FontPlatformData::verticalData() const
 
 PassRefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
 {
+#if USE(CAIRO)
     FT_Face freeTypeFace = cairo_ft_scaled_font_lock_face(m_scaledFont);
+#elif USE(TYGL)
+    FT_Face freeTypeFace = m_scaledFont->fontFace();
+#endif
     if (!freeTypeFace)
         return 0;
 
@@ -367,7 +474,9 @@ PassRefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
     if (error || tableSize != expectedTableSize)
         return 0;
 
+#if USE(CAIRO)
     cairo_ft_scaled_font_unlock_face(m_scaledFont);
+#endif
 
     return buffer.release();
 }
@@ -379,6 +488,7 @@ void FontPlatformData::setOrientation(FontOrientation orientation)
     if (!m_scaledFont || (m_orientation == orientation))
         return;
 
+#if USE(CAIRO)
     cairo_matrix_t transformationMatrix;
     cairo_matrix_init_identity(&transformationMatrix);
 
@@ -398,6 +508,15 @@ void FontPlatformData::setOrientation(FontOrientation orientation)
     cairo_scaled_font_destroy(m_scaledFont);
     m_scaledFont = cairo_scaled_font_create(fontFace, &fontMatrix, &transformationMatrix, options);
     cairo_font_options_destroy(options);
+#elif USE(TYGL)
+    m_textureFont->setTransform(m_horizontalOrientationTransform);
+    if (orientation == Vertical) {
+        TyGL::AffineTransform transform = m_horizontalOrientationTransform;
+        TyGL::AffineTransform::Transform matrix = { { cos(-M_PI_2), sin(-M_PI_2), -sin(-M_PI_2), cos(-M_PI_2), -1, 0 } };
+        transform.multiply(matrix);
+        m_textureFont->setTransform(transform);
+    }
+#endif
     m_orientation = orientation;
 }
 

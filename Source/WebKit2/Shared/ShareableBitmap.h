@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011 Apple Inc.
+ * Copyright (C) 2013 University of Szeged
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +42,10 @@
 #include <WebCore/RefPtrCairo.h>
 #endif
 
+#if USE(TYGL)
+#include <WebCore/NativeImageTyGL.h>
+#endif
+
 namespace WebCore {
     class Image;
     class GraphicsContext;
@@ -60,9 +66,12 @@ public:
     public:
         Handle();
 
+#if USE(TYGL)
+        bool isNull() const { return m_imageHandle; }
+#else
         bool isNull() const { return m_handle.isNull(); }
-
         void clear();
+#endif
 
         void encode(IPC::ArgumentEncoder&) const;
         static bool decode(IPC::ArgumentDecoder&, Handle&);
@@ -70,7 +79,11 @@ public:
     private:
         friend class ShareableBitmap;
 
+#if USE(TYGL)
+        uintptr_t m_imageHandle;
+#else
         mutable SharedMemory::Handle m_handle;
+#endif
         WebCore::IntSize m_size;
         Flags m_flags;
     };
@@ -81,8 +94,10 @@ public:
     // Create a shareable bitmap whose backing memory can be shared with another process.
     static PassRefPtr<ShareableBitmap> createShareable(const WebCore::IntSize&, Flags);
 
+#if !USE(TYGL)
     // Create a shareable bitmap from an already existing shared memory block.
     static PassRefPtr<ShareableBitmap> create(const WebCore::IntSize&, Flags, PassRefPtr<SharedMemory>);
+#endif
 
     // Create a shareable bitmap from a handle.
     static PassRefPtr<ShareableBitmap> create(const Handle&, SharedMemory::Protection = SharedMemory::ReadWrite);
@@ -95,7 +110,9 @@ public:
     const WebCore::IntSize& size() const { return m_size; }
     WebCore::IntRect bounds() const { return WebCore::IntRect(WebCore::IntPoint(), size()); }
 
+#if !USE(TYGL)
     bool resize(const WebCore::IntSize& size);
+#endif
 
     // Create a graphics context that can be used to paint into the backing store.
     std::unique_ptr<WebCore::GraphicsContext> createGraphicsContext();
@@ -104,7 +121,11 @@ public:
     void paint(WebCore::GraphicsContext&, const WebCore::IntPoint& destination, const WebCore::IntRect& source);
     void paint(WebCore::GraphicsContext&, float scaleFactor, const WebCore::IntPoint& destination, const WebCore::IntRect& source);
 
+#if USE(TYGL)
+    bool isBackedBySharedMemory() const { return m_sharedImage->sharedImageHandle(); }
+#else
     bool isBackedBySharedMemory() const { return m_sharedMemory; }
+#endif
 
     // This creates a bitmap image that directly references the shared bitmap data.
     // This is only safe to use when we know that the contents of the shareable bitmap won't change.
@@ -121,11 +142,17 @@ public:
     // This creates a BitmapImage that directly references the shared bitmap data.
     // This is only safe to use when we know that the contents of the shareable bitmap won't change.
     PassRefPtr<cairo_surface_t> createCairoSurface();
+#elif USE(TYGL)
+    PassRefPtr<WebCore::NativeImageTyGL> sharedImage() { return m_sharedImage; }
 #endif
 
 private:
+#if USE(TYGL)
+    ShareableBitmap(const WebCore::IntSize&, Flags, PassRefPtr<WebCore::NativeImageTyGL>);
+#else
     ShareableBitmap(const WebCore::IntSize&, Flags, void*);
     ShareableBitmap(const WebCore::IntSize&, Flags, PassRefPtr<SharedMemory>);
+#endif
 
 #if USE(CAIRO)
     static size_t numBytesForSize(const WebCore::IntSize&);
@@ -143,7 +170,9 @@ private:
     static void releaseSurfaceData(void* typelessBitmap);
 #endif
 
+#if !USE(TYGL)
     void* data() const;
+#endif
     size_t sizeInBytes() const { return numBytesForSize(m_size); }
 
     WebCore::IntSize m_size;
@@ -154,6 +183,10 @@ private:
 
     // If the shareable bitmap is backed by fastMalloced memory, this points to the data.
     void* m_data;
+
+#if USE(TYGL)
+    RefPtr<WebCore::NativeImageTyGL> m_sharedImage;
+#endif
 };
 
 } // namespace WebKit

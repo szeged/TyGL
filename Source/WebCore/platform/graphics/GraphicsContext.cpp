@@ -696,6 +696,7 @@ void GraphicsContext::fillRect(const FloatRect& rect, const Color& color, ColorS
     setCompositeOperation(previousOperator);
 }
 
+#if !USE(TYGL)
 void GraphicsContext::fillRoundedRect(const FloatRoundedRect& rect, const Color& color, ColorSpace colorSpace, BlendMode blendMode)
 {
     if (rect.isRounded()) {
@@ -705,9 +706,10 @@ void GraphicsContext::fillRoundedRect(const FloatRoundedRect& rect, const Color&
     } else
         fillRect(rect.rect(), color, colorSpace, compositeOperation(), blendMode);
 }
+#endif
 
 #if !USE(CG) && !USE(CAIRO)
-void GraphicsContext::fillRectWithRoundedHole(const IntRect& rect, const FloatRoundedRect& roundedHoleRect, const Color& color, ColorSpace colorSpace)
+void GraphicsContext::fillRectWithRoundedHole(const FloatRect& rect, const FloatRoundedRect& roundedHoleRect, const Color& color, ColorSpace colorSpace)
 {
     if (paintingDisabled())
         return;

@@ -24,8 +24,10 @@
 
 #include "FontPlatformData.h"
 #include "SharedBuffer.h"
+#if USE(CAIRO)
 #include <cairo-ft.h>
 #include <cairo.h>
+#endif
 
 namespace WebCore {
 

@@ -1,0 +1,66 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Blending mode test</title>
+    <script type="application/x-javascript">
+      var blendingModes = [
+        'normal',
+        'multiply',
+        'screen',
+        'overlay',
+        'darken',
+        'lighten',
+        'color-dodge',
+        'color-burn',
+        'hard-light',
+        'soft-light',
+        'difference',
+        'exclusion',
+        'hue',
+        'saturation',
+        'color',
+        'luminosity'
+        ];
+      function draw(){
+        for (i = 0; i < blendingModes.length; ++i){
+          var name = document.createTextNode(blendingModes[i]);
+          document.getElementById('name' + i).appendChild(name);
+          var context = document.getElementById('canvas' + i).getContext('2d');
+          context.fillStyle = "rgba(0, 0, 255, 0.5)"
+          context.fillRect(5, 5, 115, 115);
+          context.globalCompositeOperation = blendingModes[i];
+          context.fillStyle = "rgba(255, 0, 0, 0.5)";
+          context.beginPath();
+          context.arc(125, 125 ,70, 0, Math.PI * 2, false);
+          context.fill();
+          context.fillStyle = "rgba(0, 255, 0, 0.5)";
+          context.beginPath();
+          context.arc(140, 60, 50, 0, Math.PI * 2, false);
+          context.fill();
+        }
+      }
+    </script>
+
+  </head>
+  <body onload="draw();">
+    <h1>Blending mode test</h1>
+    <div>
+      <table border="1">
+        <tr><td><p>canvas</p></td><td><p>reference image<br>rendered with Chromium</p></td><td><p>blending mode</p></td></tr>
+        <tr><td><canvas id="canvas0" width="200" height="200"></canvas></td><td><img src="shape_normal.png"></td><td><nameel id="name0"></nameel></td></tr>
+        <tr><td><canvas id="canvas1" width="200" height="200"></canvas></td><td><img src="shape_multiply.png"></td><td><nameel id="name1"></nameel></td></tr>
+        <tr><td><canvas id="canvas2" width="200" height="200"></canvas></td><td><img src="shape_screen.png"></td><td><nameel id="name2"></nameel></td></tr>
+        <tr><td><canvas id="canvas3" width="200" height="200"></canvas></td><td><img src="shape_overlay.png"></td><td><nameel id="name3"></nameel></td></tr>
+        <tr><td><canvas id="canvas4" width="200" height="200"></canvas></td><td><img src="shape_darken.png"></td><td><nameel id="name4"></nameel></td></tr>
+        <tr><td><canvas id="canvas5" width="200" height="200"></canvas></td><td><img src="shape_lighten.png"></td><td><nameel id="name5"></nameel></td></tr>
+        <tr><td><canvas id="canvas6" width="200" height="200"></canvas></td><td><img src="shape_color-dodge.png"></td><td><nameel id="name6"></nameel></td></tr>
+        <tr><td><canvas id="canvas7" width="200" height="200"></canvas></td><td><img src="shape_color-burn.png"></td><td><nameel id="name7"></nameel></td></tr>
+        <tr><td><canvas id="canvas8" width="200" height="200"></canvas></td><td><img src="shape_hard-light.png"></td><td><nameel id="name8"></nameel></td></tr>
+        <tr><td><canvas id="canvas9" width="200" height="200"></canvas></td><td><img src="shape_soft-light.png"></td><td><nameel id="name9"></nameel></td></tr>
+        <tr><td><canvas id="canvas10" width="200" height="200"></canvas></td><td><img src="shape_difference.png"></td><td><nameel id="name10"></nameel></td></tr>
+        <tr><td><canvas id="canvas11" width="200" height="200"></canvas></td><td><img src="shape_exclusion.png"></td><td><nameel id="name11"></nameel></td></tr>
+        <tr><td><canvas id="canvas12" width="200" height="200"></canvas></td><td><img src="shape_hue.png"></td><td><nameel id="name12"></nameel></td></tr>
+        <tr><td><canvas id="canvas13" width="200" height="200"></canvas></td><td><img src="shape_saturation.png"></td><td><nameel id="name13"></nameel></td></tr>
+        <tr><td><canvas id="canvas14" width="200" height="200"></canvas></td><td><img src="shape_color.png"></td><td><nameel id="name14"></nameel></td></tr>
+        <tr><td><canvas id="canvas15" width="200" height="200"></canvas></td><td><img src="shape_luminosity.png"></td><td><nameel id="name15"></nameel></td></tr>
+      </table>
+    </div>
+</body></html>

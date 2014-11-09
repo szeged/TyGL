@@ -28,7 +28,9 @@
 #include "WKEinaSharedString.h"
 #include "WKRetainPtr.h"
 #include "WebViewEfl.h"
+#if USE(CAIRO)
 #include <WebCore/RefPtrCairo.h>
+#endif
 #include <WebCore/TextDirection.h>
 #include <WebCore/Timer.h>
 #include <WebKit/WKBase.h>
@@ -42,7 +44,9 @@
 #include <Ecore_X.h>
 #endif
 
+#if USE(CAIRO)
 typedef struct _cairo_surface cairo_surface_t;
+#endif
 
 namespace WebKit {
 class ContextMenuClientEfl;
@@ -186,7 +190,9 @@ public:
     // FIXME: needs refactoring (split callback invoke)
     void informURLChange();
 
+#if USE(CAIRO)
     PassRefPtr<cairo_surface_t> takeSnapshot();
+#endif
     bool scrollBy(const WebCore::IntSize&);
 
     void setBackgroundColor(int red, int green, int blue, int alpha);

@@ -21,6 +21,12 @@
 #include "config.h"
 #include "EwkView.h"
 
+#if USE(TYGL)
+#include "TyGLDefs.h"
+#else
+#include <Evas_GL.h>
+#endif
+
 #include "ContextMenuClientEfl.h"
 #include "EflScreenUtilities.h"
 #include "EvasGLContext.h"
@@ -65,12 +71,16 @@
 #include "ewk_window_features_private.h"
 #include <Ecore_Evas.h>
 #include <Edje.h>
-#include <Evas_GL.h>
-#include <WebCore/CairoUtilitiesEfl.h>
 #include <WebCore/Cursor.h>
 #include <WebCore/NotImplemented.h>
+#if USE(TYGL)
+#include <WebCore/PlatformContextTyGL.h>
+#include <WebKit/WKImageTyGL.h>
+#else
+#include <WebCore/CairoUtilitiesEfl.h>
 #include <WebCore/PlatformContextCairo.h>
 #include <WebKit/WKImageCairo.h>
+#endif
 #include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 
@@ -546,6 +556,7 @@ void EwkView::displayTimerFired(Timer<EwkView>*)
         m_pendingSurfaceResize = false;
     }
 
+#if USE(CAIRO)
     if (!m_isAccelerated) {
         RefPtr<cairo_surface_t> surface = createSurfaceForImage(sd->image);
         if (!surface)
@@ -555,6 +566,7 @@ void EwkView::displayTimerFired(Timer<EwkView>*)
         evas_object_image_data_update_add(sd->image, 0, 0, sd->view.w, sd->view.h);
         return;
     }
+#endif
 
     evas_gl_make_current(m_evasGL.get(), m_evasGLSurface->surface(), m_evasGLContext->context());
 
@@ -1348,6 +1360,7 @@ void EwkView::handleFaviconChanged(const char* pageURL, void* eventInfo)
         return;
 }
 
+#if USE(CAIRO)
 PassRefPtr<cairo_surface_t> EwkView::takeSnapshot()
 {
     // Suspend all animations before taking the snapshot.
@@ -1372,6 +1385,7 @@ PassRefPtr<cairo_surface_t> EwkView::takeSnapshot()
 
     return snapshot.release();
 }
+#endif
 
 void EwkView::didFindZoomableArea(const WKPoint& point, const WKRect& area)
 {

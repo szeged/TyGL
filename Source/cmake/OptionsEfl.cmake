@@ -36,7 +36,6 @@ set(WTF_USE_UDIS86 1)
 
 add_definitions(-DWTF_USE_GLIB=1)
 add_definitions(-DWTF_USE_SOUP=1)
-add_definitions(-DWTF_USE_CAIRO=1)
 add_definitions(-DWTF_USE_CROSS_PLATFORM_CONTEXT_MENUS=1)
 
 set(WTF_LIBRARY_TYPE STATIC)
@@ -182,6 +181,15 @@ if (ENABLE_GEOLOCATION)
     endif ()
 endif ()
 
+if (WTF_USE_TYGL)
+    set(ENABLE_EGL 1)
+    set(ENABLE_GLES2 1)
+    add_definitions(-DWTF_USE_TYGL=1)
+else ()
+    find_package(Cairo 1.10.2 REQUIRED)
+    add_definitions(-DWTF_USE_CAIRO=1)
+endif ()
+
 if (ENABLE_NETSCAPE_PLUGIN_API)
     set(ENABLE_PLUGIN_PROCESS 1)
 endif ()
@@ -230,7 +238,7 @@ add_definitions(-DENABLE_3D_RENDERING=1)
 
 add_definitions(-DWTF_USE_GRAPHICS_SURFACE=1)
 
-option(ENABLE_GLES2 "Enable GLES Support")
+option(ENABLE_GLES2 "Enable GLES Support" ON)
 if (ENABLE_GLES2)
     find_package(GLES REQUIRED)
 
@@ -243,7 +251,7 @@ else ()
     add_definitions(-DWTF_USE_OPENGL=1)
 endif ()
 
-option(ENABLE_EGL "Enable EGL Support")
+option(ENABLE_EGL "Enable EGL Support" ON)
 if (ENABLE_EGL)
     find_package(EGL REQUIRED)
     set(WTF_USE_EGL 1)

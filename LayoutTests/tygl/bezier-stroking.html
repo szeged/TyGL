@@ -1,0 +1,206 @@
+<html>
+<body>
+<canvas width="876" height="1024" id='testcanvas'/>
+<script>
+
+var testWidth = 250;
+var testHeight = 200;
+var testIndex = 0;
+var lastTranslateX = 0;
+var lastTranslateY = 0;
+
+function strokeBaseLine(ctx)
+{
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "red";
+    ctx.lineCap = "butt";
+    ctx.stroke();
+}
+
+function getContextForTest()
+{
+    var canvas = document.getElementById("testcanvas");
+    var ctx = canvas.getContext("2d");
+
+    var numTestsPerRow = Math.floor(canvas.width / testWidth);
+    var testX = (testIndex % numTestsPerRow) * testWidth;
+    var testY = Math.floor(testIndex / numTestsPerRow) * testHeight;
+
+    ctx.translate(-lastTranslateX, -lastTranslateY);
+    ctx.translate(testX, testY);
+    lastTranslateX = testX;
+    lastTranslateY = testY;
+    ctx.fillStyle='red';
+    testIndex++;
+    return ctx;
+}
+
+function testNormalBezier()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("Normal", 80, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "butt";
+
+    ctx.beginPath();
+    ctx.moveTo(50, 150);
+    ctx.bezierCurveTo(50, 50, 150, 50, 150, 150);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+function testNormalBezierWithRoundJoinAndCap()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("RoundJoinAndCap", 30, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    ctx.beginPath();
+    ctx.moveTo(80, 100);
+    ctx.lineTo(30, 130);
+    ctx.bezierCurveTo(30, 30, 130, 30, 130, 130);
+    ctx.lineTo(130, 30);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+function testBezierCornerCaseCollinear1()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("Collinear1", 70, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "miter";
+
+    ctx.beginPath();
+    ctx.moveTo(100, 50);
+    ctx.bezierCurveTo(50, 50, 150, 50, 100, 50);
+    ctx.moveTo(100, 100);
+    ctx.bezierCurveTo(50, 80, 150, 120, 100, 100);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+
+}
+
+function testBezierCornerCaseCollinear2()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("Collinear2", 70, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "miter";
+
+    ctx.beginPath();
+    ctx.moveTo(100, 50);
+    ctx.bezierCurveTo(50, 50, 150, 50, 50, 50);
+    ctx.moveTo(50, 100);
+    ctx.bezierCurveTo(50, 100, 100, 150, 50, 100);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+
+}
+
+function testBezierCornerCaseBrokenCurve1()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("BrokenCurve1", 50, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "miter";
+
+    ctx.beginPath();
+    ctx.moveTo(20, 50);
+    ctx.bezierCurveTo(220, 150, 120, 150, 120, 50);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+function testBezierCornerCaseBrokenCurve2()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("BrokenCurve2", 70, testHeight - 20);
+
+    ctx.lineWidth = 120;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "miter";
+
+    ctx.beginPath();
+    ctx.moveTo(54, 70);
+    ctx.bezierCurveTo(94, 90, 74, 90, 74, 70);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+function testBezierCornerCaseBigThickness1()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("BigThickness1", 180, testHeight + 10);
+
+    ctx.lineWidth = 150;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "butt";
+
+    ctx.beginPath();
+    ctx.moveTo(150, 175);
+    ctx.bezierCurveTo(150, 75, 250, 75, 250, 140);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+function testBezierCornerCaseBigThickness2()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("BigThickness2", 180, testHeight + 10);
+
+    ctx.lineWidth = 150;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "butt";
+
+    ctx.beginPath();
+    ctx.moveTo(180, 150);
+    ctx.bezierCurveTo(180, 100, 230, 100, 230, 150);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+testNormalBezier();
+testNormalBezierWithRoundJoinAndCap();
+testBezierCornerCaseCollinear1();
+testBezierCornerCaseCollinear2();
+testBezierCornerCaseBrokenCurve1();
+testBezierCornerCaseBrokenCurve2();
+testBezierCornerCaseBigThickness1();
+testBezierCornerCaseBigThickness2();
+
+</script>
+</body>
+</html>

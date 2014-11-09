@@ -1,0 +1,152 @@
+<html>
+<body>
+<canvas width="876" height="1024" id='testcanvas'/>
+<script>
+
+var testWidth = 250;
+var testHeight = 200;
+var testIndex = 0;
+var lastTranslateX = 0;
+var lastTranslateY = 0;
+
+function strokeBaseLine(ctx)
+{
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "red";
+    ctx.lineCap = "butt";
+    ctx.stroke();
+}
+
+function getContextForTest()
+{
+    var canvas = document.getElementById("testcanvas");
+    var ctx = canvas.getContext("2d");
+
+    var numTestsPerRow = Math.floor(canvas.width / testWidth);
+    var testX = (testIndex % numTestsPerRow) * testWidth;
+    var testY = Math.floor(testIndex / numTestsPerRow) * testHeight;
+
+    ctx.translate(-lastTranslateX, -lastTranslateY);
+    ctx.translate(testX, testY);
+    lastTranslateX = testX;
+    lastTranslateY = testY;
+    ctx.fillStyle='red';
+    testIndex++;
+    return ctx;
+}
+
+function testNormalLine()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("Normal", 80, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "butt";
+
+    ctx.beginPath();
+    ctx.moveTo(50, 50);
+    ctx.lineTo(150, 50);
+    ctx.lineTo(50, 100);
+    ctx.lineTo(60, 90);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+function tyglPath(ctx)
+{
+    ctx.beginPath();
+    ctx.moveTo(20, 20);
+    ctx.lineTo(70, 20);
+    ctx.lineTo(45, 20);
+    ctx.lineTo(45, 70);
+    ctx.moveTo(100, 30);
+    ctx.lineTo(115, 50);
+    ctx.lineTo(130, 30);
+    ctx.lineTo(110, 70);
+    ctx.moveTo(70, 100);
+    ctx.lineTo(65, 95);
+    ctx.lineTo(30, 95);
+    ctx.lineTo(25, 105);
+    ctx.lineTo(25, 140);
+    ctx.lineTo(30, 145);
+    ctx.lineTo(70, 145);
+    ctx.lineTo(70, 125);
+    ctx.lineTo(65, 125);
+    ctx.lineTo(73, 125);
+    ctx.moveTo(100, 95);
+    ctx.lineTo(100, 145);
+    ctx.lineTo(140, 145);
+    ctx.lineTo(140, 140);
+}
+
+function testNormalLineRoundCapJoin()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("RoundCapJoin", 50, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    tyglPath(ctx);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+function testNormalLineSquareCapMiterJoin()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("SquareCapMiterJoin", 30, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "square";
+    ctx.lineJoin = "miter";
+
+    tyglPath(ctx);
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+function testEmptyCloseSquare()
+{
+    var ctx = getContextForTest();
+    ctx.fillStyle = "black";
+    ctx.fillText("EmptyCloseSquare", 40, testHeight - 20);
+
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "black";
+    ctx.lineCap = "square";
+    ctx.lineJoin = "miter";
+
+    ctx.beginPath();
+    ctx.moveTo(20, 30);
+
+    ctx.moveTo(50, 30);
+    ctx.lineTo(50, 30);
+    ctx.moveTo(80, 30);
+    ctx.closePath();
+    ctx.moveTo(120, 30);
+    ctx.lineTo(120, 30);
+    ctx.closePath();
+    ctx.stroke();
+
+    strokeBaseLine(ctx);
+}
+
+testNormalLine();
+testNormalLineRoundCapJoin();
+testNormalLineSquareCapMiterJoin();
+testEmptyCloseSquare();
+
+</script>
+</body>
+</html>

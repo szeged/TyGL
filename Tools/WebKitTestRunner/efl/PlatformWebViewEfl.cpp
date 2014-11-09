@@ -25,10 +25,15 @@
 #include "EWebKit2.h"
 #include "WebKit/WKAPICast.h"
 #include <Ecore_Evas.h>
+#include <WebKit/WKViewEfl.h>
+
+#if USE(TYGL)
+#include <WebKit/WKImageTyGL.h>
+#else
 #include <WebCore/RefPtrCairo.h>
 #include <WebKit/WKImageCairo.h>
-#include <WebKit/WKViewEfl.h>
 #include <cairo.h>
+#endif
 
 using namespace WebKit;
 

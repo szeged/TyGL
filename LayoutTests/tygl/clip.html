@@ -1,0 +1,36 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+  </head>
+  <body>
+    <canvas id="myCanvas" width="1024" height="500"></canvas>
+    <script>
+        var canvas = document.getElementById('myCanvas');
+        var context = canvas.getContext('2d');
+
+        context.save();
+        context.beginPath();
+        context.moveTo(50, 50);
+        context.quadraticCurveTo(300, 250, 400, 500);
+        context.lineTo(0, 500);
+        context.quadraticCurveTo(100, 250, 50, 50);
+        context.clip();
+
+        context.fillStyle="rgba(0, 0, 255, 1.0)";
+        context.fillRect(0, 0, 500, 500);
+
+        context.beginPath();
+        context.moveTo(70, 700);
+        context.lineTo(300, 200);
+        context.lineTo(70, 70);
+        context.quadraticCurveTo(-100, 350, 70, 700);
+        context.closePath();
+        context.clip();
+
+        context.fillStyle="rgba(255, 0, 0, 1.0)";
+        context.fillRect(50, 50, 400, 400);
+
+        context.restore();
+    </script>
+  </body>
+</html>

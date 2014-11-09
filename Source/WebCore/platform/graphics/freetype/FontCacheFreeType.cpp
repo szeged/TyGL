@@ -23,12 +23,16 @@
 #include "FontCache.h"
 
 #include "Font.h"
-#include "OwnPtrCairo.h"
-#include "RefPtrCairo.h"
 #include "SimpleFontData.h"
 #include "UTF16UChar32Iterator.h"
+
+#if USE(CAIRO)
+#include "OwnPtrCairo.h"
+#include "RefPtrCairo.h"
 #include <cairo-ft.h>
 #include <cairo.h>
+#endif
+
 #include <fontconfig/fcfreetype.h>
 #include <wtf/Assertions.h>
 #include <wtf/text/CString.h>

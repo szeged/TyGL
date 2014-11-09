@@ -26,7 +26,7 @@
 #ifndef EGLSurface_h
 #define EGLSurface_h
 
-#if USE(EGL) && USE(GRAPHICS_SURFACE)
+#if USE(EGL) && (USE(GRAPHICS_SURFACE) || USE(TYGL))
 
 #include "GLTransportSurface.h"
 
@@ -58,6 +58,9 @@ public:
     virtual PlatformSurfaceConfig configuration() override;
     virtual void destroy() override;
     virtual GLPlatformSurface::SurfaceAttributes attributes() const override;
+#if USE(TYGL)
+    EGLConfigSelector* configSelector() const { return m_configSelector.get(); }
+#endif
 
 protected:
     EGLOffScreenSurface(SurfaceAttributes);

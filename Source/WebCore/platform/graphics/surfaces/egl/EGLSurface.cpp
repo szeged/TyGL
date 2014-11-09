@@ -26,7 +26,7 @@
 #include "config.h"
 #include "EGLSurface.h"
 
-#if USE(EGL) && USE(GRAPHICS_SURFACE)
+#if USE(EGL) && (USE(GRAPHICS_SURFACE) || USE(TYGL))
 
 #include "EGLConfigSelector.h"
 #include "EGLHelper.h"

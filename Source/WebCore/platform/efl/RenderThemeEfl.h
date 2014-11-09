@@ -32,8 +32,11 @@
 
 #include "RenderTheme.h"
 
-#include <Eina.h>
+#if USE(CAIRO)
 #include <cairo.h>
+#endif
+
+#include <Eina.h>
 #include <wtf/efl/UniquePtrEfl.h>
 
 namespace WebCore {
@@ -228,7 +231,9 @@ private:
 
         ALWAYS_INLINE Ecore_Evas* canvas() { return m_canvas.get(); }
         ALWAYS_INLINE Evas_Object* edje() { return m_edje.get(); }
+#if USE(CAIRO)
         ALWAYS_INLINE cairo_surface_t* surface() { return m_surface.get(); }
+#endif
 
         FormType type;
         IntSize size;
@@ -237,7 +242,9 @@ private:
         // Order so that the canvas gets destroyed at last.
         EflUniquePtr<Ecore_Evas> m_canvas;
         EflUniquePtr<Evas_Object> m_edje;
+#if USE(CAIRO)
         RefPtr<cairo_surface_t> m_surface;
+#endif
     };
 
     struct ThemePartDesc m_partDescs[FormTypeLast];

@@ -30,21 +30,35 @@
 #include "FontDescription.h"
 #include "FontOrientation.h"
 #include "GlyphBuffer.h"
-#include "HarfBuzzFace.h"
 #include "OpenTypeVerticalData.h"
+
+#if USE(HARFBUZZ)
+#include "HarfBuzzFace.h"
+class HarfBuzzFace;
+#endif
+
+#if USE(CAIRO)
 #include "RefPtrCairo.h"
+typedef cairo_scaled_font_t scaled_font;
+#elif USE(TYGL)
+#include "ScaledFontTyGL.h"
+#include "TextureFontTyGL.h"
+#include <fontconfig/fontconfig.h>
+#include <fontconfig/fcfreetype.h>
+typedef WebCore::ScaledFont scaled_font;
+#endif
+
 #include "SharedBuffer.h"
 #include <wtf/Forward.h>
 #include <wtf/HashFunctions.h>
 
 typedef struct _FcFontSet FcFontSet;
-class HarfBuzzFace;
 
 namespace WebCore {
 
 class FontPlatformData {
 public:
-    FontPlatformData(WTF::HashTableDeletedValueType)
+    FontPlatformData(WTF::HashTableDeletedValueType hashTableDeletedValue)
         : m_fallbacks(0)
         , m_size(0)
         , m_syntheticBold(false)
@@ -63,14 +77,20 @@ public:
         { }
 
     FontPlatformData(FcPattern*, const FontDescription&);
+#if USE(CAIRO)
     FontPlatformData(cairo_font_face_t*, float size, bool bold, bool italic, FontOrientation);
+#elif USE(TYGL)
+    FontPlatformData(FT_Face fontFace, float size, bool bold, bool italic, FontOrientation);
+#endif
     FontPlatformData(float size, bool bold, bool italic);
     FontPlatformData(const FontPlatformData&);
     FontPlatformData(const FontPlatformData&, float size);
 
     ~FontPlatformData();
 
+#if USE(HARFBUZZ)
     HarfBuzzFace* harfBuzzFace() const;
+#endif
 
     bool isFixedPitch();
     float size() const { return m_size; }
@@ -84,11 +104,19 @@ public:
     PassRefPtr<SharedBuffer> openTypeTable(uint32_t table) const;
     PassRefPtr<OpenTypeVerticalData> verticalData() const;
 
+#if USE(CAIRO)
     cairo_scaled_font_t* scaledFont() const { return m_scaledFont; }
+#elif USE(TYGL)
+    scaled_font* scaledFont() const { return m_scaledFont.get(); }
+#endif
 
     unsigned hash() const
     {
-        return PtrHash<cairo_scaled_font_t*>::hash(m_scaledFont);
+#if USE(TYGL)
+        return FcPatternHash(m_pattern.get());
+#else
+        return PtrHash<scaled_font*>::hash(scaledFont());
+#endif
     }
 
     bool operator==(const FontPlatformData&) const;
@@ -108,15 +136,38 @@ public:
     bool m_syntheticBold;
     bool m_syntheticOblique;
     bool m_fixedWidth;
+#if USE(CAIRO)
     cairo_scaled_font_t* m_scaledFont;
+#elif USE(TYGL)
+    RefPtr<scaled_font> m_scaledFont;
+#endif
+
+#if USE(HARFBUZZ)
     mutable RefPtr<HarfBuzzFace> m_harfBuzzFace;
+#endif
+#if USE(TYGL)
+    TyGL::TextureFont* textureFont() const { return m_textureFont.get(); }
+    TyGL::AffineTransform* horizontalOrientationTransform() { return &m_horizontalOrientationTransform; }
+#endif
 
 private:
+#if USE(CAIRO)
     void initializeWithFontFace(cairo_font_face_t*, const FontDescription& = FontDescription());
-    static cairo_scaled_font_t* hashTableDeletedFontValue() { return reinterpret_cast<cairo_scaled_font_t*>(-1); }
+#elif USE(TYGL)
+    void initializeWithFontFace(FT_Face, const FontDescription& = FontDescription());
+#endif
+    static scaled_font* hashTableDeletedFontValue() { return reinterpret_cast<scaled_font*>(-1); }
 
     FontOrientation m_orientation;
+#if USE(CAIRO)
     cairo_matrix_t m_horizontalOrientationMatrix;
+#endif
+
+#if USE(TYGL)
+    mutable RefPtr<TyGL::TextureFont> m_textureFont;
+    TyGL::AffineTransform m_horizontalOrientationTransform;
+    FloatPoint m_horizontalNormalisedTranslationVector;
+#endif
 };
 
 }

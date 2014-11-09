@@ -40,7 +40,7 @@ typedef CGPatternRef PlatformPatternPtr;
 #elif USE(CAIRO)
 #include <cairo.h>
 typedef cairo_pattern_t* PlatformPatternPtr;
-#elif USE(WINGDI)
+#elif USE(TYGL) || USE(WINGDI)
 typedef void* PlatformPatternPtr;
 #endif
 

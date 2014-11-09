@@ -1,0 +1,60 @@
+<html>
+<body>
+<canvas width=1024 height=1024 id='mycanvas'></canvas>
+<script>
+var testWidth = 300;
+var testHeight = 300;
+var testIndex = 0;
+var lastTranslateX = 0;
+var lastTranslateY = 0;
+function getContextForTest()
+{
+    var canvas = document.getElementById('mycanvas');
+    var ctx = canvas.getContext("2d");
+    var numTestsPerRow = Math.floor(canvas.width / testWidth);
+    var testX = (testIndex % numTestsPerRow) * testWidth;
+    var testY = Math.floor(testIndex / numTestsPerRow) * testHeight;
+
+    ctx.translate(-lastTranslateX, -lastTranslateY);
+    ctx.translate(testX, testY);
+    lastTranslateX = testX;
+    lastTranslateY = testY;
+    ctx.fillStyle='red';
+    testIndex++;
+    return ctx;
+}
+
+function testGetAndPutImageData()
+{
+    var ctx = getContextForTest();
+    ctx.fillRect(10,10,50,50);
+    ctx.fillStyle="blue";
+    ctx.fillRect(20,20,50,50);
+
+    var imgData=ctx.getImageData(10,10,70,100);
+    ctx.putImageData(imgData,10,80);
+}
+
+function testToDataURL()
+{
+    var ctx = getContextForTest();
+    var canvas = document.getElementById('mycanvas');
+
+    ctx.fillRect(10,10,50,50);
+    ctx.fillStyle="green";
+    ctx.fillRect(40,40,50,50);
+    ctx.fillStyle="blue";
+    ctx.fillRect(70,70,50,50);
+    var dataURL = canvas.toDataURL();
+
+    ctx.font="14px Georgia";
+    ctx.fillStyle = "black";
+    ctx.fillText("canvas.toDataURL(): "+dataURL,10,160);
+    ctx.fillText("dataURL.length: "+dataURL.length,10,175);
+}
+
+testGetAndPutImageData();
+testToDataURL();
+</script>
+</body>
+</html>

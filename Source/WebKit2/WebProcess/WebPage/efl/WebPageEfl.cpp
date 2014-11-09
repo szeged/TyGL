@@ -43,8 +43,11 @@
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/Page.h>
 #include <WebCore/PlatformKeyboardEvent.h>
-#include <WebCore/RenderThemeEfl.h>
 #include <WebCore/Settings.h>
+
+#if !USE(TYGL)
+#include <WebCore/RenderThemeEfl.h>
+#endif
 
 #if HAVE(ACCESSIBILITY)
 #include "WebPageAccessibilityObject.h"
@@ -170,8 +173,10 @@ const char* WebPage::interpretKeyEvent(const KeyboardEvent* event)
 
 void WebPage::setThemePath(const String& themePath)
 {
+#if !USE(TYGL)
     WebCore::RenderThemeEfl& theme = static_cast<WebCore::RenderThemeEfl&>(m_page->theme());
     theme.setThemePath(themePath);
+#endif
 }
 
 static Frame* targetFrameForEditing(WebPage* page)

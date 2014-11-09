@@ -29,11 +29,13 @@
 #include "config.h"
 #include "Image.h"
 
-#include "BitmapImage.h"
+#if USE(CAIRO)
 #include "CairoUtilitiesEfl.h"
+#include <cairo.h>
+#endif
+#include "BitmapImage.h"
 #include "SharedBuffer.h"
 
-#include <cairo.h>
 #include <wtf/text/StringConcatenate.h>
 
 namespace WebCore {
@@ -65,8 +67,12 @@ PassRefPtr<Image> Image::loadPlatformResource(const char* name)
 
 Evas_Object* BitmapImage::getEvasObject(Evas* evas)
 {
+#if !USE(TYGL)
     RefPtr<cairo_surface_t> surface = nativeImageForCurrentFrame();
     return surface ? evasObjectFromCairoImageSurface(evas, surface.get()).release() : nullptr;
+#else
+    return nullptr;
+#endif
 }
 
 }

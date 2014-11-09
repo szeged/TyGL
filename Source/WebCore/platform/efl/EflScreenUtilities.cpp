@@ -125,6 +125,14 @@ void applyCursorFromEcoreX(Ecore_X_Window window, const char* cursorString)
 
 Ecore_X_Cursor createCustomCursor(Ecore_X_Window window, Image* image, const IntSize& cursorSize, const IntPoint& hotSpot)
 {
+#if  USE(TYGL)
+    RefPtr<NativeImageTyGL> surface = image->nativeImageForCurrentFrame();
+    if (!surface)
+        return 0;
+
+    // FIXME: read buffer not implemented!
+    return 0;
+#else
     RefPtr<cairo_surface_t> surface = image->nativeImageForCurrentFrame();
     if (!surface)
         return 0;
@@ -132,6 +140,7 @@ Ecore_X_Cursor createCustomCursor(Ecore_X_Window window, Image* image, const Int
     unsigned char* buffer = cairo_image_surface_get_data(surface.get());
 
     return ecore_x_cursor_new(window, (int*)(buffer), cursorSize.width(), cursorSize.height(), hotSpot.x(), hotSpot.y());
+#endif
 }
 
 Ecore_X_Window getEcoreXWindow(Ecore_Evas* ecoreEvas)

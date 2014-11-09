@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010 Apple Inc.
+ * Copyright (C) 2013 University of Szeged
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,15 +43,24 @@ ShareableBitmap::Handle::Handle()
 
 void ShareableBitmap::Handle::encode(IPC::ArgumentEncoder& encoder) const
 {
+#if USE(TYGL)
+    encoder << m_imageHandle;
+#else
     encoder << m_handle;
+#endif
     encoder << m_size;
     encoder << m_flags;
 }
 
 bool ShareableBitmap::Handle::decode(IPC::ArgumentDecoder& decoder, Handle& handle)
 {
+#if USE(TYGL)
+    if (!decoder.decode(handle.m_imageHandle))
+        return false;
+#else
     if (!decoder.decode(handle.m_handle))
         return false;
+#endif
     if (!decoder.decode(handle.m_size))
         return false;
     if (!decoder.decode(handle.m_flags))
@@ -57,15 +68,20 @@ bool ShareableBitmap::Handle::decode(IPC::ArgumentDecoder& decoder, Handle& hand
     return true;
 }
 
+#if !USE(TYGL)
 void ShareableBitmap::Handle::clear()
 {
     m_handle.clear();
     m_size = IntSize();
     m_flags = Flag::NoFlags;
 }
+#endif
 
 PassRefPtr<ShareableBitmap> ShareableBitmap::create(const IntSize& size, Flags flags)
 {
+#if USE(TYGL)
+    return adoptRef(new ShareableBitmap(size, flags, WebCore::NativeImageTyGL::create(size.width(), size.height())));
+#else
     size_t numBytes = numBytesForSize(size);
     
     void* data = 0;
@@ -73,10 +89,14 @@ PassRefPtr<ShareableBitmap> ShareableBitmap::create(const IntSize& size, Flags f
         return nullptr;
 
     return adoptRef(new ShareableBitmap(size, flags, data));
+#endif
 }
 
 PassRefPtr<ShareableBitmap> ShareableBitmap::createShareable(const IntSize& size, Flags flags)
 {
+#if USE(TYGL)
+    return adoptRef(new ShareableBitmap(size, flags, WebCore::NativeImageTyGL::createShared(size)));
+#else
     size_t numBytes = numBytesForSize(size);
 
     RefPtr<SharedMemory> sharedMemory = SharedMemory::create(numBytes);
@@ -84,8 +104,10 @@ PassRefPtr<ShareableBitmap> ShareableBitmap::createShareable(const IntSize& size
         return nullptr;
 
     return adoptRef(new ShareableBitmap(size, flags, sharedMemory));
+#endif
 }
 
+#if !USE(TYGL)
 PassRefPtr<ShareableBitmap> ShareableBitmap::create(const IntSize& size, Flags flags, PassRefPtr<SharedMemory> sharedMemory)
 {
     ASSERT(sharedMemory);
@@ -95,28 +117,47 @@ PassRefPtr<ShareableBitmap> ShareableBitmap::create(const IntSize& size, Flags f
     
     return adoptRef(new ShareableBitmap(size, flags, sharedMemory));
 }
+#endif
 
 PassRefPtr<ShareableBitmap> ShareableBitmap::create(const Handle& handle, SharedMemory::Protection protection)
 {
+#if USE(TYGL)
+    return adoptRef(new ShareableBitmap(handle.m_size, handle.m_flags,
+        WebCore::NativeImageTyGL::createShared(handle.m_size, handle.m_imageHandle)));
+#else
     // Create the shared memory.
     RefPtr<SharedMemory> sharedMemory = SharedMemory::create(handle.m_handle, protection);
     if (!sharedMemory)
         return nullptr;
 
     return create(handle.m_size, handle.m_flags, sharedMemory.release());
+#endif
 }
 
 bool ShareableBitmap::createHandle(Handle& handle, SharedMemory::Protection protection)
 {
     ASSERT(isBackedBySharedMemory());
 
+#if USE(TYGL)
+    handle.m_imageHandle = m_sharedImage->sharedImageHandle();
+#else
     if (!m_sharedMemory->createHandle(handle.m_handle, protection))
         return false;
+#endif
     handle.m_size = m_size;
     handle.m_flags = m_flags;
     return true;
 }
 
+#if USE(TYGL)
+ShareableBitmap::ShareableBitmap(const IntSize& size, Flags flags, PassRefPtr<NativeImageTyGL> nativeImage)
+    : m_size(size)
+    , m_flags(flags)
+    , m_data(0)
+    , m_sharedImage(nativeImage)
+{
+}
+#else
 ShareableBitmap::ShareableBitmap(const IntSize& size, Flags flags, void* data)
     : m_size(size)
     , m_flags(flags)
@@ -131,13 +172,18 @@ ShareableBitmap::ShareableBitmap(const IntSize& size, Flags flags, PassRefPtr<Sh
     , m_data(0)
 {
 }
+#endif
+
 
 ShareableBitmap::~ShareableBitmap()
 {
+#if !USE(TYGL)
     if (!isBackedBySharedMemory())
         fastFree(m_data);
+#endif
 }
 
+#if !USE(TYGL)
 bool ShareableBitmap::resize(const IntSize& size)
 {
     // We can't resize backing stores that are backed by shared memory.
@@ -169,5 +215,7 @@ void* ShareableBitmap::data() const
     ASSERT(m_data);
     return m_data;
 }
+
+#endif
 
 } // namespace WebKit
