@@ -33,6 +33,11 @@
 #include <Ecore_IMF.h>
 #include <Eina.h>
 #include <Evas.h>
+#if USE(TYGL)
+#include <wtf/tygl/Evas_TyGL.h>
+#else
+#include <Evas_GL.h>
+#endif
 
 namespace WTF {
 

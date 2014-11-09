@@ -28,7 +28,11 @@
 
 #include "IntSize.h"
 
+#if USE(TYGL)
+#include "TyGLDefs.h"
+#else
 #include <Evas_GL.h>
+#endif
 
 namespace WebCore {
 

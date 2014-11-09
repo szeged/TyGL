@@ -132,6 +132,7 @@ my (
     $touchEventsSupport,
     $touchSliderSupport,
     $touchIconLoadingSupport,
+    $tyglSupport,
     $userTimingSupport,
     $vibrationSupport,
     $videoSupport,
@@ -393,6 +394,9 @@ my @features = (
 
     { option => "touch-icon-loading", desc => "Toggle Touch Icon Loading Support",
       define => "ENABLE_TOUCH_ICON_LOADING", default => 0, value => \$touchIconLoadingSupport },
+
+    { option => "tygl", desc => "Toggle TyGL support",
+      define => "WTF_USE_TYGL", default => 0, value => \$tyglSupport },
 
     { option => "user-timing", desc => "Toggle User Timing support",
       define => "ENABLE_USER_TIMING", default => isGtk(), value => \$userTimingSupport },

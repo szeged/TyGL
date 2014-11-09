@@ -26,7 +26,7 @@
 #include "config.h"
 #include "EGLSurface.h"
 
-#if USE(EGL) && USE(GRAPHICS_SURFACE)
+#if USE(EGL) && (USE(GRAPHICS_SURFACE) || USE(TYGL))
 
 #include "EGLConfigSelector.h"
 #include "EGLHelper.h"
@@ -130,7 +130,7 @@ EGLOffScreenSurface::EGLOffScreenSurface(SurfaceAttributes surfaceAttributes)
     if (m_sharedDisplay == EGL_NO_DISPLAY)
         return;
 
-    m_configSelector = adoptPtr(new EGLConfigSelector(surfaceAttributes));
+    m_configSelector = std::make_unique<EGLConfigSelector>(surfaceAttributes);
 }
 
 EGLOffScreenSurface::~EGLOffScreenSurface()

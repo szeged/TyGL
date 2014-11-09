@@ -1,0 +1,40 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Blending mode test</title>
+    <script type="application/x-javascript">
+      var blendingModeFirst = [
+        'multiply',
+        'screen',
+        'overlay',
+        ];
+      var blendingModeSecond = [
+        'saturation',
+        'color',
+        'luminosity'
+        ];
+      function draw(){
+        for (i = 0; i < blendingModeFirst.length; ++i){
+          var context = document.getElementById('canvas' + i).getContext('2d');
+          context.fillStyle = "rgba(0, 0, 255, 0.5)"
+          context.fillRect(5, 5, 115, 115);
+          context.globalCompositeOperation = blendingModeFirst[i];
+          context.fillStyle = "rgba(255, 0, 0, 0.5)";
+          context.fillRect(50, 50, 100, 100);
+          context.globalCompositeOperation = blendingModeSecond[i];
+          context.fillStyle = "rgba(0, 255, 0, 0.5)";
+          context.fillRect(100, 25, 75, 75);
+        }
+      }
+    </script>
+
+  </head>
+  <body onload="draw();">
+    <h1>Testing two different blending modes on rects</h1>
+    <div>
+      <table border="1">
+        <tr><td><p>canvas</p></td><td><p>reference image<br>rendered with Chromium</p></td></tr>
+        <tr><td><canvas id="canvas0" width="200" height="200"></canvas></td><td><img src="rects_test1.png"></td></tr>
+        <tr><td><canvas id="canvas1" width="200" height="200"></canvas></td><td><img src="rects_test2.png"></td></tr>
+        <tr><td><canvas id="canvas2" width="200" height="200"></canvas></td><td><img src="rects_test3.png"></td></tr>
+      </table>
+    </div>
+</body></html>

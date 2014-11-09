@@ -35,7 +35,11 @@
 #include "WebContextMenuProxyEfl.h"
 #include "WebPopupMenuListenerEfl.h"
 #include "ewk_context_private.h"
+#if USE(TYGL)
+#include <WebCore/PlatformContextTyGL.h>
+#else
 #include <WebCore/PlatformContextCairo.h>
+#endif
 
 #if ENABLE(FULLSCREEN_API)
 #include "WebFullScreenManagerProxy.h"
@@ -71,6 +75,7 @@ void WebViewEfl::setEwkView(EwkView* ewkView)
     m_ewkView = ewkView;
 }
 
+#if USE(CAIRO)
 void WebViewEfl::paintToCairoSurface(cairo_surface_t* surface)
 {
     CoordinatedGraphicsScene* scene = coordinatedGraphicsScene();
@@ -86,6 +91,7 @@ void WebViewEfl::paintToCairoSurface(cairo_surface_t* surface)
     cairo_set_matrix(context.cr(), &transform);
     scene->paintToGraphicsContext(&context, m_page->pageExtendedBackgroundColor(), m_page->drawsBackground());
 }
+#endif
 
 PassRefPtr<WebPopupMenuProxy> WebViewEfl::createPopupMenuProxy(WebPageProxy* page)
 {

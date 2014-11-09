@@ -1,0 +1,54 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Testing tiling for images that fit into one of WebKit's backing-store tiles.</title>
+    <style type="text/css" media="screen">
+        img {
+            float: left;
+            width: 250px;
+            height: 200px;
+        }
+        img {
+            -webkit-transform: rotate3d(0, 0, 1, 0);
+        }
+        .test {
+            float: left;
+            height: 200px;
+            width: 260px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Offsetting, skewing, rotating, scaling, clipping etc for small background images that fit within one of WebKit's backing-store tiles. -->
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png); background-repeat:    repeat-x repeat-y; -webkit-transform: scale(0.3); ">
+    </div>
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) ; background-repeat:    repeat-x repeat-y; -webkit-transform: rotate(15deg); ">
+    </div>
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) ; background-repeat:    repeat-x repeat-y; -webkit-transform: skew(15deg); ">
+    </div>
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) ; background-repeat:    repeat-x repeat-y; -webkit-transform: skew(15deg) rotate(20deg) scale(0.4)">
+    </div>
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) ; background-repeat:    repeat-x; -webkit-transform: skew(15deg) rotate(20deg) scale(0.4)">
+    </div>
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) ; background-repeat:    repeat-y; -webkit-transform: skew(15deg) rotate(20deg) scale(0.4)">
+    </div>
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) ; background-repeat:    no-repeat; -webkit-transform: skew(15deg) rotate(20deg) scale(0.4)">
+    </div>
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) -30px -50px; background-repeat:    no-repeat; -webkit-transform: skew(15deg) rotate(20deg) scale(0.4)">
+    </div>
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) -30px -50px; background-repeat:    repeat-x repeat-y; -webkit-transform: skew(15deg) rotate(20deg) scale(0.4)">
+    </div>
+</body>
+</html>

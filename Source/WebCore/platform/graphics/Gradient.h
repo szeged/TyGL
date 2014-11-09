@@ -124,7 +124,7 @@ namespace WebCore {
 
         float aspectRatio() const { return m_aspectRatio; }
 
-#if USE(WINGDI)
+#if USE(WINGDI) | USE(TYGL)
         const Vector<ColorStop, 2>& getStops() const;
 #else
         PlatformGradient platformGradient();

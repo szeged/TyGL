@@ -27,13 +27,15 @@
 #include "config.h"
 #include "ewk_favicon_database.h"
 
-#include "WKAPICast.h"
-#include "WKIconDatabase.h"
+#if USE(CAIRO)
 #include "WKIconDatabaseCairo.h"
-#include "WKURL.h"
-#include "ewk_favicon_database_private.h"
 #include <WebCore/CairoUtilitiesEfl.h>
 #include <WebCore/RefPtrCairo.h>
+#endif
+#include "WKAPICast.h"
+#include "WKIconDatabase.h"
+#include "WKURL.h"
+#include "ewk_favicon_database_private.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -71,6 +73,7 @@ void EwkFaviconDatabase::unwatchChanges(Ewk_Favicon_Database_Icon_Change_Cb call
     m_changeListeners.remove(callback);
 }
 
+#if USE(CAIRO)
 PassRefPtr<cairo_surface_t> EwkFaviconDatabase::getIconSurfaceSynchronously(const char* pageURL) const
 {
     WKRetainPtr<WKURLRef> wkPageURL(AdoptWK, WKURLCreateWithUTF8CString(pageURL));
@@ -81,6 +84,7 @@ PassRefPtr<cairo_surface_t> EwkFaviconDatabase::getIconSurfaceSynchronously(cons
 
     return surface.release();
 }
+#endif
 
 void EwkFaviconDatabase::iconDataReadyForPageURL(WKIconDatabaseRef, WKURLRef pageURL, const void* clientInfo)
 {
@@ -99,11 +103,15 @@ Evas_Object* ewk_favicon_database_icon_get(Ewk_Favicon_Database* ewkIconDatabase
     EINA_SAFETY_ON_NULL_RETURN_VAL(pageURL, 0);
     EINA_SAFETY_ON_NULL_RETURN_VAL(evas, 0);
 
+#if USE(CAIRO)
     RefPtr<cairo_surface_t> surface = ewkIconDatabase->getIconSurfaceSynchronously(pageURL);
     if (!surface)
         return 0;
 
     return WebCore::evasObjectFromCairoImageSurface(evas, surface.get()).release();
+#else
+    return nullptr;
+#endif
 }
 
 void ewk_favicon_database_icon_change_callback_add(Ewk_Favicon_Database* ewkIconDatabase, Ewk_Favicon_Database_Icon_Change_Cb callback, void* userData)

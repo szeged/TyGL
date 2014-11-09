@@ -43,7 +43,9 @@ public:
     void setEwkView(EwkView*);
     EwkView* ewkView() { return m_ewkView; }
 
+#if USE(CAIRO)
     void paintToCairoSurface(cairo_surface_t*);
+#endif
     void setThemePath(const String&);
 
 #if ENABLE(TOUCH_EVENTS)

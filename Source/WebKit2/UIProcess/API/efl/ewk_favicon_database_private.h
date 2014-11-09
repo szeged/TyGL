@@ -53,7 +53,9 @@ public:
     explicit EwkFaviconDatabase(WKIconDatabaseRef iconDatabase);
     ~EwkFaviconDatabase();
 
+#if USE(CAIRO)
     PassRefPtr<cairo_surface_t> getIconSurfaceSynchronously(const char* pageURL) const;
+#endif
     void watchChanges(const IconChangeCallbackData& callbackData);
     void unwatchChanges(Ewk_Favicon_Database_Icon_Change_Cb callback);
 

@@ -23,11 +23,13 @@
 #include "config.h"
 #include "TextPainter.h"
 
+#include "Font.h"
 #include "GraphicsContext.h"
 #include "InlineTextBox.h"
 #include "RenderCombineText.h"
 #include "TextPaintStyle.h"
 #include <wtf/NeverDestroyed.h>
+
 
 namespace WebCore {
 

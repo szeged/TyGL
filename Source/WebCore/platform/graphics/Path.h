@@ -46,6 +46,11 @@ namespace WebCore {
     class PlatformPath;
 }
 typedef WebCore::PlatformPath PlatformPath;
+#elif USE(TYGL)
+namespace WebCore { namespace TyGL {
+    class PathData;
+} }
+typedef WebCore::TyGL::PathData PlatformPath;
 #else
 typedef void PlatformPath;
 #endif

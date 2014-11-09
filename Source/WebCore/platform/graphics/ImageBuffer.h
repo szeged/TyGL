@@ -30,6 +30,8 @@
 
 #include "AffineTransform.h"
 #include "ColorSpace.h"
+#include "FloatSize.h"
+#include "FloatRect.h"
 #include "GraphicsTypes.h"
 #include "GraphicsTypes3D.h"
 #include "IntSize.h"

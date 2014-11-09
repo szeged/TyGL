@@ -39,6 +39,11 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/TemporaryChange.h>
 
+#if USE(TYGL)
+// FIXME: This is only a temporary solution.
+#include <EGL/egl.h>
+#endif
+
 // FIXME: Having this in the platform directory is a layering violation. This does not belong here.
 
 namespace WebCore {
@@ -92,6 +97,12 @@ void CompositingCoordinator::sizeDidChange(const IntSize& newSize)
 
 bool CompositingCoordinator::flushPendingLayerChanges()
 {
+#if USE(TYGL)
+    // FIXME: This is only a temporary solution.
+    if (m_isFlushingLayerChanges)
+        return false;
+#endif
+
     TemporaryChange<bool> protector(m_isFlushingLayerChanges, true);
 
     initializeRootCompositingLayerIfNeeded();
@@ -107,6 +118,11 @@ bool CompositingCoordinator::flushPendingLayerChanges()
     flushPendingImageBackingChanges();
 
     if (m_shouldSyncFrame) {
+#if USE(TYGL)
+        // FIXME: This is also a layering violation. CompositingCoordinator shouldn't need to know about underlying technology.
+        // FIXME: This is only a temporary solution.
+        eglWaitClient();
+#endif
         didSync = true;
 
         if (m_rootCompositingLayer) {

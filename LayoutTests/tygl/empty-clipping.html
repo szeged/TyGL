@@ -1,0 +1,28 @@
+<html>
+  <head>
+    <script>
+      function drawStuff()
+      {
+          var canvas = document.getElementById('canvas');
+          var ctx = canvas.getContext('2d');
+
+          ctx.beginPath();
+          ctx.closePath();
+          ctx.clip();
+
+          ctx.beginPath();
+          ctx.moveTo(55, 55);
+          ctx.lineTo(105, 80);
+          ctx.lineTo(55, 105);
+          ctx.lineTo(5, 80);
+          ctx.closePath();
+          ctx.fill();
+
+      }
+    </script>
+  </head>
+  <body onload="drawStuff()">
+    <canvas id="canvas" width=512px height=512px>
+    </canvas>
+  </body>
+</html>

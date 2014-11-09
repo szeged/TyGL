@@ -279,7 +279,13 @@ void X11Helper::createPixmap(Pixmap* handleId, const EGLint id, bool hasAlpha, c
     int matchingCount = 0;
     OwnPtrX11<XVisualInfo> matchingVisuals(XGetVisualInfo(nativeDisplay(), VisualIDMask, &visualInfoTemplate, &matchingCount));
     XVisualInfo* foundVisual = 0;
+
+#if USE(TYGL)
+    UNUSED_PARAM(hasAlpha);
+    int requiredDepth = 32;
+#else
     int requiredDepth = hasAlpha ? 32 : 24;
+#endif
 
     if (matchingVisuals) {
         for (int i = 0; i< matchingCount; i++) {

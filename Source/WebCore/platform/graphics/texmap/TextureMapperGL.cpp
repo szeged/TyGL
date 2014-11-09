@@ -2,6 +2,7 @@
  Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
  Copyright (C) 2012 Igalia S.L.
  Copyright (C) 2012 Adobe Systems Incorporated
+ Copyright (C) 2013 University of Szeged
 
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Library General Public
@@ -40,6 +41,19 @@
 #include "RefPtrCairo.h"
 #include <cairo.h>
 #include <wtf/text/CString.h>
+#endif
+
+#if USE(TYGL)
+#include "PlatformContextTyGL.h"
+#endif
+
+#if ENABLE(CSS_SHADERS)
+#include "CustomFilterCompiledProgram.h"
+#include "CustomFilterOperation.h"
+#include "CustomFilterProgram.h"
+#include "CustomFilterRenderer.h"
+#include "CustomFilterValidatedProgram.h"
+#include "ValidatedCustomFilterOperation.h"
 #endif
 
 #if !USE(TEXMAP_OPENGL_ES_2)
@@ -716,12 +730,17 @@ static void swizzleBGRAToRGBA(uint32_t* data, const IntRect& rect, int stride = 
 // internal and external formats need to be BGRA
 static bool driverSupportsExternalTextureBGRA(GraphicsContext3D* context)
 {
+#if USE(TYGL)
+    UNUSED_PARAM(context);
+    return false;
+#else
     if (context->isGLES2Compliant()) {
         static bool supportsExternalTextureBGRA = context->getExtensions()->supports("GL_EXT_texture_format_BGRA8888");
         return supportsExternalTextureBGRA;
     }
 
     return true;
+#endif
 }
 
 static bool driverSupportsSubImage(GraphicsContext3D* context)
@@ -795,9 +814,15 @@ void BitmapTextureGL::updateContents(const void* srcData, const IntRect& targetR
     // Texture upload requires subimage buffer if driver doesn't support subimage and we don't have full image upload.
     bool requireSubImageBuffer = !driverSupportsSubImage(m_context3D.get())
         && !(bytesPerLine == static_cast<int>(targetRect.width() * bytesPerPixel) && adjustedSourceOffset == IntPoint::zero());
+#if USE(TYGL)
+    UNUSED_PARAM(updateContentsFlag);
+    bool requireSwizzle = false;
+#else
+    bool requireSwizzle = !driverSupportsExternalTextureBGRA(m_context3D.get()) && updateContentsFlag == UpdateCannotModifyOriginalImageData;
+#endif
 
     // prepare temporaryData if necessary
-    if ((!driverSupportsExternalTextureBGRA(m_context3D.get()) && updateContentsFlag == UpdateCannotModifyOriginalImageData) || requireSubImageBuffer) {
+    if (requireSwizzle || requireSubImageBuffer) {
         temporaryData.resize(targetRect.width() * targetRect.height() * bytesPerPixel);
         data = temporaryData.data();
         const char* bits = static_cast<const char*>(srcData);
@@ -814,10 +839,12 @@ void BitmapTextureGL::updateContents(const void* srcData, const IntRect& targetR
         adjustedSourceOffset = IntPoint(0, 0);
     }
 
+#if !USE(TYGL)
     if (driverSupportsExternalTextureBGRA(m_context3D.get()))
         glFormat = GraphicsContext3D::BGRA;
     else
         swizzleBGRAToRGBA(reinterpret_cast_ptr<uint32_t*>(data), IntRect(adjustedSourceOffset, targetRect.size()), bytesPerLine / bytesPerPixel);
+#endif
 
     updateContentsNoSwizzle(data, targetRect, adjustedSourceOffset, bytesPerLine, bytesPerPixel, glFormat);
 }
@@ -830,6 +857,14 @@ void BitmapTextureGL::updateContents(Image* image, const IntRect& targetRect, co
     if (!frameImage)
         return;
 
+#if USE(TYGL)
+    GLint previousFbo;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFbo);
+    frameImage->bindFbo();
+    glBindTexture(GL_TEXTURE_2D, m_id);
+    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, targetRect.x(), targetRect.y(), offset.x(), offset.y(), targetRect.width(), targetRect.height());
+    glBindFramebuffer(GL_FRAMEBUFFER, previousFbo);
+#else
     int bytesPerLine;
     const char* imageData;
 
@@ -840,6 +875,7 @@ void BitmapTextureGL::updateContents(Image* image, const IntRect& targetRect, co
 #endif
 
     updateContents(imageData, targetRect, offset, bytesPerLine, updateContentsFlag);
+#endif
 }
 
 void TextureMapperGL::drawFiltered(const BitmapTexture& sampler, const BitmapTexture* contentTexture, const FilterOperation& filter, int pass)

@@ -1,0 +1,169 @@
+<html>
+<body>
+<canvas width=1024 height=1024 id='mycanvas'></canvas>
+<script>
+var testWidth = 300;
+var testHeight = 300;
+var testIndex = 0;
+var lastTranslateX = 0;
+var lastTranslateY = 0;
+function getContextForTest()
+{
+	var canvas = document.getElementById('mycanvas');
+	var ctx = canvas.getContext("2d");
+	var numTestsPerRow = Math.floor(canvas.width / testWidth);
+	var testX = (testIndex % numTestsPerRow) * testWidth;
+	var testY = Math.floor(testIndex / numTestsPerRow) * testHeight;
+
+	ctx.translate(-lastTranslateX, -lastTranslateY);
+	ctx.translate(testX, testY);
+	lastTranslateX = testX;
+	lastTranslateY = testY;
+	ctx.fillStyle='red';
+	testIndex++;
+	return ctx;
+}
+function testWhere2ndLineIsHighest()
+{
+	var ctx = getContextForTest();
+	ctx.beginPath();
+	ctx.moveTo(100, 100);
+	ctx.lineTo(100, 50);
+	ctx.lineTo(200, 25);
+	ctx.lineTo(100, 100);
+	ctx.closePath();
+	ctx.fill();
+}
+function testWhereLaterLineLineIsLowest()
+{
+	var ctx = getContextForTest();
+	ctx.beginPath();
+	ctx.moveTo(50, 50);
+	ctx.lineTo(100, 50);
+	ctx.lineTo(100, 100);
+	ctx.lineTo(50, 100);
+	ctx.lineTo(50, 50);
+	// Have to introduce a discontinuity, I think, in
+	// order to trigger the "new line is bottommost" code-path.
+	ctx.moveTo(50, 150);
+	ctx.lineTo(100, 200);
+	ctx.lineTo(100, 250);
+	ctx.closePath();
+	ctx.fill();
+}
+function testWhereHaveToSplitBottomMostDueToTop()
+{
+	var ctx = getContextForTest();
+	ctx.beginPath();
+	ctx.moveTo(50, 50);
+	ctx.lineTo(100, 50);
+	ctx.lineTo(100, 100);
+	ctx.lineTo(50, 100);
+	ctx.lineTo(50, 50);
+	// Need to introduce a discontinuity in order to split the
+	// bottommost line.
+	ctx.moveTo(125, 75);
+	// Splitter line.
+	ctx.lineTo(150, 100);
+	ctx.lineTo(125, 100);
+	ctx.closePath();
+	ctx.fill();
+}
+function testWhereLinesOverlapButAreParallel()
+{
+	var ctx = getContextForTest();
+	ctx.beginPath();
+	ctx.moveTo(50, 100);
+	ctx.lineTo(100, 50);
+	ctx.lineTo(125, 50);
+	ctx.lineTo(75, 100);
+	ctx.closePath();
+	ctx.fill();
+}
+function testMultipleTimesThroughLoopNoIntersection()
+{
+	var ctx = getContextForTest();
+	ctx.beginPath();
+	ctx.moveTo(100,250);
+	ctx.lineTo(50,200);
+	ctx.lineTo(75,150);
+	ctx.lineTo(50,100);
+	ctx.lineTo(100,50);
+	// This line breaks up the jagged line to the left.
+	ctx.lineTo(100,50);
+	ctx.fill();
+}
+function testWithTopClipped()
+{
+	var ctx = getContextForTest();
+	ctx.save();
+	ctx.rect(0, 100, 150, 150);
+	ctx.clip();
+
+	ctx.beginPath();
+	ctx.moveTo(50,150);
+	ctx.lineTo(100,50);
+	ctx.lineTo(150,150);
+	ctx.closePath();
+	ctx.fill();
+
+	// Undo the clip.
+	ctx.restore();
+}
+function testWithBottomClipped()
+{
+	var ctx = getContextForTest();
+	ctx.save();
+	ctx.rect(50, 50, 100, 50);
+	ctx.clip();
+
+	ctx.beginPath();
+	ctx.moveTo(50,50);
+	ctx.lineTo(150,50);
+	ctx.lineTo(100,150);
+	ctx.closePath();
+	ctx.fill();
+
+	// Undo the clip.
+	ctx.restore();
+}
+function testSimpleIntersection()
+{
+	var ctx = getContextForTest();
+
+	ctx.beginPath();
+	ctx.moveTo(50,100);
+	ctx.lineTo(150,50);
+	ctx.lineTo(100,50);
+	ctx.lineTo(100,150);
+	ctx.lineTo(150,100);
+	ctx.lineTo(50,100);
+	ctx.closePath();
+	ctx.fill();
+}
+function testMultipleIntersectionsOnSameScanLine()
+{
+	var ctx = getContextForTest();
+	ctx.beginPath();
+	ctx.moveTo(150,150);
+	ctx.lineTo(150,100);
+	ctx.lineTo(50,100);
+	ctx.lineTo(100,150);
+	ctx.lineTo(50,150);
+	ctx.lineTo(250,75);
+	ctx.closePath();
+	ctx.fill();
+}
+
+testWhere2ndLineIsHighest();
+testWhereLaterLineLineIsLowest();
+testWhereHaveToSplitBottomMostDueToTop();
+testWhereLinesOverlapButAreParallel();
+testMultipleTimesThroughLoopNoIntersection();
+testWithTopClipped();
+testWithBottomClipped();
+testSimpleIntersection();
+testMultipleIntersectionsOnSameScanLine();
+</script>
+</body>
+</html>

@@ -19,8 +19,6 @@ list(APPEND WebKit2_SOURCES
     PluginProcess/unix/PluginProcessMainUnix.cpp
     PluginProcess/unix/PluginProcessUnix.cpp
 
-    Shared/API/c/cairo/WKImageCairo.cpp
-
     Shared/API/c/efl/WKArrayEfl.cpp
 
     Shared/CoordinatedGraphics/CoordinatedBackingStore.cpp
@@ -36,8 +34,6 @@ list(APPEND WebKit2_SOURCES
     Shared/Network/CustomProtocols/soup/CustomProtocolManagerSoup.cpp
 
     Shared/Plugins/Netscape/x11/NetscapePluginModuleX11.cpp
-
-    Shared/cairo/ShareableBitmapCairo.cpp
 
     Shared/efl/NativeWebKeyboardEventEfl.cpp
     Shared/efl/NativeWebTouchEventEfl.cpp
@@ -62,8 +58,6 @@ list(APPEND WebKit2_SOURCES
     UIProcess/DefaultUndoController.cpp
 
     UIProcess/API/C/CoordinatedGraphics/WKView.cpp
-
-    UIProcess/API/C/cairo/WKIconDatabaseCairo.cpp
 
     UIProcess/API/C/efl/WKColorPickerResultListener.cpp
     UIProcess/API/C/efl/WKEventEfl.cpp
@@ -139,8 +133,6 @@ list(APPEND WebKit2_SOURCES
 
     UIProcess/Storage/StorageManager.cpp
 
-    UIProcess/cairo/BackingStoreCairo.cpp
-
     UIProcess/efl/BatteryProvider.cpp
     UIProcess/efl/ContextHistoryClientEfl.cpp
     UIProcess/efl/ContextMenuClientEfl.cpp
@@ -214,6 +206,35 @@ list(APPEND WebKit2_SOURCES
     WebProcess/soup/WebKitSoupRequestInputStream.cpp
     WebProcess/soup/WebProcessSoup.cpp
 )
+
+if (WTF_USE_TYGL)
+    list(APPEND WebKit2_SOURCES
+        Shared/API/c/tygl/WKImageTyGL.cpp
+        Shared/tygl/ShareableBitmapTyGL.cpp
+        UIProcess/tygl/BackingStoreTyGL.cpp
+    )
+
+    list(APPEND WebKit2_INCLUDE_DIRECTORIES
+        "${WEBKIT2_DIR}/Shared/API/c/tygl"
+        "${WEBCORE_DIR}/platform/graphics/tygl"
+
+    )
+    list(APPEND WebKit2_LIBRARIES ${X11_X11_LIB} ${X11_Xcomposite_LIB} ${X11_Xrender_LIB})
+else()
+    list(APPEND WebKit2_SOURCES
+        Shared/API/c/cairo/WKImageCairo.cpp
+        Shared/cairo/ShareableBitmapCairo.cpp
+        UIProcess/API/C/cairo/WKIconDatabaseCairo.cpp
+        UIProcess/cairo/BackingStoreCairo.cpp
+    )
+
+    list(APPEND WebKit2_INCLUDE_DIRECTORIES
+        ${CAIRO_INCLUDE_DIRS}
+        "${WEBCORE_DIR}/platform/graphics/cairo"
+        "${WEBKIT2_DIR}/UIProcess/API/C/cairo"
+    )
+    list(APPEND WebKit2_LIBRARIES ${CAIRO_LIBRARIES})
+endif()
 
 list(APPEND WebKit2_MESSAGES_IN_FILES
     UIProcess/CoordinatedGraphics/CoordinatedLayerTreeHostProxy.messages.in
@@ -297,7 +318,6 @@ list(APPEND WebKit2_LIBRARIES
     ${JPEG_LIBRARIES}
     ${LIBSOUP_LIBRARIES}
     ${LIBXML2_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     ${PNG_LIBRARIES}
     ${SQLITE_LIBRARIES}
 )
@@ -319,9 +339,25 @@ list(APPEND WebProcess_LIBRARIES
     ${EVAS_LIBRARIES}
     ${LIBXML2_LIBRARIES}
     ${LIBXSLT_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     ${SQLITE_LIBRARIES}
 )
+
+if (ENABLE_GLES2)
+    list(APPEND WebKit2_LIBRARIES
+        ${OPENGLES2_LIBRARY}
+    )
+    list(APPEND WebProcess_LIBRARIES
+        ${OPENGLES2_LIBRARY}
+    )
+else ()
+    list(APPEND WebKit2_LIBRARIES
+        ${OPENGL_LIBRARIES}
+    )
+    list(APPEND WebProcess_LIBRARIES
+        ${OPENGL_LIBRARIES}
+    )
+endif ()
+
 
 if (ENABLE_SECCOMP_FILTERS)
     list(APPEND WebKit2_LIBRARIES
@@ -345,6 +381,7 @@ if (ENABLE_ECORE_X)
     )
     list(APPEND WebKit2_LIBRARIES
         ${ECORE_X_LIBRARIES}
+        ${X11_Xext_LIB}
     )
 endif ()
 
@@ -448,7 +485,6 @@ endif () # ENABLE_PLUGIN_PROCESS
 include_directories(${THIRDPARTY_DIR}/gtest/include)
 
 set(EWK2UnitTests_LIBRARIES
-    ${CAIRO_LIBRARIES}
     ${ECORE_EVAS_LIBRARIES}
     ${ECORE_LIBRARIES}
     ${EVAS_LIBRARIES}

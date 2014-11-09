@@ -31,6 +31,10 @@
 #include <wtf/Atomics.h>
 #include <wtf/MainThread.h>
 
+#if USE(TYGL)
+#include <EGL/egl.h>
+#endif
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -109,6 +113,10 @@ void CoordinatedGraphicsScene::paintToCurrentGLContext(const TransformationMatri
     m_fpsCounter.updateFPSAndDisplay(m_textureMapper.get(), clipRect.location(), matrix);
     m_textureMapper->endClip();
     m_textureMapper->endPainting();
+
+#if USE(TYGL)
+    eglWaitClient();
+#endif
 
     if (currentRootLayer->descendantsOrSelfHaveRunningAnimations()) {
         RefPtr<CoordinatedGraphicsScene> protector(this);

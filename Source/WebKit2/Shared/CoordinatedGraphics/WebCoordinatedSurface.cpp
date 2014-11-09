@@ -31,6 +31,10 @@
 #include "TextureMapperGL.h"
 #endif
 
+#if USE(TYGL)
+#include "PlatformContextTyGL.h"
+#endif
+
 using namespace WebCore;
 
 namespace WebKit {

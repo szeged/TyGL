@@ -26,7 +26,7 @@
 #ifndef EGLXSurface_h
 #define EGLXSurface_h
 
-#if PLATFORM(X11) && USE(EGL) && USE(GRAPHICS_SURFACE)
+#if PLATFORM(X11) && USE(EGL) && (USE(GRAPHICS_SURFACE) || USE(TYGL))
 
 #include "EGLSurface.h"
 #include <glx/X11Helper.h>

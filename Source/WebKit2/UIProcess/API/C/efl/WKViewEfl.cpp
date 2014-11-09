@@ -30,7 +30,11 @@
 #include "WKAPICast.h"
 #include "WebViewEfl.h"
 #include <Evas.h>
+#if USE(TYGL)
+#include <WebKit/WKImageTyGL.h>
+#else
 #include <WebKit/WKImageCairo.h>
+#endif
 
 using namespace WebKit;
 
@@ -44,15 +48,21 @@ void WKViewSetColorPickerClient(WKViewRef viewRef, const WKColorPickerClientBase
 #endif
 }
 
+#if USE(CAIRO)
 void WKViewPaintToCairoSurface(WKViewRef viewRef, cairo_surface_t* surface)
 {
     static_cast<WebViewEfl*>(toImpl(viewRef))->paintToCairoSurface(surface);
 }
+#endif
 
 WKImageRef WKViewCreateSnapshot(WKViewRef viewRef)
 {
     EwkView* ewkView = static_cast<WebViewEfl*>(toImpl(viewRef))->ewkView();
+#if USE(TYGL)
+    return nullptr;
+#else
     return WKImageCreateFromCairoSurface(ewkView->takeSnapshot().get(), 0 /* options */);
+#endif
 }
 
 void WKViewSetThemePath(WKViewRef viewRef, WKStringRef theme)

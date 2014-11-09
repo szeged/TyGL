@@ -28,7 +28,9 @@
 #include "RenderThemeEfl.h"
 
 #include "CSSValueKeywords.h"
+#if USE(CAIRO)
 #include "CairoUtilitiesEfl.h"
+#endif
 #include "ExceptionCodePlaceholder.h"
 #include "FloatRoundedRect.h"
 #include "FontDescription.h"
@@ -38,7 +40,11 @@
 #include "NotImplemented.h"
 #include "Page.h"
 #include "PaintInfo.h"
+#if USE(TYGL)
+#include "PlatformContextTyGL.h"
+#else
 #include "PlatformContextCairo.h"
+#endif
 #include "RenderBox.h"
 #include "RenderObject.h"
 #include "RenderProgress.h"
@@ -182,9 +188,11 @@ std::unique_ptr<RenderThemeEfl::ThemePartCacheEntry> RenderThemeEfl::ThemePartCa
     if (!setSourceGroupForEdjeObject(entry->edje(), themePath, toEdjeGroup(type)))
         return nullptr;
 
+#if USE(CAIRO)
     entry->m_surface = createSurfaceForBackingStore(entry->canvas());
     if (!entry->surface())
         return nullptr;
+#endif
 
     evas_object_resize(entry->edje(), size.width(), size.height());
     evas_object_show(entry->edje());
@@ -212,11 +220,13 @@ void RenderThemeEfl::ThemePartCacheEntry::reuse(const String& themePath, FormTyp
         ecore_evas_resize(canvas(), newSize.width(), newSize.height());
         evas_object_resize(edje(), newSize.width(), newSize.height());
 
+#if USE(CAIRO)
         m_surface = createSurfaceForBackingStore(canvas());
         if (!surface()) {
             type = FormTypeLast; // Invalidate;
             return;
         }
+#endif
     }
 }
 
@@ -360,6 +370,7 @@ bool RenderThemeEfl::paintThemePart(const RenderObject& object, FormType type, c
     edje_object_message_signal_process(entry->edje());
     evas_render(ecore_evas_get(entry->canvas()));
 
+#if USE(CAIRO)
     cairo_t* cairo = info.context->platformContext()->cr();
     ASSERT(cairo);
 
@@ -367,6 +378,7 @@ bool RenderThemeEfl::paintThemePart(const RenderObject& object, FormType type, c
     cairo_set_source_surface(cairo, entry->surface(), rect.x(), rect.y());
     cairo_paint_with_alpha(cairo, 1.0);
     cairo_restore(cairo);
+#endif
 
     return false;
 }

@@ -33,6 +33,10 @@
 #include <WebCore/BackingStoreBackendCairo.h>
 #endif
 
+#if USE(TYGL)
+#include <PlatformContextTyGL.h>
+#endif
+
 namespace WebKit {
 
 class ShareableBitmap;
@@ -49,7 +53,9 @@ public:
     const WebCore::IntSize& size() const { return m_size; }
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
 
-#if USE(CAIRO)
+#if USE(TYGL)
+    typedef WebCore::PlatformContextTyGL* PlatformGraphicsContext;
+#elif USE(CAIRO)
     typedef cairo_t* PlatformGraphicsContext;
 #endif
 

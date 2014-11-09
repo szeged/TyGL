@@ -208,9 +208,8 @@ static const char* fragmentTemplate =
     ANTIALIASING_TEX_COORD_DIRECTIVE
     BLUR_CONSTANTS
     STRINGIFY(
-        precision highp float;
-        uniform mat4 u_textureSpaceMatrix;
         precision mediump float;
+        uniform mat4 u_textureSpaceMatrix;
         uniform SamplerType s_sampler;
         uniform sampler2D s_contentTexture;
         uniform float u_opacity;

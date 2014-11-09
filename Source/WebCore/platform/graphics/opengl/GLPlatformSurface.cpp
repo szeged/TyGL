@@ -47,7 +47,7 @@ std::unique_ptr<GLPlatformSurface> GLPlatformSurface::createOffScreenSurface(Sur
     std::unique_ptr<GLPlatformSurface> surface;
 #if USE(GLX)
     surface = std::make_unique<GLXOffScreenSurface>(attributes);
-#elif USE(EGL) && USE(GRAPHICS_SURFACE)
+#elif USE(EGL) && (USE(GRAPHICS_SURFACE) || USE(TYGL))
     surface = EGLOffScreenSurface::createOffScreenSurface(attributes);
 #else
     // FIXME: Need WGL implementation for Windows

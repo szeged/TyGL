@@ -1,0 +1,23 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+  </head>
+  <body>
+    <img src="img_lamp.jpg" id="lamp" alt="Lamp">
+    <canvas id="myCanvas" width="1024" height="500"></canvas>
+    <script>
+        var canvas = document.getElementById('myCanvas');
+        var context = canvas.getContext('2d');
+
+        var img = document.getElementById("lamp");
+        var pattern = context.createPattern(img, 'repeat');
+
+        context.save();
+        context.rect(0, 0, 150, 100);
+        context.fillStyle = pattern;
+        context.fill();
+
+        context.restore();
+    </script>
+  </body>
+</html>

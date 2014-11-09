@@ -471,7 +471,9 @@
 #endif
 
 #if PLATFORM(GTK) || PLATFORM(EFL)
+#if !USE(TYGL)
 #define WTF_USE_CAIRO 1
+#endif
 #define WTF_USE_GLIB 1
 #define WTF_USE_FREETYPE 1
 #define WTF_USE_HARFBUZZ 1

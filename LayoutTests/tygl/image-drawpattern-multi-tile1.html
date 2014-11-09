@@ -1,0 +1,29 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Testing tiling for images over areas that *DO NOT* fit into one of WebKit's backing-store tiles.</title>
+    <style type="text/css" media="screen">
+        img {
+            float: left;
+            width: 800px;
+            height: 600px;
+        }
+        img {
+            -webkit-transform: rotate3d(0, 0, 1, 0);
+        }
+        .test {
+            float: left;
+        }
+    </style>
+</head>
+<body>
+    <!-- Offsetting, skewing, rotating, scaling, clipping etc for small background images that *DO NOT* fit within one of WebKit's backing-store tiles; this
+         introduces some interesting complications, so test for those.-->
+    <div class="test">
+        <img src="" style="background: url(resources/simple_image.png) -30px -50px; ">
+    </div>
+</body>
+</html>

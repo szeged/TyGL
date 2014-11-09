@@ -40,6 +40,12 @@
 
 #if USE(CG)
 typedef struct CGContext PlatformGraphicsContext;
+#elif USE(TYGL)
+namespace WebCore {
+class PlatformContextTyGL;
+}
+typedef WebCore::PlatformContextTyGL PlatformGraphicsContext;
+typedef WebCore::PlatformContextTyGL GraphicsContextPlatformPrivate;
 #elif USE(CAIRO)
 namespace WebCore {
 class PlatformContextCairo;
