@@ -57,33 +57,22 @@ private:
 
     struct Line {
         static const int32_t kRed = 1 << 0;
-        static const int32_t kBottomInprecise = 1 << 0;
-        static const int32_t kTopInprecise = 1 << 1;
-        static const int32_t kInpreciseBits = kBottomInprecise | kTopInprecise;
-        static const int32_t directionShift = 2;
+        static const int32_t directionShift = 1;
         static const int32_t directionDown = 1 << directionShift;
         static const int32_t directionUp = -directionDown;
 
-        inline bool isRed() { return flagsAndDirection & kRed; }
+        inline bool isRed() const { return flagsAndDirection & kRed; }
         inline void setRed() { flagsAndDirection |= kRed; }
         inline void setBlack() { flagsAndDirection &= ~kRed; }
-        inline bool isInprecise() { return flagsAndDirection & kInpreciseBits; }
-        inline void clearInprecise() { flagsAndDirection &= ~kInpreciseBits; }
-        inline void setBottomInprecise() { flagsAndDirection |= kBottomInprecise; }
 
-        inline void shiftInpreciseBit()
+        inline int32_t direction() const { return flagsAndDirection >> directionShift; }
+        inline bool isOddDirection() const { return flagsAndDirection & (1 << directionShift); }
+
+        inline bool lessTopPosition(const Line* right) const
         {
-            // Clear bit 1.
-            flagsAndDirection &= ~kTopInprecise;
-            // Effect: copy bit 0 to bit 1, and invert bit 0.
-            ++flagsAndDirection;
-            // Clear bit 0.
-            flagsAndDirection &= ~kBottomInprecise;
+            return topX < right->topX
+                || (topX == right->topX && slope < right->slope);
         }
-
-        inline int32_t direction() { return flagsAndDirection >> directionShift; }
-        inline bool isOddDirection() { return flagsAndDirection & (1 << directionShift); }
-
         // During the insertion phase, the lines are stored
         // in a red-black tree. Later, the active lines are
         // moved to a queue. When a line becomes active, its
