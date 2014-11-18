@@ -495,7 +495,6 @@ inline TrapezoidBuilder::Line* TrapezoidBuilder::computeLineList(Line* current)
         // This is even true for the first node.
         if ((nonZeroRule && current->direction())
             || (!nonZeroRule && (current->isOddDirection()))) {
-            current->clearInprecise();
             previous->u1.next = current;
             previous = current;
         }
@@ -557,6 +556,8 @@ inline TrapezoidBuilder::Trapezoid* TrapezoidBuilder::createTrapezoids(Line* cur
     bool inpreciseLeft = false;
     bool hasLeftSide = false;
     int fillLevel = 0;
+    bool resetInprecise = true;
+    bool inprecise;
 
     do {
         ASSERT(!current || bottomY <= current->bottomY);
@@ -564,13 +565,20 @@ inline TrapezoidBuilder::Trapezoid* TrapezoidBuilder::createTrapezoids(Line* cur
         int32_t topX;
         int32_t bottomX;
         float slope;
-        bool inprecise;
+        if (resetInprecise)
+            inprecise = false;
+        resetInprecise = true;
 
         if (current) {
             topX = current->topX;
             bottomX = current->u4.nextTopX;
             slope = current->slope;
-            inprecise = current->isInprecise();
+
+            if (bottomX < minTopX) {
+                bottomX = minTopX;
+                inprecise = true;
+            } else
+                minTopX = bottomX;
 
             if (m_fillRule == RULE_NONZERO)
                 fillLevel += current->direction();
@@ -580,23 +588,17 @@ inline TrapezoidBuilder::Trapezoid* TrapezoidBuilder::createTrapezoids(Line* cur
             current = current->u1.next;
             if (current) {
                 int32_t nextTopX = computeNextTopX(current, bottomY);
-                ASSERT(!(current->flagsAndDirection & Line::kBottomInprecise));
-                if (nextTopX < minTopX) {
-                    nextTopX = minTopX;
-                    current->setBottomInprecise();
-                }
-
                 current->u4.nextTopX = nextTopX;
-                minTopX = nextTopX;
-                if (topX == current->topX && bottomX == nextTopX)
+                if (topX == current->topX && bottomX >= nextTopX) {
+                    resetInprecise = false;
                     continue;
+                }
             }
         } else {
             ASSERT(hasLeftSide);
             topX = m_clipRight;
             bottomX = m_clipRight;
             slope = 0;
-            inprecise = false;
             fillLevel = 0;
         }
 
@@ -690,6 +692,12 @@ inline void TrapezoidBuilder::checkIntersection(Line* leftLine, Line* rightLine,
         }
 
         intersectionY = roundf(y + ((x2 - x1) / (leftLine->slope - rightLine->slope)));
+        int32_t leftX = computeX(intersectionY, leftLine->originalTopX, leftLine->originalTopY, leftLine->slope);
+        int32_t rightX = computeX(intersectionY, rightLine->originalTopX, rightLine->originalTopY, rightLine->slope);
+
+        if (leftX < rightX && intersectionY >= bottomY)
+            ++intersectionY;
+
         leftLine->u2.cachedIntersectionLine = rightLine;
         leftLine->u3.cachedIntersectionY = intersectionY;
     }
@@ -723,7 +731,6 @@ inline TrapezoidBuilder::Line* TrapezoidBuilder::updateActiveLineSet(Line* curre
                 continue;
             }
             lineForInsert->topX = lineForInsert->u4.nextTopX;
-            lineForInsert->shiftInpreciseBit();
         } else if (hasInactiveLine) {
             lineForInsert = nextInactiveLine;
             nextInactiveLine = nextInactiveLine->u1.next;
@@ -737,13 +744,11 @@ inline TrapezoidBuilder::Line* TrapezoidBuilder::updateActiveLineSet(Line* curre
         if (lineForInsert->bottomY < nextBottomY)
             nextBottomY = lineForInsert->bottomY;
 
-        if (!firstLine) {
+        if (UNLIKELY(!firstLine)) {
             firstLine = lineForInsert;
             lastLine = lineForInsert;
             continue;
         }
-
-        ASSERT(lastLine->topX <= lineForInsert->topX);
 
         if (lastLine->topX < lineForInsert->topX) {
             // The chance of entering here is usually > 95%.
@@ -754,42 +759,75 @@ inline TrapezoidBuilder::Line* TrapezoidBuilder::updateActiveLineSet(Line* curre
             continue;
         }
 
-        // Sort by slope. Note: lines starting from the
-        // same topX cannot intersect with each other.
+        if (lastLine->topX == lineForInsert->topX) {
+            // The chance of entering here is usually > 90%.
+            // Sort by slope. Note: lines starting from the
+            // same topX cannot intersect with each other.
 
-        if (lastLine->slope <= lineForInsert->slope) {
-            // The chance of entering here is usually > 55%.
-            lastLine->u1.next = lineForInsert;
-            lastLine = lineForInsert;
+            if (lastLine->slope <= lineForInsert->slope) {
+                // The chance of entering here is usually > 55%.
+                lastLine->u1.next = lineForInsert;
+                lastLine = lineForInsert;
+                continue;
+            }
+
+            Line* previousLine;
+            if (!lastLineWithSmallerTopX) {
+                if (lineForInsert->slope <= firstLine->slope) {
+                    lineForInsert->u1.next = firstLine;
+                    firstLine = lineForInsert;
+                    continue;
+                }
+                previousLine = firstLine;
+            } else {
+                ASSERT(lastLineWithSmallerTopX->u1.next);
+                if (lineForInsert->slope <= lastLineWithSmallerTopX->u1.next->slope) {
+                    lineForInsert->u1.next = lastLineWithSmallerTopX->u1.next;
+                    lastLineWithSmallerTopX->u1.next = lineForInsert;
+                    checkIntersection(lastLineWithSmallerTopX, lineForInsert, bottomY, nextBottomY);
+                    continue;
+                }
+                previousLine = lastLineWithSmallerTopX->u1.next;
+            }
+
+            // The only case where we perform a search loop. Usually new lines are
+            // inserted in order, intersecting lines are in reversed order, so
+            // the chance of entering here is usually very low (< 2%).
+            while (previousLine->u1.next && previousLine->u1.next->slope < lineForInsert->slope)
+                previousLine = previousLine->u1.next;
+
+            ASSERT(previousLine != lastLine);
+            lineForInsert->u1.next = previousLine->u1.next;
+            previousLine->u1.next = lineForInsert;
             continue;
         }
 
-        Line* previousLine;
-        if (!lastLineWithSmallerTopX) {
-            if (lineForInsert->slope <= firstLine->slope) {
-                lineForInsert->u1.next = firstLine;
-                firstLine = lineForInsert;
-                continue;
-            }
-            previousLine = firstLine;
-        } else {
-            ASSERT(lastLineWithSmallerTopX->u1.next);
-            if (lineForInsert->slope <= lastLineWithSmallerTopX->u1.next->slope) {
-                lineForInsert->u1.next = lastLineWithSmallerTopX->u1.next;
-                lastLineWithSmallerTopX->u1.next = lineForInsert;
-                checkIntersection(lastLineWithSmallerTopX, lineForInsert, bottomY, nextBottomY);
-                continue;
-            }
-            previousLine = lastLineWithSmallerTopX->u1.next;
+        if (lastLineWithSmallerTopX && lastLineWithSmallerTopX->lessTopPosition(lineForInsert)) {
+            // The chance of entering here is usually > 95%.
+            // We are lucky, the line is after lastLineWithSmallerTopX.
+            lineForInsert->u1.next = lastLineWithSmallerTopX->u1.next;
+            lastLineWithSmallerTopX->u1.next = lineForInsert;
+            lastLineWithSmallerTopX = lineForInsert;
+            continue;
         }
 
-        // The only case where we perform a search loop. Usually new lines are
-        // inserted in order, intersecting lines are in reversed order, so
-        // the chance of entering here is usually very low (< 2%).
-        while (previousLine->u1.next && previousLine->u1.next->slope < lineForInsert->slope)
-            previousLine = previousLine->u1.next;
+        if (lineForInsert->lessTopPosition(firstLine)) {
+            // The line is before the first line.
+            lineForInsert->u1.next = firstLine;
+            firstLine = lineForInsert;
+            if (!lastLineWithSmallerTopX)
+                lastLineWithSmallerTopX = lineForInsert;
+            continue;
+        }
 
-        ASSERT(previousLine != lastLine);
+        ASSERT(lastLineWithSmallerTopX);
+
+        Line* previousLine = firstLine;
+        ASSERT(previousLine->u1.next);
+        while (previousLine->u1.next->lessTopPosition(lineForInsert)) {
+            previousLine = previousLine->u1.next;
+            ASSERT(previousLine && previousLine->u1.next && previousLine != lastLineWithSmallerTopX);
+        }
         lineForInsert->u1.next = previousLine->u1.next;
         previousLine->u1.next = lineForInsert;
     }
