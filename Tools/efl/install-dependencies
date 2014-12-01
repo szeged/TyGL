@@ -105,6 +105,10 @@ function installDependenciesWithApt {
     apt-get install \
         luajit
 
+    # These are dependencies necessary for building TyGL.
+    apt-get install \
+        libgles2-mesa-dev
+
     # These are dependencies necessary for running tests.
     apt-get install \
         apache2 \
