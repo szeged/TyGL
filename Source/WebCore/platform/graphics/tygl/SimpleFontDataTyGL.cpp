@@ -26,7 +26,7 @@
  */
 
 #include "config.h"
-#include "SimpleFontData.h"
+#include "Font.h"
 
 #include "FloatRect.h"
 #include "NotImplemented.h"
@@ -43,9 +43,9 @@ static inline float fromFTPixelPosition(FT_Pos pixelPos)
     return pixelPos / 64.0;
 }
 
-void SimpleFontData::platformInit()
+void Font::platformInit()
 {
-    m_platformData.textureFont()->setSimpleFontData(this);
+    m_platformData.textureFont()->setFont(this);
 
     if (!m_platformData.m_size)
         return;
@@ -75,8 +75,6 @@ void SimpleFontData::platformInit()
     if (!hasHorizontalOrientation && !isTextOrientationFallback())
         m_fontMetrics.setUnitsPerEm(face->units_per_EM);
 
-    m_syntheticBoldOffset = m_platformData.syntheticBold() ? 1 : 0;
-
     // FIXME: Ideally ALL font has to be scaled because there is never one to one relationship between request fonts size and received
     // from font config. But quality of scaling now is so poor so it is disabled at the moment.
     // To fix it properly we need to start using SDF approach which will require rewriting font shader.
@@ -84,27 +82,27 @@ void SimpleFontData::platformInit()
     // m_platformData.textureFont()->setTransform(*m_platformData.horizontalOrientationTransform());
 }
 
-void SimpleFontData::platformDestroy()
+void Font::platformDestroy()
 {
 }
 
-void SimpleFontData::determinePitch()
+void Font::determinePitch()
 {
     m_treatAsFixedPitch = m_platformData.isFixedPitch();
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::platformCreateScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
+PassRefPtr<Font> Font::platformCreateScaledFont(const FontDescription& fontDescription, float scaleFactor) const
 {
     ASSERT(m_platformData.scaledFont());
 
-    return SimpleFontData::create(FontPlatformData(m_platformData.m_scaledFont->fontFace(),
+    return Font::create(FontPlatformData(m_platformData.m_scaledFont->fontFace(),
                                                    scaleFactor * fontDescription.computedSize(),
                                                    m_platformData.syntheticBold(),
                                                    m_platformData.syntheticOblique(),
                                                    fontDescription.orientation()), isCustomFont(), false);
 }
 
-FloatRect SimpleFontData::platformBoundsForGlyph(unsigned short glyph) const
+FloatRect Font::platformBoundsForGlyph(unsigned short glyph) const
 {
     if (!m_platformData.size())
         return FloatRect();
@@ -117,7 +115,7 @@ FloatRect SimpleFontData::platformBoundsForGlyph(unsigned short glyph) const
     return FloatRect(fromFTPixelPosition(metrics.horiBearingX), fromFTPixelPosition(metrics.horiBearingY), fromFTPixelPosition(metrics.width), fromFTPixelPosition(metrics.height));
 }
 
-float SimpleFontData::platformWidthForGlyph(Glyph glyph) const
+float Font::platformWidthForGlyph(Glyph glyph) const
 {
     if (!m_platformData.size())
         return 0;
@@ -132,7 +130,7 @@ float SimpleFontData::platformWidthForGlyph(Glyph glyph) const
     return width ? width : m_spaceWidth;
 }
 
-void SimpleFontData::platformCharWidthInit()
+void Font::platformCharWidthInit()
 {
     m_avgCharWidth = 0;
     m_maxCharWidth = 0;
@@ -142,7 +140,7 @@ void SimpleFontData::platformCharWidthInit()
 }
 
 #if USE(HARFBUZZ)
-bool SimpleFontData::canRenderCombiningCharacterSequence(const UChar* characters, size_t length) const
+bool Font::canRenderCombiningCharacterSequence(const UChar* characters, size_t length) const
 {
     if (!m_combiningCharacterSequenceSupport)
         m_combiningCharacterSequenceSupport = std::make_unique<HashMap<String, bool>>();

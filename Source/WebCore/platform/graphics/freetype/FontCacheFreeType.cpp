@@ -23,7 +23,6 @@
 #include "FontCache.h"
 
 #include "Font.h"
-#include "SimpleFontData.h"
 #include "UTF16UChar32Iterator.h"
 
 #if USE(CAIRO)

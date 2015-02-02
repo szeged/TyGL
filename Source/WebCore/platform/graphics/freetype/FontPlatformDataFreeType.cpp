@@ -260,7 +260,7 @@ FontPlatformData::FontPlatformData(const FontPlatformData& other, float size)
     , m_scaledFont(nullptr)
 
 #if USE(HARFBUZZ)
-    : m_harfBuzzFace(other.m_harfBuzzFace)
+    , m_harfBuzzFace(other.m_harfBuzzFace)
 #endif
 {
     *this = other;

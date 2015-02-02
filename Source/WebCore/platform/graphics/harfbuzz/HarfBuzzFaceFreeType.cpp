@@ -35,7 +35,7 @@
 #include "FontPlatformData.h"
 #include "GlyphBuffer.h"
 #include "HarfBuzzShaper.h"
-#include "SimpleFontData.h"
+#include "Font.h"
 #include "TextEncoding.h"
 #include "ScaledFontTyGL.h"
 typedef WebCore::ScaledFont scaled_font;

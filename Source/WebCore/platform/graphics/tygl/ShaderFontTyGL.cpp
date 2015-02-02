@@ -135,7 +135,7 @@ void PlatformContextTyGL::addTextAttributes(TyGL::GlyphBufferFontData& fontData,
     TyGL::TextureFont* textureFont = fontData.textureFont();
     const GlyphBuffer* glyphBuffer = fontData.glyphBuffer();
     GlyphBufferGlyph* glyphs = const_cast<GlyphBufferGlyph*>(glyphBuffer->glyphs(fromIndex));
-    const FontMetrics& fontMetrics = textureFont->simpleFontData()->fontMetrics();
+    const FontMetrics& fontMetrics = textureFont->font()->fontMetrics();
     RefPtr<NativeImageTyGL> atlasTexture = texture;
 
     float xOffset = boundingBox.x();

@@ -154,6 +154,10 @@ void RenderThemeTyGL::systemFont(WebCore::CSSValueID, FontDescription&) const
 {
 }
 
+void RenderThemeTyGL::updateCachedSystemFontDescription(CSSValueID systemFontID, FontDescription&) const
+{
+}
+
 bool RenderThemeTyGL::paintButton(const RenderObject& object, const PaintInfo& info, const IntRect& rect)
 {
     info.context->platformContext()->drawUIElement(PlatformGraphicsContext::Button, rect, this, &object);

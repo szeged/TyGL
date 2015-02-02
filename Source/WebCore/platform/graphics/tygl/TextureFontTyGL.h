@@ -37,9 +37,9 @@
 
 namespace WebCore {
 
+class Font;
 class GlyphBuffer;
 class PlatformContextTyGL;
-class SimpleFontData;
 
 namespace TyGL {
 
@@ -100,8 +100,8 @@ public:
 
     static PassRefPtr<TextureFont> create(PassRefPtr<WebCore::ScaledFont> scaledFont) { return adoptRef(new TextureFont(scaledFont)); }
     const GlyphMetrics& glyph(const int glyphCode, int& errorCode);
-    WebCore::SimpleFontData* simpleFontData() const { return m_simpleFontData; }
-    void setSimpleFontData(WebCore::SimpleFontData* simpleFontData) { m_simpleFontData = simpleFontData; }
+    WebCore::Font* font() const { return m_font; }
+    void setFont(WebCore::Font* font) { m_font = font; }
     WebCore::ScaledFont* scaledFont() const { return m_scaledFont.get(); }
     FontTextureAtlasTyGL* fontTextureAtlas() { return m_textureAtlas.get(); }
     bool createAtlas();
@@ -113,7 +113,7 @@ public:
 
 private:
     TextureFont(PassRefPtr<WebCore::ScaledFont> scaledFont)
-        : m_simpleFontData(0)
+        : m_font(0)
         , m_scaledFont(scaledFont)
     {
     }
@@ -122,7 +122,7 @@ private:
     RefPtr<FontTextureAtlasTyGL> m_textureAtlas;
     typedef HashMap<uint64_t, GlyphMetrics, WTF::IntHash<uint64_t>, WTF::UnsignedWithZeroKeyHashTraits<uint64_t> > GlyphMetricsCache;
     GlyphMetricsCache m_glyphs;
-    WebCore::SimpleFontData* m_simpleFontData;
+    WebCore::Font* m_font;
     RefPtr<WebCore::ScaledFont> m_scaledFont;
     TyGL::AffineTransform m_transform;
     FloatPoint m_normalisedTranslateVector;

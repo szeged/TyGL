@@ -33,7 +33,6 @@
 #include "IntRect.h"
 #include "PlatformContextTyGL.h"
 #include "ShaderCommonTyGL.h"
-#include "SimpleFontData.h"
 
 namespace WebCore {
 namespace TyGL {
@@ -145,8 +144,8 @@ bool TextureFont::expandAtlas()
 
 IntSize TextureFont::calculateAtlasSize()
 {
-    int charWidth = m_simpleFontData->maxCharWidth() + 1;
-    int charHeight = m_simpleFontData->fontMetrics().height() + 1;
+    int charWidth = m_font->maxCharWidth() + 1;
+    int charHeight = m_font->fontMetrics().height() + 1;
 
     // After checking popular web sites 32 seems to be close to an average number of characters used per font.
     int count = 32;
@@ -176,7 +175,7 @@ FloatRect GlyphBufferFontData::calculateBoundingBox() const
     int numGlyphs = m_numGlyphs;
 
     const GlyphBuffer* glyphBuffer = m_glyphBuffer;
-    const FontMetrics& fontMetrics = m_textureFont->simpleFontData()->fontMetrics();
+    const FontMetrics& fontMetrics = m_textureFont->font()->fontMetrics();
 
     FloatRect boundingBox;
     boundingBox.setLocation(FloatPoint(m_point.x(), m_point.y() - fontMetrics.ascent()));
