@@ -22,7 +22,7 @@
 #ifndef FontCustomPlatformData_h
 #define FontCustomPlatformData_h
 
-#if USE(CAIRO)
+#if USE(CAIRO) || USE(TYGL)
 
 #include "FontOrientation.h"
 #include "FontRenderingMode.h"
