@@ -298,7 +298,7 @@ else()
         ${CAIRO_INCLUDE_DIRS}
     )
     list(APPEND WebCore_SOURCES
-        platform/cairo/WidgetBackingStoreCairo.cpp
+        platform/graphics/cairo/BackingStoreBackendCairoImpl.cpp
 
         platform/graphics/cairo/BitmapImageCairo.cpp
         platform/graphics/cairo/CairoUtilities.cpp
