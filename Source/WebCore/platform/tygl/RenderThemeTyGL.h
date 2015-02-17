@@ -28,6 +28,7 @@
 #ifndef RenderThemeTyGL_h
 #define RenderThemeTyGL_h
 
+#include "FontDescription.h"
 #include "RenderTheme.h"
 
 namespace WebCore {
@@ -55,6 +56,7 @@ public:
 #endif
 
 protected:
+    static float defaultFontSize;
     virtual void updateCachedSystemFontDescription(CSSValueID systemFontID, FontDescription&) const override;
 
     // The platform selection color.
