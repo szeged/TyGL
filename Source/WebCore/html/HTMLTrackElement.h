@@ -37,7 +37,7 @@ class HTMLMediaElement;
 
 class HTMLTrackElement final : public HTMLElement, public TextTrackClient {
 public:
-    static PassRefPtr<HTMLTrackElement> create(const QualifiedName&, Document&);
+    static Ref<HTMLTrackElement> create(const QualifiedName&, Document&);
 
     String kind();
     void setKind(const String&);
@@ -75,7 +75,7 @@ private:
 
     virtual bool isURLAttribute(const Attribute&) const override;
 
-    void loadTimerFired(Timer<HTMLTrackElement>&);
+    void loadTimerFired();
 
     HTMLMediaElement* mediaElement() const;
 
@@ -91,7 +91,7 @@ private:
     bool canLoadURL(const URL&);
 
     RefPtr<LoadableTextTrack> m_track;
-    Timer<HTMLTrackElement> m_loadTimer;
+    Timer m_loadTimer;
 };
 
 }

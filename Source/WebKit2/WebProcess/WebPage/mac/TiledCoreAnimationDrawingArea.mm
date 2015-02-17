@@ -39,6 +39,7 @@
 #import "WebPageProxyMessages.h"
 #import "WebProcess.h"
 #import <QuartzCore/QuartzCore.h>
+#import <WebCore/DebugPageOverlays.h>
 #import <WebCore/FrameView.h>
 #import <WebCore/GraphicsContext.h>
 #import <WebCore/GraphicsLayerCA.h>
@@ -77,6 +78,7 @@ TiledCoreAnimationDrawingArea::TiledCoreAnimationDrawingArea(WebPage& webPage, c
     , m_scrolledExposedRect(FloatRect::infiniteRect())
     , m_transientZoomScale(1)
     , m_sendDidUpdateViewStateTimer(RunLoop::main(), this, &TiledCoreAnimationDrawingArea::didUpdateViewStateTimerFired)
+    , m_wantsDidUpdateViewState(false)
     , m_viewOverlayRootLayer(nullptr)
 {
     m_webPage.corePage()->settings().setForceCompositingMode(true);
@@ -189,7 +191,11 @@ void TiledCoreAnimationDrawingArea::updatePreferences(const WebPreferencesStore&
 #if ENABLE(ASYNC_SCROLLING)
     if (AsyncScrollingCoordinator* scrollingCoordinator = downcast<AsyncScrollingCoordinator>(m_webPage.corePage()->scrollingCoordinator())) {
         bool scrollingPerformanceLoggingEnabled = m_webPage.scrollingPerformanceLoggingEnabled();
-        ScrollingThread::dispatch(bind(&ScrollingTree::setScrollingPerformanceLoggingEnabled, scrollingCoordinator->scrollingTree(), scrollingPerformanceLoggingEnabled));
+        
+        RefPtr<ScrollingTree> scrollingTree = scrollingCoordinator->scrollingTree();
+        ScrollingThread::dispatch([scrollingTree, scrollingPerformanceLoggingEnabled] {
+            scrollingTree->setScrollingPerformanceLoggingEnabled(scrollingPerformanceLoggingEnabled);
+        });
     }
 #endif
 
@@ -199,6 +205,9 @@ void TiledCoreAnimationDrawingArea::updatePreferences(const WebPreferencesStore&
     // <rdar://problem/9813262> for more details.
     settings.setAcceleratedCompositingForFixedPositionEnabled(true);
     settings.setFixedPositionCreatesStackingContext(true);
+
+    if (MainFrame* mainFrame = m_webPage.mainFrame())
+        DebugPageOverlays::settingsChanged(*mainFrame);
 
     bool showTiledScrollingIndicator = settings.showTiledScrollingIndicator();
     if (showTiledScrollingIndicator == !!m_debugInfoLayer)
@@ -291,42 +300,43 @@ bool TiledCoreAnimationDrawingArea::flushLayers()
 {
     ASSERT(!m_layerTreeStateIsFrozen);
 
-    // This gets called outside of the normal event loop so wrap in an autorelease pool
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    @autoreleasepool {
+        m_webPage.layoutIfNeeded();
 
-    m_webPage.layoutIfNeeded();
+        updateIntrinsicContentSizeIfNeeded();
 
-    updateIntrinsicContentSizeIfNeeded();
+        if (m_pendingRootLayer) {
+            setRootCompositingLayer(m_pendingRootLayer.get());
+            m_pendingRootLayer = nullptr;
+        }
 
-    if (m_pendingRootLayer) {
-        setRootCompositingLayer(m_pendingRootLayer.get());
-        m_pendingRootLayer = nullptr;
+        FloatRect visibleRect = [m_hostingLayer frame];
+        visibleRect.intersect(m_scrolledExposedRect);
+
+        // Because our view-relative overlay root layer is not attached to the main GraphicsLayer tree, we need to flush it manually.
+        if (m_viewOverlayRootLayer)
+            m_viewOverlayRootLayer->flushCompositingState(visibleRect);
+
+        bool returnValue = m_webPage.mainFrameView()->flushCompositingStateIncludingSubframes();
+    #if ENABLE(ASYNC_SCROLLING)
+        if (ScrollingCoordinator* scrollingCoordinator = m_webPage.corePage()->scrollingCoordinator())
+            scrollingCoordinator->commitTreeStateIfNeeded();
+    #endif
+
+        // If we have an active transient zoom, we want the zoom to win over any changes
+        // that WebCore makes to the relevant layers, so re-apply our changes after flushing.
+        if (m_transientZoomScale != 1)
+            applyTransientZoomToLayers(m_transientZoomScale, m_transientZoomOrigin);
+
+        return returnValue;
     }
-
-    FloatRect visibleRect = [m_hostingLayer frame];
-    visibleRect.intersect(m_scrolledExposedRect);
-
-    // Because our view-relative overlay root layer is not attached to the main GraphicsLayer tree, we need to flush it manually.
-    if (m_viewOverlayRootLayer)
-        m_viewOverlayRootLayer->flushCompositingState(visibleRect);
-
-    bool returnValue = m_webPage.mainFrameView()->flushCompositingStateIncludingSubframes();
-#if ENABLE(ASYNC_SCROLLING)
-    if (ScrollingCoordinator* scrollingCoordinator = m_webPage.corePage()->scrollingCoordinator())
-        scrollingCoordinator->commitTreeStateIfNeeded();
-#endif
-
-    // If we have an active transient zoom, we want the zoom to win over any changes
-    // that WebCore makes to the relevant layers, so re-apply our changes after flushing.
-    if (m_transientZoomScale != 1)
-        applyTransientZoomToLayers(m_transientZoomScale, m_transientZoomOrigin);
-
-    [pool drain];
-    return returnValue;
 }
 
-void TiledCoreAnimationDrawingArea::viewStateDidChange(ViewState::Flags changed, bool wantsDidUpdateViewState)
+void TiledCoreAnimationDrawingArea::viewStateDidChange(ViewState::Flags changed, bool wantsDidUpdateViewState, const Vector<uint64_t>& nextViewStateChangeCallbackIDs)
 {
+    m_nextViewStateChangeCallbackIDs.appendVector(nextViewStateChangeCallbackIDs);
+    m_wantsDidUpdateViewState |= wantsDidUpdateViewState;
+
     if (changed & ViewState::IsVisible) {
         if (m_webPage.isVisible())
             resumePainting();
@@ -334,14 +344,22 @@ void TiledCoreAnimationDrawingArea::viewStateDidChange(ViewState::Flags changed,
             suspendPainting();
     }
 
-    if (wantsDidUpdateViewState)
+    if (m_wantsDidUpdateViewState || !m_nextViewStateChangeCallbackIDs.isEmpty())
         m_sendDidUpdateViewStateTimer.startOneShot(0);
 }
 
 void TiledCoreAnimationDrawingArea::didUpdateViewStateTimerFired()
 {
     [CATransaction flush];
-    m_webPage.send(Messages::WebPageProxy::DidUpdateViewState());
+
+    if (m_wantsDidUpdateViewState)
+        m_webPage.send(Messages::WebPageProxy::DidUpdateViewState());
+
+    for (uint64_t callbackID : m_nextViewStateChangeCallbackIDs)
+        m_webPage.send(Messages::WebPageProxy::VoidCallback(callbackID));
+
+    m_nextViewStateChangeCallbackIDs.clear();
+    m_wantsDidUpdateViewState = false;
 }
 
 void TiledCoreAnimationDrawingArea::suspendPainting()
@@ -464,7 +482,7 @@ void TiledCoreAnimationDrawingArea::updateLayerHostingContext()
     // Create a new context and set it up.
     switch (m_webPage.layerHostingMode()) {
     case LayerHostingMode::InProcess:
-        m_layerHostingContext = LayerHostingContext::createForPort(WebProcess::shared().compositingRenderServerPort());
+        m_layerHostingContext = LayerHostingContext::createForPort(WebProcess::singleton().compositingRenderServerPort());
         break;
 #if HAVE(OUT_OF_PROCESS_LAYER_HOSTING)
     case LayerHostingMode::OutOfProcess:
@@ -537,9 +555,9 @@ PlatformCALayer* TiledCoreAnimationDrawingArea::layerForTransientZoom() const
     RenderLayerBacking* renderViewBacking = m_webPage.mainFrameView()->renderView()->layer()->backing();
 
     if (GraphicsLayer* contentsContainmentLayer = renderViewBacking->contentsContainmentLayer())
-        return toGraphicsLayerCA(contentsContainmentLayer)->platformCALayer();
+        return downcast<GraphicsLayerCA>(*contentsContainmentLayer).platformCALayer();
 
-    return toGraphicsLayerCA(renderViewBacking->graphicsLayer())->platformCALayer();
+    return downcast<GraphicsLayerCA>(*renderViewBacking->graphicsLayer()).platformCALayer();
 }
 
 PlatformCALayer* TiledCoreAnimationDrawingArea::shadowLayerForTransientZoom() const
@@ -547,7 +565,7 @@ PlatformCALayer* TiledCoreAnimationDrawingArea::shadowLayerForTransientZoom() co
     RenderLayerCompositor& renderLayerCompositor = m_webPage.mainFrameView()->renderView()->compositor();
 
     if (GraphicsLayer* shadowGraphicsLayer = renderLayerCompositor.layerForContentShadow())
-        return toGraphicsLayerCA(shadowGraphicsLayer)->platformCALayer();
+        return downcast<GraphicsLayerCA>(*shadowGraphicsLayer).platformCALayer();
 
     return nullptr;
 }
@@ -673,7 +691,7 @@ void TiledCoreAnimationDrawingArea::commitTransientZoom(double scale, FloatPoint
             drawingArea->applyTransientZoomToPage(scale, origin);
     }];
 
-    zoomLayer->addAnimationForKey("transientZoomCommit", renderViewAnimation.get());
+    zoomLayer->addAnimationForKey("transientZoomCommit", *renderViewAnimation);
 
     if (shadowCALayer) {
         FloatRect shadowBounds = shadowLayerBoundsForFrame(frameView, scale);

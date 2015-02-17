@@ -34,7 +34,7 @@ class RenderObject;
 class SVGClipPathElement final : public SVGGraphicsElement,
                                  public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGClipPathElement> create(const QualifiedName&, Document&);
+    static Ref<SVGClipPathElement> create(const QualifiedName&, Document&);
 
 private:
     SVGClipPathElement(const QualifiedName&, Document&);
@@ -48,7 +48,7 @@ private:
     virtual void svgAttributeChanged(const QualifiedName&) override;
     virtual void childrenChanged(const ChildChange&) override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGClipPathElement)
         DECLARE_ANIMATED_ENUMERATION(ClipPathUnits, clipPathUnits, SVGUnitTypes::SVGUnitType)

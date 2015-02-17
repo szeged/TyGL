@@ -28,15 +28,14 @@
 
 #include "CSSValuePool.h"
 #include "Document.h"
-#include "Font.h"
 #include "FontCache.h"
+#include "FontCascade.h"
 #include "GCController.h"
 #include "JSDOMWindow.h"
 #include "MemoryCache.h"
 #include "Page.h"
 #include "PageCache.h"
 #include "ScrollingThread.h"
-#include "StorageThread.h"
 #include "WorkerThread.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/FastMalloc.h>
@@ -64,6 +63,11 @@ MemoryPressureHandler::MemoryPressureHandler()
     , m_clearPressureOnMemoryRelease(true)
     , m_releaseMemoryBlock(0)
     , m_observer(0)
+#elif OS(LINUX)
+    , m_eventFD(0)
+    , m_pressureLevelFD(0)
+    , m_threadID(0)
+    , m_holdOffTimer(*this, &MemoryPressureHandler::holdOffTimerFired)
 #endif
 {
 }
@@ -96,14 +100,14 @@ void MemoryPressureHandler::releaseCriticalMemory()
 {
     {
         ReliefLogger log("Empty the PageCache");
-        int savedPageCacheCapacity = pageCache()->capacity();
-        pageCache()->setCapacity(0);
-        pageCache()->setCapacity(savedPageCacheCapacity);
+        // Right now, the only reason we call release critical memory while not under memory pressure is if the process is about to be suspended.
+        PruningReason pruningReason = memoryPressureHandler().isUnderMemoryPressure() ? PruningReason::MemoryPressure : PruningReason::ProcessSuspended;
+        PageCache::singleton().pruneToSizeNow(0, pruningReason);
     }
 
     {
         ReliefLogger log("Prune MemoryCache");
-        memoryCache()->pruneToPercentage(0);
+        MemoryCache::singleton().evictResources();
     }
 
     {
@@ -135,16 +139,15 @@ void MemoryPressureHandler::releaseMemory(bool critical)
     {
         ReliefLogger log("Release free FastMalloc memory");
         // FastMalloc has lock-free thread specific caches that can only be cleared from the thread itself.
-        StorageThread::releaseFastMallocFreeMemoryInAllThreads();
         WorkerThread::releaseFastMallocFreeMemoryInAllThreads();
 #if ENABLE(ASYNC_SCROLLING) && !PLATFORM(IOS)
-        ScrollingThread::dispatch(bind(WTF::releaseFastMallocFreeMemory));
+        ScrollingThread::dispatch(WTF::releaseFastMallocFreeMemory);
 #endif
         WTF::releaseFastMallocFreeMemory();
     }
 }
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(COCOA) && !OS(LINUX)
 void MemoryPressureHandler::install() { }
 void MemoryPressureHandler::uninstall() { }
 void MemoryPressureHandler::holdOff(unsigned) { }

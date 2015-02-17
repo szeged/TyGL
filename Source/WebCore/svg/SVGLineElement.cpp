@@ -59,9 +59,9 @@ inline SVGLineElement::SVGLineElement(const QualifiedName& tagName, Document& do
     registerAnimatedPropertiesForSVGLineElement();
 }
 
-PassRefPtr<SVGLineElement> SVGLineElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGLineElement> SVGLineElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGLineElement(tagName, document));
+    return adoptRef(*new SVGLineElement(tagName, document));
 }
 
 bool SVGLineElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -107,7 +107,7 @@ void SVGLineElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     bool isLengthAttribute = attrName == SVGNames::x1Attr
                           || attrName == SVGNames::y1Attr
@@ -117,7 +117,7 @@ void SVGLineElement::svgAttributeChanged(const QualifiedName& attrName)
     if (isLengthAttribute)
         updateRelativeLengthsInformation();
 
-    RenderSVGShape* renderer = toRenderSVGShape(this->renderer());
+    auto* renderer = downcast<RenderSVGShape>(this->renderer());
     if (!renderer)
         return;
 

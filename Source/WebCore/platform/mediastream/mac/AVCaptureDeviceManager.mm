@@ -117,7 +117,7 @@ static Vector<CaptureDevice>& captureDeviceList()
     if (firstTime && !captureDeviceList.size()) {
         firstTime = false;
         refreshCaptureDeviceList();
-        AVCaptureDeviceManager::shared().registerForDeviceNotifications();
+        AVCaptureDeviceManager::singleton().registerForDeviceNotifications();
     }
 
     return captureDeviceList;
@@ -174,7 +174,7 @@ bool AVCaptureDeviceManager::isAvailable()
     return AVFoundationLibrary();
 }
 
-AVCaptureDeviceManager& AVCaptureDeviceManager::shared()
+AVCaptureDeviceManager& AVCaptureDeviceManager::singleton()
 {
     DEPRECATED_DEFINE_STATIC_LOCAL(AVCaptureDeviceManager, manager, ());
     return manager;
@@ -358,7 +358,7 @@ bool AVCaptureDeviceManager::verifyConstraintsForMediaType(MediaStreamSource::Ty
     Vector<MediaConstraint> mandatoryConstraints;
     constraints->getMandatoryConstraints(mandatoryConstraints);
     if (mandatoryConstraints.size()) {
-        RetainPtr<AVCaptureSessionType> session = adoptNS([[AVCaptureSession alloc] init]);
+        RetainPtr<AVCaptureSessionType> session = adoptNS([allocAVCaptureSessionInstance() init]);
         for (size_t i = 0; i < mandatoryConstraints.size(); ++i) {
             const MediaConstraint& constraint = mandatoryConstraints[i];
             if (!sessionSupportsConstraint(session.get(), type, constraint.m_name, constraint.m_value)) {

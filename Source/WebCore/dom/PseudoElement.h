@@ -36,16 +36,16 @@ namespace WebCore {
 
 class PseudoElement final : public Element {
 public:
-    static PassRefPtr<PseudoElement> create(Element& host, PseudoId pseudoId)
+    static Ref<PseudoElement> create(Element& host, PseudoId pseudoId)
     {
-        return adoptRef(new PseudoElement(host, pseudoId));
+        return adoptRef(*new PseudoElement(host, pseudoId));
     }
     virtual ~PseudoElement();
 
     Element* hostElement() const { return m_hostElement; }
     void clearHostElement() { m_hostElement = nullptr; }
 
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer(RenderStyle& parentStyle) override;
+    virtual RefPtr<RenderStyle> customStyleForRenderer(RenderStyle& parentStyle) override;
     virtual void didAttachRenderers() override;
     virtual bool rendererIsNeeded(const RenderStyle&) override;
 

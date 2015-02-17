@@ -1,3 +1,1225 @@
+2015-02-05  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Move commits viewer to the end of details view
+        https://bugs.webkit.org/show_bug.cgi?id=141315
+
+        Rubber-stamped by Andreas Kling.
+
+        Show the difference instead of the old value per kling's request.
+
+        * public/v2/app.js:
+        (App.PaneController._updateDetails):
+        * public/v2/index.html:
+
+2015-02-05  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Move commits viewer to the end of details view
+        https://bugs.webkit.org/show_bug.cgi?id=141315
+
+        Reviewed by Andreas Kling.
+
+        Improved the way list of commits are shown per kling's request.
+
+        * public/v2/app.js:
+        (App.PaneController._updateDetails): Always show the old value even when a single point is selected.
+
+        * public/v2/chart-pane.css: Updated the style for the commits viewer.
+
+        * public/v2/commits-viewer.js:
+        (App.CommitsViewerComponent): Added "visible" property to hide the list of commits.
+        (App.CommitsViewerComponent.actions.toggleVisibility): Added. Toggles "visible" property.
+
+        * public/v2/index.html: Updated the template for commits viewer to support "visible" property. Also
+        moved the commits viewers out of the details tables so that they don't interleave revision data.
+
+2015-02-05  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New perf dashboard should compare results to baseline and target
+        https://bugs.webkit.org/show_bug.cgi?id=141286
+
+        Reviewed by Chris Dumez.
+
+        Compare the selected value against baseline and target values as done in v1. e.g. "5% below target"
+        Also use d3.format to format the selected value to show four significant figures.
+
+        * public/v2/app.js:
+        (App.Pane.searchCommit):
+        (App.Pane._fetch): Create time series here via createChartData so that _computeStatus can use them
+        to compute the status text without having to recreate them.
+        (App.createChartData): Added.
+        (App.PaneController._updateDetails): Use 3d.format on current and old values.
+        (App.PaneController._computeStatus): Added. Computes the status text.
+        (App.PaneController._relativeDifferentToLaterPointInTimeSeries): Added.
+        (App.AnalysisTaskController._fetchedManifest): Use createChartData as done in App.Pane._fetch. Also
+        format the values using chartData.formatter.
+
+        * public/v2/chart-pane.css: Enlarge the status text. Show the status text in red if it's worse than
+        the baseline and in blue if it's better than the target.
+
+        * public/v2/data.js:
+        (TimeSeries.prototype.findPointAfterTime): Added.
+
+        * public/v2/index.html: Added a new tbody for the status text and the selected value. Also fixed
+        the bug that we were not showing the old value's unit.
+
+        * public/v2/interactive-chart.js:
+        (App.InteractiveChartComponent._constructGraphIfPossible): Use chartData.formatter. Also cleaned up
+        the code to show the baseline and the target lines.
+
+        * public/v2/manifest.js:
+        (App.Manifest.fetchRunsWithPlatformAndMetric): Added smallerIsBetter.
+
+2015-02-05  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix.
+
+        * public/v2/app.js:
+        (App.IndexController.gridChanged): Use store.createRecord to create a custom dashboard as required by Ember.js
+
+2015-02-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New perf dashboard doesn't preserve the number of days when clicking on a dashboard chart
+        https://bugs.webkit.org/show_bug.cgi?id=141280
+
+        Reviewed by Chris Dumez.
+
+        Fixed the bug by passing in "since" as a query parameter to the charts page.
+
+        Also fixed the styling issue that manifests when a JSON fetching fails on "Dashboard" page.
+
+        * public/v2/app.css: Fixed CSS rules for error messages shown in the place of charts.
+        * public/v2/app.js:
+        (App.IndexController): Changed the default number of days from one month to one week.
+        (App.IndexController._sharedDomainChanged): Set "since" property on the controller.
+        * public/v2/index.html: Pass in "since" property on the controller as a query parameter.
+
+2015-02-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New perf dashboard erroneously clears zoom when poping history items
+        https://bugs.webkit.org/show_bug.cgi?id=141278
+
+        Reviewed by Chris Dumez.
+
+        The bug was caused by _sharedZoomChanged updating overviewSelection without updating mainPlotDomain.
+
+        Updating overviewSelection resulted in _overviewSelectionChanged, which observes changes to overviewSelection,
+        to schedule a call to propagateZoom, which in turn overrode "sharedZoom" we just parsed from the query string.
+
+        * public/v2/app.js:
+        (App.PaneController._overviewSelectionChanged): Don't schedule propagateZoom if the selected domain is already
+        shown in the main plot.
+        (App.PaneController._sharedZoomChanged): Set both overviewSelection and mainPlotDomain to avoid overriding
+        "sharedZoom" via propagateZoom inside _overviewSelectionChanged.
+
+2015-02-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New perf dashboard shows null as the aggregator name if no aggregation is done
+        https://bugs.webkit.org/show_bug.cgi?id=141256
+
+        Reviewed by Chris Dumez.
+
+        Don't show the aggregator name if there isn't one.
+
+        * public/v2/manifest.js:
+        (App.Metric.label):
+
+2015-02-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix after r179611.
+
+        * public/v2/interactive-chart.js:
+
+2015-02-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard doesn’t show the right unit for Safari UI tests
+        https://bugs.webkit.org/show_bug.cgi?id=141238
+
+        Reviewed by Darin Adler.
+
+        Safari UI tests use custom metrics that end with "Time". This patch teaches the perf dashboard how to
+        get the unit for a given metric based on the suffix of the metric name instead of hard-coding the mapping
+        between metrics and their units.
+
+        * public/js/helper-classes.js:
+        (PerfTestRuns): Use the suffix of the metric name to compute the unit.
+        * public/v2/manifest.js:
+        (App.Manifest.fetchRunsWithPlatformAndMetric): Ditto. Also set "useSI" property iff for "bytes".
+        * public/v2/interactive-chart.js:
+        (App.InteractiveChartComponent._constructGraphIfPossible): Respect useSI. Use toPrecision(3) otherwise.
+        (App.InteractiveChartComponent._relayoutDataAndAxes): Place the unit vertically on the left of ticks.
+
+2015-02-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Interactive chart component provides two duplicate API for highlighting points
+        https://bugs.webkit.org/show_bug.cgi?id=141234
+
+        Reviewed by Chris Dumez.
+
+        Prior to this patch, the interactive chart component supported highlightedItems for finding commits
+        on the main charts page and markedPoints to show the two end points in the analysis task page.
+
+        This patch merges markedPoints into highlightedItems. 
+
+        * public/v2/app.js:
+        (App.AnalysisTaskController._fetchedRuns): Use highlightedItems.
+        * public/v2/chart-pane.css:
+        * public/v2/index.html: Ditto.
+        * public/v2/interactive-chart.js: 
+        (App.InteractiveChartComponent._constructGraphIfPossible): Make this._highlights an array instead of
+        array of arrays. Also call _highlightedItemsChanged at the end to fix the bug that we never highlight
+        items if highlightedItems was set before the initial layout.
+        (App.InteractiveChartComponent._relayoutDataAndAxes):
+        (App.InteractiveChartComponent._updateHighlightPositions): Now that highlights are circles instead of
+        vertical lines, just set cx and cy as done for other "dots".
+        (App.InteractiveChartComponent._highlightedItemsChanged): Exit early only if _clippedContainer wasn't
+        already set; i.e. _constructGraphIfPossible hasn't been called. Also updated the logic to accommodate
+        the fact this._highlights is an array of elements instead of an array of arrays of elements. Finally,
+        set the radius of highlight circles here.
+
+2015-02-03  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Don’t use repository names as id’s.
+        https://bugs.webkit.org/show_bug.cgi?id=141226
+
+        Reviewed by Chris Dumez.
+
+        Not using repository names as their id's reduces the need to fetch the entire repositories table.
+        Since names of repositories are available in manifest.json, we can resolve their names in the front end.
+
+        * Websites/perf.webkit.org/public/api/runs.php:
+        (parse_revisions_array): No longer uses $repository_id_to_name.
+        (main): No longer populates $repository_id_to_name.
+
+        * Websites/perf.webkit.org/public/api/triggerables.php:
+        (main): Don't resolve repository names.
+
+        * Websites/perf.webkit.org/public/include/manifest.php:
+        (ManifestGenerator::repositories): Use repositories ids as keys in the result and include their names.
+        (ManifestGenerator::bug_trackers): Don't resolve repository names.
+
+        * Websites/perf.webkit.org/public/js/helper-classes.js:
+        (TestBuild): Renamed repositoryName to repositoryId.
+        (TestBuild.revision): Ditto.
+        (TestBuild.formattedRevisions): Ditto. Continue to use the repository name in the formatted result
+        since this is the text shown to human.
+
+        * Websites/perf.webkit.org/public/v2/app.js:
+        (App.pane.searchCommit): Renamed repositoryName to repositoryId.
+        (App.PaneController._updateDetails): Ditto.
+        (App.AnalysisTaskController.updateRoots): Ditto.
+
+        * Websites/perf.webkit.org/public/v2/data.js:
+        (Measurement): Ditto.
+        (Measurement.prototype.commitTimeForRepository): Ditto.
+        (Measurement.prototype.formattedRevisions): Ditto.
+
+        * Websites/perf.webkit.org/public/v2/index.html: Use the repository name and the repository id as
+        select element's label and value respectively.
+
+2015-02-03  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix. Declare $repository_id_to_name in the global scope.
+
+        * public/api/runs.php:
+
+2015-02-03  Ryosuke Niwa  <rniwa@webkit.org>
+
+        /api/runs.php should have main function
+        https://bugs.webkit.org/show_bug.cgi?id=141220
+
+        Reviewed by Benjamin Poulain.
+
+        Wrapped the code inside main function for clarity.
+
+        * public/api/runs.php:
+
+2015-01-27  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix. "eta" isn't set on a in-progress build on a newly added builder.
+
+        * tools/sync-with-buildbot.py:
+        (find_request_updates):
+
+2015-01-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard always assigns the result of A/B testing with build request 1
+        https://bugs.webkit.org/show_bug.cgi?id=140382
+
+        Reviewed by Darin Adler.
+
+        The bug was caused by the expression array_get($report, 'jobId') or array_get($report, 'buildRequest')
+        which always evaluated to 1 when the report contained jobId. Fixed the bug by cascading array_get instead.
+
+        Also fixed a typo as well as a bug that reports were never associated with builds.
+
+        * public/include/report-processor.php:
+        (ReportProcessor::process): Don't use "or" to find the non-null value since that always evaluates to 1
+        instead of the first non-null value.
+        (ReportProcessor::resolve_build_id): Fixed the typo by adding the missing "$this->".
+        (ReportProcessor::commit): Associate the report with the corresponding build as intended.
+
+2015-01-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed typo fix. The prefix in triggerable_configurations is "trigconfig", not "trigrepo".
+
+        * public/admin/tests.php:
+
+2015-01-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix. Removed the stale code.
+
+        * public/admin/triggerables.php:
+
+2015-01-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard should have the ability to post A/B testing builds
+        https://bugs.webkit.org/show_bug.cgi?id=140317
+
+        Rubber-stamped by Simon Fraser.
+
+        This patch adds the support for triggering A/B testing from the perf dashboard.
+
+        We add a few new tables to the database. "build_triggerables", which represents a set of builders
+        that accept A/B testing. "triggerable_repositories" associates each "triggerable" with a fixed set
+        of repositories for which an arbitrary revision can be specified for A/B testing.
+        "triggerable_configurations" specifies a triggerable available on a given test on a given platform.
+        "roots" table which specifies the revision used in a given root set in each repository.
+
+        * init-database.sql: Added "build_triggerables", "triggerable_repositories",
+        "triggerable_configurations", and "roots" tables. Added references to "build_triggerables",
+        "platforms", and "tests" tables as well as columns to store status, status url, and creation time
+        to build_requests table. Also made each test group's name unique in a given analysis task as it
+        would be confusing to have multiple test groups of the same name.
+
+        * public/admin/tests.php: Added the UI and the code to associate a test with a triggerable.
+
+        * public/admin/triggerables.php: Added. Manages the list of triggerables as well as repositories
+        for which a specific revision can be set in an A/B testing on a given triggerable.
+
+        * public/api/build-requests.php: Added. Returns the list of open build requests on a specified
+        triggerable. Also updates the status' and the status urls of specified build requests when
+        buildRequestUpdates is provided in the raw POST data.
+        (main):
+
+        * public/api/runs.php:
+        (fetch_runs_for_config): Don't include results associated with a build request, meaning they are
+        results of an A/B testing.
+
+        * public/api/test-groups.php:
+        (main): Use the newly added BuildRequestsFetcher. Also merged fetch_test_groups_for_task back.
+
+        * public/api/triggerables.php: Added.
+        (main): Returns a list of triggerables or a triggerable associated with a given analysis task.
+
+        * public/include/admin-header.php:
+
+        * public/include/build-requests-fetcher.php: Added. Extracted from public/api/test-groups.php.
+        (BuildRequestsFetcher): This class abstracts the process of fetching a list of builds requests
+        and root sets used in those requests.D
+        (BuildRequestsFetcher::__construct):
+        (BuildRequestsFetcher::fetch_for_task):
+        (BuildRequestsFetcher::fetch_for_group):
+        (BuildRequestsFetcher::fetch_incomplete_requests_for_triggerable):
+        (BuildRequestsFetcher::has_results):
+        (BuildRequestsFetcher::results):
+        (BuildRequestsFetcher::results_with_resolved_ids):
+        (BuildRequestsFetcher::results_internal):
+        (BuildRequestsFetcher::root_sets):
+        (BuildRequestsFetcher::fetch_roots_for_set):
+
+        * public/include/db.php:
+        (Database::prefixed_column_names): Don't return "$prefix_" when there are no columns.
+        (Database::insert_row): Support taking an empty array for values. This is useful in "root_sets"
+        table since it only has the primary key, id, column.
+        (Database::select_or_insert_row):
+        (Database::update_or_insert_row):
+        (Database::update_row): Added.
+        (Database::_select_update_or_insert_row): Takes an extra argument specifying whether a new row
+        should be inserted when no row matches the specified criteria. This is used while updating
+        build_requests' status and url in public/api/build-requests.php since we shouldn't be inserting
+        new build requests in that API.
+        (Database::select_rows): Also use "1 == 1" in the select query when the query criteria is empty.
+        This is used in public/api/triggerables.php when no analysis task is specified.
+
+        * public/include/json-header.php:
+        (find_triggerable_for_task): Added. Finds a triggerable available on a given test. We return the
+        triggerable associated with the closest ancestor of the test. Since issuing a new query for each
+        ancestor test is expensive, we retrieve triggerable for all ancestor tests at once and manually
+        find the closest ancestor with a triggerable.
+
+        * public/include/report-processor.php:
+        (ReportProcessor::process):
+        (ReportProcessor::resolve_build_id): Associate a build request with the newly created build
+        if jobId or buildRequest is specified.
+
+        * public/include/test-name-resolver.php:
+        (TestNameResolver::map_metrics_to_tests): Store the entire metric row instead of its name so that
+        test_exists_on_platform can use it. The last diff in public/admin/tests.php adopts this change.
+        (TestNameResolver::test_exists_on_platform): Added. Returns true iff the test has ever run on
+        a given platform.
+
+        * public/include/test-path-resolver.php: Added.
+        (TestPathResolver): This class abstracts the ancestor chains of a test. It retrieves the entire
+        "tests" table to do this since there could be arbitrary number of ancestors for a given test.
+        This class is a lot more lightweight than TestNameResolver, which retrieves a whole bunch of tables
+        in order to compute full test metric names.
+        (TestPathResolver::__construct):
+        (TestPathResolver::ancestors_for_test): Returns the ordered list of ancestors from the closest to
+        the highest (a test without a parent).
+        (TestPathResolver::path_for_test): Returns a test "path", the ordered list of test names from
+        the highest ancestor to the test itself.
+        (TestPathResolver::ensure_id_to_test_map): Fetches "tests" table to construct id_to_test_map.
+
+        * public/privileged-api/create-test-group.php: Added. An API to create A/B testing groups.
+        (main):
+        (commit_sets_from_root_sets): Given a dictionary of repository names to a pair of revisions
+        for sets A and B respectively, returns a pair of arrays, each of which contains the corresponding
+        set of "commits" for sets A and B respectively. e.g. {"WebKit": [1, 2], "Safari": [3, 4]} will
+        result in [[WebKit commit at r1, Safari commit at r3], [WebKit commit at r2, Safari commit at r4]].
+
+        * public/v2/analysis.js:
+        (App.AnalysisTask.testGroups): Takes arguments so that set('testGroups') will invalidate the cache.
+        (App.AnalysisTask.triggerable): Added. Retrieves the triggerable associated with the task lazily.
+        (App.TestGroup.rootSets): Added. Returns the list of root set ids used in this A/B testing group.
+        (App.TestGroup.create): Added. Creates a new A/B testing group.
+        (App.Triggerable): Added.
+        (App.TriggerableAdapter): Added.
+        (App.TriggerableAdapter.buildURL): Added.
+        (App.BuildRequest.testGroup): Renamed from group.
+        (App.BuildRequest.orderLabel): Added. One-based index to be used in labels.
+        (App.BuildRequest.config): Added. Returns either 'A' or 'B' depending on the configuration used
+        in this build request.
+        (App.BuildRequest.status): Added.
+        (App.BuildRequest.statusLabel): Added. Returns a human friendly label for the current status.
+        (App.BuildRequest): Removed buildNumber, buildBuilder, as well as buildTime as they're unused.
+
+        * public/v2/app.js:
+        (App.AnalysisTaskController.testGroups): Added.
+        (App.AnalysisTaskController.possibleRepetitionCounts): Added.
+        (App.AnalysisTaskController.updateRoots): Renamed from roots. This is also no longer a property
+        but an observer that updates "roots" property. Filter out the repositories that are not accepted
+        by the associated triggerable as they will be ignored.
+        (App.AnalysisTaskController.actions.createTestGroup): Added.
+
+        * public/v2/index.html: Updated the UI, and added a form element to trigger createTestGroup action.
+
+        * tools/sync-with-buildbot.py: Added. This scripts posts new builds on buildbot and reports back
+        the status of those builds to the perf dashboard. A similar script can be written to support
+        other continuous builds systems.
+        (main): Fetches the list of pending builds as well as currently running or completed builds from
+        a buildbot, and report new statuses of builds requests to the perf dashboard. It will then schedule
+        a single new build on each builder with no pending builds, and marks the set of open build requests
+        that have been scheduled to run on the buildbot but not found in the first step as stale.
+        (load_config): Loads a JSON that contains the configurations for each builder. e.g.
+        [
+            {
+                "platform": "mac-mavericks",
+                "test": ["Parser", "html5-full-render.html"],
+                "builder": "Trunk Syrah Production Perf AB Tests",
+                "arguments": {
+                    "forcescheduler": "force-mac-mavericks-release-perf",
+                    "webkit_revision": "$WebKit",
+                    "jobid": "$buildRequest"
+                }
+            }
+        ]
+
+        (find_request_updates): Return a list of build request status updates to make based on the pending
+        builds as well as in-progress and completed builds on each builder on the buildbot. When a build is
+        completed, we use the special status "failedIfNotCompleted" which results in "failed" status only
+        if the build request had not been completed. This is necessary because a failed build will not
+        report its failed-ness back to the perf dashboard in some cases; e.g. lost slave or svn up failure.
+        (update_and_fetch_build_requests): Submit the build request status updates and retrieve the list
+        of open requests the perf dashboard has.
+        (find_stale_request_updates): Compute the list of build requests that have been scheduled on the
+        buildbot but not found in find_request_updates. These build requests are lost. e.g. a master reboot
+        or human canceling a build may trigger such a state.
+        (schedule_request): Schedules a build with the arguments specified in the configuration JSON after
+        replacing repository names with their revisions and buildRequest with the build request id.
+        (config_for_request): Finds a builder for the test and the platform of a build request.
+        (fetch_json): Fetches a JSON from the specified URL, optionally with BasicAuth.
+        (property_value_from_build): Returns the value of a specific property in a buildbot build.
+        (request_id_from_build): Returns the build request id of a given buildbot build if there is one.
+
+2015-01-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Cache-control should be set only on api/runs
+        https://bugs.webkit.org/show_bug.cgi?id=140312
+
+        Reviewed by Andreas Kling.
+
+        Some JSON APIs such as api/analysis-tasks can't be cached even for a short period of time (e.g. a few minutes)
+        since they can be modified by the user on demand. Since only api/runs.php takes a long time to generate JSONs,
+        just set cache-control there instead of json-header.php which is used by other JSON APIs.
+
+        Also set date_default_timezone_set in db.php since we never use non-UTC timezone in our scripts.
+
+        * public/api/analysis-tasks.php:
+        * public/api/runs.php: Set the cache control headers.
+        * public/api/test-groups.php:
+        * public/include/db.php: Set the default timezone to UTC.
+        * public/include/json-header.php: Don't set the cache control headers.
+
+2015-01-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        api/report-commit should authenticate with a slave name and password
+        https://bugs.webkit.org/show_bug.cgi?id=140308
+
+        Reviewed by Benjamin Poulain.
+
+        Use a slave name and a password to authenticate new commit reports.
+
+        * public/api/report-commits.php:
+        (main):
+        * public/include/json-header.php:
+        (verify_slave): Renamed and repurposed from verify_builder in report-commits.php. Now authenticates with
+        a slave name and a password instead of a builder name and a password.
+        * tests/api-report-commits.js: Updated tests.
+        * tools/pull-svn.py:
+        (main): Renamed variables.
+        (submit_commits): Submits slaveName and slavePassword instead of builderName and builderPassword.
+
+2014-12-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard should support authentication via a slave password
+        https://bugs.webkit.org/show_bug.cgi?id=139837
+
+        Reviewed by Andreas Kling.
+
+        For historical reasons, perf dashboard conflated builders and build slaves. As a result we ended up
+        having to add multiple builders with the same password when a single build slave is shared among them.
+
+        This patch introduces the concept of build_slave into the perf dashboard to end this madness.
+
+        * init-database.sql: Added build_slave table as well as references to it in builds and reports.
+
+        * public/admin/build-slaves.php: Added.
+
+        * public/admin/builders.php: Added the support for updating passwords.
+
+        * public/include/admin-header.php:
+        (update_field): Takes an extra argument when a new value needs to be supplied by the caller instead of
+        being retrieved from $_POST.
+        (AdministrativePage::render_table): Use array_get to retrieve a value out of the database row since
+        the raw may not exist (e.g. new_password).
+        (AdministrativePage::render_form_to_add): Added the support for post_insertion. Don't render the form
+        control here when this flag evaluates to TRUE.
+
+        * public/include/report-processor.php:
+        (ReportProcessor::process): Added the logic to authenticate with slaveName and slavePassword if those
+        values are present in the report. In addition, try authenticating builderName with slavePassword if
+        builderPassword is not specified. When neither password is specified, exit with BuilderNotFound.
+        Also insert the slave or the builder whichever is missing after we've successfully authenticated.
+        (ReportProcessor::construct_build_data): Takes a builder ID and an optional slave ID instead of
+        a builder row.
+        (ReportProcessor::store_report): Store the slave ID with the report.
+        (ReportProcessor::resolve_build_id): Exit with MismatchingBuildSlave when the slave associated with
+        the matching build is different from what's being reported.
+
+        * tests/api-report.js: Added a bunch of tests to test the new features of /api/report.
+        (.addSlave): Added.
+
+2014-12-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New perf dashboard should not duplicate author information in each commit
+        https://bugs.webkit.org/show_bug.cgi?id=139756
+
+        Reviewed by Darin Adler.
+
+        Instead of each commit having author name and email, make it reference a newly added committers table.
+        Also replace "email" by "account" since some repositories don't use emails as account names.
+
+        This improves the keyword search performance in commits.php since LIKE now runs on committers table,
+        which only contains as many rows as there are accounts in each repository, instead of commits table
+        which contains every commit ever happened in each repository.
+
+        To migrate an existing database into match the new schema, run:
+
+        BEGIN;
+
+        INSERT INTO committers (committer_repository, committer_name, committer_email)
+            (SELECT DISTINCT commit_repository, commit_author_name, commit_author_email
+                FROM commits WHERE commit_author_email IS NOT NULL);
+
+        ALTER TABLE commits ADD COLUMN commit_committer integer REFERENCES committers ON DELETE CASCADE;
+
+        UPDATE commits SET commit_committer = committer_id FROM committers
+            WHERE commit_repository = committer_repository AND commit_author_email = committer_email;
+
+        ALTER TABLE commits DROP COLUMN commit_author_name CASCADE;
+        ALTER TABLE commits DROP COLUMN commit_author_email CASCADE;
+
+        COMMIT;
+
+        * init-database.sql: Added committers table, and replaced author columns in commits table by a foreign
+        reference to committers. Also added the missing drop table statements.
+
+        * public/api/commits.php:
+        (main): Fetch the corresponding committers row for a single commit. Also wrap a single commit by
+        an array here instead of doing it in format_commit.
+        (fetch_commits_between): Updated queries to JOIN commits with committers.
+        (format_commit): Takes both commit and committers rows. Also don't wrap the result in an array as that
+        is now done in main.
+
+        * public/api/report-commits.php:
+        (main): Store the reported committer information or update the existing entry if there is one.
+
+        * tests/admin-regenerate-manifest.js: Fixed tests.
+
+        * tests/api-report-commits.js: Ditto. Also added a test for updating an existing committer entry.
+
+        * tools/pull-svn.py: Renamed email to account.
+        (main):
+        (fetch_commit_and_resolve_author):
+        (fetch_commit):
+        (resolve_author_name_from_account):
+        (resolve_author_name_from_email): Deleted.
+
+2014-12-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix.
+
+        * public/v2/index.html: Include js files we extracted in r177424.
+
+2014-12-16  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed. Adding the forgotten svnprop.
+
+        * tools/pull-svn.py: Added property svn:executable.
+
+2014-12-16  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Split InteractiveChartComponent and CommitsViewerComponent into separate files
+        https://bugs.webkit.org/show_bug.cgi?id=139716
+
+        Rubber-stamped by Benjamin Poulain.
+
+        Refactored InteractiveChartComponent and CommitsViewerComponent out of app.js into commits-viewer.js
+        and interactive-chart.js respectively since app.js has gotten really large.
+
+        * public/v2/app.js:
+        * public/v2/commits-viewer.js: Added.
+        * public/v2/interactive-chart.js: Added.
+
+2014-12-02  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New perf dashboard's chart UI is buggy
+        https://bugs.webkit.org/show_bug.cgi?id=139214
+
+        Reviewed by Chris Dumez.
+
+        The bugginess was caused by weird interactions between charts and panes. Rewrote the code to fix it.
+
+        Superfluous selectionChanged and domainChanged "event" actions were removed from the interactive chart
+        component. This is not how Ember.js components should interact to begin with. The component now exposes
+        selectedPoints and always updates selection instead of sharedSelection.
+
+        * public/v2/app.js:
+        (App.ChartsController.present): Added. We can't call Date.now() in various points in our code as that
+        would lead to infinite mutual recursions since X-axis domain values wouldn't match up.
+        (App.ChartsController.updateSharedDomain): This function was completely useless. The overview's start
+        and end time should be completely determined by "since" and the present time.
+        (App.ChartsController._startTimeChanged): Ditto.
+        (App.ChartsController._scheduleQueryStringUpdate):
+        (App.ChartsController._updateQueryString): Set "zoom" only if it's different from the shared domain.
+
+        (App.domainsAreEqual): Moved from InteractiveChartComponent._xDomainsAreSame.
+
+        (App.PaneController.actions.createAnalysisTask): Use selectedPoints property set by the chart.
+        (App.PaneController.actions.overviewDomainChanged): Removed; only needed to call updateSharedDomain.
+        (App.PaneController.actions.rangeChanged): Removed. _showDetails (renamed to _updateDetails) directly
+        observes the changes to selectedPoints property as it gets updated by the main chart.
+        (App.PaneController._overviewSelectionChanged): This was previously a dead code. Now it's used again
+        with a bug fix. When the overview selection is cleared, we use the same domain in the main chart and
+        the overview chart.
+        (App.PaneController._sharedDomainChanged): Fixed a but that it erroneously updates the overview domain
+        when domain arrays aren't identical. This was causing a subtle race with other logic.
+        (App.PaneController._sharedZoomChanged): Ditto. Also don't set mainPlotDomain here as any changes to
+        overviewSelection will automatically propagate to the main plot's domain as they're aliased.
+        (App.PaneController._currentItemChanged): Merged into _updateDetails (renamed from _showDetails).
+        (App.PaneController._updateDetails): Previously, this function took points and inspected _hasRange to
+        see if those two points correspond to a range or a single data point. Rewrote all that logic by
+        directly observing selectedPoints and currentItem properties instead of taking points and relying on
+        an instance variable, which was a terrible API.
+        (App.PaneController._updateCanAnalyze): Use selectedPoints property. Since this property is only set
+        when the main plot has a selected range, we don't have to check this._hasRange anymore.
+
+        (App.InteractiveChartComponent._updateDomain): No longer sends domainChanged "event" action.
+        (App.InteractiveChartComponent._sharedSelectionChanged): Removed. This is a dead code.
+        (App.InteractiveChartComponent._updateSelection):
+        (App.InteractiveChartComponent._xDomainsAreSame): Moved to App.domainsAreEqual.
+        (App.InteractiveChartComponent._setCurrentSelection): Update the selection only if needed. Also set
+        selectedPoints property.
+
+        (App.AnalysisTaskController._fetchedRuns):
+        (App.AnalysisTaskController._rootChangedForTestSet):
+
+        * public/v2/index.html:
+        Removed non-functional sharedSelection and superfluous selectionChanged and domainChanged actions.
+
+2014-11-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed. Fixed syntax errors.
+
+        * init-database.sql:
+        * public/api/commits.php:
+
+2014-11-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        The dashboard on new perf monitor should be configurable
+        https://bugs.webkit.org/show_bug.cgi?id=138994
+
+        Reviewed by Benjamin Poulain.
+
+        For now, make it configurable via config.json. We should eventually make it configurable via
+        an administrative page but this will do for now.
+
+        * config.json: Added the empty dashboard configuration.
+
+        * public/include/manifest.php: Include the dashboard configuration in the manifest file.
+
+        * public/v2/app.js:
+        (App.IndexController): Removed defaultTable since this is now dynamically obtained via App.Manifest.
+        (App.IndexController.gridChanged): Use App.Dashboard to parse the dashboard configuration.
+        Also obtain the default configuration from App.Manifest.
+        (App.IndexController._normalizeTable): Moved to App.Dashboard.
+
+        * public/v2/manifest.js:
+        (App.Repository.urlForRevision): Fixed the position of the open curly bracket.
+        (App.Repository.urlForRevisionRange): Ditto.
+        (App.Dashboard): Added.
+        (App.Dashboard.table): Extracted from App.IndexController.gridChanged.
+        (App.Dashboard.rows): Ditto.
+        (App.Dashboard.headerColumns): Ditto.
+        (App.Dashboard._normalizeTable): Moved from App.IndexController._normalizeTable.
+        (App.MetricSerializer.normalizePayload): Synthesize a dashboard record from the configuration.
+        Since there is exactly one dashboard object per app, it's okay to hard code an id here.
+        (App.Manifest._fetchedManifest): Set defaultDashboard to the one and only one dashboard we have.
+
+2014-11-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        There should be a way to associate bugs with analysis tasks
+        https://bugs.webkit.org/show_bug.cgi?id=138977
+
+        Reviewed by Benjamin Poulain.
+
+        Updated associate-bug.php to match the new database schema.
+
+        * public/include/json-header.php:
+        (require_format): Removed the call to camel_case_words_separated_by_underscore since the name is
+        already camel-cased in require_existence_of. This makes the function usable elsewhere.
+
+        * public/privileged-api/associate-bug.php:
+        (main): Changed the API to take run, bugTracker, and number to match the new database schema.
+        Also verify that those values are integers using require_format.
+
+        * public/v2/analysis.js:
+        (App.AnalysisTask.label): Added. Concatenates the task's name with the bug numbers.
+        (App.Bug.label): Added.
+        (App.BugAdapter): Added.
+        (App.BugAdapter.createRecord): Use PrivilegedAPI instead of the builtin ajax call.
+        (App.BuildRequest): Inherit from newly added App.Model, which is set to DS.Model right now.
+
+        * public/v2/app.css: Renamed .test-groups to .analysis-group. Also added new rules for the table
+        containing the bug information.
+
+        * public/v2/app.js:
+        (App.InteractiveChartComponent._rangesChanged): Added label to range bar objects.
+        (App.AnalysisTaskRoute):
+        (App.AnalysisTaskController): Replaced the functionality of App.AnalysisTaskViewModel.
+        (App.AnalysisTaskController._fetchedManifest): Added.
+        (App.AnalysisTaskController.actions.associateBug): Added.
+
+        * public/v2/chart-pane.css: Renamed .bugs-pane to .analysis-pane.
+
+        * public/v2/data.js:
+        (Measurement.prototype.associateBug): Deleted.
+
+        * public/v2/index.html: Renamed .bugs-pane to .analysis-pane and .test-groups to .analysis-group.
+        Added a table show the bug information. Also hide the chart until chartData is available.
+
+        * public/v2/manifest.js:
+        (App.Model): Added.
+
+2014-11-20  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix misc bugs and typos in app.js
+        https://bugs.webkit.org/show_bug.cgi?id=138946
+
+        Reviewed by Benjamin Poulain.
+
+        * public/v2/app.js:
+        (App.DashboardPaneProxyForPicker._platformOrMetricIdChanged):
+        (App.ChartsController.init):
+        (App.buildPopup): Renamed from App.BuildPopup.
+        (App.InteractiveChartComponent._constructGraphIfPossible): Fixed the bug that we were calling
+        remove() on the wrong object (an array as opposed to elements in the array).
+        (App.InteractiveChartComponent._highlightedItemsChanged): Check the length of _highlights as
+        _highlights is always an array and evalutes to true.
+
+2014-11-20  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New perf dashboard should provide UI to create a new analysis task
+        https://bugs.webkit.org/show_bug.cgi?id=138910
+
+        Reviewed by Benjamin Poulain.
+
+        This patch reverts some parts of r175006 and re-introduces bugs associated with analysis tasks.
+        I'll add UI to show and edit bug numbers associated with an analysis task in a follow up patch.
+
+        With this patch, we can create a new analysis task by selection a range of points and opening
+        "analysis pane" (renamed from "bugs pane"). Each analysis task created is represented by a yellow bar
+        in the chart hyperlinked to the analysis task.
+
+        * init-database.sql: Redefined the bugs to be associated with an analysis task instead of a test run.
+
+        * public/api/analysis-tasks.php: Added the support for querying analysis tasks for a specific metric
+        on a specific platform. Also retrieve and return all bugs associated with analysis tasks.
+        (main):
+        (fetch_and_push_bugs_to_tasks): Added. Fetches all bugs associated with an array of analysis tasks
+        and adds the associated bugs to each task in the array.
+        (format_task):
+
+        * public/api/runs.php: Reverted changes made in r175006.
+        (fetch_runs_for_config):
+        (format_run): 
+
+        * public/api/test-groups.php:
+        (fetch_test_groups_for_task): Use the newly added Database::select_rows.
+
+        * public/include/db.php:
+        (Database::select_first_or_last_row):
+        (Database::select_rows): Extracted from select_first_or_last_row.
+
+        * public/v2/analysis.js:
+        (App.AnalysisTask): Added "bugs" property.
+        (App.Bug): Added now that bugs are regular data store objects.
+
+        * public/v2/app.js:
+        (App.Pane._fetch): Calls this.fetchAnalyticRanges to fetch analysis tasks as well as test runs.
+        (App.Pane.fetchAnalyticRanges): Added. Fetches analysis tasks for the current metric on the current
+        platform that are associated with a specific range of runs.
+        (App.PaneController.actions.toggleBugsPane): Updated per showingBugsPane to showingAnalysisPane rename.
+        (App.PaneController.actions.associateBug): Deleted.
+        (App.PaneController.actions.createAnalysisTask): Replaced the pre-condition checks with assertions as
+        this action should never be triggered when the pre-condition is not met. Also re-fetch analysis tasks
+        once we've created one.
+        (App.PaneController.toggleSearchPane): Updated per showingBugsPane to showingAnalysisPane rename.
+        (App.PaneController._detailsChanged): Ditto. Removed selectedSinglePoint since it's no longer used.
+        (App.PaneController._showDetails): Call _updateCanAnalyze to update the status of "Analyze" button.
+        (App.PaneController._updateBugs): Deleted.
+        (App.PaneController._updateMarkedPoints): Deleted.
+        (App.PaneController._updateCanAnalyze): Added. Disables the button to create an analysis task when
+        the name is missing or when at most one point is selected.
+        
+        (App.InteractiveChartComponent._constructGraphIfPossible): Update the locations of range rects.
+        (App.InteractiveChartComponent._relayoutDataAndAxes): Ditto.
+        (App.InteractiveChartComponent._mousePointInGraph): Don't return a point unless the mouse cursor is
+        on our svg element to avoid locking the current item when a bar shown for an analysis task is clicked.
+        (App.InteractiveChartComponent._rangesChanged): Added. Creates an array of objects representing
+        clickable bars for analysis tasks.
+        (App.InteractiveChartComponent._updateRangeBarRects): Computes the inline style used by each clickable
+        bar for analysis tasks to place them at the right location.
+        (App.InteractiveChartComponent.actions.openRange): Added. Forwards the action to the parent controller.
+
+        * public/v2/chart-pane.css:
+        (.chart .extent): Use the same color as the vertical indicator in the highlight behind the selection.
+        (.chart .rangeBar): Added.
+
+        * public/v2/data.js:
+        (TimeSeries.prototype.nextPoint): Added. Used by _rangesChanged.
+
+        * public/v2/index.html: Renamed "bugs pane" to "analysis pane" and removed the UI to associate bugs.
+        This ability will be reinstated in a follow up patch. Also added a container div and spans for analysis
+        task bars in the interactive chart component.
+
+2014-11-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix typos in r176203.
+
+        * public/v2/app.js:
+        (App.ChartsController.actions.addPaneByMetricAndPlatform):
+        (App.AnalysisTaskRoute):
+
+2014-11-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed. Updated the install instruction.
+
+        * Install.md:
+
+2014-11-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        App.Manifest shouldn't use App.__container__.lookup
+        https://bugs.webkit.org/show_bug.cgi?id=138768
+
+        Reviewed by Andreas Kling.
+
+        Removed the hack to find the store object via App.__container__.lookup.
+        Pass around the store object instead.
+
+        * public/v2/app.js:
+        (App.DashboardRow._createPane): Add "store" property to the pane.
+        (App.DashboardPaneProxyForPicker._platformOrMetricIdChanged): Ditto.
+        (App.IndexController.gridChanged): Ditto.
+        (App.IndexController.actions.addRow): Ditto.
+        (App.IndexController.init): Ditto.
+        (App.Pane._fetch): Ditto.
+        (App.ChartsController._parsePaneList): Ditto.
+        (App.ChartsController._updateQueryString): Ditto.
+        (App.ChartsController.actions.addPaneByMetricAndPlatform): Ditto.
+        (App.BuildPopup): Ditto.
+        (App.AnalysisTaskRoute.model): Ditto.
+        (App.AnalysisTaskViewModel._taskUpdated): Ditto.
+
+        * public/v2/manifest.js:
+        (App.Manifest.fetch): Removed the code to find the store object.
+
+2014-11-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix Ember.js warnings the new perf dashboard
+        https://bugs.webkit.org/show_bug.cgi?id=138531
+
+        Reviewed by Darin Adler.
+
+        Fixed various warnings.
+
+        * public/v2/app.js:
+        (App.InteractiveChartComponent._relayoutDataAndAxes): We can't use "rem". Use this._rem as done for x.
+        * public/v2/data.js:
+        (PrivilegedAPI._post): Removed the superfluous console.log.
+        (CommitLogs.fetchForTimeRange): Ditto.
+        * public/v2/index.html: Added tbody as required by the HTML specification.
+
+2014-11-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Fix typos in r175768.
+
+        * public/v2/app.js:
+        (App.AnalysisTaskViewModel.roots):
+
+2014-11-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Introduce the concept of analysis task to perf dashboard
+        https://bugs.webkit.org/show_bug.cgi?id=138517
+
+        Reviewed by Andreas Kling.
+
+        Introduced the concept of an analysis task, which is created for a range of measurements for a given metric on
+        a single platform and used to bisect regressions in the range.
+        
+        Added a new page to see the list of active analysis tasks and a page to view the contents of an analysis task.
+
+        * init-database.sql: Added a bunch of tables to store information about analysis tasks.
+            analysis_tasks - Represents each analysis task. Associated with a platform and a metric and possibly with two
+            test runs. Analysis tasks not associated with test runs are used for try new patches.
+            analysis_test_groups - A test group in an analysis task represents a bunch of related A/B testing results.
+            root_sets - A root set represents a set of roots (or packages) installed in each A/B testing.
+            build_requests - A build request represents a single pending build for A/B testing.
+
+        * public/api/analysis-tasks.php: Added. Returns the specified analysis task or all analysis tasks in an array.
+        (main):
+        (format_task):
+
+        * public/api/test-groups.php: Added. Returns analysis task groups for the specified analysis task or returns
+        the specified analysis task group as well as build requests associated with them.
+        (main):
+        (fetch_test_groups_for_task):
+        (fetch_build_requests_for_task):
+        (fetch_build_requests_for_group):
+        (format_test_group):
+        (format_build_request):
+
+        * public/include/json-header.php:
+        (remote_user_name): Extracted from compute_token so that we can use it in create-analysis-task.php.
+        (compute_token):
+
+        * public/privileged-api/associate-bug.php:
+        (main): Fixed a typo.
+
+        * public/privileged-api/create-analysis-task.php: Added. Creates a new analysis task for a given test run range.
+        (main):
+        (ensure_row_by_id):
+        (ensure_config_from_runs):
+
+        * public/privileged-api/generate-csrf-token.php: Use remote_user_name.
+
+        * public/v2/analysis.js: Added. Various Ember data store models to represent analysis tasks and related objects.
+        (App.AnalysisTask):
+        (App.AnalysisTask.create):
+        (App.TestGroup):
+        (App.TestGroupAdapter):
+        (App.AnalysisTaskSerializer):
+        (App.TestGroupSerializer):
+        (App.BuildRequest):
+
+        * public/v2/app.css: Added style rules for the analysis page.
+
+        * public/v2/app.js:
+        (App.Pane._fetch): Use fetchRunsWithPlatformAndMetric, which has been refactored into App.Manifest.
+
+        (App.PaneController.actions.toggleBugsPane): Show bugs pane even when there are no bug trackers or there is not
+        exactly one selected point as we can still create an analysis task.
+        (App.PaneController.actions.associateBug): Renamed singlySelectedPoint to selectedSinglePoint to be more
+        grammatical and also alert'ed the error message when there is one.
+        (App.PaneController.actions.createAnalysisTask): Added. Creates a new analysis task and opens it in a new tab.
+        Since window.open only works during the click, we open the new "window" preemptively and navigates or closes it
+        once XHR request has completed.
+        (App.PaneController._detailsChanged): Changes due to singlySelectedPoint to selectedSinglePoint rename.
+        (App.PaneController._updateBugs): Fixed a bug that we were showing bugs in the previous point when a single point
+        is selected in the details pane.
+
+        (App.AnalysisRoute): Added.
+        (App.AnalysisTaskRoute): Added.
+        (App.AnalysisTaskViewModel): Added.
+        (App.AnalysisTaskViewModel._taskUpdated): Fetch runs for the associated platform and metric.
+        (App.AnalysisTaskViewModel._fetchedRuns): Setup the chart data to show.
+        (App.AnalysisTaskViewModel.testSets): The computed property used to update roots for all repositories/projects.
+        (App.AnalysisTaskViewModel._rootChangedForTestSet): Updates root selections for all repositories/projects when
+        the user selects an option for all roots in A or B configuration.
+        (App.AnalysisTaskViewModel.roots): The computed property used to show root choices for each repository/project.
+
+        * public/v2/chart-pane.css: Added style rules for details view in the analysis task page.
+
+        * public/v2/data.js:
+        (Measurement.prototype._formatRevisionRange): Don't prefix a revision number with "At " when there is no previous
+        point so that we can use it in App.AnalysisTaskViewModel.roots.
+        (TimeSeries.prototype.findPointByMeasurementId): Added.
+        (TimeSeries.prototype.seriesBetweenPoints): Added.
+
+        * public/v2/index.html: Use Metric.fullName since the same value is needed in the analysis task page. Also added
+        a button to create an analysis task, and made bugs pane button always enabled since we can an analysis task even
+        when multiple points are selected. Finally, added a new template for the analysis task page.
+
+        * public/v2/manifest.js:
+        (App.Metric.fullName): Added to share code between the charts page and the analysis task page.
+        (App.Manifest.fetchRunsWithPlatformAndMetric): Extracted from App.Pane._fetch to be reused in
+        App.AnalysisTaskViewModel._taskUpdated.
+
+2014-10-28  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove App.PaneController.bugsChangeCount in the new perf dashboard
+        https://bugs.webkit.org/show_bug.cgi?id=138111
+
+        Reviewed by Darin Adler.
+
+        * public/v2/app.js:
+        (App.PaneController.bugsChangeCount): Removed.
+        (App.PaneController.actions.associateBug): Call _updateMarkedPoints instead of incrementing bugsChangeCount.
+        (App.PaneController._updateMarkedPoints): Extracted from App.InteractiveChartComponent._updateDotsWithBugs.
+        Finds the list of current run's points that are associated with bugs.
+        (App.InteractiveChartComponent._updateMarkedDots): Renamed from _updateDotsWithBugs.
+        * public/v2/chart-pane.css:
+        (.chart .marked): Renamed from .hasBugs.
+        * public/v2/index.html: Specify chartPointRadius and markedPoints.
+
+2014-10-27  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION: commit logs are not shown sometimes on the new dashboard UI
+        https://bugs.webkit.org/show_bug.cgi?id=138099
+
+        Reviewed by Benjamin Poulain.
+
+        The bug was caused by _currentItemChanged not passing the previous point in the list of points and also
+        _showDetails inverting the order of the current and old measurements.
+
+        * public/v2/app.js:
+        (App.PaneController._currentItemChanged): Pass in the previous point to _showDetails when there is one.
+        (App.PaneController._showDetails): Since points are ordered chronologically, the last point is the
+        current (latest) measurement and the first point is the oldest measurement.
+        (App.CommitsViewerComponent.commitsChanged): Don't show a single measurement as a range for clarity.
+
+2014-10-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf dashboard should provide a way to associate bugs with a test run
+        https://bugs.webkit.org/show_bug.cgi?id=137857
+
+        Reviewed by Andreas Kling.
+
+        Added a "privileged" API, /privileged-api/associate-bug, to associate a bug with a test run.
+        /privileged-api/ is to be protected by an authentication mechanism such as DigestAuth over https by
+        the Apache configuration.
+
+
+        The Cross Site Request (CSRF) Forgery prevention for privileged APIs work as follows. When a user is
+        about to make a privileged API access, the front end code obtains a CSRF token generated by POST'ing
+        to privileged-api/generate-csrf-token; the page sets a randomly generated salt and an expiration time
+        via the cookie and returns a token computed from those two values as well as the remote username.
+
+        The font end code then POST's the request along with the returned token. The server side code verifies
+        that the specified token can be generated from the salt and the expiration time set in the cookie, and
+        the token hasn't expired.
+
+
+        * init-database.sql: Added bug_url to bug_trackers table, and added bugs table. Each bug tracker will
+        have zero or exactly one bug associated with a test run.
+
+        * public/admin/bug-trackers.php: Added the support for editing bug_url.
+        * public/api/runs.php:
+        (fetch_runs_for_config): Modified the query to fetch bugs associated with test_runs.
+        (parse_bugs_array): Added. Parses the aggregated bugs and creates a dictionary that maps a tracker id to
+        an associated bug if there is one.
+        (format_run): Calls parse_bugs_array.
+
+        * public/include/json-header.php: Added helper functions to deal for CSRF prevention.
+        (ensure_privileged_api_data): Added. Dies immediately if the request's method is not POST or doesn't
+        have a valid JSON payload.
+        (ensure_privileged_api_data_and_token): Ditto. Also checks that the CSRF prevention token is valid.
+        (compute_token): Computes a CSRF token using the REMOTE_USER (e.g. set via BasicAuth), the salt, and
+        the expiration time stored in the cookie.
+        (verify_token): Returns true iff the specified token matches what compute_token returns from the cookie.
+
+        * public/include/manifest.php:
+        (ManifestGenerator::bug_trackers): Include bug_url as bugUrl in the manifest. Also use tracker_id instead
+        of tracker_name as the key in the manifest. This requires changes to both v1 and v2 front end.
+
+        * public/index.html:
+        (Chart..showTooltipWithResults): Updated for the manifest format changed mentioned above.
+
+        * public/privileged-api/associate-bug.php: Added.
+        (main): Added. Associates or dissociates a bug with a test run inside a transaction. It prevent a CSRF
+        attack via ensure_privileged_api_data_and_token, which calls verify_token.
+
+        * public/privileged-api/generate-csrf-token.php: Added. Generates a CSRF token valid for one hour.
+
+        * public/v2/app.css:
+        (.disabled .icon-button:hover g): Used by the "bugs" icon when a range of points or no points are
+        selected in a chart.
+
+        * public/v2/app.js:
+        (App.PaneController.actions.toggleBugsPane): Added. Toggles the visibility of the bugs pane when exactly
+        one point is selected in the chart. Also hides the search pane when making the bugs pane visible since
+        they would overlap on each other if both of them are shown.
+        (App.PaneController.actions.associateBug): Makes a privileged API request to associate the specified bug
+        with the currently selected point (test run). Updates the bug information in "details" and colors of dots
+        in the charts to reflect new states. Because chart data objects aren't real Ember objects for performance
+        reasons, we have to use a dirty hack of modifying a dummy counter bugsChangeCount.
+        (App.PaneController.actions.toggleSearchPane): Renamed from toggleSearch. Also hides the bugs pane when
+        showing the search pane.
+        (App.PaneController.actions.rangeChanged): Takes all selected points as the second argument instead of
+        taking start and end points as the second and the third arguments so that _showDetails can enumerate all
+        bugs in the selected range.
+
+        (App.PaneController._detailsChanged): Added. Hide the bugs pane whenever a new point is selected.
+        Also update singlySelectedPoint, which is used by toggleBugsPane and associateBug.
+        (App.PaneController._currentItemChanged): Updated for the _showDetails change.
+        (App.PaneController._showDetails): Takes an array of selected points in place of old arguments.
+        Simplified the code to compute the revision information. Calls _updateBugs to format the associated bugs.
+        (App.PaneController._updateBugs): Sets details.bugTrackers to a dictionary that maps a bug tracker id to
+        a bug tracker proxy with an array of (bugNumber, bugUrl) pairs and also editedBugNumber, which is used by
+        the bugs pane to associate or dissociate a bug number, if exactly one point is selected.
+
+        (App.InteractiveChartComponent._updateDotsWithBugs): Added. Sets hasBugs class on dots as needed.
+        (App.InteractiveChartComponent._setCurrentSelection): Finds and passes all points in the selected range
+        to selectionChanged action instead of just finding the first and the last points.
+
+        * public/v2/chart-pane.css: Updated the style.
+
+        * public/v2/data.js:
+        (PrivilegedAPI): Added. A wrapper for privileged APIs' CSRF tokens.
+        (PrivilegedAPI.sendRequest): Makes a privileged API call. Fetches a new CSRF token if needed.
+        (PrivilegedAPI._generateTokenInServerIfNeeded): Makes a request to privileged-api/generate-csrf-token if
+        we haven't already obtained a CSRF token or if the token has already been expired.
+        (PrivilegedAPI._post): Makes a single POST request to /privileged-api/* with a JSON payload.
+
+        (Measurement.prototype.bugs): Added.
+        (Measurement.prototype.hasBugs): Returns true iff bugs has more than one bug number.
+        (Measurement.prototype.associateBug): Associates a bug with a test run via privileged-api/associate-bug.
+
+        * public/v2/index.html: Added the bugs pane. Also added a list of bugs associated with the current run in
+        the details.
+
+        * public/v2/manifest.js:
+        (App.BugTracker.bugUrl):
+        (App.BugTracker.newBugUrl): Added.
+        (App.BugTracker.repositories): Added. This was a missing back reference to repositories.
+        (App.MetricSerializer.normalizePayload): Now parses/loads the list of bug trackers from the manifest.
+        (App.Manifest.repositoriesWithReportedCommits): Now initialized to an empty array instead of null.
+        (App.Manifest.bugTrackers): Added.
+        (App.Manifest._fetchedManifest): Sets App.Manifest.bugTrackers. Also sorts the list of repositories by
+        their respective ids to make the ordering stable.
+
+2014-10-14  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove unused jobs table
+        https://bugs.webkit.org/show_bug.cgi?id=137724
+
+        Reviewed by Daniel Bates.
+
+        Removed jobs table in the database as well as related code.
+
+        * init-database.sql:
+        * public/admin/jobs.php: Removed.
+        * public/admin/tests.php:
+        * public/include/admin-header.php:
+
+2014-10-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        New perf dashboard should have an ability to search commits by a keyword
+        https://bugs.webkit.org/show_bug.cgi?id=137675
+
+        Reviewed by Geoffrey Garen.
+
+        /api/commits/ now accepts query parameters to search a commit by a keyword. Its output format changed to
+        include "authorEmail" and "authorName" directly as columns instead of including an "author" object.
+        This API change allows fetch_commits_between to generate results without processing Postgres query results.
+
+        In the front end side, we've added a search pane in pane controller, and the interactive chart component
+        now has a concept of highlighted items which is used to indicate commits found by the search pane.
+
+        * public/api/commits.php:
+        (main): Extract query parameters: keyword, from, and to and use that to fetch appropriate commits.
+        (fetch_commits_between): Moved some code from main. Now takes a search term as the third argument.
+        We look for a commit if its author name or email contains the keyword or if its revision matches the keyword.
+        (format_commit): Renamed from format_commits. Now only formats one commit.
+
+        * public/include/db.php:
+        (Database::query_and_fetch_all): Now returns array() when the query results is empty (instead of false).
+
+        * public/v2/app.css: Renamed .close-button to .icon-button since it's used by a search button as well.
+
+        * public/v2/app.js:
+        (App.Pane.searchCommit): Added. Finds the commits by a search term and assigns 'highlightedItems',
+        which is a hash table that contains highlighted items' measurements' ids as keys.
+        (App.PaneController.actions.toggleSearch): Toggles the visibility of the search pane. Also sets
+        the default commit repository.
+        (App.PaneController.actions.searchCommit): Delegates the work to App.Pane.searchCommit.
+        (App.InteractiveChartComponent._constructGraphIfPossible): Fixed a bug that we weren't removing old this._dots.
+        Added the code to initialize this._highlights.
+        (App.InteractiveChartComponent._updateDimensionsIfNeeded): Updates dimensions of highlight lines.
+        (App.InteractiveChartComponent._updateHighlightPositions): Added. Ditto.
+        (App.InteractiveChartComponent._highlightedItemsChanged): Adds vertical lines for highlighted items and deletes
+        the existing lines for the old highlighted items.
+        (App.CommitsViewerComponent.commitsChanged): Updated the code per JSON API change mentioned above.
+        Also fixed a bug that the code tries to update the commits viewer even if the viewer had already been destroyed. 
+
+        * public/v2/chart-pane.css: Added style for the search pane and the search button.
+
+        * public/v2/data.js: Turned FetchCommitsForTimeRange into a class: CommitLogs.
+        (CommitLogs): Added.
+        (CommitLogs.fetchForTimeRange): Renamed from FetchCommitsForTimeRange. Takes a search term as an argument.
+        (CommitLogs._cachedCommitsBetween): Extracted from FetchCommitsForTimeRange.
+        (CommitLogs._cacheConsecutiveCommits): Ditto.
+        (FetchCommitsForTimeRange._cachedCommitsByRepository): Deleted.
+        (Measurement.prototype.commitTimeForRepository): Extracted from formattedRevisions.
+        (Measurement.prototype.formattedRevisions): Uses formattedRevisions. Deleted the unused code for commitTime.
+
+        * public/v2/index.html: Added the search pane and the search button. Also removed the unused attribute binding
+        for showingDetails since this property is no longer used.
+
+        * public/v2/manifest.js:
+        (App.Manifest.repositories): Added.
+        (App.Manifest.repositoriesWithReportedCommits): Ditto. Used by App.PaneController.actions.toggleSearch to find
+        the default repository to search.
+        (App.Manifest._fetchedManifest): Populates repositories and repositoriesWithReportedCommits.
+
+2014-10-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix after r174555.
+
+        * public/include/manifest.php:
+        (ManifestGenerator::generate): Assign an empty array to $repositories_with_commit when there are no commits.
+        * tests/admin-regenerate-manifest.js: Fixed the test case.
+
 2014-10-09  Ryosuke Niwa  <rniwa@webkit.org>
 
         New perf dashboard UI tries to fetch commits all the time

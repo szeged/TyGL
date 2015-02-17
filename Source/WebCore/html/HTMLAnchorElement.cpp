@@ -41,6 +41,7 @@
 #include "MouseEvent.h"
 #include "PingLoader.h"
 #include "PlatformMouseEvent.h"
+#include "RelList.h"
 #include "RenderImage.h"
 #include "ResourceRequest.h"
 #include "SVGImage.h"
@@ -62,14 +63,14 @@ HTMLAnchorElement::HTMLAnchorElement(const QualifiedName& tagName, Document& doc
 {
 }
 
-PassRefPtr<HTMLAnchorElement> HTMLAnchorElement::create(Document& document)
+Ref<HTMLAnchorElement> HTMLAnchorElement::create(Document& document)
 {
-    return adoptRef(new HTMLAnchorElement(aTag, document));
+    return adoptRef(*new HTMLAnchorElement(aTag, document));
 }
 
-PassRefPtr<HTMLAnchorElement> HTMLAnchorElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLAnchorElement> HTMLAnchorElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLAnchorElement(tagName, document));
+    return adoptRef(*new HTMLAnchorElement(tagName, document));
 }
 
 HTMLAnchorElement::~HTMLAnchorElement()
@@ -166,9 +167,9 @@ static void appendServerMapMousePosition(StringBuilder& url, Event* event)
     if (!imageElement.isServerMap())
         return;
 
-    if (!imageElement.renderer() || !imageElement.renderer()->isRenderImage())
+    if (!is<RenderImage>(imageElement.renderer()))
         return;
-    RenderImage& renderer = toRenderImage(*imageElement.renderer());
+    auto& renderer = downcast<RenderImage>(*imageElement.renderer());
 
     // FIXME: This should probably pass true for useTransforms.
     FloatPoint absolutePosition = renderer.absoluteToLocal(FloatPoint(downcast<MouseEvent>(*event).pageX(), downcast<MouseEvent>(*event).pageY()));
@@ -189,7 +190,7 @@ void HTMLAnchorElement::defaultEventHandler(Event* event)
             return;
         }
 
-        if (isLinkClick(event) && treatLinkAsLiveForEventType(eventType(event))) {
+        if (MouseEvent::canTriggerActivationBehavior(*event) && treatLinkAsLiveForEventType(eventType(event))) {
             handleClick(event);
             return;
         }
@@ -250,7 +251,7 @@ void HTMLAnchorElement::parseAttribute(const QualifiedName& name, const AtomicSt
         bool wasLink = isLink();
         setIsLink(!value.isNull() && !shouldProhibitLinks(this));
         if (wasLink != isLink())
-            didAffectSelector(AffectedSelectorLink | AffectedSelectorVisited);
+            setNeedsStyleRecalc();
         if (isLink()) {
             String parsedURL = stripLeadingAndTrailingHTMLSpaces(value);
             if (document().isDNSPrefetchEnabled()) {
@@ -261,8 +262,12 @@ void HTMLAnchorElement::parseAttribute(const QualifiedName& name, const AtomicSt
         invalidateCachedVisitedLinkHash();
     } else if (name == nameAttr || name == titleAttr) {
         // Do nothing.
-    } else if (name == relAttr)
-        setRel(value);
+    } else if (name == relAttr) {
+        if (SpaceSplitString::spaceSplitStringContainsValue(value, "noreferrer", true))
+            m_linkRelations |= RelationNoReferrer;
+        if (m_relList)
+            m_relList->updateRelAttribute(value);
+    }
     else
         HTMLElement::parseAttribute(name, value);
 }
@@ -310,10 +315,11 @@ bool HTMLAnchorElement::hasRel(uint32_t relation) const
     return m_linkRelations & relation;
 }
 
-void HTMLAnchorElement::setRel(const String& value)
+DOMTokenList& HTMLAnchorElement::relList()
 {
-    if (SpaceSplitString::spaceSplitStringContainsValue(value, "noreferrer", true))
-        m_linkRelations |= RelationNoReferrer;
+    if (!m_relList) 
+        m_relList = std::make_unique<RelList>(*this);
+    return *m_relList;
 }
 
 const AtomicString& HTMLAnchorElement::name() const
@@ -482,8 +488,7 @@ String HTMLAnchorElement::search() const
 
 String HTMLAnchorElement::origin() const
 {
-    RefPtr<SecurityOrigin> origin = SecurityOrigin::create(href());
-    return origin->toString();
+    return SecurityOrigin::create(href()).get().toString();
 }
 
 void HTMLAnchorElement::setSearch(const String& value)
@@ -498,7 +503,12 @@ void HTMLAnchorElement::setSearch(const String& value)
 
 String HTMLAnchorElement::text()
 {
-    return innerText();
+    return textContent();
+}
+
+void HTMLAnchorElement::setText(const String& text, ExceptionCode& ec)
+{
+    setTextContent(text, ec);
 }
 
 String HTMLAnchorElement::toString() const
@@ -595,11 +605,6 @@ bool HTMLAnchorElement::treatLinkAsLiveForEventType(EventType eventType) const
 bool isEnterKeyKeydownEvent(Event* event)
 {
     return event->type() == eventNames().keydownEvent && is<KeyboardEvent>(*event) && downcast<KeyboardEvent>(*event).keyIdentifier() == "Enter";
-}
-
-bool isLinkClick(Event* event)
-{
-    return event->type() == eventNames().clickEvent && (!is<MouseEvent>(*event) || downcast<MouseEvent>(*event).button() != RightButton);
 }
 
 bool shouldProhibitLinks(Element* element)

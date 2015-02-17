@@ -33,12 +33,16 @@
 #include "DownloadProxyMessages.h"
 #include "NetworkProcessCreationParameters.h"
 #include "NetworkProcessMessages.h"
-#include "WebContext.h"
 #include "WebProcessMessages.h"
+#include "WebProcessPool.h"
 #include <wtf/RunLoop.h>
 
 #if ENABLE(SEC_ITEM_SHIM)
 #include "SecItemShimProxy.h"
+#endif
+
+#if PLATFORM(IOS)
+#include <wtf/spi/darwin/XPCSPI.h>
 #endif
 
 #define MESSAGE_CHECK(assertion) MESSAGE_CHECK_BASE(assertion, connection())
@@ -47,23 +51,29 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<NetworkProcessProxy> NetworkProcessProxy::create(WebContext& webContext)
+static uint64_t generateCallbackID()
 {
-    return adoptRef(new NetworkProcessProxy(webContext));
+    static uint64_t callbackID;
+
+    return ++callbackID;
 }
 
-NetworkProcessProxy::NetworkProcessProxy(WebContext& webContext)
-    : m_webContext(webContext)
+PassRefPtr<NetworkProcessProxy> NetworkProcessProxy::create(WebProcessPool& processPool)
+{
+    return adoptRef(new NetworkProcessProxy(processPool));
+}
+
+NetworkProcessProxy::NetworkProcessProxy(WebProcessPool& processPool)
+    : m_processPool(processPool)
     , m_numPendingConnectionRequests(0)
-#if ENABLE(CUSTOM_PROTOCOLS)
-    , m_customProtocolManagerProxy(this, webContext)
-#endif
+    , m_customProtocolManagerProxy(this, processPool)
 {
     connect();
 }
 
 NetworkProcessProxy::~NetworkProcessProxy()
 {
+    ASSERT(m_pendingDeleteWebsiteDataCallbacks.isEmpty());
 }
 
 void NetworkProcessProxy::getLaunchOptions(ProcessLauncher::LaunchOptions& launchOptions)
@@ -72,17 +82,13 @@ void NetworkProcessProxy::getLaunchOptions(ProcessLauncher::LaunchOptions& launc
     platformGetLaunchOptions(launchOptions);
 }
 
-void NetworkProcessProxy::connectionWillOpen(IPC::Connection* connection)
+void NetworkProcessProxy::connectionWillOpen(IPC::Connection& connection)
 {
 #if ENABLE(SEC_ITEM_SHIM)
-    SecItemShimProxy::shared().initializeConnection(connection);
+    SecItemShimProxy::singleton().initializeConnection(connection);
 #else
     UNUSED_PARAM(connection);
 #endif
-}
-
-void NetworkProcessProxy::connectionWillClose(IPC::Connection*)
-{
 }
 
 void NetworkProcessProxy::getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply> reply)
@@ -102,7 +108,15 @@ DownloadProxy* NetworkProcessProxy::createDownloadProxy(const ResourceRequest& r
     if (!m_downloadProxyMap)
         m_downloadProxyMap = std::make_unique<DownloadProxyMap>(this);
 
-    return m_downloadProxyMap->createDownloadProxy(m_webContext, resourceRequest);
+    return m_downloadProxyMap->createDownloadProxy(m_processPool, resourceRequest);
+}
+
+void NetworkProcessProxy::deleteWebsiteData(WebCore::SessionID sessionID, WebsiteDataTypes dataTypes, std::chrono::system_clock::time_point modifiedSince,  std::function<void ()> completionHandler)
+{
+    auto callbackID = generateCallbackID();
+
+    m_pendingDeleteWebsiteDataCallbacks.add(callbackID, WTF::move(completionHandler));
+    send(Messages::NetworkProcess::DeleteWebsiteData(sessionID, dataTypes, modifiedSince, callbackID), 0);
 }
 
 void NetworkProcessProxy::networkProcessCrashedOrFailedToLaunch()
@@ -120,22 +134,26 @@ void NetworkProcessProxy::networkProcessCrashedOrFailedToLaunch()
 #endif
     }
 
+    for (const auto& callback : m_pendingDeleteWebsiteDataCallbacks.values())
+        callback();
+    m_pendingDeleteWebsiteDataCallbacks.clear();
+
     // Tell the network process manager to forget about this network process proxy. This may cause us to be deleted.
-    m_webContext.networkProcessCrashed(this);
+    m_processPool.networkProcessCrashed(this);
 }
 
-void NetworkProcessProxy::didReceiveMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder)
+void NetworkProcessProxy::didReceiveMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
 {
     if (dispatchMessage(connection, decoder))
         return;
 
-    if (m_webContext.dispatchMessage(connection, decoder))
+    if (m_processPool.dispatchMessage(connection, decoder))
         return;
 
     didReceiveNetworkProcessProxyMessage(connection, decoder);
 }
 
-void NetworkProcessProxy::didReceiveSyncMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
+void NetworkProcessProxy::didReceiveSyncMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
 {
     if (dispatchSyncMessage(connection, decoder, replyEncoder))
         return;
@@ -143,7 +161,7 @@ void NetworkProcessProxy::didReceiveSyncMessage(IPC::Connection* connection, IPC
     ASSERT_NOT_REACHED();
 }
 
-void NetworkProcessProxy::didClose(IPC::Connection*)
+void NetworkProcessProxy::didClose(IPC::Connection&)
 {
     if (m_downloadProxyMap)
         m_downloadProxyMap->processDidClose();
@@ -152,7 +170,7 @@ void NetworkProcessProxy::didClose(IPC::Connection*)
     networkProcessCrashedOrFailedToLaunch();
 }
 
-void NetworkProcessProxy::didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference, IPC::StringReference)
+void NetworkProcessProxy::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
 {
 }
 
@@ -181,6 +199,12 @@ void NetworkProcessProxy::didReceiveAuthenticationChallenge(uint64_t pageID, uin
     page->didReceiveAuthenticationChallengeProxy(frameID, authenticationChallenge.release());
 }
 
+void NetworkProcessProxy::didDeleteWebsiteData(uint64_t callbackID)
+{
+    auto callback = m_pendingDeleteWebsiteDataCallbacks.take(callbackID);
+    callback();
+}
+
 void NetworkProcessProxy::didFinishLaunching(ProcessLauncher* launcher, IPC::Connection::Identifier connectionIdentifier)
 {
     ChildProcessProxy::didFinishLaunching(launcher, connectionIdentifier);
@@ -196,11 +220,11 @@ void NetworkProcessProxy::didFinishLaunching(ProcessLauncher* launcher, IPC::Con
     m_numPendingConnectionRequests = 0;
 
 #if PLATFORM(COCOA)
-    if (m_webContext.processSuppressionEnabled())
+    if (m_processPool.processSuppressionEnabled())
         setProcessSuppressionEnabled(true);
 #endif
     
-#if PLATFORM(IOS) && USE(XPC_SERVICES)
+#if PLATFORM(IOS)
     if (xpc_connection_t connection = this->connection()->xpcConnection())
         m_assertion = std::make_unique<ProcessAssertion>(xpc_connection_get_pid(connection), AssertionState::Foreground);
 #endif

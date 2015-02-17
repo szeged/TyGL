@@ -30,9 +30,9 @@
 
 #import "APIArray.h"
 #import "APIData.h"
+#import "APIDictionary.h"
 #import "APINumber.h"
 #import "APIString.h"
-#import "MutableDictionary.h"
 #import "_WKRemoteObjectInterfaceInternal.h"
 #import <objc/runtime.h>
 #import <wtf/RetainPtr.h>
@@ -45,9 +45,7 @@ static const char* const objectStreamKey = "$objectStream";
 static NSString * const selectorKey = @"selector";
 static NSString * const typeStringKey = @"typeString";
 
-using namespace WebKit;
-
-static PassRefPtr<ImmutableDictionary> createEncodedObject(WKRemoteObjectEncoder *, id);
+static PassRefPtr<API::Dictionary> createEncodedObject(WKRemoteObjectEncoder *, id);
 
 @interface NSMethodSignature (Details)
 - (NSString *)_typeString;
@@ -58,10 +56,10 @@ static PassRefPtr<ImmutableDictionary> createEncodedObject(WKRemoteObjectEncoder
 @end
 
 @implementation WKRemoteObjectEncoder {
-    RefPtr<MutableDictionary> _rootDictionary;
+    RefPtr<API::Dictionary> _rootDictionary;
     API::Array* _objectStream;
 
-    MutableDictionary* _currentDictionary;
+    API::Dictionary* _currentDictionary;
 }
 
 - (id)init
@@ -69,7 +67,7 @@ static PassRefPtr<ImmutableDictionary> createEncodedObject(WKRemoteObjectEncoder
     if (!(self = [super init]))
         return nil;
 
-    _rootDictionary = MutableDictionary::create();
+    _rootDictionary = API::Dictionary::create();
     _currentDictionary = _rootDictionary.get();
 
     return self;
@@ -84,7 +82,7 @@ static PassRefPtr<ImmutableDictionary> createEncodedObject(WKRemoteObjectEncoder
 }
 #endif
 
-- (ImmutableDictionary*)rootObjectDictionary
+- (API::Dictionary*)rootObjectDictionary
 {
     return _rootDictionary.get();
 }
@@ -107,7 +105,7 @@ static void encodeToObjectStream(WKRemoteObjectEncoder *encoder, id value)
     size_t position = encoder->_objectStream->size();
     encoder->_objectStream->elements().append(nullptr);
 
-    RefPtr<ImmutableDictionary> encodedObject = createEncodedObject(encoder, value);
+    RefPtr<API::Dictionary> encodedObject = createEncodedObject(encoder, value);
     ASSERT(!encoder->_objectStream->elements()[position]);
     encoder->_objectStream->elements()[position] = encodedObject.release();
 }
@@ -131,6 +129,15 @@ static void encodeInvocation(WKRemoteObjectEncoder *encoder, NSInvocation *invoc
         // double
         case 'd': {
             double value;
+            [invocation getArgument:&value atIndex:i];
+
+            encodeToObjectStream(encoder, @(value));
+            break;
+        }
+
+        // float
+        case 'f': {
+            float value;
             [invocation getArgument:&value atIndex:i];
 
             encodeToObjectStream(encoder, @(value));
@@ -231,13 +238,13 @@ static void encodeObject(WKRemoteObjectEncoder *encoder, id object)
     [object encodeWithCoder:encoder];
 }
 
-static PassRefPtr<ImmutableDictionary> createEncodedObject(WKRemoteObjectEncoder *encoder, id object)
+static PassRefPtr<API::Dictionary> createEncodedObject(WKRemoteObjectEncoder *encoder, id object)
 {
     if (!object)
         return nil;
 
-    RefPtr<MutableDictionary> dictionary = MutableDictionary::create();
-    TemporaryChange<MutableDictionary*> dictionaryChange(encoder->_currentDictionary, dictionary.get());
+    RefPtr<API::Dictionary> dictionary = API::Dictionary::create();
+    TemporaryChange<API::Dictionary*> dictionaryChange(encoder->_currentDictionary, dictionary.get());
 
     encodeObject(encoder, object);
 
@@ -300,6 +307,11 @@ static NSString *escapeKey(NSString *key)
     return [self encodeInt64:intv forKey:key];
 }
 
+- (void)encodeFloat:(float)value forKey:(NSString *)key
+{
+    _currentDictionary->set(escapeKey(key), API::Double::create(value));
+}
+
 - (void)encodeDouble:(double)value forKey:(NSString *)key
 {
     _currentDictionary->set(escapeKey(key), API::Double::create(value));
@@ -315,8 +327,8 @@ static NSString *escapeKey(NSString *key)
 @implementation WKRemoteObjectDecoder {
     RetainPtr<_WKRemoteObjectInterface> _interface;
 
-    const ImmutableDictionary* _rootDictionary;
-    const ImmutableDictionary* _currentDictionary;
+    const API::Dictionary* _rootDictionary;
+    const API::Dictionary* _currentDictionary;
 
     const API::Array* _objectStream;
     size_t _objectStreamPosition;
@@ -324,7 +336,7 @@ static NSString *escapeKey(NSString *key)
     NSSet *_allowedClasses;
 }
 
-- (id)initWithInterface:(_WKRemoteObjectInterface *)interface rootObjectDictionary:(const WebKit::ImmutableDictionary*)rootObjectDictionary
+- (id)initWithInterface:(_WKRemoteObjectInterface *)interface rootObjectDictionary:(const API::Dictionary*)rootObjectDictionary
 {
     if (!(self = [super init]))
         return nil;
@@ -367,7 +379,7 @@ static NSString *escapeKey(NSString *key)
     return [self decodeObjectOfClasses:nil forKey:key];
 }
 
-static id decodeObject(WKRemoteObjectDecoder *, const ImmutableDictionary*, NSSet *allowedClasses);
+static id decodeObject(WKRemoteObjectDecoder *, const API::Dictionary*, NSSet *allowedClasses);
 
 static id decodeObjectFromObjectStream(WKRemoteObjectDecoder *decoder, NSSet *allowedClasses)
 {
@@ -377,7 +389,7 @@ static id decodeObjectFromObjectStream(WKRemoteObjectDecoder *decoder, NSSet *al
     if (decoder->_objectStreamPosition == decoder->_objectStream->size())
         return nil;
 
-    const ImmutableDictionary* dictionary = decoder->_objectStream->at<ImmutableDictionary>(decoder->_objectStreamPosition++);
+    const API::Dictionary* dictionary = decoder->_objectStream->at<API::Dictionary>(decoder->_objectStreamPosition++);
 
     return decodeObject(decoder, dictionary, allowedClasses);
 }
@@ -424,6 +436,13 @@ static void decodeInvocationArguments(WKRemoteObjectDecoder *decoder, NSInvocati
         // double
         case 'd': {
             double value = [decodeObjectFromObjectStream(decoder, [NSSet setWithObject:[NSNumber class]]) doubleValue];
+            [invocation setArgument:&value atIndex:i];
+            break;
+        }
+
+        // float
+        case 'f': {
+            float value = [decodeObjectFromObjectStream(decoder, [NSSet setWithObject:[NSNumber class]]) floatValue];
             [invocation setArgument:&value atIndex:i];
             break;
         }
@@ -549,12 +568,12 @@ static id decodeObject(WKRemoteObjectDecoder *decoder)
     return [result autorelease];
 }
 
-static id decodeObject(WKRemoteObjectDecoder *decoder, const ImmutableDictionary* dictionary, NSSet *allowedClasses)
+static id decodeObject(WKRemoteObjectDecoder *decoder, const API::Dictionary* dictionary, NSSet *allowedClasses)
 {
     if (!dictionary)
         return nil;
 
-    TemporaryChange<const ImmutableDictionary*> dictionaryChange(decoder->_currentDictionary, dictionary);
+    TemporaryChange<const API::Dictionary*> dictionaryChange(decoder->_currentDictionary, dictionary);
 
     // If no allowed classes were listed, just use the currently allowed classes.
     if (!allowedClasses)
@@ -585,6 +604,14 @@ static id decodeObject(WKRemoteObjectDecoder *decoder, const ImmutableDictionary
     return [self decodeInt64ForKey:key];
 }
 
+- (float)decodeFloatForKey:(NSString *)key
+{
+    const API::Double* value = _currentDictionary->get<API::Double>(escapeKey(key));
+    if (!value)
+        return 0;
+    return value->value();
+}
+
 - (double)decodeDoubleForKey:(NSString *)key
 {
     const API::Double* value = _currentDictionary->get<API::Double>(escapeKey(key));
@@ -612,7 +639,7 @@ static id decodeObject(WKRemoteObjectDecoder *decoder, const ImmutableDictionary
 
 - (id)decodeObjectOfClasses:(NSSet *)classes forKey:(NSString *)key
 {
-    return decodeObject(self, _currentDictionary->get<ImmutableDictionary>(escapeKey(key)), classes);
+    return decodeObject(self, _currentDictionary->get<API::Dictionary>(escapeKey(key)), classes);
 }
 
 - (NSSet *)allowedClasses

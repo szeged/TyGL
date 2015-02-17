@@ -103,14 +103,14 @@ private:
 
     virtual void mainFrameContentSizeChanged(const WebCore::IntSize&) override;
 
-    virtual void viewStateDidChange(WebCore::ViewState::Flags changed, bool wantsDidUpdateViewState) override;
+    virtual void viewStateDidChange(WebCore::ViewState::Flags changed, bool wantsDidUpdateViewState, const Vector<uint64_t>& callbackIDs) override;
 
     virtual bool adjustLayerFlushThrottling(WebCore::LayerFlushThrottleState::Flags) override;
 
     void updateScrolledExposedRect();
     void updateRootLayers();
 
-    void layerFlushTimerFired(WebCore::Timer<RemoteLayerTreeDrawingArea>*);
+    void layerFlushTimerFired();
     void flushLayers();
 
     WebCore::TiledBacking* mainFrameTiledBacking() const;
@@ -144,7 +144,7 @@ private:
     WebCore::FloatRect m_exposedRect;
     WebCore::FloatRect m_scrolledExposedRect;
 
-    WebCore::Timer<RemoteLayerTreeDrawingArea> m_layerFlushTimer;
+    WebCore::Timer m_layerFlushTimer;
     bool m_isFlushingSuspended;
     bool m_hasDeferredFlush;
     bool m_isThrottlingLayerFlushes;

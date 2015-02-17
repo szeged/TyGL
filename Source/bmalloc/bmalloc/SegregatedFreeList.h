@@ -44,6 +44,13 @@ public:
     // Does not eagerly remove the returned range from the free list.
     Range take(size_t);
 
+    // Returns a reasonable fit for the provided alignment and size, or
+    // a reasonable fit for the provided unaligned size, or Range() if no fit
+    // is found. May return Range() spuriously if searching takes too long.
+    // Incrementally removes stale items from the free list while searching.
+    // Does not eagerly remove the returned range from the free list.
+    Range take(size_t alignment, size_t, size_t unalignedSize);
+
     // Returns an unreasonable fit for the provided size, or Range() if no fit
     // is found. Never returns Range() spuriously.
     // Incrementally removes stale items from the free list while searching.
@@ -54,8 +61,8 @@ private:
     typedef Vector<Range> List;
 
     List& select(size_t);
-
     Range take(List&, size_t);
+    Range take(List&, size_t alignment, size_t, size_t unalignedSize);
     Range takeGreedy(List&, size_t);
 
     std::array<List, 19> m_lists;

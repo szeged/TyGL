@@ -30,11 +30,11 @@
 #import <CoreSimulator/CoreSimulator.h>
 
 @interface LTRelayController ()
-@property (readonly, strong) NSFileHandle *standardInput;
+@property (readonly, strong) dispatch_source_t standardInputDispatchSource;
 @property (readonly, strong) NSFileHandle *standardOutput;
 @property (readonly, strong) NSFileHandle *standardError;
 @property (readonly, strong) NSString *uniqueAppPath;
-@property (readonly, strong) NSString *uniqueAppIdentifer;
+@property (readonly, strong) NSString *uniqueAppIdentifier;
 @property (readonly, strong) NSURL *uniqueAppURL;
 @property (readonly, strong) NSString *originalAppIdentifier;
 @property (readonly, strong) NSString *originalAppPath;
@@ -58,9 +58,25 @@
         _originalAppIdentifier = [NSDictionary dictionaryWithContentsOfFile:[_originalAppPath stringByAppendingPathComponent:@"Info.plist"]][(NSString *)kCFBundleIdentifierKey];
         _identifierSuffix = suffix;
         _dumpToolArguments = arguments;
-        _standardInput = [NSFileHandle fileHandleWithStandardInput];
+        _standardInputDispatchSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, STDIN_FILENO, 0, dispatch_get_main_queue());
         _standardOutput = [NSFileHandle fileHandleWithStandardOutput];
         _standardError = [NSFileHandle fileHandleWithStandardError];
+
+        dispatch_source_set_event_handler(_standardInputDispatchSource, ^{
+            uint8_t buffer[1024];
+            ssize_t len = read(STDIN_FILENO, buffer, sizeof(buffer));
+            if (len > 0) {
+                @try {
+                    [[[self relay] outputStream] write:buffer maxLength:len];
+                } @catch (NSException *e) {
+                    // Broken pipe - the dump tool crashed. Time to die.
+                    [self didCrashWithMessage:nil];
+                }
+            } else {
+                // EOF Received on the relay's standard input.
+                [self finish];
+            }
+        });
 
         _relay = [[LTPipeRelay alloc] initWithPrefix:[@"/tmp" stringByAppendingPathComponent:[self uniqueAppIdentifier]]];
         [_relay setRelayDelegate:self];
@@ -87,45 +103,44 @@
     return [[[self originalAppIdentifier] componentsSeparatedByString:@"."] lastObject];
 }
 
-- (void)readFileHandle:(NSFileHandle *)fileHandle
-{
-    @try {
-        NSData *data = [fileHandle availableData];
-        [[[self relay] outputStream] write:[data bytes] maxLength:[data length]];
-    } @catch (NSException *e) {
-        // Broken pipe - the dump tool crashed. Time to die.
-        [self didCrashWithMessage:nil];
-    }
-}
-
-
 - (void)didReceiveStdoutData:(NSData *)data
 {
-    [[self standardOutput] writeData:data];
+    @try {
+        [[self standardOutput] writeData:data];
+    } @catch (NSException *exception) {
+        // NSFileHandleOperationException
+        // Broken pipe - the test harness stopped listening to us,
+        // probably because we timed out or a run was canceled.
+        exit(EXIT_FAILURE);
+    }
 }
 
 - (void)didReceiveStderrData:(NSData *)data
 {
-    [[self standardError] writeData:data];
+    @try {
+        [[self standardError] writeData:data];
+    } @catch (NSException *exception) {
+        // NSFileHandleOperationException
+        // Broken pipe - the test harness stopped listening to us,
+        // probably because we timed out or a run was canceled.
+        exit(EXIT_FAILURE);
+    }
 }
 
 - (void)didDisconnect
 {
-    [[self standardInput] setReadabilityHandler:nil];
+    dispatch_suspend([self standardInputDispatchSource]);
 }
 
 - (void)didConnect
 {
-    [[self standardInput] setReadabilityHandler: ^(NSFileHandle *fileHandle)
-    {
-        [self readFileHandle:fileHandle];
-    }];
+    dispatch_resume([self standardInputDispatchSource]);
 }
 
 - (void)didCrashWithMessage:(NSString *)message
 {
     [[self relay] disconnect];
-    NSString *crashMessage = [NSString stringWithFormat:@"\nCRASH: %@ %d\n", [self processName], [self pid]];
+    NSString *crashMessage = [NSString stringWithFormat:@"\n#CRASHED - %@ (pid %d)\n", [self processName], [self pid]];
 
     if (message)
         crashMessage = [crashMessage stringByAppendingFormat:@"%@\n", message];
@@ -204,13 +219,13 @@
     [self setPid:pid];
 
     dispatch_queue_t queue = dispatch_get_main_queue();
-    dispatch_source_t dispatchSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, [self pid], DISPATCH_PROC_EXIT, queue);
-    [self setAppDispatchSource:dispatchSource];
-    dispatch_source_set_event_handler(dispatchSource, ^{
-        dispatch_source_cancel(dispatchSource);
+    dispatch_source_t simulatorAppExitDispatchSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, [self pid], DISPATCH_PROC_EXIT, queue);
+    [self setAppDispatchSource:simulatorAppExitDispatchSource];
+    dispatch_source_set_event_handler(simulatorAppExitDispatchSource, ^{
+        dispatch_source_cancel(simulatorAppExitDispatchSource);
         [self didCrashWithMessage:nil];
     });
-    dispatch_resume(dispatchSource);
+    dispatch_resume(simulatorAppExitDispatchSource);
 }
 
 - (void)start
@@ -219,6 +234,13 @@
     [[self relay] setup];
     [self launchApp];
     [[self relay] connect];
+}
+
+- (void)finish
+{
+    [[self relay] disconnect];
+    [self killApp];
+    exit(EXIT_SUCCESS);
 }
 
 @end

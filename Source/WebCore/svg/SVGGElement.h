@@ -30,12 +30,12 @@ namespace WebCore {
 class SVGGElement final : public SVGGraphicsElement,
                           public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGGElement> create(const QualifiedName&, Document&);
+    static Ref<SVGGElement> create(const QualifiedName&, Document&);
 
 private:
     SVGGElement(const QualifiedName&, Document&);
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     virtual bool isValid() const override { return SVGTests::isValid(); }
 

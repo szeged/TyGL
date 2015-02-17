@@ -32,19 +32,16 @@
 #include "APIObject.h"
 #include "DefaultUndoController.h"
 #include "PageClient.h"
-#include "WebContext.h"
 #include "WebFullScreenManagerProxy.h"
 #include "WebPageGroup.h"
 #include "WebPageProxy.h"
 #include "WebPreferences.h"
+#include "WebProcessPool.h"
 #include "WebViewClient.h"
 #include <WebCore/TransformationMatrix.h>
 
-namespace WebCore {
-class CoordinatedGraphicsScene;
-}
-
 namespace WebKit {
+class CoordinatedGraphicsScene;
 
 class WebView : public API::ObjectImpl<API::Object::Type::View>, public PageClient
 #if ENABLE(FULLSCREEN_API)
@@ -54,7 +51,7 @@ class WebView : public API::ObjectImpl<API::Object::Type::View>, public PageClie
 public:
     virtual ~WebView();
 
-    static PassRefPtr<WebView> create(WebContext*, WebPageGroup*);
+    static PassRefPtr<WebView> create(WebProcessPool*, WebPageGroup*);
 
     void initialize();
 
@@ -117,8 +114,8 @@ public:
     double opacity() const { return m_opacity; }
 
 protected:
-    WebView(WebContext*, WebPageGroup*);
-    WebCore::CoordinatedGraphicsScene* coordinatedGraphicsScene();
+    WebView(WebProcessPool*, WebPageGroup*);
+    CoordinatedGraphicsScene* coordinatedGraphicsScene();
 
     void updateViewportSize();
     WebCore::FloatSize dipSize() const;
@@ -184,7 +181,8 @@ protected:
     virtual PassRefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) override;
 #endif
 
-    virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool, bool) override;
+    virtual void setTextIndicator(PassRefPtr<WebCore::TextIndicator>, bool) override;
+    virtual void setTextIndicatorAnimationProgress(float) override;
 
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) override;
     virtual void exitAcceleratedCompositingMode() override;

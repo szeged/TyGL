@@ -126,7 +126,7 @@
         return loaded; \
     } \
     \
-    resultType functionName parameterDeclarations \
+    __attribute__((visibility("hidden"))) resultType functionName parameterDeclarations \
     { \
         ASSERT(softLink##functionName); \
         return softLink##functionName parameterNames; \
@@ -143,6 +143,7 @@
     }
 
 #define SOFT_LINK_CLASS(framework, className) \
+    @class className; \
     static Class init##className(); \
     static Class (*get##className##Class)() = init##className; \
     static Class class##className; \
@@ -159,9 +160,17 @@
         ASSERT(class##className); \
         get##className##Class = className##Function; \
         return class##className; \
-    }
+    } \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wunused-function\"") \
+    static className *alloc##className##Instance() \
+    { \
+        return [get##className##Class() alloc]; \
+    } \
+    _Pragma("clang diagnostic pop")
 
 #define SOFT_LINK_CLASS_OPTIONAL(framework, className) \
+    @class className; \
     static Class init##className(); \
     static Class (*get##className##Class)() = init##className; \
     static Class class##className; \
@@ -177,7 +186,14 @@
         class##className = objc_getClass(#className); \
         get##className##Class = className##Function; \
         return class##className; \
-    }
+    } \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wunused-function\"") \
+    static className *alloc##className##Instance() \
+    { \
+        return [get##className##Class() alloc]; \
+    } \
+    _Pragma("clang diagnostic pop")
 
 #define SOFT_LINK_POINTER(framework, name, type) \
     static type init##name(); \
@@ -236,7 +252,6 @@
         return constant##name; \
     }
 
-#if PLATFORM(IOS)
 #define SOFT_LINK_CONSTANT_MAY_FAIL(framework, name, type) \
     static bool init##name(); \
     static type (*get##name)() = 0; \
@@ -263,4 +278,3 @@
         get##name = name##Function; \
         return true; \
     }
-#endif

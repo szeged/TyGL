@@ -33,7 +33,7 @@ class HTMLFieldSetElement;
 
 class RenderFieldset final : public RenderBlockFlow {
 public:
-    RenderFieldset(HTMLFieldSetElement&, PassRef<RenderStyle>);
+    RenderFieldset(HTMLFieldSetElement&, Ref<RenderStyle>&&);
 
     enum FindLegendOption { IgnoreFloatingOrOutOfFlow, IncludeFloatingOrOutOfFlow };
     RenderBox* findLegend(FindLegendOption = IgnoreFloatingOrOutOfFlow) const;
@@ -54,8 +54,6 @@ private:
     virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&) override;
     virtual void paintMask(PaintInfo&, const LayoutPoint&) override;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderFieldset, isFieldset())
 
 } // namespace WebCore
 

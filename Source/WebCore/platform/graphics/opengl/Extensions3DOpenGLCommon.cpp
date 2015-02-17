@@ -84,17 +84,6 @@ Extensions3DOpenGLCommon::Extensions3DOpenGLCommon(GraphicsContext3D* context)
     // or if the vendor is AMD/ATI and the system is 10.7.2 and above.
 
     bool systemSupportsMultisampling = true;
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED < 1080
-    ASSERT(isMainThread());
-    static SInt32 version;
-    if (!version) {
-        if (Gestalt(gestaltSystemVersion, &version) != noErr)
-            systemSupportsMultisampling = false;
-    }
-    // See https://bugs.webkit.org/show_bug.cgi?id=77922 for more details
-    if (systemSupportsMultisampling)
-        systemSupportsMultisampling = version >= 0x1072;
-#endif // SNOW_LEOPARD and LION
 
     if (m_isAMD && !systemSupportsMultisampling)
         m_maySupportMultisampling = false;
@@ -142,6 +131,14 @@ void Extensions3DOpenGLCommon::ensureEnabled(const String& name)
         ShBuiltInResources ANGLEResources = compiler.getResources();
         if (!ANGLEResources.EXT_shader_texture_lod) {
             ANGLEResources.EXT_shader_texture_lod = 1;
+            compiler.setResources(ANGLEResources);
+        }
+    } else if (name == "GL_EXT_frag_depth") {
+        // Enable support in ANGLE (if not enabled already)
+        ANGLEWebKitBridge& compiler = m_context->m_compiler;
+        ShBuiltInResources ANGLEResources = compiler.getResources();
+        if (!ANGLEResources.EXT_frag_depth) {
+            ANGLEResources.EXT_frag_depth = 1;
             compiler.setResources(ANGLEResources);
         }
     }

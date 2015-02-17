@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2012-2015 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Patrick Gansterer <paroga@paroga.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,7 @@
 #include "JIT.h"
 
 #include "Arguments.h"
+#include "BasicBlockLocation.h"
 #include "CopiedSpaceInlines.h"
 #include "Debugger.h"
 #include "Heap.h"
@@ -250,31 +251,6 @@ void JIT::emit_op_ret(Instruction* currentInstruction)
     ret();
 }
 
-void JIT::emit_op_ret_object_or_this(Instruction* currentInstruction)
-{
-    ASSERT(callFrameRegister != regT1);
-    ASSERT(regT1 != returnValueGPR);
-    ASSERT(returnValueGPR != callFrameRegister);
-
-    // Return the result in %eax.
-    emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueGPR);
-    Jump notJSCell = emitJumpIfNotJSCell(returnValueGPR);
-    Jump notObject = emitJumpIfCellNotObject(returnValueGPR);
-
-    // Return.
-    emitFunctionEpilogue();
-    ret();
-
-    // Return 'this' in %eax.
-    notJSCell.link(this);
-    notObject.link(this);
-    emitGetVirtualRegister(currentInstruction[2].u.operand, returnValueGPR);
-
-    // Return.
-    emitFunctionEpilogue();
-    ret();
-}
-
 void JIT::emit_op_to_primitive(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
@@ -444,13 +420,16 @@ void JIT::emit_op_throw(Instruction* currentInstruction)
 
 void JIT::emit_op_push_with_scope(Instruction* currentInstruction)
 {
-    emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
-    callOperation(operationPushWithScope, regT0);
+    int dst = currentInstruction[1].u.operand;
+    emitGetVirtualRegister(currentInstruction[2].u.operand, regT0);
+    callOperation(operationPushWithScope, dst, regT0);
 }
 
-void JIT::emit_op_pop_scope(Instruction*)
+void JIT::emit_op_pop_scope(Instruction* currentInstruction)
 {
-    callOperation(operationPopScope);
+    int scope = currentInstruction[1].u.operand;
+
+    callOperation(operationPopScope, scope);
 }
 
 void JIT::compileOpStrictEq(Instruction* currentInstruction, CompileOpStrictEqType type)
@@ -506,8 +485,9 @@ void JIT::emit_op_to_number(Instruction* currentInstruction)
 
 void JIT::emit_op_push_name_scope(Instruction* currentInstruction)
 {
-    emitGetVirtualRegister(currentInstruction[2].u.operand, regT0);
-    callOperation(operationPushNameScope, &m_codeBlock->identifier(currentInstruction[1].u.operand), regT0, currentInstruction[3].u.operand, currentInstruction[4].u.operand);
+    int dst = currentInstruction[1].u.operand;
+    emitGetVirtualRegister(currentInstruction[3].u.operand, regT0);
+    callOperation(operationPushNameScope, dst, &m_codeBlock->identifier(currentInstruction[2].u.operand), regT0, currentInstruction[4].u.operand, currentInstruction[5].u.operand);
 }
 
 void JIT::emit_op_catch(Instruction* currentInstruction)
@@ -665,18 +645,34 @@ void JIT::emit_op_enter(Instruction*)
 void JIT::emit_op_create_lexical_environment(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
+    int scope = currentInstruction[2].u.operand;
 
-    callOperation(operationCreateActivation, 0);
+    emitGetVirtualRegister(scope, regT0);
+    callOperation(operationCreateActivation, regT0, 0);
     emitStoreCell(dst, returnValueGPR);
+    emitStoreCell(scope, returnValueGPR);
+}
+
+void JIT::emit_op_get_scope(Instruction* currentInstruction)
+{
+    int dst = currentInstruction[1].u.operand;
+    emitGetFromCallFrameHeaderPtr(JSStack::Callee, regT0);
+    loadPtr(Address(regT0, JSFunction::offsetOfScopeChain()), regT0);
+    emitStoreCell(dst, regT0);
 }
 
 void JIT::emit_op_create_arguments(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
+    int lexicalEnvironment = currentInstruction[2].u.operand;
 
     Jump argsCreated = branchTest64(NonZero, Address(callFrameRegister, sizeof(Register) * dst));
 
-    callOperation(operationCreateArguments);
+    if (VirtualRegister(lexicalEnvironment).isValid()) {
+        emitGetVirtualRegister(lexicalEnvironment, regT0);
+        callOperation(operationCreateArguments, regT0);
+    } else
+        callOperation(operationCreateArguments, TrustedImmPtr(nullptr));
     emitStoreCell(dst, returnValueGPR);
     emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(dst)), returnValueGPR);
 
@@ -924,13 +920,12 @@ void JIT::emit_op_get_argument_by_val(Instruction* currentInstruction)
     addSlowCase(branchTest64(NonZero, addressFor(argumentsRegister)));
     emitGetVirtualRegister(property, regT1);
     addSlowCase(emitJumpIfNotImmediateInteger(regT1));
-    add32(TrustedImm32(1), regT1);
-    // regT1 now contains the integer index of the argument we want, including this
     emitGetFromCallFrameHeader32(JSStack::ArgumentCount, regT2);
+    sub32(TrustedImm32(1), regT2);
     addSlowCase(branch32(AboveOrEqual, regT1, regT2));
 
     signExtend32ToPtr(regT1, regT1);
-    load64(BaseIndex(callFrameRegister, regT1, TimesEight, CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register))), regT0);
+    load64(BaseIndex(callFrameRegister, regT1, TimesEight, CallFrame::argumentOffset(0) * static_cast<int>(sizeof(Register))), regT0);
     emitValueProfilingSite();
     emitPutVirtualRegister(dst, regT0);
 }
@@ -940,13 +935,18 @@ void JIT::emitSlow_op_get_argument_by_val(Instruction* currentInstruction, Vecto
     int dst = currentInstruction[1].u.operand;
     int arguments = currentInstruction[2].u.operand;
     int property = currentInstruction[3].u.operand;
+    int lexicalEnvironment = currentInstruction[4].u.operand;
     
     linkSlowCase(iter);
     Jump skipArgumentsCreation = jump();
     
     linkSlowCase(iter);
     linkSlowCase(iter);
-    callOperation(operationCreateArguments);
+    if (VirtualRegister(lexicalEnvironment).isValid()) {
+        emitGetVirtualRegister(lexicalEnvironment, regT0);
+        callOperation(operationCreateArguments, regT0);
+    } else
+        callOperation(operationCreateArguments, TrustedImmPtr(nullptr));
     emitStoreCell(arguments, returnValueGPR);
     emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(arguments)), returnValueGPR);
     
@@ -1020,7 +1020,7 @@ void JIT::emit_op_new_func(Instruction* currentInstruction)
 {
     Jump lazyJump;
     int dst = currentInstruction[1].u.operand;
-    if (currentInstruction[3].u.operand) {
+    if (currentInstruction[4].u.operand) {
 #if USE(JSVALUE32_64)
         lazyJump = branch32(NotEqual, tagFor(dst), TrustedImm32(JSValue::EmptyValueTag));
 #else
@@ -1028,18 +1028,38 @@ void JIT::emit_op_new_func(Instruction* currentInstruction)
 #endif
     }
 
-    FunctionExecutable* funcExec = m_codeBlock->functionDecl(currentInstruction[2].u.operand);
-    callOperation(operationNewFunction, dst, funcExec);
+#if USE(JSVALUE64)
+    emitGetVirtualRegister(currentInstruction[2].u.operand, regT0);
+#else
+    emitLoadPayload(currentInstruction[2].u.operand, regT0);
+#endif
+    FunctionExecutable* funcExec = m_codeBlock->functionDecl(currentInstruction[3].u.operand);
+    callOperation(operationNewFunction, dst, regT0, funcExec);
 
-    if (currentInstruction[3].u.operand)
+    if (currentInstruction[4].u.operand)
         lazyJump.link(this);
 }
 
 void JIT::emit_op_new_func_exp(Instruction* currentInstruction)
 {
+    Jump notUndefinedScope;
     int dst = currentInstruction[1].u.operand;
-    FunctionExecutable* funcExpr = m_codeBlock->functionExpr(currentInstruction[2].u.operand);
-    callOperation(operationNewFunction, dst, funcExpr);
+#if USE(JSVALUE64)
+    emitGetVirtualRegister(currentInstruction[2].u.operand, regT0);
+    notUndefinedScope = branch64(NotEqual, regT0, TrustedImm64(JSValue::encode(jsUndefined())));
+    store64(TrustedImm64(JSValue::encode(jsUndefined())), Address(callFrameRegister, sizeof(Register) * dst));
+#else
+    emitLoadPayload(currentInstruction[2].u.operand, regT0);
+    notUndefinedScope = branch32(NotEqual, tagFor(currentInstruction[2].u.operand), TrustedImm32(JSValue::UndefinedTag));
+    emitStore(dst, jsUndefined());
+#endif
+
+    Jump done = jump();
+    notUndefinedScope.link(this);
+
+    FunctionExecutable* funcExpr = m_codeBlock->functionExpr(currentInstruction[3].u.operand);
+    callOperation(operationNewFunction, dst, regT0, funcExpr);
+    done.link(this);
 }
 
 void JIT::emit_op_new_array(Instruction* currentInstruction)
@@ -1364,6 +1384,13 @@ void JIT::emit_op_profile_type(Instruction* currentInstruction)
     skipClearLog.link(this);
 
     jumpToEnd.link(this);
+}
+
+void JIT::emit_op_profile_control_flow(Instruction* currentInstruction)
+{
+    BasicBlockLocation* basicBlockLocation = currentInstruction[1].u.basicBlockLocation;
+    if (!basicBlockLocation->hasExecuted())
+        basicBlockLocation->emitExecuteCode(*this, regT1);
 }
 
 #endif // USE(JSVALUE64)

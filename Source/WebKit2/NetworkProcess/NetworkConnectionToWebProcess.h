@@ -55,18 +55,22 @@ public:
 
     bool isSerialLoadingEnabled() const { return m_serialLoadingEnabled; }
 
+    void didCleanupResourceLoader(NetworkResourceLoader&);
+
 private:
     NetworkConnectionToWebProcess(IPC::Connection::Identifier);
 
     // IPC::Connection::Client
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&);
-    virtual void didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
-    virtual void didClose(IPC::Connection*);
-    virtual void didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference messageReceiverName, IPC::StringReference messageName);
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    virtual void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
+    virtual void didClose(IPC::Connection&) override;
+    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::Network; }
+    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Web; }
 
     // Message handlers.
-    void didReceiveNetworkConnectionToWebProcessMessage(IPC::Connection*, IPC::MessageDecoder&);
-    void didReceiveSyncNetworkConnectionToWebProcessMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
+    void didReceiveNetworkConnectionToWebProcessMessage(IPC::Connection&, IPC::MessageDecoder&);
+    void didReceiveSyncNetworkConnectionToWebProcessMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
     
     void scheduleResourceLoad(const NetworkResourceLoadParameters&);
     void performSynchronousLoad(const NetworkResourceLoadParameters&, PassRefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>);

@@ -50,14 +50,14 @@ HTMLProgressElement::~HTMLProgressElement()
 {
 }
 
-PassRefPtr<HTMLProgressElement> HTMLProgressElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLProgressElement> HTMLProgressElement::create(const QualifiedName& tagName, Document& document)
 {
-    RefPtr<HTMLProgressElement> progress = adoptRef(new HTMLProgressElement(tagName, document));
+    Ref<HTMLProgressElement> progress = adoptRef(*new HTMLProgressElement(tagName, document));
     progress->ensureUserAgentShadowRoot();
-    return progress.release();
+    return progress;
 }
 
-RenderPtr<RenderElement> HTMLProgressElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLProgressElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     if (!style.get().hasAppearance())
         return RenderElement::createFor(*this, WTF::move(style));
@@ -72,9 +72,9 @@ bool HTMLProgressElement::childShouldCreateRenderer(const Node& child) const
 
 RenderProgress* HTMLProgressElement::renderProgress() const
 {
-    if (renderer() && renderer()->isProgress())
-        return toRenderProgress(renderer());
-    return toRenderProgress(descendantsOfType<Element>(*userAgentShadowRoot()).first()->renderer());
+    if (is<RenderProgress>(renderer()))
+        return downcast<RenderProgress>(renderer());
+    return downcast<RenderProgress>(descendantsOfType<Element>(*userAgentShadowRoot()).first()->renderer());
 }
 
 void HTMLProgressElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -142,7 +142,7 @@ void HTMLProgressElement::didElementStateChange()
         bool wasDeterminate = render->isDeterminate();
         render->updateFromElement();
         if (wasDeterminate != isDeterminate())
-            didAffectSelector(AffectedSelectorIndeterminate);
+            setNeedsStyleRecalc();
     }
 }
 

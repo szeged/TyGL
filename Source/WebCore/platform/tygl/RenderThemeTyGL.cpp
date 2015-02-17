@@ -154,6 +154,10 @@ void RenderThemeTyGL::systemFont(WebCore::CSSValueID, FontDescription&) const
 {
 }
 
+void RenderThemeTyGL::updateCachedSystemFontDescription(CSSValueID systemFontID, FontDescription&) const
+{
+}
+
 bool RenderThemeTyGL::paintButton(const RenderObject& object, const PaintInfo& info, const IntRect& rect)
 {
     info.context->platformContext()->drawUIElement(PlatformGraphicsContext::Button, rect, this, &object);
@@ -242,7 +246,7 @@ void RenderThemeTyGL::adjustProgressBarStyle(StyleResolver&, RenderStyle& style,
 
 bool RenderThemeTyGL::paintProgressBar(const RenderObject& object, const PaintInfo& info, const IntRect& rect)
 {
-    const RenderProgress* renderProgress = toRenderProgress(&object);
+    const RenderProgress* renderProgress = &(downcast<RenderProgress>(object));
 
     info.context->platformContext()->fillRect(rect, Color(TyGL::gray225));
 
@@ -434,7 +438,7 @@ bool RenderThemeTyGL::paintMeter(const RenderObject& object, const PaintInfo& in
     if (!object.isMeter())
         return true;
 
-    HTMLMeterElement* meterElement = toRenderMeter(object).meterElement();
+    HTMLMeterElement* meterElement = downcast<RenderMeter>(object).meterElement();
 
     info.context->platformContext()->fillRect(rect, Color(TyGL::gray225));
 

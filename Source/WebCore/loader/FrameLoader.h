@@ -38,6 +38,7 @@
 #include "IconURL.h"
 #include "LayoutMilestones.h"
 #include "MixedContentChecker.h"
+#include "PageThrottler.h"
 #include "ResourceHandleTypes.h"
 #include "ResourceLoadNotifier.h"
 #include "SecurityContext.h"
@@ -66,7 +67,6 @@ class IconController;
 class NavigationAction;
 class NetworkingContext;
 class Page;
-class PageActivityAssertionToken;
 class PolicyChecker;
 class ResourceError;
 class ResourceRequest;
@@ -125,7 +125,7 @@ public:
     WEBCORE_EXPORT void reloadWithOverrideEncoding(const String& overrideEncoding);
 
     void open(CachedFrameBase&);
-    void loadItem(HistoryItem*, FrameLoadType);
+    void loadItem(HistoryItem&, FrameLoadType);
     HistoryItem* requestedHistoryItem() const { return m_requestedHistoryItem.get(); }
 
     void retryAfterFailedCacheOnlyMainResourceLoad();
@@ -267,8 +267,6 @@ public:
 
     bool suppressOpenerInNewFrame() const { return m_suppressOpenerInNewFrame; }
 
-    static ObjectContentType defaultObjectContentType(const URL&, const String& mimeType, bool shouldPreferPlugInsForImages);
-
     bool quickRedirectComing() const { return m_quickRedirectComing; }
 
     WEBCORE_EXPORT bool shouldClose();
@@ -299,10 +297,10 @@ private:
 
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
-    void checkTimerFired(Timer<FrameLoader>&);
+    void checkTimerFired();
     
-    void loadSameDocumentItem(HistoryItem*);
-    void loadDifferentDocumentItem(HistoryItem*, FrameLoadType, FormSubmissionCacheLoadPolicy);
+    void loadSameDocumentItem(HistoryItem&);
+    void loadDifferentDocumentItem(HistoryItem&, FrameLoadType, FormSubmissionCacheLoadPolicy);
     
     void loadProvisionalItemFromCachedPage();
 
@@ -423,7 +421,7 @@ private:
 
     URL m_submittedFormURL;
 
-    Timer<FrameLoader> m_checkTimer;
+    Timer m_checkTimer;
     bool m_shouldCallCheckCompleted;
     bool m_shouldCallCheckLoadComplete;
 
@@ -443,7 +441,7 @@ private:
 
     URL m_previousURL;
     RefPtr<HistoryItem> m_requestedHistoryItem;
-    std::unique_ptr<PageActivityAssertionToken> m_activityAssertion;
+    PageActivityAssertionToken m_activityAssertion;
 };
 
 // This function is called by createWindow() in JSDOMWindowBase.cpp, for example, for

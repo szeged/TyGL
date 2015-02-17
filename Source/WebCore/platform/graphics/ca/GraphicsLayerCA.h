@@ -45,6 +45,7 @@
 
 namespace WebCore {
 
+class FloatRoundedRect;
 class Image;
 class TransformState;
 
@@ -55,10 +56,10 @@ public:
     // to keep the overall tile cost low.
     static const int kTiledLayerTileSize = 512;
 
-    WEBCORE_EXPORT explicit GraphicsLayerCA(GraphicsLayerClient&);
+    WEBCORE_EXPORT explicit GraphicsLayerCA(Type, GraphicsLayerClient&);
     WEBCORE_EXPORT virtual ~GraphicsLayerCA();
 
-    WEBCORE_EXPORT virtual void initialize() override;
+    WEBCORE_EXPORT virtual void initialize(Type) override;
 
     WEBCORE_EXPORT virtual void setName(const String&) override;
 
@@ -105,6 +106,8 @@ public:
     WEBCORE_EXPORT virtual bool setFilters(const FilterOperations&) override;
     virtual bool filtersCanBeComposited(const FilterOperations&);
 
+    WEBCORE_EXPORT virtual bool setBackdropFilters(const FilterOperations&) override;
+
 #if ENABLE(CSS_COMPOSITING)
     WEBCORE_EXPORT virtual void setBlendMode(BlendMode) override;
 #endif
@@ -114,8 +117,9 @@ public:
     WEBCORE_EXPORT virtual void setContentsNeedsDisplay() override;
     
     WEBCORE_EXPORT virtual void setContentsRect(const FloatRect&) override;
-    WEBCORE_EXPORT virtual void setContentsClippingRect(const FloatRect&) override;
-    
+    WEBCORE_EXPORT virtual void setContentsClippingRect(const FloatRoundedRect&) override;
+    WEBCORE_EXPORT virtual bool setMasksToBoundsRect(const FloatRoundedRect&) override;
+
     WEBCORE_EXPORT virtual void suspendAnimations(double time) override;
     WEBCORE_EXPORT virtual void resumeAnimations() override;
 
@@ -139,7 +143,6 @@ public:
     WEBCORE_EXPORT virtual void setDebugBorder(const Color&, float borderWidth) override;
 
     WEBCORE_EXPORT virtual void setCustomAppearance(CustomAppearance) override;
-    WEBCORE_EXPORT virtual void setCustomBehavior(CustomBehavior) override;
 
     WEBCORE_EXPORT virtual void deviceOrPageScaleFactorChanged() override;
 
@@ -202,6 +205,7 @@ private:
     WEBCORE_EXPORT void layerDidDisplay(PlatformCALayer*);
     void updateOpacityOnLayer();
     void updateFilters();
+    void updateBackdropFilters();
 
 #if ENABLE(CSS_COMPOSITING)
     void updateBlendMode();
@@ -262,6 +266,8 @@ private:
 
     void setupContentsLayer(PlatformCALayer*);
     PlatformCALayer* contentsLayer() const { return m_contentsLayer.get(); }
+
+    void updateClippingStrategy(PlatformCALayer&, RefPtr<PlatformCALayer>& shapeMaskLayer, const FloatRoundedRect&);
 
     WEBCORE_EXPORT virtual void setReplicatedByLayer(GraphicsLayer*) override;
 
@@ -341,14 +347,12 @@ private:
     PassRefPtr<PlatformCALayer> findOrMakeClone(CloneID, PlatformCALayer *, LayerMap*, CloneLevel);
 
     void ensureCloneLayers(CloneID, RefPtr<PlatformCALayer>& primaryLayer, RefPtr<PlatformCALayer>& structuralLayer,
-        RefPtr<PlatformCALayer>& contentsLayer, RefPtr<PlatformCALayer>& contentsClippingLayer, CloneLevel);
+        RefPtr<PlatformCALayer>& contentsLayer, RefPtr<PlatformCALayer>& contentsClippingLayer, RefPtr<PlatformCALayer>& contentsShapeMaskLayer, RefPtr<PlatformCALayer>& shapeMaskLayer, CloneLevel);
 
-    bool hasCloneLayers() const { return m_layerClones; }
+    bool hasCloneLayers() const { return !!m_layerClones; }
     void removeCloneLayers();
     FloatPoint positionForCloneRootLayer() const;
-    
-    void propagateLayerChangeToReplicas();
-    
+
     // All these "update" methods will be called inside a BEGIN_BLOCK_OBJC_EXCEPTIONS/END_BLOCK_OBJC_EXCEPTIONS block.
     void updateLayerNames();
     void updateSublayerList(bool maxLayerDepthReached = false);
@@ -367,6 +371,7 @@ private:
     void updateContentsPlatformLayer();
     void updateContentsColorLayer();
     void updateContentsRects();
+    void updateMasksToBoundsRect();
     void updateMaskLayer();
     void updateReplicatedLayers();
 
@@ -378,61 +383,71 @@ private:
     void updateTiles();
     void updateContentsScale(float pageScaleFactor);
     void updateCustomAppearance();
-    void updateCustomBehavior();
 
     enum StructuralLayerPurpose {
         NoStructuralLayer = 0,
         StructuralLayerForPreserves3D,
-        StructuralLayerForReplicaFlattening
+        StructuralLayerForReplicaFlattening,
+        StructuralLayerForBackdrop
     };
     void ensureStructuralLayer(StructuralLayerPurpose);
     StructuralLayerPurpose structuralLayerPurpose() const;
 
-    void setAnimationOnLayer(PlatformCAAnimation*, AnimatedPropertyID, const String& animationName, int index, int subIndex, double timeOffset);
+    void setAnimationOnLayer(PlatformCAAnimation&, AnimatedPropertyID, const String& animationName, int index, int subIndex, double timeOffset);
     bool removeCAAnimationFromLayer(AnimatedPropertyID, const String& animationName, int index, int subINdex);
     void pauseCAAnimationOnLayer(AnimatedPropertyID, const String& animationName, int index, int subIndex, double timeOffset);
 
     enum MoveOrCopy { Move, Copy };
     static void moveOrCopyLayerAnimation(MoveOrCopy, const String& animationIdentifier, PlatformCALayer *fromLayer, PlatformCALayer *toLayer);
-    void moveOrCopyAnimations(MoveOrCopy, PlatformCALayer * fromLayer, PlatformCALayer * toLayer);
-    
+    void moveOrCopyAnimations(MoveOrCopy, PlatformCALayer* fromLayer, PlatformCALayer* toLayer);
+
+    void moveAnimations(PlatformCALayer* fromLayer, PlatformCALayer* toLayer)
+    {
+        moveOrCopyAnimations(Move, fromLayer, toLayer);
+    }
+    void copyAnimations(PlatformCALayer* fromLayer, PlatformCALayer* toLayer)
+    {
+        moveOrCopyAnimations(Copy, fromLayer, toLayer);
+    }
+
     bool appendToUncommittedAnimations(const KeyframeValueList&, const TransformOperations*, const Animation*, const String& animationName, const FloatSize& boxSize, int animationIndex, double timeOffset, bool isMatrixAnimation);
     bool appendToUncommittedAnimations(const KeyframeValueList&, const FilterOperation*, const Animation*, const String& animationName, int animationIndex, double timeOffset);
 
     enum LayerChange {
-        NoChange = 0,
-        NameChanged = 1LLU << 1,
-        ChildrenChanged = 1LLU << 2, // also used for content layer, and preserves-3d, and size if tiling changes?
-        GeometryChanged = 1LLU << 3,
-        TransformChanged = 1LLU << 4,
-        ChildrenTransformChanged = 1LLU << 5,
-        Preserves3DChanged = 1LLU << 6,
-        MasksToBoundsChanged = 1LLU << 7,
-        DrawsContentChanged = 1LLU << 8,
-        BackgroundColorChanged = 1LLU << 9,
-        ContentsOpaqueChanged = 1LLU << 10,
-        BackfaceVisibilityChanged = 1LLU << 11,
-        OpacityChanged = 1LLU << 12,
-        AnimationChanged = 1LLU << 13,
-        DirtyRectsChanged = 1LLU << 14,
-        ContentsImageChanged = 1LLU << 15,
-        ContentsPlatformLayerChanged = 1LLU << 16,
-        ContentsColorLayerChanged = 1LLU << 17,
-        ContentsRectsChanged = 1LLU << 18,
-        MaskLayerChanged = 1LLU << 19,
-        ReplicatedLayerChanged = 1LLU << 20,
-        ContentsNeedsDisplay = 1LLU << 21,
-        AcceleratesDrawingChanged = 1LLU << 22,
-        ContentsScaleChanged = 1LLU << 23,
-        ContentsVisibilityChanged = 1LLU << 24,
-        VisibleRectChanged = 1LLU << 25,
-        FiltersChanged = 1LLU << 26,
-        TilingAreaChanged = 1LLU << 27,
-        TilesAdded = 1LLU < 28,
-        DebugIndicatorsChanged = 1LLU << 29,
-        CustomAppearanceChanged = 1LLU << 30,
-        CustomBehaviorChanged = 1LLU << 31,
-        BlendModeChanged = 1LLU << 32
+        NoChange =                      0,
+        NameChanged =                   1LLU << 1,
+        ChildrenChanged =               1LLU << 2, // also used for content layer, and preserves-3d, and size if tiling changes?
+        GeometryChanged =               1LLU << 3,
+        TransformChanged =              1LLU << 4,
+        ChildrenTransformChanged =      1LLU << 5,
+        Preserves3DChanged =            1LLU << 6,
+        MasksToBoundsChanged =          1LLU << 7,
+        DrawsContentChanged =           1LLU << 8,
+        BackgroundColorChanged =        1LLU << 9,
+        ContentsOpaqueChanged =         1LLU << 10,
+        BackfaceVisibilityChanged =     1LLU << 11,
+        OpacityChanged =                1LLU << 12,
+        AnimationChanged =              1LLU << 13,
+        DirtyRectsChanged =             1LLU << 14,
+        ContentsImageChanged =          1LLU << 15,
+        ContentsPlatformLayerChanged =  1LLU << 16,
+        ContentsColorLayerChanged =     1LLU << 17,
+        ContentsRectsChanged =          1LLU << 18,
+        MasksToBoundsRectChanged =      1LLU << 19,
+        MaskLayerChanged =              1LLU << 20,
+        ReplicatedLayerChanged =        1LLU << 21,
+        ContentsNeedsDisplay =          1LLU << 22,
+        AcceleratesDrawingChanged =     1LLU << 23,
+        ContentsScaleChanged =          1LLU << 24,
+        ContentsVisibilityChanged =     1LLU << 25,
+        VisibleRectChanged =            1LLU << 26,
+        FiltersChanged =                1LLU << 27,
+        BackdropFiltersChanged =        1LLU << 28,
+        TilingAreaChanged =             1LLU << 29,
+        TilesAdded =                    1LLU << 30,
+        DebugIndicatorsChanged =        1LLU << 31,
+        CustomAppearanceChanged =       1LLU << 32,
+        BlendModeChanged =              1LLU << 33,
     };
     typedef uint64_t LayerChangeFlags;
     enum ScheduleFlushOrNot { ScheduleFlush, DontScheduleFlush };
@@ -440,18 +455,25 @@ private:
     void noteSublayersChanged(ScheduleFlushOrNot = ScheduleFlush);
     void noteChangesForScaleSensitiveProperties();
 
+    void propagateLayerChangeToReplicas(ScheduleFlushOrNot = ScheduleFlush);
+
     void repaintLayerDirtyRects();
 
     RefPtr<PlatformCALayer> m_layer; // The main layer
     RefPtr<PlatformCALayer> m_structuralLayer; // A layer used for structural reasons, like preserves-3d or replica-flattening. Is the parent of m_layer.
     RefPtr<PlatformCALayer> m_contentsClippingLayer; // A layer used to clip inner content
+    RefPtr<PlatformCALayer> m_shapeMaskLayer; // Used to clip with non-trivial corner radii.
     RefPtr<PlatformCALayer> m_contentsLayer; // A layer used for inner content, like image and video
+    RefPtr<PlatformCALayer> m_contentsShapeMaskLayer; // Used to clip the content layer with non-trivial corner radii.
+    RefPtr<PlatformCALayer> m_backdropLayer; // The layer used for backdrop rendering, if necessary.
 
     // References to clones of our layers, for replicated layers.
-    OwnPtr<LayerMap> m_layerClones;
-    OwnPtr<LayerMap> m_structuralLayerClones;
-    OwnPtr<LayerMap> m_contentsLayerClones;
-    OwnPtr<LayerMap> m_contentsClippingLayerClones;
+    std::unique_ptr<LayerMap> m_layerClones;
+    std::unique_ptr<LayerMap> m_structuralLayerClones;
+    std::unique_ptr<LayerMap> m_contentsLayerClones;
+    std::unique_ptr<LayerMap> m_contentsClippingLayerClones;
+    std::unique_ptr<LayerMap> m_contentsShapeMaskLayerClones;
+    std::unique_ptr<LayerMap> m_shapeMaskLayerClones;
 
 #ifdef VISIBLE_TILE_WASH
     RefPtr<PlatformCALayer> m_visibleTileWashLayer;
@@ -516,8 +538,8 @@ private:
     bool m_isCommittingChanges;
 };
 
-GRAPHICSLAYER_TYPE_CASTS(GraphicsLayerCA, isGraphicsLayerCA());
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_GRAPHICSLAYER(WebCore::GraphicsLayerCA, isGraphicsLayerCA())
 
 #endif // GraphicsLayerCA_h

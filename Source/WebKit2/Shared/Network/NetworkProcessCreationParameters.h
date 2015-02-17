@@ -56,6 +56,9 @@ struct NetworkProcessCreationParameters {
 
     String diskCacheDirectory;
     SandboxExtension::Handle diskCacheDirectoryExtensionHandle;
+#if ENABLE(NETWORK_CACHE)
+    bool shouldEnableNetworkCache;
+#endif
 
     String cookieStorageDirectory;
 
@@ -69,9 +72,7 @@ struct NetworkProcessCreationParameters {
 #endif
     bool shouldUseTestingNetworkSession;
 
-#if ENABLE(CUSTOM_PROTOCOLS)
     Vector<String> urlSchemesRegisteredForCustomProtocols;
-#endif
 
 #if PLATFORM(COCOA)
     String parentProcessName;

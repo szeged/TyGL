@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="DebugSuffix|Win32">
@@ -304,8 +304,7 @@
     <ClCompile Include="..\API\OpaqueJSString.cpp" />
     <ClCompile Include="..\assembler\LinkBuffer.cpp" />
     <ClCompile Include="..\assembler\MacroAssembler.cpp" />
-    <ClInclude Include="..\API\JSCTestRunnerUtils.h" />
-    <ClInclude Include="..\assembler\MacroAssemblerX86Common.cpp" />
+    <ClCompile Include="..\assembler\MacroAssemblerX86Common.cpp" />
     <ClCompile Include="..\bindings\ScriptFunctionCall.cpp" />
     <ClCompile Include="..\bindings\ScriptObject.cpp" />
     <ClCompile Include="..\bindings\ScriptValue.cpp" />
@@ -315,7 +314,6 @@
     <ClCompile Include="..\bytecode\BytecodeBasicBlock.cpp" />
     <ClCompile Include="..\bytecode\BytecodeLivenessAnalysis.cpp" />
     <ClCompile Include="..\bytecode\CallEdge.cpp" />
-    <ClCompile Include="..\bytecode\CallEdgeProfile.cpp" />
     <ClCompile Include="..\bytecode\CallLinkInfo.cpp" />
     <ClCompile Include="..\bytecode\CallLinkStatus.cpp" />
     <ClCompile Include="..\bytecode\CallVariant.cpp" />
@@ -355,6 +353,7 @@
     <ClCompile Include="..\bytecode\UnlinkedInstructionStream.cpp" />
     <ClCompile Include="..\bytecode\ValueRecovery.cpp" />
     <ClCompile Include="..\bytecode\VariableWatchpointSet.cpp" />
+    <ClCompile Include="..\bytecode\VirtualRegister.cpp" />
     <ClCompile Include="..\bytecode\Watchpoint.cpp" />
     <ClCompile Include="..\bytecompiler\BytecodeGenerator.cpp" />
     <ClCompile Include="..\bytecompiler\NodesCodegen.cpp" />
@@ -371,7 +370,6 @@
     <ClCompile Include="..\dfg\DFGAvailabilityMap.cpp" />
     <ClCompile Include="..\dfg\DFGBackwardsPropagationPhase.cpp" />
     <ClCompile Include="..\dfg\DFGBasicBlock.cpp" />
-    <ClCompile Include="..\dfg\DFGBinarySwitch.cpp" />
     <ClCompile Include="..\dfg\DFGBlockInsertionSet.cpp" />
     <ClCompile Include="..\dfg\DFGBlockSet.cpp" />
     <ClCompile Include="..\dfg\DFGBlockWorklist.cpp" />
@@ -548,6 +546,7 @@
     <ClCompile Include="..\heap\Heap.cpp" />
     <ClCompile Include="..\heap\HeapStatistics.cpp" />
     <ClCompile Include="..\heap\HeapTimer.cpp" />
+    <ClCompile Include="..\heap\HeapVerifier.cpp" />
     <ClCompile Include="..\heap\IncrementalSweeper.cpp" />
     <ClCompile Include="..\heap\JITStubRoutineSet.cpp" />
     <ClCompile Include="..\heap\MachineStackMarker.cpp" />
@@ -598,7 +597,7 @@
     <ClCompile Include="..\jit\AccessorCallJITStubRoutine.cpp" />
     <ClCompile Include="..\jit\ArityCheckFailReturnThunks.cpp" />
     <ClCompile Include="..\jit\AssemblyHelpers.cpp" />
-    <ClCompile Include="..\jit\ClosureCallStubRoutine.cpp" />
+    <ClCompile Include="..\jit\BinarySwitch.cpp" />
     <ClCompile Include="..\jit\ExecutableAllocator.cpp" />
     <ClCompile Include="..\jit\GCAwareJITStubRoutine.cpp" />
     <ClCompile Include="..\jit\HostCallReturnValue.cpp" />
@@ -621,10 +620,13 @@
     <ClCompile Include="..\jit\JITStubs.cpp" />
     <ClCompile Include="..\jit\JITThunks.cpp" />
     <ClCompile Include="..\jit\JITToDFGDeferredCompilationCallback.cpp" />
+    <ClCompile Include="..\jit\PolymorphicCallStubRoutine.cpp" />
     <ClCompile Include="..\jit\Reg.cpp" />
     <ClCompile Include="..\jit\RegisterPreservationWrapperGenerator.cpp" />
+    <ClCompile Include="..\jit\RegisterSet.cpp" />
     <ClCompile Include="..\jit\Repatch.cpp" />
     <ClCompile Include="..\jit\ScratchRegisterAllocator.cpp" />
+    <ClCompile Include="..\jit\TempRegisterSet.cpp" />
     <ClCompile Include="..\jit\ThunkGenerators.cpp" />
     <ClCompile Include="..\llint\LLIntCLoop.cpp" />
     <ClCompile Include="..\llint\LLIntData.cpp" />
@@ -672,6 +674,7 @@
     <ClCompile Include="..\runtime\ArrayIteratorConstructor.cpp" />
     <ClCompile Include="..\runtime\ArrayIteratorPrototype.cpp" />
     <ClCompile Include="..\runtime\ArrayPrototype.cpp" />
+    <ClCompile Include="..\runtime\BasicBlockLocation.cpp" />
     <ClCompile Include="..\runtime\BooleanConstructor.cpp" />
     <ClCompile Include="..\runtime\BooleanObject.cpp" />
     <ClCompile Include="..\runtime\BooleanPrototype.cpp" />
@@ -686,6 +689,7 @@
     <ClCompile Include="..\runtime\ConsoleClient.cpp" />
     <ClCompile Include="..\runtime\ConsolePrototype.cpp" />
     <ClCompile Include="..\runtime\ConstructData.cpp" />
+    <ClCompile Include="..\runtime\ControlFlowProfiler.cpp" />
     <ClCompile Include="..\runtime\CustomGetterSetter.cpp" />
     <ClCompile Include="..\runtime\DataView.cpp" />
     <ClCompile Include="..\runtime\DateConstructor.cpp" />
@@ -769,11 +773,10 @@
     <ClCompile Include="..\runtime\MapPrototype.cpp" />
     <ClCompile Include="..\runtime\MathObject.cpp" />
     <ClCompile Include="..\runtime\MemoryStatistics.cpp" />
-    <ClCompile Include="..\runtime\NameConstructor.cpp" />
-    <ClCompile Include="..\runtime\NameInstance.cpp" />
-    <ClCompile Include="..\runtime\NamePrototype.cpp" />
     <ClCompile Include="..\runtime\NativeErrorConstructor.cpp" />
     <ClCompile Include="..\runtime\NativeErrorPrototype.cpp" />
+    <ClCompile Include="..\runtime\NullGetterFunction.cpp" />
+    <ClCompile Include="..\runtime\NullSetterFunction.cpp" />
     <ClCompile Include="..\runtime\NumberConstructor.cpp" />
     <ClCompile Include="..\runtime\NumberObject.cpp" />
     <ClCompile Include="..\runtime\NumberPrototype.cpp" />
@@ -810,6 +813,10 @@
     <ClCompile Include="..\runtime\StructureChain.cpp" />
     <ClCompile Include="..\runtime\StructureIDTable.cpp" />
     <ClCompile Include="..\runtime\StructureRareData.cpp" />
+    <ClCompile Include="..\runtime\Symbol.cpp" />
+    <ClCompile Include="..\runtime\SymbolConstructor.cpp" />
+    <ClCompile Include="..\runtime\SymbolObject.cpp" />
+    <ClCompile Include="..\runtime\SymbolPrototype.cpp" />
     <ClCompile Include="..\runtime\SymbolTable.cpp" />
     <ClCompile Include="..\runtime\TestRunnerUtils.cpp" />
     <ClCompile Include="..\runtime\TypedArrayController.cpp" />
@@ -833,9 +840,9 @@
     <ClCompile Include="..\yarr\YarrJIT.cpp" />
     <ClCompile Include="..\yarr\YarrPattern.cpp" />
     <ClCompile Include="..\yarr\YarrSyntaxChecker.cpp" />
-    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorJSBackendDispatchers.cpp" />
-    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorJSFrontendDispatchers.cpp" />
-    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorJSProtocolTypes.cpp" />
+    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorBackendDispatchers.cpp" />
+    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorFrontendDispatchers.cpp" />
+    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorProtocolObjects.cpp" />
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSCBuiltins.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -847,9 +854,9 @@
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\ErrorPrototype.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\HeaderDetection.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InjectedScriptSource.h" />
-    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorJSBackendDispatchers.h" />
-    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorJSFrontendDispatchers.h" />
-    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorJSProtocolTypes.h" />
+    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorBackendDispatchers.h" />
+    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorFrontendDispatchers.h" />
+    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\InspectorProtocolObjects.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSDataViewPrototype.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSGlobalObject.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSONObject.lut.h" />
@@ -857,7 +864,6 @@
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSPromisePrototype.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\KeywordLookup.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\Lexer.lut.h" />
-    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\NamePrototype.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\NumberConstructor.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\NumberPrototype.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\ObjectConstructor.lut.h" />
@@ -866,6 +872,7 @@
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\RegExpObject.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\RegExpPrototype.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\StringConstructor.lut.h" />
+    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\SymbolPrototype.lut.h" />
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSCBuiltins.h" />
   </ItemGroup>
   <ItemGroup>
@@ -876,6 +883,7 @@
     <ClInclude Include="..\API\JSAPIWrapperObject.h" />
     <ClInclude Include="..\API\JSBase.h" />
     <ClInclude Include="..\API\JSBasePrivate.h" />
+    <ClInclude Include="..\API\JSCTestRunnerUtils.h" />
     <ClInclude Include="..\API\JSCallbackConstructor.h" />
     <ClInclude Include="..\API\JSCallbackFunction.h" />
     <ClInclude Include="..\API\JSCallbackObject.h" />
@@ -924,8 +932,6 @@
     <ClInclude Include="..\bytecode\BytecodeLivenessAnalysis.h" />
     <ClInclude Include="..\bytecode\BytecodeUseDef.h" />
     <ClInclude Include="..\bytecode\CallEdge.h" />
-    <ClInclude Include="..\bytecode\CallEdgeProfile.h" />
-    <ClInclude Include="..\bytecode\CallEdgeProfileInlines.h" />
     <ClInclude Include="..\bytecode\CallLinkInfo.h" />
     <ClInclude Include="..\bytecode\CallLinkStatus.h" />
     <ClInclude Include="..\bytecode\CallReturnOffsetToBytecodeOffset.h" />
@@ -1008,7 +1014,6 @@
     <ClInclude Include="..\dfg\DFGBackwardsPropagationPhase.h" />
     <ClInclude Include="..\dfg\DFGBasicBlock.h" />
     <ClInclude Include="..\dfg\DFGBasicBlockInlines.h" />
-    <ClInclude Include="..\dfg\DFGBinarySwitch.h" />
     <ClInclude Include="..\dfg\DFGBlockInsertionSet.h" />
     <ClInclude Include="..\dfg\DFGBlockMap.h" />
     <ClInclude Include="..\dfg\DFGBlockMapInlines.h" />
@@ -1225,7 +1230,6 @@
     <ClInclude Include="..\heap\CopyWorkList.h" />
     <ClInclude Include="..\heap\CopyWriteBarrier.h" />
     <ClInclude Include="..\heap\DeferGC.h" />
-    <ClInclude Include="..\heap\DelayedReleaseScope.h" />
     <ClInclude Include="..\heap\EdenGCActivityCallback.h" />
     <ClInclude Include="..\heap\FullGCActivityCallback.h" />
     <ClInclude Include="..\heap\GCActivityCallback.h" />
@@ -1248,6 +1252,7 @@
     <ClInclude Include="..\heap\HeapRootVisitor.h" />
     <ClInclude Include="..\heap\HeapStatistics.h" />
     <ClInclude Include="..\heap\HeapTimer.h" />
+    <ClInclude Include="..\heap\HeapVerifier.h" />
     <ClInclude Include="..\heap\IncrementalSweeper.h" />
     <ClInclude Include="..\heap\JITStubRoutineSet.h" />
     <ClInclude Include="..\heap\ListableHandler.h" />
@@ -1290,7 +1295,6 @@
     <ClInclude Include="..\inspector\InspectorBackendDispatcher.h" />
     <ClInclude Include="..\inspector\InspectorEnvironment.h" />
     <ClInclude Include="..\inspector\InspectorFrontendChannel.h" />
-    <ClInclude Include="..\inspector\InspectorProtocolTypes.h" />
     <ClInclude Include="..\inspector\InspectorValues.h" />
     <ClInclude Include="..\inspector\JSInjectedScriptHost.h" />
     <ClInclude Include="..\inspector\JSInjectedScriptHostPrototype.h" />
@@ -1324,8 +1328,8 @@
     <ClInclude Include="..\jit\AccessorCallJITStubRoutine.h" />
     <ClInclude Include="..\jit\ArityCheckFailReturnThunks.h" />
     <ClInclude Include="..\jit\AssemblyHelpers.h" />
+    <ClInclude Include="..\jit\BinarySwitch.h" />
     <ClInclude Include="..\jit\CCallHelpers.h" />
-    <ClInclude Include="..\jit\ClosureCallStubRoutine.h" />
     <ClInclude Include="..\jit\CompactJITCodeMap.h" />
     <ClInclude Include="..\jit\ExecutableAllocator.h" />
     <ClInclude Include="..\jit\FPRInfo.h" />
@@ -1349,14 +1353,13 @@
     <ClInclude Include="..\jit\JITToDFGDeferredCompilationCallback.h" />
     <ClInclude Include="..\jit\JITWriteBarrier.h" />
     <ClInclude Include="..\jit\JSInterfaceJIT.h" />
-    <ClCompile Include="..\jit\RegisterSet.cpp" />
+    <ClInclude Include="..\jit\PolymorphicCallStubRoutine.h" />
     <ClInclude Include="..\jit\Reg.h" />
     <ClInclude Include="..\jit\RegisterPreservationWrapperGenerator.h" />
     <ClInclude Include="..\jit\RegisterSet.h" />
     <ClInclude Include="..\jit\Repatch.h" />
     <ClInclude Include="..\jit\ScratchRegisterAllocator.h" />
     <ClInclude Include="..\jit\SpecializedThunkJIT.h" />
-    <ClCompile Include="..\jit\TempRegisterSet.cpp" />
     <ClInclude Include="..\jit\TempRegisterSet.h" />
     <ClInclude Include="..\jit\ThunkGenerator.h" />
     <ClInclude Include="..\jit\ThunkGenerators.h" />
@@ -1378,7 +1381,6 @@
     <ClInclude Include="..\parser\ASTBuilder.h" />
     <ClInclude Include="..\parser\Lexer.h" />
     <ClInclude Include="..\parser\NodeConstructors.h" />
-    <ClInclude Include="..\parser\NodeInfo.h" />
     <ClInclude Include="..\parser\Nodes.h" />
     <ClInclude Include="..\parser\Parser.h" />
     <ClInclude Include="..\parser\ParserArena.h" />
@@ -1420,6 +1422,7 @@
     <ClInclude Include="..\runtime\ArrayIteratorPrototype.h" />
     <ClInclude Include="..\runtime\ArrayPrototype.h" />
     <ClInclude Include="..\runtime\ArrayStorage.h" />
+    <ClInclude Include="..\runtime\BasicBlockLocation.h" />
     <ClInclude Include="..\runtime\BatchedTransitionOptimizer.h" />
     <ClInclude Include="..\runtime\BigInteger.h" />
     <ClInclude Include="..\runtime\BooleanConstructor.h" />
@@ -1441,6 +1444,7 @@
     <ClInclude Include="..\runtime\ConsoleTypes.h" />
     <ClInclude Include="..\runtime\ConstantMode.h" />
     <ClInclude Include="..\runtime\ConstructData.h" />
+    <ClInclude Include="..\runtime\ControlFlowProfiler.h" />
     <ClInclude Include="..\runtime\CustomGetterSetter.h" />
     <ClInclude Include="..\runtime\DataView.h" />
     <ClInclude Include="..\runtime\DateConstructor.h" />
@@ -1561,11 +1565,10 @@
     <ClInclude Include="..\runtime\MathObject.h" />
     <ClInclude Include="..\runtime\MemoryStatistics.h" />
     <ClInclude Include="..\runtime\Microtask.h" />
-    <ClInclude Include="..\runtime\NameConstructor.h" />
-    <ClInclude Include="..\runtime\NameInstance.h" />
-    <ClInclude Include="..\runtime\NamePrototype.h" />
     <ClInclude Include="..\runtime\NativeErrorConstructor.h" />
     <ClInclude Include="..\runtime\NativeErrorPrototype.h" />
+    <ClInclude Include="..\runtime\NullGetterFunction.h" />
+    <ClInclude Include="..\runtime\NullSetterFunction.h" />
     <ClInclude Include="..\runtime\NumberConstructor.h" />
     <ClInclude Include="..\runtime\NumberObject.h" />
     <ClInclude Include="..\runtime\NumberPrototype.h" />
@@ -1616,6 +1619,10 @@
     <ClInclude Include="..\runtime\StructureRareData.h" />
     <ClInclude Include="..\runtime\StructureRareDataInlines.h" />
     <ClInclude Include="..\runtime\StructureTransitionTable.h" />
+    <ClInclude Include="..\runtime\Symbol.h" />
+    <ClInclude Include="..\runtime\SymbolConstructor.h" />
+    <ClInclude Include="..\runtime\SymbolObject.h" />
+    <ClInclude Include="..\runtime\SymbolPrototype.h" />
     <ClInclude Include="..\runtime\SymbolTable.h" />
     <ClInclude Include="..\runtime\TestRunnerUtils.h" />
     <ClInclude Include="..\runtime\Tracing.h" />
@@ -1658,13 +1665,15 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\bytecode\BytecodeList.json" />
-    <None Include="..\inspector\scripts\codegen\generate_backend_commands.py" />
-    <None Include="..\inspector\scripts\codegen\generate_backend_dispatcher_header.py" />
-    <None Include="..\inspector\scripts\codegen\generate_backend_dispatcher_implementation.py" />
-    <None Include="..\inspector\scripts\codegen\generate_frontend_dispatcher_header.py" />
-    <None Include="..\inspector\scripts\codegen\generate_frontend_dispatcher_implementation.py" />
-    <None Include="..\inspector\scripts\codegen\generate_protocol_types_header.py" />
-    <None Include="..\inspector\scripts\codegen\generate_protocol_types_implementation.py" />
+    <None Include="..\inspector\scripts\codegen\cpp_generator.py" />
+    <None Include="..\inspector\scripts\codegen\cpp_generator_templates.py" />
+    <None Include="..\inspector\scripts\codegen\generate_cpp_backend_dispatcher_header.py" />
+    <None Include="..\inspector\scripts\codegen\generate_cpp_backend_dispatcher_implementation.py" />
+    <None Include="..\inspector\scripts\codegen\generate_cpp_frontend_dispatcher_header.py" />
+    <None Include="..\inspector\scripts\codegen\generate_cpp_frontend_dispatcher_implementation.py" />
+    <None Include="..\inspector\scripts\codegen\generate_cpp_protocol_types_header.py" />
+    <None Include="..\inspector\scripts\codegen\generate_cpp_protocol_types_implementation.py" />
+    <None Include="..\inspector\scripts\codegen\generate_js_backend_commands.py" />
     <None Include="..\inspector\scripts\codegen\generator.py" />
     <None Include="..\inspector\scripts\codegen\generator_templates.py" />
     <None Include="..\inspector\scripts\codegen\models.py" />

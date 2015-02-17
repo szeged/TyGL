@@ -24,7 +24,7 @@
 
 namespace WebCore {
 
-RenderTableCaption::RenderTableCaption(Element& element, PassRef<RenderStyle> style)
+RenderTableCaption::RenderTableCaption(Element& element, Ref<RenderStyle>&& style)
     : RenderBlockFlow(element, WTF::move(style))
 {
 }
@@ -55,7 +55,7 @@ void RenderTableCaption::willBeRemovedFromTree()
 
 RenderTable* RenderTableCaption::table() const
 {
-    return toRenderTable(parent());
+    return downcast<RenderTable>(parent());
 }
 
 }

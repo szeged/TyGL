@@ -54,6 +54,7 @@ static NSString * const WKExplicitBeginTimeFlag = @"WKPlatformCAAnimationExplici
 }
 
 - (instancetype)initWithLayerID:(GraphicsLayer::PlatformLayerID)layerID layerTreeHost:(WebKit::RemoteLayerTreeHost*)layerTreeHost;
+- (void)invalidate;
 @end
 
 @implementation WKAnimationDelegate
@@ -67,8 +68,16 @@ static NSString * const WKExplicitBeginTimeFlag = @"WKPlatformCAAnimationExplici
     return self;
 }
 
+- (void)invalidate
+{
+    _layerTreeHost = nullptr;
+}
+
 - (void)animationDidStart:(CAAnimation *)animation
 {
+    if (!_layerTreeHost)
+        return;
+
     bool hasExplicitBeginTime = [[animation valueForKey:WKExplicitBeginTimeFlag] boolValue];
     CFTimeInterval startTime;
 
@@ -84,6 +93,9 @@ static NSString * const WKExplicitBeginTimeFlag = @"WKPlatformCAAnimationExplici
 
 - (void)animationDidStop:(CAAnimation *)animation finished:(BOOL)finished
 {
+    if (!_layerTreeHost)
+        return;
+
     _layerTreeHost->animationDidEnd(_layerID, animation);
 }
 
@@ -295,19 +307,19 @@ PassRefPtr<PlatformCAAnimation> PlatformCAAnimationRemote::copy() const
     animation->setFillMode(fillMode());
     animation->setRemovedOnCompletion(isRemovedOnCompletion());
     animation->setAdditive(isAdditive());
-    animation->copyTimingFunctionFrom(this);
+    animation->copyTimingFunctionFrom(*this);
     animation->setValueFunction(valueFunction());
 
-    toPlatformCAAnimationRemote(animation.get())->setHasExplicitBeginTime(hasExplicitBeginTime());
+    downcast<PlatformCAAnimationRemote>(*animation).setHasExplicitBeginTime(hasExplicitBeginTime());
     
     // Copy the specific Basic or Keyframe values.
     if (animationType() == Keyframe) {
-        animation->copyValuesFrom(this);
-        animation->copyKeyTimesFrom(this);
-        animation->copyTimingFunctionsFrom(this);
+        animation->copyValuesFrom(*this);
+        animation->copyKeyTimesFrom(*this);
+        animation->copyTimingFunctionsFrom(*this);
     } else {
-        animation->copyFromValueFrom(this);
-        animation->copyToValueFrom(this);
+        animation->copyFromValueFrom(*this);
+        animation->copyToValueFrom(*this);
     }
     
     return animation;
@@ -411,7 +423,7 @@ void PlatformCAAnimationRemote::setTimingFunction(const TimingFunction* value, b
     m_properties.reverseTimingFunctions = reverse;
 }
 
-void PlatformCAAnimationRemote::copyTimingFunctionFrom(const PlatformCAAnimation* value)
+void PlatformCAAnimationRemote::copyTimingFunctionFrom(const PlatformCAAnimation& value)
 {
     copyTimingFunctionsFrom(value);
 }
@@ -491,15 +503,15 @@ void PlatformCAAnimationRemote::setFromValue(const FilterOperation* operation, i
     m_properties.keyValues[0] = KeyframeValue(operation->clone());
 }
 
-void PlatformCAAnimationRemote::copyFromValueFrom(const PlatformCAAnimation* value)
+void PlatformCAAnimationRemote::copyFromValueFrom(const PlatformCAAnimation& value)
 {
-    const PlatformCAAnimationRemote* other = toPlatformCAAnimationRemote(value);
+    const PlatformCAAnimationRemote& other = downcast<PlatformCAAnimationRemote>(value);
 
-    if (other->m_properties.keyValues.isEmpty())
+    if (other.m_properties.keyValues.isEmpty())
         return;
     
     m_properties.keyValues.resize(2);
-    m_properties.keyValues[0] = other->m_properties.keyValues[0];
+    m_properties.keyValues[0] = other.m_properties.keyValues[0];
 }
 
 void PlatformCAAnimationRemote::setToValue(float value)
@@ -549,14 +561,14 @@ void PlatformCAAnimationRemote::setToValue(const FilterOperation* operation, int
     m_properties.keyValues[1] = KeyframeValue(operation->clone());
 }
 
-void PlatformCAAnimationRemote::copyToValueFrom(const PlatformCAAnimation* value)
+void PlatformCAAnimationRemote::copyToValueFrom(const PlatformCAAnimation& value)
 {
-    const PlatformCAAnimationRemote* other = toPlatformCAAnimationRemote(value);
+    const PlatformCAAnimationRemote& other = downcast<PlatformCAAnimationRemote>(value);
 
-    if (other->m_properties.keyValues.size() < 2)
+    if (other.m_properties.keyValues.size() < 2)
         return;
     m_properties.keyValues.resize(2);
-    m_properties.keyValues[1] = other->m_properties.keyValues[1];
+    m_properties.keyValues[1] = other.m_properties.keyValues[1];
 }
 
 // Keyframe-animation properties.
@@ -632,10 +644,9 @@ void PlatformCAAnimationRemote::setValues(const Vector<RefPtr<FilterOperation>>&
     m_properties.keyValues = WTF::move(keyframes);
 }
 
-void PlatformCAAnimationRemote::copyValuesFrom(const PlatformCAAnimation* value)
+void PlatformCAAnimationRemote::copyValuesFrom(const PlatformCAAnimation& value)
 {
-    const PlatformCAAnimationRemote* other = toPlatformCAAnimationRemote(value);
-    m_properties.keyValues = other->m_properties.keyValues;
+    m_properties.keyValues = downcast<PlatformCAAnimationRemote>(value).m_properties.keyValues;
 }
 
 void PlatformCAAnimationRemote::setKeyTimes(const Vector<float>& keyTimes)
@@ -643,10 +654,9 @@ void PlatformCAAnimationRemote::setKeyTimes(const Vector<float>& keyTimes)
     m_properties.keyTimes = keyTimes;
 }
 
-void PlatformCAAnimationRemote::copyKeyTimesFrom(const PlatformCAAnimation* value)
+void PlatformCAAnimationRemote::copyKeyTimesFrom(const PlatformCAAnimation& value)
 {
-    const PlatformCAAnimationRemote* other = toPlatformCAAnimationRemote(value);
-    m_properties.keyTimes = other->m_properties.keyTimes;
+    m_properties.keyTimes = downcast<PlatformCAAnimationRemote>(value).m_properties.keyTimes;
 }
 
 void PlatformCAAnimationRemote::setTimingFunctions(const Vector<const TimingFunction*>& values, bool reverse)
@@ -661,12 +671,12 @@ void PlatformCAAnimationRemote::setTimingFunctions(const Vector<const TimingFunc
     m_properties.reverseTimingFunctions = reverse;
 }
 
-void PlatformCAAnimationRemote::copyTimingFunctionsFrom(const PlatformCAAnimation* value)
+void PlatformCAAnimationRemote::copyTimingFunctionsFrom(const PlatformCAAnimation& value)
 {
-    const PlatformCAAnimationRemote* other = toPlatformCAAnimationRemote(value);
+    const PlatformCAAnimationRemote& other = downcast<PlatformCAAnimationRemote>(value);
 
-    m_properties.timingFunctions = other->m_properties.timingFunctions;
-    m_properties.reverseTimingFunctions = other->m_properties.reverseTimingFunctions;
+    m_properties.timingFunctions = other.m_properties.timingFunctions;
+    m_properties.reverseTimingFunctions = other.m_properties.reverseTimingFunctions;
 }
 
 static NSObject* animationValueFromKeyframeValue(const PlatformCAAnimationRemote::KeyframeValue& keyframeValue)

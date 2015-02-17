@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  *
@@ -53,6 +53,7 @@
 #include "HTMLImageElement.h"
 #include "HTMLStyleElement.h"
 #include "InsertionPoint.h"
+#include "InspectorController.h"
 #include "KeyboardEvent.h"
 #include "Logging.h"
 #include "MutationEvent.h"
@@ -87,10 +88,6 @@
 #include "UIRequestEvent.h"
 #endif
 
-#if ENABLE(INSPECTOR)
-#include "InspectorController.h"
-#endif
-
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -120,7 +117,6 @@ void Node::dumpStatistics()
     size_t documentNodes = 0;
     size_t docTypeNodes = 0;
     size_t fragmentNodes = 0;
-    size_t notationNodes = 0;
     size_t xpathNSNodes = 0;
     size_t shadowRootNodes = 0;
 
@@ -209,10 +205,6 @@ void Node::dumpStatistics()
                     ++fragmentNodes;
                 break;
             }
-            case NOTATION_NODE: {
-                ++notationNodes;
-                break;
-            }
             case XPATH_NAMESPACE_NODE: {
                 ++xpathNSNodes;
                 break;
@@ -235,7 +227,6 @@ void Node::dumpStatistics()
     printf("  Number of Document nodes: %zu\n", documentNodes);
     printf("  Number of DocumentType nodes: %zu\n", docTypeNodes);
     printf("  Number of DocumentFragment nodes: %zu\n", fragmentNodes);
-    printf("  Number of Notation nodes: %zu\n", notationNodes);
     printf("  Number of XPathNS nodes: %zu\n", xpathNSNodes);
     printf("  Number of ShadowRoot nodes: %zu\n", shadowRootNodes);
 
@@ -349,8 +340,8 @@ void Node::willBeDeletedFrom(Document& document)
 void Node::materializeRareData()
 {
     NodeRareData* data;
-    if (isElementNode())
-        data = std::make_unique<ElementRareData>(toRenderElement(m_data.m_renderer)).release();
+    if (is<Element>(*this))
+        data = std::make_unique<ElementRareData>(downcast<Element>(*this), downcast<RenderElement>(m_data.m_renderer)).release();
     else
         data = std::make_unique<NodeRareData>(m_data.m_renderer).release();
     ASSERT(data);
@@ -403,7 +394,7 @@ void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode& ec)
     // By default, setting nodeValue has no effect.
 }
 
-PassRefPtr<NodeList> Node::childNodes()
+RefPtr<NodeList> Node::childNodes()
 {
     if (is<ContainerNode>(*this))
         return ensureRareData().ensureNodeLists().ensureChildNodeList(downcast<ContainerNode>(*this));
@@ -485,7 +476,7 @@ void Node::normalize()
             break;
 
         if (type != TEXT_NODE) {
-            node = NodeTraversal::nextPostOrder(node.get());
+            node = NodeTraversal::nextPostOrder(*node);
             continue;
         }
 
@@ -494,7 +485,7 @@ void Node::normalize()
         // Remove empty text nodes.
         if (!text->length()) {
             // Care must be taken to get the next node before removing the current node.
-            node = NodeTraversal::nextPostOrder(node.get());
+            node = NodeTraversal::nextPostOrder(*node);
             text->remove(IGNORE_EXCEPTION);
             continue;
         }
@@ -518,7 +509,7 @@ void Node::normalize()
             nextText->remove(IGNORE_EXCEPTION);
         }
 
-        node = NodeTraversal::nextPostOrder(node.get());
+        node = NodeTraversal::nextPostOrder(*node);
     }
 }
 
@@ -560,10 +551,8 @@ bool Node::isContentRichlyEditable()
 
 void Node::inspect()
 {
-#if ENABLE(INSPECTOR)
     if (document().page())
         document().page()->inspectorController().inspect(this);
-#endif
 }
 
 bool Node::hasEditableStyle(EditableLevel editableLevel, UserSelectAllTreatment treatment) const
@@ -629,20 +618,13 @@ bool Node::isEditableToAccessibility(EditableLevel editableLevel) const
 RenderBox* Node::renderBox() const
 {
     RenderObject* renderer = this->renderer();
-    return renderer && renderer->isBox() ? toRenderBox(renderer) : 0;
+    return is<RenderBox>(renderer) ? downcast<RenderBox>(renderer) : nullptr;
 }
 
 RenderBoxModelObject* Node::renderBoxModelObject() const
 {
     RenderObject* renderer = this->renderer();
-    return renderer && renderer->isBoxModelObject() ? toRenderBoxModelObject(renderer) : 0;
-}
-
-LayoutRect Node::boundingBox() const
-{
-    if (renderer())
-        return renderer()->absoluteBoundingBoxRect();
-    return LayoutRect();
+    return is<RenderBoxModelObject>(renderer) ? downcast<RenderBoxModelObject>(renderer) : nullptr;
 }
     
 LayoutRect Node::renderRect(bool* isReplaced)
@@ -670,16 +652,21 @@ void Node::derefEventTarget()
     deref();
 }
 
-static inline void markAncestorsWithChildNeedsStyleRecalc(Node& node)
+inline void Node::updateAncestorsForStyleRecalc()
 {
-    if (ContainerNode* ancestor = is<PseudoElement>(node) ? downcast<PseudoElement>(node).hostElement() : node.parentOrShadowHostNode()) {
+    if (ContainerNode* ancestor = is<PseudoElement>(*this) ? downcast<PseudoElement>(*this).hostElement() : parentOrShadowHostNode()) {
         ancestor->setDirectChildNeedsStyleRecalc();
+
+        if (is<Element>(*ancestor) && downcast<Element>(*ancestor).childrenAffectedByPropertyBasedBackwardPositionalRules()) {
+            if (ancestor->styleChangeType() < FullStyleChange)
+                ancestor->setStyleChange(FullStyleChange);
+        }
 
         for (; ancestor && !ancestor->childNeedsStyleRecalc(); ancestor = ancestor->parentOrShadowHostNode())
             ancestor->setChildNeedsStyleRecalc();
     }
 
-    Document& document = node.document();
+    Document& document = this->document();
     if (document.childNeedsStyleRecalc())
         document.scheduleStyleRecalc();
 }
@@ -695,7 +682,7 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
         setStyleChange(changeType);
 
     if (existingChangeType == NoStyleChange || changeType == ReconstructRenderTree)
-        markAncestorsWithChildNeedsStyleRecalc(*this);
+        updateAncestorsForStyleRecalc();
 }
 
 unsigned Node::computeNodeIndex() const
@@ -1166,7 +1153,6 @@ bool Node::isDefaultNamespace(const AtomicString& namespaceURIMaybeEmpty) const
                 return documentElement->isDefaultNamespace(namespaceURI);
             return false;
         case ENTITY_NODE:
-        case NOTATION_NODE:
         case DOCUMENT_TYPE_NODE:
         case DOCUMENT_FRAGMENT_NODE:
             return false;
@@ -1199,7 +1185,6 @@ String Node::lookupPrefix(const AtomicString &namespaceURI) const
                 return documentElement->lookupPrefix(namespaceURI);
             return String();
         case ENTITY_NODE:
-        case NOTATION_NODE:
         case DOCUMENT_FRAGMENT_NODE:
         case DOCUMENT_TYPE_NODE:
             return String();
@@ -1257,7 +1242,6 @@ String Node::lookupNamespaceURI(const String &prefix) const
                 return documentElement->lookupNamespaceURI(prefix);
             return String();
         case ENTITY_NODE:
-        case NOTATION_NODE:
         case DOCUMENT_TYPE_NODE:
         case DOCUMENT_FRAGMENT_NODE:
             return String();
@@ -1335,7 +1319,6 @@ static void appendTextContent(const Node* node, bool convertBRsToNewlines, bool&
 
     case Node::DOCUMENT_NODE:
     case Node::DOCUMENT_TYPE_NODE:
-    case Node::NOTATION_NODE:
     case Node::XPATH_NAMESPACE_NODE:
         break;
     }
@@ -1364,7 +1347,7 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
         case ENTITY_REFERENCE_NODE:
         case DOCUMENT_FRAGMENT_NODE: {
             Ref<ContainerNode> container(downcast<ContainerNode>(*this));
-            ChildListMutationScope mutation(container.get());
+            ChildListMutationScope mutation(container);
             container->removeChildren();
             if (!text.isEmpty())
                 container->appendChild(document().createTextNode(text), ec);
@@ -1372,7 +1355,6 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
         }
         case DOCUMENT_NODE:
         case DOCUMENT_TYPE_NODE:
-        case NOTATION_NODE:
         case XPATH_NAMESPACE_NODE:
             // Do nothing.
             return;
@@ -1615,7 +1597,7 @@ void Node::showNodePathForThis() const
 
 static void traverseTreeAndMark(const String& baseIndent, const Node* rootNode, const Node* markedNode1, const char* markedLabel1, const Node* markedNode2, const char* markedLabel2)
 {
-    for (const Node* node = rootNode; node; node = NodeTraversal::next(node)) {
+    for (const Node* node = rootNode; node; node = NodeTraversal::next(*node)) {
         if (node == markedNode1)
             fprintf(stderr, "%s", markedLabel1);
         if (node == markedNode2)
@@ -2126,12 +2108,12 @@ void Node::defaultEventHandler(Event* event)
                 return;
 
             RenderObject* renderer = this->renderer();
-            while (renderer && (!renderer->isBox() || !toRenderBox(renderer)->canBeScrolledAndHasScrollableArea()))
+            while (renderer && (!is<RenderBox>(*renderer) || !downcast<RenderBox>(*renderer).canBeScrolledAndHasScrollableArea()))
                 renderer = renderer->parent();
 
             if (renderer) {
                 if (Frame* frame = document().frame())
-                    frame->eventHandler().startPanScrolling(toRenderBox(renderer));
+                    frame->eventHandler().startPanScrolling(downcast<RenderBox>(renderer));
             }
         }
 #endif
@@ -2149,7 +2131,7 @@ void Node::defaultEventHandler(Event* event)
 #if ENABLE(TOUCH_EVENTS) && PLATFORM(IOS)
     } else if (is<TouchEvent>(*event) && eventNames().isTouchEventType(eventType)) {
         RenderObject* renderer = this->renderer();
-        while (renderer && (!renderer->isBox() || !toRenderBox(renderer)->canBeScrolledAndHasScrollableArea()))
+        while (renderer && (!is<RenderBox>(*renderer) || !downcast<RenderBox>(*renderer).canBeScrolledAndHasScrollableArea()))
             renderer = renderer->parent();
 
         if (renderer && renderer->node()) {

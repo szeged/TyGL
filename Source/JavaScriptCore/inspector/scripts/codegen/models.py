@@ -25,6 +25,7 @@
 # THE POSSIBILITY OF SUCH DAMAGE.
 
 import logging
+import collections
 
 log = logging.getLogger('global')
 
@@ -33,20 +34,20 @@ def ucfirst(str):
     return str[:1].upper() + str[1:]
 
 
+def find_duplicates(l):
+    return [key for key, count in collections.Counter(l).items() if count > 1]
+
+
 _FRAMEWORK_CONFIG_MAP = {
     "Global": {
-        "prefix": "",
     },
     "JavaScriptCore": {
-        "prefix": "JS",
         "export_macro": "JS_EXPORT_PRIVATE"
     },
-    "WebCore": {
-        "prefix": "Web",
+    "WebInspector": {
     },
     # Used for code generator tests.
     "Test": {
-        "prefix": "Test",
     }
 }
 
@@ -75,8 +76,8 @@ class Framework:
         if frameworkString == "JavaScriptCore":
             return Frameworks.JavaScriptCore
 
-        if frameworkString == "WebCore":
-            return Frameworks.WebCore
+        if frameworkString == "WebInspector":
+            return Frameworks.WebInspector
 
         if frameworkString == "Test":
             return Frameworks.Test
@@ -87,7 +88,7 @@ class Framework:
 class Frameworks:
     Global = Framework("Global")
     JavaScriptCore = Framework("JavaScriptCore")
-    WebCore = Framework("WebCore")
+    WebInspector = Framework("WebInspector")
     Test = Framework("Test")
 
 
@@ -223,7 +224,8 @@ class EnumType(Type):
 
 
 class ArrayType(Type):
-    def __init__(self, element_type_ref, domain):
+    def __init__(self, name, element_type_ref, domain):
+        self._name = name
         self._domain = domain
         self._element_type_ref = element_type_ref
         self.element_type = None
@@ -310,7 +312,14 @@ class Protocol:
                 raise ParseException("Malformed domain specification: events is not an array")
             events.extend([self.parse_event(event) for event in json['events']])
 
-        self.domains.append(Domain(json['domain'], json.get('description', ""), json.get("featureGuard"), isSupplemental, types, commands, events))
+        if 'availability' in json:
+            if not commands and not events:
+                raise ParseException("Malformed domain specification: availability should only be included if there are commands or events.")
+            allowed_activation_strings = set(['web'])
+            if json['availability'] not in allowed_activation_strings:
+                raise ParseException('Malformed domain specification: availability is an unsupported string. Was: "%s", Allowed values: %s' % (json['availability'], ', '.join(allowed_activation_strings)))
+
+        self.domains.append(Domain(json['domain'], json.get('description', ''), json.get('featureGuard'), json.get('availability'), isSupplemental, types, commands, events))
 
     def parse_type_declaration(self, json):
         check_for_required_properties(['id', 'type'], json, "type")
@@ -322,6 +331,10 @@ class Protocol:
             if not isinstance(json['properties'], list):
                 raise ParseException("Malformed type specification: properties is not an array")
             type_members.extend([self.parse_type_member(member) for member in json['properties']])
+
+        duplicate_names = find_duplicates([member.member_name for member in type_members])
+        if len(duplicate_names) > 0:
+            raise ParseException("Malformed domain specification: type declaration for %s has duplicate member names" % json['id'])
 
         type_ref = TypeReference(json['type'], json.get('$ref'), json.get('enum'), json.get('items'))
         return TypeDeclaration(json['id'], type_ref, json.get("description", ""), type_members)
@@ -345,10 +358,18 @@ class Protocol:
                 raise ParseException("Malformed command specification: parameters is not an array")
             call_parameters.extend([self.parse_call_or_return_parameter(parameter) for parameter in json['parameters']])
 
+            duplicate_names = find_duplicates([param.parameter_name for param in call_parameters])
+            if len(duplicate_names) > 0:
+                raise ParseException("Malformed domain specification: call parameter list for command %s has duplicate parameter names" % json['name'])
+
         if 'returns' in json:
             if not isinstance(json['returns'], list):
                 raise ParseException("Malformed command specification: returns is not an array")
             return_parameters.extend([self.parse_call_or_return_parameter(parameter) for parameter in json['returns']])
+
+            duplicate_names = find_duplicates([param.parameter_name for param in return_parameters])
+            if len(duplicate_names) > 0:
+                raise ParseException("Malformed domain specification: return parameter list for command %s has duplicate parameter names" % json['name'])
 
         return Command(json['name'], call_parameters, return_parameters, json.get('description', ""), json.get('async', False))
 
@@ -362,6 +383,10 @@ class Protocol:
             if not isinstance(json['parameters'], list):
                 raise ParseException("Malformed event specification: parameters is not an array")
             event_parameters.extend([self.parse_call_or_return_parameter(parameter) for parameter in json['parameters']])
+
+            duplicate_names = find_duplicates([param.parameter_name for param in event_parameters])
+            if len(duplicate_names) > 0:
+                raise ParseException("Malformed domain specification: parameter list for event %s has duplicate parameter names" % json['name'])
 
         return Event(json['name'], event_parameters, json.get('description', ""))
 
@@ -402,7 +427,7 @@ class Protocol:
                     primitive_type_ref = TypeReference(declaration.type_ref.type_kind, None, None, None)
                     type_instance = EnumType(declaration.type_name, domain, declaration.type_ref.enum_values, primitive_type_ref)
                 elif kind == "array":
-                    type_instance = ArrayType(declaration.type_ref.array_type_ref, domain)
+                    type_instance = ArrayType(declaration.type_name, declaration.type_ref.array_type_ref, domain)
                 elif kind == "object":
                     type_instance = ObjectType(declaration.type_name, domain, declaration.type_members)
                 else:
@@ -428,7 +453,7 @@ class Protocol:
     def lookup_type_reference(self, type_ref, domain):
         # If reference is to an anonymous array type, create a fresh instance.
         if type_ref.type_kind == "array":
-            type_instance = ArrayType(type_ref.array_type_ref, domain)
+            type_instance = ArrayType(None, type_ref.array_type_ref, domain)
             type_instance.resolve_type_references(self)
             log.debug("< Created fresh type instance for anonymous array type: %s" % type_instance.qualified_name())
             return type_instance
@@ -461,10 +486,11 @@ class Protocol:
 
 
 class Domain:
-    def __init__(self, domain_name, description, feature_guard, isSupplemental, type_declarations, commands, events):
+    def __init__(self, domain_name, description, feature_guard, availability, isSupplemental, type_declarations, commands, events):
         self.domain_name = domain_name
         self.description = description
         self.feature_guard = feature_guard
+        self.availability = availability
         self.is_supplemental = isSupplemental
         self.type_declarations = type_declarations
         self.commands = commands
@@ -485,7 +511,7 @@ class Domain:
 
 
 class Domains:
-    GLOBAL = Domain("", "The global domain, in which primitive types are implicitly declared.", None, True, [], [], [])
+    GLOBAL = Domain("", "The global domain, in which primitive types are implicitly declared.", None, None, True, [], [], [])
 
 
 class TypeDeclaration:

@@ -84,13 +84,11 @@ namespace WebCore {
 
 static PlatformMouseEvent createMouseEvent(DragData& dragData)
 {
-    bool shiftKey, ctrlKey, altKey, metaKey;
-    shiftKey = ctrlKey = altKey = metaKey = false;
     int keyState = dragData.modifierKeyState();
-    shiftKey = static_cast<bool>(keyState & PlatformEvent::ShiftKey);
-    ctrlKey = static_cast<bool>(keyState & PlatformEvent::CtrlKey);
-    altKey = static_cast<bool>(keyState & PlatformEvent::AltKey);
-    metaKey = static_cast<bool>(keyState & PlatformEvent::MetaKey);
+    bool shiftKey = static_cast<bool>(keyState & PlatformEvent::ShiftKey);
+    bool ctrlKey = static_cast<bool>(keyState & PlatformEvent::CtrlKey);
+    bool altKey = static_cast<bool>(keyState & PlatformEvent::AltKey);
+    bool metaKey = static_cast<bool>(keyState & PlatformEvent::MetaKey);
 
     return PlatformMouseEvent(dragData.clientPosition(), dragData.globalPosition(),
                               LeftButton, PlatformEvent::MouseMoved, 0, shiftKey, ctrlKey, altKey,
@@ -489,8 +487,7 @@ bool DragController::concludeEditDrag(DragData& dragData)
     if (!range)
         return false;
 
-    CachedResourceLoader* cachedResourceLoader = range->ownerDocument().cachedResourceLoader();
-    ResourceCacheValidationSuppressor validationSuppressor(cachedResourceLoader);
+    ResourceCacheValidationSuppressor validationSuppressor(range->ownerDocument().cachedResourceLoader());
     if (dragIsMove(innerFrame->selection(), dragData) || dragCaret.isContentRichlyEditable()) {
         bool chosePlainText = false;
         RefPtr<DocumentFragment> fragment = documentFragmentFromDragData(dragData, *innerFrame, *range, true, chosePlainText);
@@ -660,10 +657,10 @@ Element* DragController::draggableElement(const Frame* sourceFrame, Element* sta
 static CachedImage* getCachedImage(Element& element)
 {
     RenderObject* renderer = element.renderer();
-    if (!renderer || !renderer->isRenderImage())
-        return 0;
-    RenderImage* image = toRenderImage(renderer);
-    return image->cachedImage();
+    if (!is<RenderImage>(renderer))
+        return nullptr;
+    auto& image = downcast<RenderImage>(*renderer);
+    return image.cachedImage();
 }
 
 static Image* getImage(Element& element)
@@ -673,7 +670,7 @@ static Image* getImage(Element& element)
     // Users of getImage() want access to the SVGImage, in order to figure out the filename extensions,
     // which would be empty when asking the cached BitmapImages.
     return (cachedImage && !cachedImage->errorOccurred()) ?
-        cachedImage->image() : 0;
+        cachedImage->image() : nullptr;
 }
 
 static void selectElement(Element& element)

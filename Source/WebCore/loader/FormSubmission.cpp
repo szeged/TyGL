@@ -137,7 +137,24 @@ inline FormSubmission::FormSubmission(Method method, const URL& action, const St
 {
 }
 
-PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const Attributes& attributes, PassRefPtr<Event> event, LockHistory lockHistory, FormSubmissionTrigger trigger)
+static TextEncoding encodingFromAcceptCharset(const String& acceptCharset, Document& document)
+{
+    String normalizedAcceptCharset = acceptCharset;
+    normalizedAcceptCharset.replace(',', ' ');
+
+    Vector<String> charsets;
+    normalizedAcceptCharset.split(' ', charsets);
+
+    for (auto& charset : charsets) {
+        TextEncoding encoding(charset);
+        if (encoding.isValid())
+            return encoding;
+    }
+
+    return document.inputEncoding();
+}
+
+Ref<FormSubmission> FormSubmission::create(HTMLFormElement* form, const Attributes& attributes, PassRefPtr<Event> event, LockHistory lockHistory, FormSubmissionTrigger trigger)
 {
     ASSERT(form);
 
@@ -179,7 +196,7 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
         }
     }
 
-    TextEncoding dataEncoding = isMailtoForm ? UTF8Encoding() : FormDataBuilder::encodingFromAcceptCharset(copiedAttributes.acceptCharset(), document);
+    TextEncoding dataEncoding = isMailtoForm ? UTF8Encoding() : encodingFromAcceptCharset(copiedAttributes.acceptCharset(), document);
     RefPtr<DOMFormData> domFormData = DOMFormData::create(dataEncoding.encodingForFormSubmission());
     Vector<std::pair<String, String>> formValues;
 
@@ -219,7 +236,7 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
     formData->setContainsPasswordData(containsPasswordData);
     String targetOrBaseTarget = copiedAttributes.target().isEmpty() ? document.baseTarget() : copiedAttributes.target();
     RefPtr<FormState> formState = FormState::create(form, formValues, &document, trigger);
-    return adoptRef(new FormSubmission(copiedAttributes.method(), actionURL, targetOrBaseTarget, encodingType, formState.release(), formData.release(), boundary, lockHistory, event));
+    return adoptRef(*new FormSubmission(copiedAttributes.method(), actionURL, targetOrBaseTarget, encodingType, formState.release(), formData.release(), boundary, lockHistory, event));
 }
 
 URL FormSubmission::requestURL() const

@@ -26,10 +26,7 @@
 #ifndef JSGlobalObjectRuntimeAgent_h
 #define JSGlobalObjectRuntimeAgent_h
 
-#if ENABLE(INSPECTOR)
-
 #include "InspectorRuntimeAgent.h"
-#include <wtf/PassOwnPtr.h>
 
 namespace JSC {
 class JSGlobalObject;
@@ -59,7 +56,5 @@ private:
 };
 
 } // namespace Inspector
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(JSGlobalObjectRuntimeAgent_h)

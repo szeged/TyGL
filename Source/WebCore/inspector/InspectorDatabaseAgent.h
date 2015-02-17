@@ -29,11 +29,9 @@
 #ifndef InspectorDatabaseAgent_h
 #define InspectorDatabaseAgent_h
 
-#if ENABLE(INSPECTOR) && ENABLE(SQL_DATABASE)
-
 #include "InspectorWebAgentBase.h"
-#include "InspectorWebBackendDispatchers.h"
-#include "InspectorWebFrontendDispatchers.h"
+#include <inspector/InspectorBackendDispatchers.h>
+#include <inspector/InspectorFrontendDispatchers.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/WTFString.h>
 
@@ -49,11 +47,11 @@ class InstrumentingAgents;
 
 typedef String ErrorString;
 
-class InspectorDatabaseAgent : public InspectorAgentBase, public Inspector::InspectorDatabaseBackendDispatcherHandler {
+class InspectorDatabaseAgent final : public InspectorAgentBase, public Inspector::InspectorDatabaseBackendDispatcherHandler {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit InspectorDatabaseAgent(InstrumentingAgents*);
-    ~InspectorDatabaseAgent();
+    virtual ~InspectorDatabaseAgent();
 
     virtual void didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, Inspector::InspectorBackendDispatcher*) override;
     virtual void willDestroyFrontendAndBackend(Inspector::InspectorDisconnectReason) override;
@@ -64,7 +62,7 @@ public:
     virtual void enable(ErrorString&) override;
     virtual void disable(ErrorString&) override;
     virtual void getDatabaseTableNames(ErrorString&, const String& databaseId, RefPtr<Inspector::Protocol::Array<String>>& names) override;
-    virtual void executeSQL(ErrorString&, const String& databaseId, const String& query, PassRefPtr<ExecuteSQLCallback>) override;
+    virtual void executeSQL(ErrorString&, const String& databaseId, const String& query, Ref<ExecuteSQLCallback>&&) override;
 
     // Called from the injected script.
     String databaseId(Database*);
@@ -82,7 +80,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR) && ENABLE(SQL_DATABASE)
 
 #endif // !defined(InspectorDatabaseAgent_h)

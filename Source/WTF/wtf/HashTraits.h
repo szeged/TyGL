@@ -88,6 +88,15 @@ template<typename T> struct UnsignedWithZeroKeyHashTraits : GenericHashTraits<T>
     static bool isDeletedValue(T value) { return value == std::numeric_limits<T>::max() - 1; }
 };
 
+// Can be used with strong enums, allows zero as key.
+template<typename T> struct StrongEnumHashTraits : GenericHashTraits<T> {
+    using UnderlyingType = typename std::underlying_type<T>::type;
+    static const bool emptyValueIsZero = false;
+    static T emptyValue() { return static_cast<T>(std::numeric_limits<UnderlyingType>::max()); }
+    static void constructDeletedValue(T& slot) { slot = static_cast<T>(std::numeric_limits<UnderlyingType>::max() - 1); }
+    static bool isDeletedValue(T value) { return value == static_cast<T>(std::numeric_limits<UnderlyingType>::max() - 1); }
+};
+
 template<typename P> struct HashTraits<P*> : GenericHashTraits<P*> {
     static const bool emptyValueIsZero = true;
     static void constructDeletedValue(P*& slot) { slot = reinterpret_cast<P*>(-1); }
@@ -96,7 +105,7 @@ template<typename P> struct HashTraits<P*> : GenericHashTraits<P*> {
 
 template<typename T> struct SimpleClassHashTraits : GenericHashTraits<T> {
     static const bool emptyValueIsZero = true;
-    static void constructDeletedValue(T& slot) { new (NotNull, &slot) T(HashTableDeletedValue); }
+    static void constructDeletedValue(T& slot) { new (NotNull, std::addressof(slot)) T(HashTableDeletedValue); }
     static bool isDeletedValue(const T& value) { return value.isHashTableDeletedValue(); }
 };
 
@@ -104,7 +113,7 @@ template<typename T, typename Deleter> struct HashTraits<std::unique_ptr<T, Dele
     typedef std::nullptr_t EmptyValueType;
     static EmptyValueType emptyValue() { return nullptr; }
 
-    static void constructDeletedValue(std::unique_ptr<T, Deleter>& slot) { new (NotNull, &slot) std::unique_ptr<T, Deleter> { reinterpret_cast<T*>(-1) }; }
+    static void constructDeletedValue(std::unique_ptr<T, Deleter>& slot) { new (NotNull, std::addressof(slot)) std::unique_ptr<T, Deleter> { reinterpret_cast<T*>(-1) }; }
     static bool isDeletedValue(const std::unique_ptr<T, Deleter>& value) { return value.get() == reinterpret_cast<T*>(-1); }
 
     typedef T* PeekType;
@@ -227,7 +236,7 @@ struct CustomHashTraits : public GenericHashTraits<T> {
     
     static void constructDeletedValue(T& slot)
     {
-        new (NotNull, &slot) T(T::DeletedValue);
+        new (NotNull, std::addressof(slot)) T(T::DeletedValue);
     }
     
     static bool isDeletedValue(const T& value)

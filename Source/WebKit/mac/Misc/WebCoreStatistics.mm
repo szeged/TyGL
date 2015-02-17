@@ -36,7 +36,7 @@
 #import <WebCore/FontCache.h>
 #import <WebCore/Frame.h>
 #import <WebCore/GCController.h>
-#import <WebCore/GlyphPageTreeNode.h>
+#import <WebCore/GlyphPage.h>
 #import <WebCore/GraphicsContext.h>
 #import <WebCore/IconDatabase.h>
 #import <WebCore/JSDOMWindow.h>
@@ -86,7 +86,7 @@ using namespace WebCore;
     
     NSCountedSet *result = [NSCountedSet set];
 
-    OwnPtr<TypeCountSet> counts(JSDOMWindow::commonVM().heap.protectedObjectTypeCounts());
+    std::unique_ptr<TypeCountSet> counts(JSDOMWindow::commonVM().heap.protectedObjectTypeCounts());
     HashCountedSet<const char*>::iterator end = counts->end();
     for (HashCountedSet<const char*>::iterator it = counts->begin(); it != end; ++it)
         for (unsigned i = 0; i < it->value; ++i)
@@ -101,7 +101,7 @@ using namespace WebCore;
     
     NSCountedSet *result = [NSCountedSet set];
 
-    OwnPtr<TypeCountSet> counts(JSDOMWindow::commonVM().heap.objectTypeCounts());
+    std::unique_ptr<TypeCountSet> counts(JSDOMWindow::commonVM().heap.objectTypeCounts());
     HashCountedSet<const char*>::iterator end = counts->end();
     for (HashCountedSet<const char*>::iterator it = counts->begin(); it != end; ++it)
         for (unsigned i = 0; i < it->value; ++i)
@@ -147,12 +147,12 @@ using namespace WebCore;
 
 + (size_t)cachedFontDataCount
 {
-    return fontCache().fontDataCount();
+    return fontCache().fontCount();
 }
 
 + (size_t)cachedFontDataInactiveCount
 {
-    return fontCache().inactiveFontDataCount();
+    return fontCache().inactiveFontCount();
 }
 
 + (void)purgeInactiveFontData
@@ -162,7 +162,7 @@ using namespace WebCore;
 
 + (size_t)glyphPageCount
 {
-    return GlyphPageTreeNode::treeGlyphPageCount();
+    return GlyphPage::count();
 }
 
 + (BOOL)shouldPrintExceptions
@@ -224,12 +224,12 @@ using namespace WebCore;
 
 + (int)cachedPageCount
 {
-    return pageCache()->pageCount();
+    return PageCache::singleton().pageCount();
 }
 
 + (int)cachedFrameCount
 {
-    return pageCache()->frameCount();
+    return PageCache::singleton().frameCount();
 }
 
 // Deprecated

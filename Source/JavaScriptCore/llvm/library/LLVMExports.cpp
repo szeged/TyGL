@@ -53,14 +53,15 @@
 #undef __STDC_LIMIT_MACROS
 #undef __STDC_CONSTANT_MACROS
 
-extern "C" WTF_EXPORT_PRIVATE JSC::LLVMAPI* initializeAndGetJSCLLVMAPI(void (*)(const char*, ...));
+static void llvmCrash(const char*) NO_RETURN;
+extern "C" WTF_EXPORT_PRIVATE JSC::LLVMAPI* initializeAndGetJSCLLVMAPI(void (*)(const char*, ...) NO_RETURN);
 
 static void llvmCrash(const char* reason)
 {
     g_llvmTrapCallback("LLVM fatal error: %s", reason);
 }
 
-extern "C" JSC::LLVMAPI* initializeAndGetJSCLLVMAPI(void (*callback)(const char*, ...))
+extern "C" JSC::LLVMAPI* initializeAndGetJSCLLVMAPI(void (*callback)(const char*, ...) NO_RETURN)
 {
     g_llvmTrapCallback = callback;
     
@@ -81,11 +82,19 @@ extern "C" JSC::LLVMAPI* initializeAndGetJSCLLVMAPI(void (*callback)(const char*
     LLVMInitializeX86AsmPrinter();
     LLVMInitializeX86Disassembler();
 #elif CPU(ARM64)
+#if __IPHONE_OS_VERSION_MIN_REQUIRED > 80200
+    LLVMInitializeAArch64TargetInfo();
+    LLVMInitializeAArch64Target();
+    LLVMInitializeAArch64TargetMC();
+    LLVMInitializeAArch64AsmPrinter();
+    LLVMInitializeAArch64Disassembler();
+#else
     LLVMInitializeARM64TargetInfo();
     LLVMInitializeARM64Target();
     LLVMInitializeARM64TargetMC();
     LLVMInitializeARM64AsmPrinter();
     LLVMInitializeARM64Disassembler();
+#endif
 #else
     UNREACHABLE_FOR_PLATFORM();
 #endif

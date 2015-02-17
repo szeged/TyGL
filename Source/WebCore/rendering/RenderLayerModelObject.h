@@ -52,12 +52,10 @@ public:
     virtual bool isScrollableOrRubberbandableBox() const { return false; }
 
 protected:
-    RenderLayerModelObject(Element&, PassRef<RenderStyle>, unsigned baseTypeFlags);
-    RenderLayerModelObject(Document&, PassRef<RenderStyle>, unsigned baseTypeFlags);
+    RenderLayerModelObject(Element&, Ref<RenderStyle>&&, unsigned baseTypeFlags);
+    RenderLayerModelObject(Document&, Ref<RenderStyle>&&, unsigned baseTypeFlags);
 
     void createLayer();
-
-    virtual void willBeDestroyed() override;
 
 private:
     std::unique_ptr<RenderLayer> m_layer;
@@ -68,8 +66,6 @@ private:
     static bool s_hadTransform;
     static bool s_layerWasSelfPainting;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderLayerModelObject, isRenderLayerModelObject())
 
 } // namespace WebCore
 

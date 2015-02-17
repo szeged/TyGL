@@ -27,8 +27,9 @@
 #define TypeProfiler_h
 
 #include "CodeBlock.h"
-#include "FunctionHasExecutedCache.h"
+#include "TypeLocation.h"
 #include "TypeLocationCache.h"
+#include <wtf/Bag.h>
 #include <wtf/HashMap.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
@@ -38,8 +39,6 @@ class TypeDescription;
 }}}
 
 namespace JSC {
-
-class TypeLocation;
 
 struct QueryKey {
     QueryKey()
@@ -87,6 +86,8 @@ template<> struct HashTraits<JSC::QueryKey> : SimpleClassHashTraits<JSC::QueryKe
 
 namespace JSC {
 
+class VM;
+
 enum TypeProfilerSearchDescriptor {
     TypeProfilerSearchDescriptorNormal = 1,
     TypeProfilerSearchDescriptorFunctionReturn = 2
@@ -94,20 +95,25 @@ enum TypeProfilerSearchDescriptor {
 
 class TypeProfiler {
 public:
-    void logTypesForTypeLocation(TypeLocation*);
-    JS_EXPORT_PRIVATE String typeInformationForExpressionAtOffset(TypeProfilerSearchDescriptor, unsigned offset, intptr_t sourceID);
+    TypeProfiler();
+    void logTypesForTypeLocation(TypeLocation*, VM&);
+    JS_EXPORT_PRIVATE String typeInformationForExpressionAtOffset(TypeProfilerSearchDescriptor, unsigned offset, intptr_t sourceID, VM&);
     void insertNewLocation(TypeLocation*);
-    FunctionHasExecutedCache* functionHasExecutedCache() { return &m_functionHasExecutedCache; }
     TypeLocationCache* typeLocationCache() { return &m_typeLocationCache; }
-    TypeLocation* findLocation(unsigned divot, intptr_t sourceID, TypeProfilerSearchDescriptor);
+    TypeLocation* findLocation(unsigned divot, intptr_t sourceID, TypeProfilerSearchDescriptor, VM&);
+    GlobalVariableID getNextUniqueVariableID() { return m_nextUniqueVariableID++; }
+    TypeLocation* nextTypeLocation();
+    void invalidateTypeSetCache();
+    void dumpTypeProfilerData(VM&);
     
 private:
     typedef HashMap<intptr_t, Vector<TypeLocation*>> SourceIDToLocationBucketMap;
     SourceIDToLocationBucketMap m_bucketMap;
-    FunctionHasExecutedCache m_functionHasExecutedCache;
     TypeLocationCache m_typeLocationCache;
     typedef HashMap<QueryKey, TypeLocation*> TypeLocationQueryCache;
     TypeLocationQueryCache m_queryCache;
+    GlobalVariableID m_nextUniqueVariableID;
+    Bag<TypeLocation> m_typeLocationInfo;
 };
 
 } // namespace JSC

@@ -194,6 +194,11 @@ WebInspector.TimelineView.prototype = {
         this._visible = false;
     },
 
+    filterDidChange: function()
+    {
+        // Implemented by sub-classes if needed.
+    },
+
     matchTreeElementAgainstCustomFilters: function(treeElement)
     {
         // Implemented by sub-classes if needed.
@@ -215,6 +220,11 @@ WebInspector.TimelineView.prototype = {
         if (!this._scheduledLayoutUpdateIdentifier)
             return;
         this.updateLayout();
+    },
+
+    filterUpdated: function()
+    {
+        this.dispatchEventToListeners(WebInspector.TimelineView.Event.SelectionPathComponentsDidChange);
     },
 
     // Protected

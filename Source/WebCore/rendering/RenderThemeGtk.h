@@ -36,9 +36,6 @@ class RenderThemeGtk final : public RenderTheme {
 public:
     static PassRefPtr<RenderTheme> create();
 
-    // System fonts.
-    virtual void systemFont(CSSValueID, FontDescription&) const override;
-
 #if ENABLE(DATALIST_ELEMENT)
     // Returns size of one slider tick mark for a horizontal track.
     // For vertical tracks we rotate it and use it. i.e. Width is always length along the track.
@@ -47,6 +44,11 @@ public:
     virtual int sliderTickOffsetFromTrackCenter() const override;
 #endif
 
+private:
+    // System fonts.
+    virtual void updateCachedSystemFontDescription(CSSValueID, FontDescription&) const override;
+
+public:
 #ifndef GTK_API_VERSION_2
 
     // A method asking if the theme's controls actually care about redrawing when hovered.
@@ -116,10 +118,10 @@ private:
     virtual bool paintTextField(const RenderObject&, const PaintInfo&, const FloatRect&) override;
     virtual bool paintTextArea(const RenderObject&, const PaintInfo&, const FloatRect&) override;
 
-    int popupInternalPaddingLeft(RenderStyle&) const override;
-    int popupInternalPaddingRight(RenderStyle&) const override;
-    int popupInternalPaddingTop(RenderStyle&) const override;
-    int popupInternalPaddingBottom(RenderStyle&) const override;
+    virtual int popupInternalPaddingLeft(RenderStyle&) const override;
+    virtual int popupInternalPaddingRight(RenderStyle&) const override;
+    virtual int popupInternalPaddingTop(RenderStyle&) const override;
+    virtual int popupInternalPaddingBottom(RenderStyle&) const override;
 
     // The Mac port differentiates between the "menu list" and the "menu list button."
     // The former is used when a menu list button has been styled. This is used to ensure
@@ -180,7 +182,7 @@ private:
     virtual void adjustInnerSpinButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintInnerSpinButton(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
-    virtual String fileListNameForWidth(const FileList*, const Font&, int width, bool multipleFilesAllowed) const override;
+    virtual String fileListNameForWidth(const FileList*, const FontCascade&, int width, bool multipleFilesAllowed) const override;
 
     static void setTextInputBorders(RenderStyle&);
 

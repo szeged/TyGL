@@ -37,7 +37,6 @@
 #include "MemoryCache.h"
 #include "Page.h"
 #include "RenderElement.h"
-#include "ResourceBuffer.h"
 #include "SVGImage.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
@@ -108,39 +107,39 @@ CachedImage::~CachedImage()
     clearImage();
 }
 
-void CachedImage::load(CachedResourceLoader* cachedResourceLoader, const ResourceLoaderOptions& options)
+void CachedImage::load(CachedResourceLoader& cachedResourceLoader, const ResourceLoaderOptions& options)
 {
-    if (!cachedResourceLoader || cachedResourceLoader->autoLoadImages())
+    if (cachedResourceLoader.shouldPerformImageLoad(resourceRequest().url()))
         CachedResource::load(cachedResourceLoader, options);
     else
         setLoading(false);
 }
 
-void CachedImage::didAddClient(CachedResourceClient* c)
+void CachedImage::didAddClient(CachedResourceClient* client)
 {
     if (m_data && !m_image && !errorOccurred()) {
         createImage();
-        m_image->setData(m_data->sharedBuffer(), true);
+        m_image->setData(m_data, true);
     }
     
-    ASSERT(c->resourceClientType() == CachedImageClient::expectedType());
+    ASSERT(client->resourceClientType() == CachedImageClient::expectedType());
     if (m_image && !m_image->isNull())
-        static_cast<CachedImageClient*>(c)->imageChanged(this);
+        static_cast<CachedImageClient*>(client)->imageChanged(this);
 
-    CachedResource::didAddClient(c);
+    CachedResource::didAddClient(client);
 }
 
-void CachedImage::didRemoveClient(CachedResourceClient* c)
+void CachedImage::didRemoveClient(CachedResourceClient* client)
 {
-    ASSERT(c);
-    ASSERT(c->resourceClientType() == CachedImageClient::expectedType());
+    ASSERT(client);
+    ASSERT(client->resourceClientType() == CachedImageClient::expectedType());
 
-    m_pendingContainerSizeRequests.remove(static_cast<CachedImageClient*>(c));
+    m_pendingContainerSizeRequests.remove(static_cast<CachedImageClient*>(client));
 
     if (m_svgImageCache)
-        m_svgImageCache->removeClientFromCache(static_cast<CachedImageClient*>(c));
+        m_svgImageCache->removeClientFromCache(static_cast<CachedImageClient*>(client));
 
-    CachedResource::didRemoveClient(c);
+    CachedResource::didRemoveClient(client);
 }
 
 void CachedImage::switchClientsToRevalidatedResource()
@@ -271,17 +270,17 @@ LayoutSize CachedImage::imageSizeForRenderer(const RenderObject* renderer, float
     LayoutSize imageSize(m_image->size());
 
 #if ENABLE(CSS_IMAGE_ORIENTATION)
-    if (renderer && m_image->isBitmapImage()) {
+    if (renderer && is<BitmapImage>(*m_image)) {
         ImageOrientationDescription orientationDescription(renderer->shouldRespectImageOrientation(), renderer->style().imageOrientation());
         if (orientationDescription.respectImageOrientation() == RespectImageOrientation)
-            imageSize = LayoutSize(toBitmapImage(m_image.get())->sizeRespectingOrientation(orientationDescription));
+            imageSize = LayoutSize(downcast<BitmapImage>(*m_image).sizeRespectingOrientation(orientationDescription));
     }
 #else
-    if (m_image->isBitmapImage() && (renderer && renderer->shouldRespectImageOrientation() == RespectImageOrientation))
-        imageSize = LayoutSize(toBitmapImage(m_image.get())->sizeRespectingOrientation());
+    if (is<BitmapImage>(*m_image) && (renderer && renderer->shouldRespectImageOrientation() == RespectImageOrientation))
+        imageSize = LayoutSize(downcast<BitmapImage>(*m_image).sizeRespectingOrientation());
 #endif // ENABLE(CSS_IMAGE_ORIENTATION)
 
-    else if (m_image->isSVGImage() && sizeType == UsedSize) {
+    else if (is<SVGImage>(*m_image) && sizeType == UsedSize) {
         imageSize = LayoutSize(m_svgImageCache->imageSizeForRenderer(renderer));
     }
 
@@ -343,7 +342,7 @@ inline void CachedImage::createImage()
         m_image = svgImage.release();
     } else {
         m_image = BitmapImage::create(this);
-        toBitmapImage(m_image.get())->setAllowSubsampling(m_loader && m_loader->frameLoader()->frame().settings().imageSubsamplingEnabled());
+        downcast<BitmapImage>(*m_image).setAllowSubsampling(m_loader && m_loader->frameLoader()->frame().settings().imageSubsamplingEnabled());
     }
 
     if (m_image) {
@@ -365,18 +364,16 @@ inline void CachedImage::clearImage()
     m_image.clear();
 }
 
-void CachedImage::addIncrementalDataBuffer(ResourceBuffer* data)
+void CachedImage::addIncrementalDataBuffer(SharedBuffer& data)
 {
-    m_data = data;
-    if (!data)
-        return;
+    m_data = &data;
 
     createImage();
 
     // Have the image update its data from its internal buffer.
     // It will not do anything now, but will delay decoding until
     // queried for info (like size or specific image frames).
-    bool sizeAvailable = m_image->setData(m_data->sharedBuffer(), false);
+    bool sizeAvailable = m_image->setData(&data, false);
     if (!sizeAvailable)
         return;
 
@@ -384,7 +381,7 @@ void CachedImage::addIncrementalDataBuffer(ResourceBuffer* data)
         // Image decoding failed. Either we need more image data or the image data is malformed.
         error(errorOccurred() ? status() : DecodeError);
         if (inCache())
-            memoryCache()->remove(this);
+            MemoryCache::singleton().remove(*this);
         return;
     }
 
@@ -398,39 +395,45 @@ void CachedImage::addIncrementalDataBuffer(ResourceBuffer* data)
     setEncodedSize(m_image->data() ? m_image->data()->size() : 0);
 }
 
-void CachedImage::addDataBuffer(ResourceBuffer* data)
+void CachedImage::addDataBuffer(SharedBuffer& data)
 {
-    ASSERT(m_options.dataBufferingPolicy() == BufferData);
+    ASSERT(dataBufferingPolicy() == BufferData);
     addIncrementalDataBuffer(data);
+    CachedResource::addDataBuffer(data);
 }
 
 void CachedImage::addData(const char* data, unsigned length)
 {
-    ASSERT(m_options.dataBufferingPolicy() == DoNotBufferData);
-    addIncrementalDataBuffer(ResourceBuffer::create(data, length).get());
+    ASSERT(dataBufferingPolicy() == DoNotBufferData);
+    addIncrementalDataBuffer(*SharedBuffer::create(data, length));
+    CachedResource::addData(data, length);
 }
 
-void CachedImage::finishLoading(ResourceBuffer* data)
+void CachedImage::finishLoading(SharedBuffer* data)
 {
     m_data = data;
     if (!m_image && data)
         createImage();
 
-    if (m_image)
-        m_image->setData(m_data->sharedBuffer(), true);
+    if (m_image) {
+        if (m_loader && m_image->isSVGImage())
+            downcast<SVGImage>(*m_image).setDataProtocolLoader(&m_loader->dataProtocolFrameLoader());
+        m_image->setData(data, true);
+    }
 
     if (!m_image || m_image->isNull()) {
         // Image decoding failed; the image data is malformed.
         error(errorOccurred() ? status() : DecodeError);
         if (inCache())
-            memoryCache()->remove(this);
+            MemoryCache::singleton().remove(*this);
         return;
     }
 
-    notifyObservers();
     if (m_image)
         setEncodedSize(m_image->data() ? m_image->data()->size() : 0);
-    CachedResource::finishLoading(data);
+
+    setLoading(false);
+    notifyObservers();
 }
 
 void CachedImage::error(CachedResource::Status status)
@@ -509,7 +512,7 @@ bool CachedImage::isOriginClean(SecurityOrigin* securityOrigin)
     return !securityOrigin->taintsCanvas(response().url());
 }
 
-bool CachedImage::mustRevalidateDueToCacheHeaders(CachePolicy policy) const
+bool CachedImage::mustRevalidateDueToCacheHeaders(const CachedResourceLoader& cachedResourceLoader, CachePolicy policy) const
 {
     if (UNLIKELY(isManuallyCached())) {
         // Do not revalidate manually cached images. This mechanism is used as a
@@ -519,7 +522,7 @@ bool CachedImage::mustRevalidateDueToCacheHeaders(CachePolicy policy) const
         // incumbent on the client to only use valid resources.
         return false;
     }
-    return CachedResource::mustRevalidateDueToCacheHeaders(policy);
+    return CachedResource::mustRevalidateDueToCacheHeaders(cachedResourceLoader, policy);
 }
 
 } // namespace WebCore

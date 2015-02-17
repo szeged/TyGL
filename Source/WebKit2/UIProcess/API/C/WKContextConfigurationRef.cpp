@@ -26,14 +26,14 @@
 #include "config.h"
 #include "WKContextConfigurationRef.h"
 
-#include "APIContextConfiguration.h"
+#include "APIProcessPoolConfiguration.h"
 #include "WKAPICast.h"
 
 using namespace WebKit;
 
 WKContextConfigurationRef WKContextConfigurationCreate()
 {
-    return toAPI(API::ContextConfiguration::create().leakRef());
+    return toAPI(&API::ProcessPoolConfiguration::create().leakRef());
 }
 
 WKStringRef WKContextConfigurationCopyIndexedDBDatabaseDirectory(WKContextConfigurationRef configuration)
@@ -74,4 +74,14 @@ WKStringRef WKContextConfigurationCopyWebSQLDatabaseDirectory(WKContextConfigura
 void WKContextConfigurationSetWebSQLDatabaseDirectory(WKContextConfigurationRef configuration, WKStringRef webSQLDatabaseDirectory)
 {
     toImpl(configuration)->setWebSQLDatabaseDirectory(toImpl(webSQLDatabaseDirectory)->string());
+}
+
+WKStringRef WKContextConfigurationCopyMediaKeysStorageDirectory(WKContextConfigurationRef configuration)
+{
+    return toCopiedAPI(toImpl(configuration)->mediaKeysStorageDirectory());
+}
+
+void WKContextConfigurationSetMediaKeysStorageDirectory(WKContextConfigurationRef configuration, WKStringRef mediaKeysStorageDirectory)
+{
+    toImpl(configuration)->setMediaKeysStorageDirectory(toImpl(mediaKeysStorageDirectory)->string());
 }

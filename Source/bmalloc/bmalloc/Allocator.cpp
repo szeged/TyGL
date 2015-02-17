@@ -27,16 +27,19 @@
 #include "BAssert.h"
 #include "Deallocator.h"
 #include "Heap.h"
+#include "LargeChunk.h"
 #include "PerProcess.h"
 #include "Sizes.h"
 #include <algorithm>
+#include <cstdlib>
 
 using namespace std;
 
 namespace bmalloc {
 
-Allocator::Allocator(Deallocator& deallocator)
-    : m_deallocator(deallocator)
+Allocator::Allocator(Heap* heap, Deallocator& deallocator)
+    : m_isBmallocEnabled(heap->environment().isBmallocEnabled())
+    , m_deallocator(deallocator)
 {
     for (unsigned short size = alignment; size <= mediumMax; size += alignment)
         m_bumpAllocators[sizeClass(size)].init(size);
@@ -45,6 +48,90 @@ Allocator::Allocator(Deallocator& deallocator)
 Allocator::~Allocator()
 {
     scavenge();
+}
+
+void* Allocator::allocate(size_t alignment, size_t size)
+{
+    BASSERT(isPowerOfTwo(alignment));
+
+    if (!m_isBmallocEnabled) {
+        void* result = nullptr;
+        posix_memalign(&result, alignment, size);
+        return result;
+    }
+    
+    if (size <= smallMax && alignment <= smallLineSize) {
+        size_t alignmentMask = alignment - 1;
+        while (void* p = allocate(size)) {
+            if (!test(p, alignmentMask))
+                return p;
+            m_deallocator.deallocate(p);
+        }
+    }
+
+    if (size <= mediumMax && alignment <= mediumLineSize) {
+        size = std::max(size, smallMax + Sizes::alignment);
+        size_t alignmentMask = alignment - 1;
+        while (void* p = allocate(size)) {
+            if (!test(p, alignmentMask))
+                return p;
+            m_deallocator.deallocate(p);
+        }
+    }
+
+    size = std::max(largeMin, roundUpToMultipleOf<largeAlignment>(size));
+    alignment = roundUpToMultipleOf<largeAlignment>(alignment);
+    size_t unalignedSize = largeMin + alignment + size;
+    if (unalignedSize <= largeMax && alignment <= largeChunkSize / 2) {
+        std::lock_guard<StaticMutex> lock(PerProcess<Heap>::mutex());
+        return PerProcess<Heap>::getFastCase()->allocateLarge(lock, alignment, size, unalignedSize);
+    }
+
+    size = roundUpToMultipleOf<xLargeAlignment>(size);
+    alignment = std::max(superChunkSize, alignment);
+    std::lock_guard<StaticMutex> lock(PerProcess<Heap>::mutex());
+    return PerProcess<Heap>::getFastCase()->allocateXLarge(lock, alignment, size);
+}
+
+void* Allocator::reallocate(void* object, size_t newSize)
+{
+    if (!m_isBmallocEnabled)
+        return realloc(object, newSize);
+
+    void* result = allocate(newSize);
+    if (!object)
+        return result;
+
+    size_t oldSize = 0;
+    switch (objectType(object)) {
+    case Small: {
+        SmallPage* page = SmallPage::get(SmallLine::get(object));
+        oldSize = objectSize(page->sizeClass());
+        break;
+    }
+    case Medium: {
+        MediumPage* page = MediumPage::get(MediumLine::get(object));
+        oldSize = objectSize(page->sizeClass());
+        break;
+    }
+    case Large: {
+        BeginTag* beginTag = LargeChunk::beginTag(object);
+        oldSize = beginTag->size();
+        break;
+    }
+    case XLarge: {
+        std::lock_guard<StaticMutex> lock(PerProcess<Heap>::mutex());
+        Range range = PerProcess<Heap>::getFastCase()->findXLarge(lock, object);
+        RELEASE_BASSERT(range);
+        oldSize = range.size();
+        break;
+    }
+    }
+
+    size_t copySize = std::min(oldSize, newSize);
+    memcpy(result, object, copySize);
+    m_deallocator.deallocate(object);
+    return result;
 }
 
 void Allocator::scavenge()
@@ -96,13 +183,16 @@ NO_INLINE void* Allocator::allocateLarge(size_t size)
 
 NO_INLINE void* Allocator::allocateXLarge(size_t size)
 {
-    size = roundUpToMultipleOf<largeAlignment>(size);
+    size = roundUpToMultipleOf<xLargeAlignment>(size);
     std::lock_guard<StaticMutex> lock(PerProcess<Heap>::mutex());
     return PerProcess<Heap>::getFastCase()->allocateXLarge(lock, size);
 }
 
 void* Allocator::allocateSlowCase(size_t size)
 {
+    if (!m_isBmallocEnabled)
+        return malloc(size);
+
     if (size <= mediumMax) {
         size_t sizeClass = bmalloc::sizeClass(size);
         BumpAllocator& allocator = m_bumpAllocators[sizeClass];

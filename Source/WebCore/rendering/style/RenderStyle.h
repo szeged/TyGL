@@ -105,9 +105,10 @@ class ContentData;
 class CounterContent;
 class CursorList;
 class FilterOperations;
-class Font;
+class FontCascade;
 class FontMetrics;
 class IntRect;
+class MaskImageOperation;
 class Pair;
 class ShadowData;
 class StyleImage;
@@ -122,12 +123,14 @@ typedef Vector<RefPtr<RenderStyle>, 4> PseudoStyleCache;
 class RenderStyle: public RefCounted<RenderStyle> {
     friend class CSSPropertyAnimationWrapperMap; // Used by CSS animations. We can't allow them to animate based off visited colors.
     friend class ApplyStyleCommand; // Editing has to only reveal unvisited info.
-    friend class DeprecatedStyleBuilder; // Sets members directly.
     friend class EditingStyle; // Editing has to only reveal unvisited info.
     friend class ComputedStyleExtractor; // Ignores visited styles, so needs to be able to see unvisited info.
     friend class PropertyWrapperMaybeInvalidColor; // Used by CSS animations. We can't allow them to animate based off visited colors.
     friend class RenderSVGResource; // FIXME: Needs to alter the visited state by hand. Should clean the SVG code up and move it into RenderStyle perhaps.
     friend class RenderTreeAsText; // FIXME: Only needed so the render tree can keep lying and dump the wrong colors.  Rebaselining would allow this to be yanked.
+    friend class StyleBuilderConverter; // Sets members directly.
+    friend class StyleBuilderCustom; // Sets members directly.
+    friend class StyleBuilderFunctions; // Sets members directly.
     friend class StyleResolver; // Sets members directly.
 
 public:
@@ -234,6 +237,14 @@ public:
             ASSERT(pseudo < FIRST_INTERNAL_PSEUDOID);
             m_flags |= oneBitMask << (pseudoBitsOffset - 1 + pseudo);
         }
+        void setHasPseudoStyles(PseudoIdSet pseudoIdSet)
+        {
+            ASSERT(pseudoIdSet);
+            uint64_t rawPseudoIdSet = pseudoIdSet.data();
+            ASSERT((rawPseudoIdSet & PUBLIC_PSEUDOID_MASK) == rawPseudoIdSet);
+            static_assert(pseudoBitsOffset >= 1, "(pseudoBitsOffset - 1) should be valid.");
+            m_flags |= (static_cast<uint64_t>(rawPseudoIdSet) << (pseudoBitsOffset - 1));
+        }
 
         ETableLayout tableLayout() const { return static_cast<ETableLayout>(getValue(tableLayoutBitMask, tableLayoutOffset)); }
         void setTableLayout(ETableLayout tableLayout) { updateValue(tableLayout, tableLayoutBitMask, tableLayoutOffset); }
@@ -264,17 +275,6 @@ public:
 
         bool isLink() const { return getBoolean(isLinkOffset); }
         void setIsLink(bool value) { updateBoolean(value, isLinkOffset); }
-
-        static EOverflow initialOverflowX() { return OVISIBLE; }
-        static EOverflow initialOverflowY() { return OVISIBLE; }
-        static EClear initialClear() { return CNONE; }
-        static EDisplay initialDisplay() { return INLINE; }
-        static EUnicodeBidi initialUnicodeBidi() { return UBNormal; }
-        static EPosition initialPosition() { return StaticPosition; }
-        static EVerticalAlign initialVerticalAlign() { return BASELINE; }
-        static EFloat initialFloating() { return NoFloat; }
-        static EPageBreak initialPageBreak() { return PBAUTO; }
-        static ETableLayout initialTableLayout() { return TAUTO; }
 
         static ptrdiff_t flagsMemoryOffset() { return OBJECT_OFFSETOF(NonInheritedFlags, m_flags); }
         static uint64_t flagIsaffectedByActive() { return oneBitMask << affectedByActiveOffset; }
@@ -483,13 +483,13 @@ private:
     ALWAYS_INLINE RenderStyle(const RenderStyle&);
 
 public:
-    static PassRef<RenderStyle> create();
-    static PassRef<RenderStyle> createDefaultStyle();
-    static PassRef<RenderStyle> createAnonymousStyleWithDisplay(const RenderStyle* parentStyle, EDisplay);
-    static PassRef<RenderStyle> clone(const RenderStyle*);
+    static Ref<RenderStyle> create();
+    static Ref<RenderStyle> createDefaultStyle();
+    static Ref<RenderStyle> createAnonymousStyleWithDisplay(const RenderStyle* parentStyle, EDisplay);
+    static Ref<RenderStyle> clone(const RenderStyle*);
 
     // Create a RenderStyle for generated content by inheriting from a pseudo style.
-    static PassRef<RenderStyle> createStyleInheritingFromPseudoStyle(const RenderStyle& pseudoStyle);
+    static Ref<RenderStyle> createStyleInheritingFromPseudoStyle(const RenderStyle& pseudoStyle);
 
     enum IsAtShadowBoundary {
         AtShadowBoundary,
@@ -572,6 +572,7 @@ public:
     bool hasAnyPublicPseudoStyles() const;
     bool hasPseudoStyle(PseudoId pseudo) const;
     void setHasPseudoStyle(PseudoId pseudo);
+    void setHasPseudoStyles(PseudoIdSet);
     bool hasUniquePseudoStyle() const;
 
     // attribute getter methods
@@ -688,7 +689,7 @@ public:
     EClear clear() const { return noninherited_flags.clear(); }
     ETableLayout tableLayout() const { return noninherited_flags.tableLayout(); }
 
-    WEBCORE_EXPORT const Font& font() const;
+    WEBCORE_EXPORT const FontCascade& fontCascade() const;
     WEBCORE_EXPORT const FontMetrics& fontMetrics() const;
     WEBCORE_EXPORT const FontDescription& fontDescription() const;
     float specifiedFontSize() const;
@@ -796,10 +797,9 @@ public:
     const Length& backgroundYPosition() const { return m_background->background().yPosition(); }
     EFillSizeType backgroundSizeType() const { return m_background->background().sizeType(); }
     const LengthSize& backgroundSizeLength() const { return m_background->background().sizeLength(); }
-    FillLayer* accessBackgroundLayers() { return &(m_background.access()->m_background); }
+    FillLayer& ensureBackgroundLayers() { return m_background.access()->m_background; }
     const FillLayer* backgroundLayers() const { return &(m_background->background()); }
 
-    StyleImage* maskImage() const { return rareNonInheritedData->m_mask.image(); }
     EFillRepeat maskRepeatX() const { return static_cast<EFillRepeat>(rareNonInheritedData->m_mask.repeatX()); }
     EFillRepeat maskRepeatY() const { return static_cast<EFillRepeat>(rareNonInheritedData->m_mask.repeatY()); }
     CompositeOperator maskComposite() const { return static_cast<CompositeOperator>(rareNonInheritedData->m_mask.composite()); }
@@ -809,7 +809,7 @@ public:
     const Length& maskYPosition() const { return rareNonInheritedData->m_mask.yPosition(); }
     EFillSizeType maskSizeType() const { return rareNonInheritedData->m_mask.sizeType(); }
     const LengthSize& maskSizeLength() const { return rareNonInheritedData->m_mask.sizeLength(); }
-    FillLayer* accessMaskLayers() { return &(rareNonInheritedData.access()->m_mask); }
+    FillLayer& ensureMaskLayers() { return rareNonInheritedData.access()->m_mask; }
     const FillLayer* maskLayers() const { return &(rareNonInheritedData->m_mask); }
     const NinePieceImage& maskBoxImage() const { return rareNonInheritedData->m_maskBoxImage; }
     StyleImage* maskBoxImageSource() const { return rareNonInheritedData->m_maskBoxImage.image(); }
@@ -930,7 +930,6 @@ public:
     bool isGridAutoFlowDirectionColumn() const { return (rareNonInheritedData->m_grid->m_gridAutoFlow & InternalAutoFlowDirectionColumn); }
     bool isGridAutoFlowAlgorithmSparse() const { return (rareNonInheritedData->m_grid->m_gridAutoFlow & InternalAutoFlowAlgorithmSparse); }
     bool isGridAutoFlowAlgorithmDense() const { return (rareNonInheritedData->m_grid->m_gridAutoFlow & InternalAutoFlowAlgorithmDense); }
-    bool isGridAutoFlowAlgorithmStack() const { return (rareNonInheritedData->m_grid->m_gridAutoFlow & InternalAutoFlowAlgorithmStack); }
     const GridTrackSize& gridAutoColumns() const { return rareNonInheritedData->m_grid->m_gridAutoColumns; }
     const GridTrackSize& gridAutoRows() const { return rareNonInheritedData->m_grid->m_gridAutoRows; }
 
@@ -1026,7 +1025,7 @@ public:
     void applyTransform(TransformationMatrix&, const FloatRect& boundingBox, ApplyTransformOrigin = IncludeTransformOrigin) const;
     void setPageScaleTransform(float);
 
-    bool hasMask() const { return rareNonInheritedData->m_mask.hasImage() || rareNonInheritedData->m_maskBoxImage.hasImage(); }
+    bool hasMask() const { return rareNonInheritedData->m_mask.hasNonEmptyMaskImage() || rareNonInheritedData->m_mask.hasImage() || rareNonInheritedData->m_maskBoxImage.hasImage(); }
 
     TextCombine textCombine() const { return static_cast<TextCombine>(rareNonInheritedData->m_textCombine); }
     bool hasTextCombine() const { return textCombine() != TextCombineNone; }
@@ -1050,8 +1049,8 @@ public:
     const AnimationList* animations() const { return rareNonInheritedData->m_animations.get(); }
     const AnimationList* transitions() const { return rareNonInheritedData->m_transitions.get(); }
 
-    AnimationList* accessAnimations();
-    AnimationList* accessTransitions();
+    AnimationList& ensureAnimations();
+    AnimationList& ensureTransitions();
 
     bool hasAnimations() const { return rareNonInheritedData->m_animations && rareNonInheritedData->m_animations->size() > 0; }
     bool hasTransitions() const { return rareNonInheritedData->m_transitions && rareNonInheritedData->m_transitions->size() > 0; }
@@ -1127,6 +1126,17 @@ public:
     FilterOperations& mutableFilter() { return rareNonInheritedData.access()->m_filter.access()->m_operations; }
     const FilterOperations& filter() const { return rareNonInheritedData->m_filter->m_operations; }
     bool hasFilter() const { return !rareNonInheritedData->m_filter->m_operations.operations().isEmpty(); }
+    
+    RefPtr<MaskImageOperation>& mutableMaskImage() { return rareNonInheritedData.access()->m_mask.m_maskImageOperation; }
+    const RefPtr<MaskImageOperation> maskImage() const { return rareNonInheritedData->m_mask.maskImage(); }
+
+#if ENABLE(FILTERS_LEVEL_2)
+    FilterOperations& mutableBackdropFilter() { return rareNonInheritedData.access()->m_backdropFilter.access()->m_operations; }
+    const FilterOperations& backdropFilter() const { return rareNonInheritedData->m_backdropFilter->m_operations; }
+    bool hasBackdropFilter() const { return !rareNonInheritedData->m_backdropFilter->m_operations.operations().isEmpty(); }
+#else
+    bool hasBackdropFilter() const { return false; }
+#endif
 
 #if ENABLE(CSS_COMPOSITING)
     BlendMode blendMode() const { return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode); }
@@ -1354,8 +1364,8 @@ public:
     void adjustBackgroundLayers()
     {
         if (backgroundLayers()->next()) {
-            accessBackgroundLayers()->cullEmptyLayers();
-            accessBackgroundLayers()->fillUnsetProperties();
+            ensureBackgroundLayers().cullEmptyLayers();
+            ensureBackgroundLayers().fillUnsetProperties();
         }
     }
 
@@ -1365,12 +1375,10 @@ public:
     void adjustMaskLayers()
     {
         if (maskLayers()->next()) {
-            accessMaskLayers()->cullEmptyLayers();
-            accessMaskLayers()->fillUnsetProperties();
+            ensureMaskLayers().cullEmptyLayers();
+            ensureMaskLayers().fillUnsetProperties();
         }
     }
-
-    void setMaskImage(PassRefPtr<StyleImage> v) { rareNonInheritedData.access()->m_mask.setImage(v); }
 
     void setMaskBoxImage(const NinePieceImage& b) { SET_VAR(rareNonInheritedData, m_maskBoxImage, b); }
     void setMaskBoxImageSource(PassRefPtr<StyleImage> v) { rareNonInheritedData.access()->m_maskBoxImage.setImage(v); }
@@ -1558,6 +1566,12 @@ public:
     void setRubyPosition(RubyPosition position) { SET_VAR(rareInheritedData, m_rubyPosition, position); }
 
     void setFilter(const FilterOperations& ops) { SET_VAR(rareNonInheritedData.access()->m_filter, m_operations, ops); }
+#if ENABLE(FILTERS_LEVEL_2)
+    void setBackdropFilter(const FilterOperations& ops) { SET_VAR(rareNonInheritedData.access()->m_backdropFilter, m_operations, ops); }
+#endif
+
+    void setMaskImage(const Vector<RefPtr<MaskImageOperation>>&);
+    void setMaskImage(const RefPtr<MaskImageOperation> maskImage) { Vector<RefPtr<MaskImageOperation>> vectMask; vectMask.append(maskImage); setMaskImage(vectMask); }
 
     void setTabSize(unsigned size) { SET_VAR(rareInheritedData, m_tabSize, size); }
 
@@ -1745,7 +1759,7 @@ public:
     bool equalForTextAutosizing(const RenderStyle *other) const;
 #endif
 
-    StyleDifference diff(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+    StyleDifference diff(const RenderStyle&, unsigned& changedContextSensitiveProperties) const;
     bool diffRequiresLayerRepaint(const RenderStyle&, bool isComposited) const;
 
     bool isDisplayReplacedType() const { return isDisplayReplacedType(display()); }
@@ -1784,6 +1798,16 @@ public:
     bool hasExplicitlyInheritedProperties() const { return noninherited_flags.hasExplicitlyInheritedProperties(); }
     
     // Initial values for all the properties
+    static EOverflow initialOverflowX() { return OVISIBLE; }
+    static EOverflow initialOverflowY() { return OVISIBLE; }
+    static EClear initialClear() { return CNONE; }
+    static EDisplay initialDisplay() { return INLINE; }
+    static EUnicodeBidi initialUnicodeBidi() { return UBNormal; }
+    static EPosition initialPosition() { return StaticPosition; }
+    static EVerticalAlign initialVerticalAlign() { return BASELINE; }
+    static EFloat initialFloating() { return NoFloat; }
+    static EPageBreak initialPageBreak() { return PBAUTO; }
+    static ETableLayout initialTableLayout() { return TAUTO; }
     static EBorderCollapse initialBorderCollapse() { return BSEPARATE; }
     static EBorderStyle initialBorderStyle() { return BNONE; }
     static OutlineIsAuto initialOutlineStyleIsAuto() { return AUTO_OFF; }
@@ -1930,6 +1954,8 @@ public:
     static StyleImage* initialBorderImageSource() { return 0; }
     static StyleImage* initialMaskBoxImageSource() { return 0; }
     static PrintColorAdjust initialPrintColorAdjust() { return PrintColorAdjustEconomy; }
+    static QuotesData* initialQuotes() { return nullptr; }
+    static const AtomicString& initialContentAltText() { return emptyAtom; }
 
 #if ENABLE(CSS_SCROLL_SNAP)
     static ScrollSnapType initialScrollSnapType() { return ScrollSnapType::None; }
@@ -1996,6 +2022,9 @@ public:
     static const Vector<StyleDashboardRegion>& noneDashboardRegions();
 #endif
     static const FilterOperations& initialFilter() { DEPRECATED_DEFINE_STATIC_LOCAL(FilterOperations, ops, ()); return ops; }
+#if ENABLE(FILTERS_LEVEL_2)
+    static const FilterOperations& initialBackdropFilter() { DEPRECATED_DEFINE_STATIC_LOCAL(FilterOperations, ops, ()); return ops; }
+#endif
 #if ENABLE(CSS_COMPOSITING)
     static BlendMode initialBlendMode() { return BlendModeNormal; }
     static Isolation initialIsolation() { return IsolationAuto; }
@@ -2005,12 +2034,12 @@ public:
 
 private:
     bool changeAffectsVisualOverflow(const RenderStyle&) const;
-    bool changeRequiresLayout(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
-    bool changeRequiresPositionedLayoutOnly(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
-    bool changeRequiresLayerRepaint(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
-    bool changeRequiresRepaint(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
-    bool changeRequiresRepaintIfTextOrBorderOrOutline(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
-    bool changeRequiresRecompositeLayer(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresLayout(const RenderStyle&, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresPositionedLayoutOnly(const RenderStyle&, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresLayerRepaint(const RenderStyle&, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresRepaint(const RenderStyle&, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresRepaintIfTextOrBorderOrOutline(const RenderStyle&, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresRecompositeLayer(const RenderStyle&, unsigned& changedContextSensitiveProperties) const;
 
     void setVisitedLinkColor(const Color&);
     void setVisitedLinkBackgroundColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBackgroundColor, v); }
@@ -2054,7 +2083,7 @@ private:
     }
 
     // Color accessors are all private to make sure callers use visitedDependentColor instead to access them.
-    Color invalidColor() const { static Color invalid; return invalid; }
+    static Color invalidColor() { return Color(); }
     Color borderLeftColor() const { return surround->border.left().color(); }
     Color borderRightColor() const { return surround->border.right().color(); }
     Color borderTopColor() const { return surround->border.top().color(); }
@@ -2154,6 +2183,11 @@ inline bool RenderStyle::hasPseudoStyle(PseudoId pseudo) const
 inline void RenderStyle::setHasPseudoStyle(PseudoId pseudo)
 {
     noninherited_flags.setHasPseudoStyle(pseudo);
+}
+
+inline void RenderStyle::setHasPseudoStyles(PseudoIdSet pseudoIdSet)
+{
+    noninherited_flags.setHasPseudoStyles(pseudoIdSet);
 }
 
 } // namespace WebCore

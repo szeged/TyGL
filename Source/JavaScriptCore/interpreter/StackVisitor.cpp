@@ -121,7 +121,6 @@ void StackVisitor::readNonInlinedFrame(CallFrame* callFrame, CodeOrigin* codeOri
     m_frame.m_callerFrame = callFrame->callerFrame(m_frame.m_CallerVMEntryFrame);
     m_frame.m_callerIsVMEntryFrame = m_frame.m_CallerVMEntryFrame != m_frame.m_VMEntryFrame;
     m_frame.m_callee = callFrame->callee();
-    m_frame.m_scope = callFrame->scope();
     m_frame.m_codeBlock = callFrame->codeBlock();
     m_frame.m_bytecodeOffset = !m_frame.codeBlock() ? 0
         : codeOrigin ? codeOrigin->bytecodeIndex
@@ -155,9 +154,7 @@ void StackVisitor::readInlinedFrame(CallFrame* callFrame, CodeOrigin* codeOrigin
         m_frame.m_bytecodeOffset = codeOrigin->bytecodeIndex;
 
         JSFunction* callee = inlineCallFrame->calleeForCallFrame(callFrame);
-        m_frame.m_scope = callee->scope();
         m_frame.m_callee = callee;
-        ASSERT(m_frame.scope());
         ASSERT(m_frame.callee());
 
         // The callerFrame just needs to be non-null to indicate that we
@@ -263,7 +260,7 @@ Arguments* StackVisitor::Frame::createArguments()
     Arguments* arguments;
     ArgumentsMode mode;
     if (Options::enableFunctionDotArguments())
-        mode = NormalArgumentsCreationMode;
+        mode = ClonedArgumentsCreationMode;
     else
         mode = FakeArgumentValuesCreationMode;
 #if ENABLE(DFG_JIT)
@@ -271,10 +268,12 @@ Arguments* StackVisitor::Frame::createArguments()
         ASSERT(m_inlineCallFrame);
         arguments = Arguments::create(vm, physicalFrame, m_inlineCallFrame, mode);
         arguments->tearOff(physicalFrame, m_inlineCallFrame);
+        jsCast<Arguments*>((JSCell*)arguments);
     } else 
 #endif
     {
-        arguments = Arguments::create(vm, physicalFrame, mode);
+        JSLexicalEnvironment* lexicalEnvironment = nullptr;
+        arguments = Arguments::create(vm, physicalFrame, lexicalEnvironment, mode);
         arguments->tearOff(physicalFrame);
     }
     return arguments;
@@ -295,9 +294,19 @@ Arguments* StackVisitor::Frame::existingArguments()
     else
 #endif // ENABLE(DFG_JIT)
         reg = codeBlock()->argumentsRegister();
-    
-    JSValue result = callFrame()->r(unmodifiedArgumentsRegister(reg).offset()).jsValue();
-    if (!result || !result.isCell()) // Protect against Undefined in case we throw in op_enter.
+
+    // Care should be taken here since exception fuzzing may raise exceptions in
+    // places where they would be otherwise impossible. Therefore, callFrame may
+    // lack activation even if the codeBlock signals need of activation. Also,
+    // even if codeBlock signals the use of arguments, the
+    // unmodifiedArgumentsRegister may not be initialized yet (neither locally
+    // nor in lexicalEnvironment).
+    JSValue result = jsUndefined();
+    if (codeBlock()->needsActivation() && callFrame()->hasActivation())
+        result = callFrame()->lexicalEnvironment()->registerAt(unmodifiedArgumentsRegister(reg).offset()).get();
+    if (!result || !result.isCell()) // Try local unmodifiedArgumentsRegister if lexicalEnvironment is not present (generally possible) or has not set up registers yet (only possible if fuzzing exceptions).
+        result = callFrame()->r(unmodifiedArgumentsRegister(reg).offset()).jsValue();
+    if (!result || !result.isCell()) // Protect against the case when exception fuzzing throws when unmodifiedArgumentsRegister is not set up yet (e.g., in op_enter).
         return 0;
     return jsCast<Arguments*>(result);
 }

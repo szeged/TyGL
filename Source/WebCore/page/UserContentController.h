@@ -45,6 +45,10 @@ class UserScript;
 class UserStyleSheet;
 class UserMessageHandlerDescriptor;
 
+namespace ContentExtensions {
+class ContentExtensionsBackend;
+}
+
 class UserContentController : public RefCounted<UserContentController> {
 public:
     WEBCORE_EXPORT static RefPtr<UserContentController> create();
@@ -56,22 +60,31 @@ public:
     const UserScriptMap* userScripts() const { return m_userScripts.get(); }
 
     WEBCORE_EXPORT void addUserScript(DOMWrapperWorld&, std::unique_ptr<UserScript>);
-    void removeUserScript(DOMWrapperWorld&, const URL&);
+    WEBCORE_EXPORT void removeUserScript(DOMWrapperWorld&, const URL&);
     WEBCORE_EXPORT void removeUserScripts(DOMWrapperWorld&);
 
     const UserStyleSheetMap* userStyleSheets() const { return m_userStyleSheets.get(); }
 
     WEBCORE_EXPORT void addUserStyleSheet(DOMWrapperWorld&, std::unique_ptr<UserStyleSheet>, UserStyleInjectionTime);
-    void removeUserStyleSheet(DOMWrapperWorld&, const URL&);
+    WEBCORE_EXPORT void removeUserStyleSheet(DOMWrapperWorld&, const URL&);
     WEBCORE_EXPORT void removeUserStyleSheets(DOMWrapperWorld&);
 
-    void removeAllUserContent();
+    WEBCORE_EXPORT void removeAllUserContent();
 
 #if ENABLE(USER_MESSAGE_HANDLERS)
     const UserMessageHandlerDescriptorMap* userMessageHandlerDescriptors() const { return m_userMessageHandlerDescriptors.get(); }
 
     WEBCORE_EXPORT void addUserMessageHandlerDescriptor(UserMessageHandlerDescriptor&);
     WEBCORE_EXPORT void removeUserMessageHandlerDescriptor(UserMessageHandlerDescriptor&);
+#endif
+
+#if ENABLE(CONTENT_EXTENSIONS)
+    // FIXME: This should really take a pointer to a compiled UserContentFilter.
+    WEBCORE_EXPORT void addUserContentFilter(const String& name, const String& ruleList);
+    WEBCORE_EXPORT void removeAllUserContentFilters();
+    
+    // FIXME: Consider putting this (and other future content filter predicates) in its own class.
+    bool contentFilterBlocksURL(const URL&);
 #endif
 
 private:
@@ -85,6 +98,9 @@ private:
     std::unique_ptr<UserStyleSheetMap> m_userStyleSheets;
 #if ENABLE(USER_MESSAGE_HANDLERS)
     std::unique_ptr<UserMessageHandlerDescriptorMap> m_userMessageHandlerDescriptors;
+#endif
+#if ENABLE(CONTENT_EXTENSIONS)
+    std::unique_ptr<ContentExtensions::ContentExtensionsBackend> m_contentExtensionBackend;
 #endif
 };
 

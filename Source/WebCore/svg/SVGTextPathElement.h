@@ -109,7 +109,7 @@ public:
         TEXTPATH_SPACINGTYPE_EXACT = SVGTextPathSpacingExact
     };
 
-    static PassRefPtr<SVGTextPathElement> create(const QualifiedName&, Document&);
+    static Ref<SVGTextPathElement> create(const QualifiedName&, Document&);
 
 protected:
     virtual void didNotifySubtreeInsertions(ContainerNode*) override;
@@ -129,7 +129,7 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
     virtual bool childShouldCreateRenderer(const Node&) const override;
     virtual bool rendererIsNeeded(const RenderStyle&) override;
 

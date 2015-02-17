@@ -115,9 +115,9 @@ public:
     ViewSnapshotStore();
     ~ViewSnapshotStore();
 
-    static ViewSnapshotStore& shared();
+    static ViewSnapshotStore& singleton();
 
-    void recordSnapshot(WebPageProxy&);
+    void recordSnapshot(WebPageProxy&, WebBackForwardListItem&);
 
     void discardSnapshotImages();
 

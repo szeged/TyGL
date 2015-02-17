@@ -104,7 +104,7 @@ my %baseTypeHash = ("Object" => 1, "Node" => 1, "NodeList" => 1, "NamedNodeMap" 
                     "NodeIterator" => 1, "TreeWalker" => 1, "AbstractView" => 1, "Blob" => 1);
 
 # Constants
-my $buildingForIPhone = defined $ENV{PLATFORM_NAME} && ($ENV{PLATFORM_NAME} eq "iphoneos" or $ENV{PLATFORM_NAME} eq "iphonesimulator");
+my $shouldUseCGColor = defined $ENV{PLATFORM_NAME} && $ENV{PLATFORM_NAME} ne "macosx";
 my $nullableInit = "bool isNull = false;";
 my $exceptionInit = "WebCore::ExceptionCode ec = 0;";
 my $jsContextSetter = "WebCore::JSMainThreadNullState state;";
@@ -392,7 +392,7 @@ sub GetClassName
 
     # special cases
     return "NSString" if $codeGenerator->IsStringType($name) or $name eq "SerializedScriptValue";
-    return "CGColorRef" if $name eq "Color" and $buildingForIPhone;
+    return "CGColorRef" if $name eq "Color" and $shouldUseCGColor;
     return "NS$name" if IsNativeObjCType($name);
     return "BOOL" if $name eq "boolean";
     return "unsigned char" if $name eq "octet";
@@ -659,7 +659,7 @@ sub AddIncludesForType
 
     if (IsNativeObjCType($type)) {
         if ($type eq "Color") {
-            if ($buildingForIPhone) {
+            if ($shouldUseCGColor) {
                 $implIncludes{"ColorSpace.h"} = 1;
             } else {
                 $implIncludes{"ColorMac.h"} = 1;
@@ -863,7 +863,7 @@ sub GenerateHeader
             my $publicInterfaceKey = $property . ";";
 
             # FIXME: This only works for the getter, but not the setter.  Need to refactor this code.
-            if ($buildingForTigerOrEarlier && !$buildingForIPhone || IsCoreFoundationType($attributeType)) {
+            if (IsCoreFoundationType($attributeType)) {
                 $publicInterfaceKey = "- (" . $attributeType . ")" . $attributeName . ";";
             }
 
@@ -895,9 +895,19 @@ sub GenerateHeader
             }
 
             if (!IsCoreFoundationType($attributeType)) {
+                # FIXME: We should probably also check that the property type is an Objective-C type.
+                my $needsReturnsRetainedAnnotation = $attributeName =~ /new([A-Z].*)?/;
+
                 $property .= $declarationSuffix;
                 push(@headerAttributes, $property) if $public;
                 push(@privateHeaderAttributes, $property) unless $public;
+                if ($needsReturnsRetainedAnnotation) {
+                    # - GETTER
+                    my $getter = "- (" . $attributeType . ")" . $attributeName . " NS_RETURNS_NOT_RETAINED" . $declarationSuffix;
+                    push(@headerAttributes, $getter) if $public;
+                    push(@privateHeaderAttributes, $getter) unless $public;
+                }
+
             } elsif (ConditionalIsEnabled(%definesRef, $attribute->signature->extendedAttributes->{"Conditional"})) {
                 # - GETTER
                 my $getter = "- (" . $attributeType . ")" . $attributeName . $declarationSuffix;
@@ -1329,7 +1339,7 @@ sub GenerateImplementation
                 $getterContentHead = "kit($getterContentHead";
                 $getterContentTail .= ")";
             } elsif ($idlType eq "Color") {
-                if ($buildingForIPhone) {
+                if ($shouldUseCGColor) {
                     $getterContentHead = "WebCore::cachedCGColor($getterContentHead";
                     $getterContentTail .= ", WebCore::ColorSpaceDeviceRGB)";
                 } else {

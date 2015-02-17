@@ -42,7 +42,10 @@ enum SVGMarkerUnitsType {
 enum SVGMarkerOrientType {
     SVGMarkerOrientUnknown = 0,
     SVGMarkerOrientAuto,
-    SVGMarkerOrientAngle
+    SVGMarkerOrientAngle,
+
+    // Add new elements before here.
+    SVGMarkerOrientMax
 };
 
 template<>
@@ -110,7 +113,7 @@ public:
         SVG_MARKER_ORIENT_ANGLE = SVGMarkerOrientAngle
     };
 
-    static PassRefPtr<SVGMarkerElement> create(const QualifiedName&, Document&);
+    static Ref<SVGMarkerElement> create(const QualifiedName&, Document&);
 
     AffineTransform viewBoxToViewTransform(float viewWidth, float viewHeight) const;
 
@@ -129,7 +132,7 @@ private:
     virtual void svgAttributeChanged(const QualifiedName&) override;
     virtual void childrenChanged(const ChildChange&) override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
     virtual bool rendererIsNeeded(const RenderStyle&) override { return true; }
 
     virtual bool selfHasRelativeLengths() const override;
@@ -155,7 +158,7 @@ public:
     // Custom 'orientType' property.
     static void synchronizeOrientType(SVGElement* contextElement);
     static PassRefPtr<SVGAnimatedProperty> lookupOrCreateOrientTypeWrapper(SVGElement* contextElement);
-    SVGMarkerOrientType& orientType() const { return m_orientType.value; }
+    SVGMarkerOrientType& orientType() const;
     SVGMarkerOrientType& orientTypeBaseValue() const { return m_orientType.value; }
     void setOrientTypeBaseValue(const SVGMarkerOrientType& type) { m_orientType.value = type; }
     PassRefPtr<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>> orientTypeAnimated();

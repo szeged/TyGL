@@ -43,6 +43,9 @@ void NetworkProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) con
     encoder << canHandleHTTPSServerTrustEvaluation;
     encoder << diskCacheDirectory;
     encoder << diskCacheDirectoryExtensionHandle;
+#if ENABLE(NETWORK_CACHE)
+    encoder << shouldEnableNetworkCache;
+#endif
     encoder << cookieStorageDirectory;
 #if PLATFORM(IOS)
     encoder << cookieStorageDirectoryExtensionHandle;
@@ -50,9 +53,7 @@ void NetworkProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) con
     encoder << parentBundleDirectoryExtensionHandle;
 #endif
     encoder << shouldUseTestingNetworkSession;
-#if ENABLE(CUSTOM_PROTOCOLS)
     encoder << urlSchemesRegisteredForCustomProtocols;
-#endif
 #if PLATFORM(COCOA)
     encoder << parentProcessName;
     encoder << uiProcessBundleIdentifier;
@@ -82,6 +83,10 @@ bool NetworkProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, Net
         return false;
     if (!decoder.decode(result.diskCacheDirectoryExtensionHandle))
         return false;
+#if ENABLE(NETWORK_CACHE)
+    if (!decoder.decode(result.shouldEnableNetworkCache))
+        return false;
+#endif
     if (!decoder.decode(result.cookieStorageDirectory))
         return false;
 #if PLATFORM(IOS)
@@ -94,10 +99,8 @@ bool NetworkProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, Net
 #endif
     if (!decoder.decode(result.shouldUseTestingNetworkSession))
         return false;
-#if ENABLE(CUSTOM_PROTOCOLS)
     if (!decoder.decode(result.urlSchemesRegisteredForCustomProtocols))
         return false;
-#endif
 #if PLATFORM(COCOA)
     if (!decoder.decode(result.parentProcessName))
         return false;

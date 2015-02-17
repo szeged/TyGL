@@ -196,7 +196,7 @@ double ScrollAnimatorNone::PerAxisData::releaseArea(Curve curve, double startT, 
     return endValue - startValue;
 }
 
-ScrollAnimatorNone::PerAxisData::PerAxisData(ScrollAnimatorNone* parent, float* currentPosition, int visibleLength)
+ScrollAnimatorNone::PerAxisData::PerAxisData(ScrollAnimatorNone*, float* currentPosition, int visibleLength)
     : m_currentPosition(currentPosition)
     , m_visibleLength(visibleLength)
 {
@@ -374,7 +374,7 @@ ScrollAnimatorNone::ScrollAnimatorNone(ScrollableArea* scrollableArea)
     , m_verticalData(this, &m_currentPosY, scrollableArea->visibleHeight())
     , m_startTime(0)
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
-    , m_animationTimer(this, &ScrollAnimatorNone::animationTimerFired)
+    , m_animationTimer(*this, &ScrollAnimatorNone::requestAnimationTimerFired)
 #else
     , m_animationActive(false)
 #endif
@@ -491,7 +491,7 @@ void ScrollAnimatorNone::updateVisibleLengths()
 }
 
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
-void ScrollAnimatorNone::animationTimerFired(Timer<ScrollAnimatorNone>* timer)
+void ScrollAnimatorNone::requestAnimationTimerFired()
 {
     animationTimerFired();
 }

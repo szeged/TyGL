@@ -32,7 +32,6 @@
 #include "MediaPlayer.h"
 #include "MediaSourcePrivateClient.h"
 #include "MockMediaSourcePrivate.h"
-#include <wtf/Functional.h>
 #include <wtf/MainThread.h>
 #include <wtf/text/WTFString.h>
 
@@ -57,6 +56,7 @@ static HashSet<String> mimeTypeCache()
     if (!isInitialized) {
         isInitialized = true;
         cache.add(ASCIILiteral("video/mock"));
+        cache.add(ASCIILiteral("audio/mock"));
     }
 
     return cache;
@@ -112,7 +112,9 @@ void MockMediaPlayerMediaSource::cancelLoad()
 void MockMediaPlayerMediaSource::play()
 {
     m_playing = 1;
-    callOnMainThread(bind(&MockMediaPlayerMediaSource::advanceCurrentTime, this));
+    callOnMainThread([this] {
+        advanceCurrentTime();
+    });
 }
 
 void MockMediaPlayerMediaSource::pause()
@@ -207,7 +209,9 @@ void MockMediaPlayerMediaSource::seekWithTolerance(const MediaTime& time, const 
         m_player->timeChanged();
 
         if (m_playing)
-            callOnMainThread(bind(&MockMediaPlayerMediaSource::advanceCurrentTime, this));
+            callOnMainThread([this] {
+                advanceCurrentTime();
+            });
     }
 }
 
@@ -267,7 +271,9 @@ void MockMediaPlayerMediaSource::seekCompleted()
     m_player->timeChanged();
 
     if (m_playing)
-        callOnMainThread(bind(&MockMediaPlayerMediaSource::advanceCurrentTime, this));
+        callOnMainThread([this] {
+            advanceCurrentTime();
+        });
 }
 
 unsigned long MockMediaPlayerMediaSource::totalVideoFrames()

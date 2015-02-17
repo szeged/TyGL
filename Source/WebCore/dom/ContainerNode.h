@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2015 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -47,16 +47,21 @@ class NoEventDispatchAssertion {
 public:
     NoEventDispatchAssertion()
     {
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
         if (!isMainThread())
             return;
-        s_count++;
+        ++s_count;
 #endif
+    }
+
+    NoEventDispatchAssertion(const NoEventDispatchAssertion&)
+        : NoEventDispatchAssertion()
+    {
     }
 
     ~NoEventDispatchAssertion()
     {
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
         if (!isMainThread())
             return;
         ASSERT(s_count);
@@ -64,18 +69,20 @@ public:
 #endif
     }
 
-#ifndef NDEBUG
     static bool isEventDispatchForbidden()
     {
-        if (!isMainThread())
-            return false;
-        return s_count;
-    }
+#if ASSERT_DISABLED
+        return false;
+#else
+        return isMainThread() && s_count;
 #endif
+    }
+
+#if !ASSERT_DISABLED
 
 private:
-#ifndef NDEBUG
-    static unsigned s_count;
+    WEBCORE_EXPORT static unsigned s_count;
+
 #endif
 };
 
@@ -112,8 +119,6 @@ public:
 
     void cloneChildNodes(ContainerNode* clone);
 
-    virtual LayoutRect boundingBox() const override;
-
     enum ChildChangeType { ElementInserted, ElementRemoved, TextInserted, TextRemoved, TextChanged, AllChildrenRemoved, NonContentsChildChanged };
     enum ChildChangeSource { ChildChangeSourceParser, ChildChangeSourceAPI };
     struct ChildChange {
@@ -134,11 +139,11 @@ public:
     Element* querySelector(const String& selectors, ExceptionCode&);
     RefPtr<NodeList> querySelectorAll(const String& selectors, ExceptionCode&);
 
-    PassRefPtr<NodeList> getElementsByTagName(const AtomicString&);
-    PassRefPtr<NodeList> getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName);
-    PassRefPtr<NodeList> getElementsByName(const String& elementName);
-    PassRefPtr<NodeList> getElementsByClassName(const AtomicString& classNames);
-    PassRefPtr<RadioNodeList> radioNodeList(const AtomicString&);
+    RefPtr<NodeList> getElementsByTagName(const AtomicString&);
+    RefPtr<NodeList> getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName);
+    RefPtr<NodeList> getElementsByName(const String& elementName);
+    RefPtr<NodeList> getElementsByClassName(const AtomicString& classNames);
+    RefPtr<RadioNodeList> radioNodeList(const AtomicString&);
 
 protected:
     explicit ContainerNode(Document&, ConstructionType = CreateContainer);
@@ -156,9 +161,6 @@ protected:
 private:
     void removeBetween(Node* previousChild, Node* nextChild, Node& oldChild);
     void insertBeforeCommon(Node& nextChild, Node& oldChild);
-
-    bool getUpperLeftCorner(FloatPoint&) const;
-    bool getLowerRightCorner(FloatPoint&) const;
 
     void notifyChildInserted(Node& child, ChildChangeSource);
     void notifyChildRemoved(Node& child, Node* previousSibling, Node* nextSibling, ChildChangeSource);
@@ -262,7 +264,7 @@ public:
     }
 
     // Returns 0 if there is no next Node.
-    PassRefPtr<Node> nextNode()
+    RefPtr<Node> nextNode()
     {
         if (LIKELY(!hasSnapshot())) {
             RefPtr<Node> node = m_currentNode.release();

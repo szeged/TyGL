@@ -169,6 +169,9 @@ novalidate
 nowrap
 object
 onabort
+onanimationstart
+onanimationiteration
+onanimationend
 onautocomplete
 onautocompleteerror
 onbeforecopy
@@ -354,6 +357,7 @@ autocapitalize
 data-youtube-id
 onwebkitcurrentplaybacktargetiswirelesschanged
 onwebkitplaybacktargetavailabilitychanged
+onwebkitpresentationmodechanged
 x-webkit-imagemenu
 webkit-playsinline
 x-webkit-airplay

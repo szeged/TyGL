@@ -33,6 +33,10 @@
 #include "Page.h"
 #include "PaintInfo.h"
 #include "RenderFlowThread.h"
+#include "RenderInline.h"
+#include "RenderRubyBase.h"
+#include "RenderRubyRun.h"
+#include "RenderRubyText.h"
 #include "RenderView.h"
 #include "VerticalPositionCache.h"
 #include <wtf/NeverDestroyed.h>
@@ -95,12 +99,9 @@ void RootInlineBox::clearTruncation()
 bool RootInlineBox::isHyphenated() const
 {
     for (InlineBox* box = firstLeafChild(); box; box = box->nextLeafChild()) {
-        if (box->isInlineTextBox()) {
-            if (toInlineTextBox(box)->hasHyphen())
-                return true;
-        }
+        if (is<InlineTextBox>(*box) && downcast<InlineTextBox>(*box).hasHyphen())
+            return true;
     }
-
     return false;
 }
 
@@ -596,12 +597,40 @@ InlineBox* RootInlineBox::lastSelectedBox()
 LayoutUnit RootInlineBox::selectionTop() const
 {
     LayoutUnit selectionTop = m_lineTop;
-
+    
     if (m_hasAnnotationsBefore)
         selectionTop -= !renderer().style().isFlippedLinesWritingMode() ? computeOverAnnotationAdjustment(m_lineTop) : computeUnderAnnotationAdjustment(m_lineTop);
 
     if (renderer().style().isFlippedLinesWritingMode())
         return selectionTop;
+
+    if (renderer().isRubyBase()) {
+        // The ruby base selection should avoid intruding into the ruby text. This is only the case if there is an actual ruby text above us.
+        RenderRubyBase* base = &downcast<RenderRubyBase>(renderer());
+        RenderRubyRun* run = base->rubyRun();
+        if (run) {
+            RenderRubyText* text = run->rubyText();
+            if (text && text->logicalTop() < base->logicalTop()) {
+                // The ruby text is above the ruby base. Just return now in order to avoid painting on top of the ruby text.
+                return selectionTop;
+            }
+        }
+    } else if (renderer().isRubyText()) {
+        // The ruby text selection should go all the way to the selection top of the containing line.
+        RenderRubyText* text = &downcast<RenderRubyText>(renderer());
+        RenderRubyRun* run = text->rubyRun();
+        if (run && run->inlineBoxWrapper()) {
+            RenderRubyBase* base = run->rubyBase();
+            if (base && text->logicalTop() < base->logicalTop()) {
+                // The ruby text is above the ruby base.
+                const RootInlineBox& containingLine = run->inlineBoxWrapper()->root();
+                LayoutUnit enclosingSelectionTop = containingLine.selectionTop();
+                LayoutUnit deltaBetweenObjects = text->logicalTop() + run->logicalTop();
+                LayoutUnit selectionTopInRubyTextCoords = enclosingSelectionTop - deltaBetweenObjects;
+                return std::min(selectionTop, selectionTopInRubyTextCoords);
+            }
+        }
+    }
 
     LayoutUnit prevBottom = prevRootBox() ? prevRootBox()->selectionBottom() : blockFlow().borderAndPaddingBefore();
     if (prevBottom < selectionTop && blockFlow().containsFloats()) {
@@ -651,9 +680,37 @@ LayoutUnit RootInlineBox::selectionBottom() const
 
     if (m_hasAnnotationsAfter)
         selectionBottom += !renderer().style().isFlippedLinesWritingMode() ? computeUnderAnnotationAdjustment(m_lineBottom) : computeOverAnnotationAdjustment(m_lineBottom);
-
+    
     if (!renderer().style().isFlippedLinesWritingMode() || !nextRootBox())
         return selectionBottom;
+    
+    if (renderer().isRubyBase()) {
+        // The ruby base selection should avoid intruding into the ruby text. This is only the case if there is an actual ruby text below us.
+        RenderRubyBase* base = &downcast<RenderRubyBase>(renderer());
+        RenderRubyRun* run = base->rubyRun();
+        if (run) {
+            RenderRubyText* text = run->rubyText();
+            if (text && text->logicalTop() > base->logicalTop()) {
+                // The ruby text is below the ruby base. Just return now in order to avoid painting on top of the ruby text.
+                return selectionBottom;
+            }
+        }
+    } else if (renderer().isRubyText()) {
+        // The ruby text selection should go all the way to the selection bottom of the containing line.
+        RenderRubyText* text = &downcast<RenderRubyText>(renderer());
+        RenderRubyRun* run = text->rubyRun();
+        if (run && run->inlineBoxWrapper()) {
+            RenderRubyBase* base = run->rubyBase();
+            if (base && text->logicalTop() > base->logicalTop()) {
+                // The ruby text is above the ruby base.
+                const RootInlineBox& containingLine = run->inlineBoxWrapper()->root();
+                LayoutUnit enclosingSelectionBottom = containingLine.selectionBottom();
+                LayoutUnit deltaBetweenObjects = text->logicalTop() + run->logicalTop();
+                LayoutUnit selectionBottomInRubyTextCoords = enclosingSelectionBottom - deltaBetweenObjects;
+                return std::min(selectionBottom, selectionBottomInRubyTextCoords);
+            }
+        }
+    }
 
     LayoutUnit nextTop = nextRootBox()->selectionTop();
     if (nextTop > selectionBottom && blockFlow().containsFloats()) {
@@ -743,7 +800,7 @@ void RootInlineBox::setLineBreakInfo(RenderObject* obj, unsigned breakPos, const
     // This has security implications because if the RenderObject does not
     // point to at least one line box, then that RenderInline can be deleted
     // later without resetting the lineBreakObj, leading to use-after-free.
-    ASSERT_WITH_SECURITY_IMPLICATION(!obj || obj->isText() || !(obj->isRenderInline() && obj->isBox() && !toRenderBox(obj)->inlineBoxWrapper()));
+    ASSERT_WITH_SECURITY_IMPLICATION(!obj || is<RenderText>(*obj) || !(is<RenderInline>(*obj) && is<RenderBox>(*obj) && !downcast<RenderBox>(*obj).inlineBoxWrapper()));
 
     m_lineBreakObj = obj;
     m_lineBreakPos = breakPos;
@@ -828,12 +885,12 @@ void RootInlineBox::ascentAndDescentForBox(InlineBox& box, GlyphOverflowAndFallb
         return;
     }
 
-    Vector<const SimpleFontData*>* usedFonts = nullptr;
+    Vector<const Font*>* usedFonts = nullptr;
     GlyphOverflow* glyphOverflow = nullptr;
-    if (box.isInlineTextBox()) {
-        GlyphOverflowAndFallbackFontsMap::iterator it = textBoxDataMap.find(toInlineTextBox(&box));
-        usedFonts = it == textBoxDataMap.end() ? 0 : &it->value.first;
-        glyphOverflow = it == textBoxDataMap.end() ? 0 : &it->value.second;
+    if (is<InlineTextBox>(box)) {
+        GlyphOverflowAndFallbackFontsMap::iterator it = textBoxDataMap.find(&downcast<InlineTextBox>(box));
+        usedFonts = it == textBoxDataMap.end() ? nullptr : &it->value.first;
+        glyphOverflow = it == textBoxDataMap.end() ? nullptr : &it->value.second;
     }
         
     bool includeLeading = includeLeadingForBox(box);
@@ -843,12 +900,8 @@ void RootInlineBox::ascentAndDescentForBox(InlineBox& box, GlyphOverflowAndFallb
     bool setUsedFontWithLeading = false;
 
     const RenderStyle& boxLineStyle = box.lineStyle();
-#if PLATFORM(IOS)
-    if (usedFonts && !usedFonts->isEmpty() && (includeFont || (boxLineStyle.lineHeight().isNegative() && includeLeading)) && !box.renderer().document().settings()->alwaysUseBaselineOfPrimaryFont()) {
-#else
     if (usedFonts && !usedFonts->isEmpty() && (includeFont || (boxLineStyle.lineHeight().isNegative() && includeLeading))) {
-#endif
-        usedFonts->append(boxLineStyle.font().primaryFont());
+        usedFonts->append(&boxLineStyle.fontCascade().primaryFont());
         for (size_t i = 0; i < usedFonts->size(); ++i) {
             const FontMetrics& fontMetrics = usedFonts->at(i)->fontMetrics();
             int usedFontAscent = fontMetrics.ascent(baselineType());
@@ -964,7 +1017,7 @@ LayoutUnit RootInlineBox::verticalPositionForBox(InlineBox* box, VerticalPositio
     
     if (verticalAlign != BASELINE) {
         const RenderStyle& parentLineStyle = firstLine ? parent->firstLineStyle() : parent->style();
-        const Font& font = parentLineStyle.font();
+        const FontCascade& font = parentLineStyle.fontCascade();
         const FontMetrics& fontMetrics = font.fontMetrics();
         int fontSize = font.pixelSize();
 
@@ -1017,7 +1070,7 @@ bool RootInlineBox::includeFontForBox(InlineBox& box) const
     if (box.renderer().isReplaced() || (box.renderer().isTextOrLineBreak() && !box.behavesLikeText()))
         return false;
     
-    if (!box.behavesLikeText() && box.isInlineFlowBox() && !toInlineFlowBox(&box)->hasTextChildren())
+    if (!box.behavesLikeText() && is<InlineFlowBox>(box) && !downcast<InlineFlowBox>(box).hasTextChildren())
         return false;
 
     // For now map "glyphs" to "font" in vertical text mode until the bounds returned by glyphs aren't garbage.
@@ -1030,7 +1083,7 @@ bool RootInlineBox::includeGlyphsForBox(InlineBox& box) const
     if (box.renderer().isReplaced() || (box.renderer().isTextOrLineBreak() && !box.behavesLikeText()))
         return false;
     
-    if (!box.behavesLikeText() && box.isInlineFlowBox() && !toInlineFlowBox(&box)->hasTextChildren())
+    if (!box.behavesLikeText() && is<InlineFlowBox>(box) && !downcast<InlineFlowBox>(box).hasTextChildren())
         return false;
 
     // FIXME: We can't fit to glyphs yet for vertical text, since the bounds returned are garbage.
@@ -1043,7 +1096,7 @@ bool RootInlineBox::includeInitialLetterForBox(InlineBox& box) const
     if (box.renderer().isReplaced() || (box.renderer().isTextOrLineBreak() && !box.behavesLikeText()))
         return false;
     
-    if (!box.behavesLikeText() && box.isInlineFlowBox() && !toInlineFlowBox(&box)->hasTextChildren())
+    if (!box.behavesLikeText() && is<InlineFlowBox>(box) && !downcast<InlineFlowBox>(box).hasTextChildren())
         return false;
 
     LineBoxContain lineBoxContain = renderer().style().lineBoxContain();

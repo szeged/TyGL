@@ -31,8 +31,7 @@
 #include "config.h"
 #include "CommandLineAPIHost.h"
 
-#if ENABLE(INSPECTOR)
-
+#include "Database.h"
 #include "Element.h"
 #include "Frame.h"
 #include "FrameLoader.h"
@@ -41,7 +40,7 @@
 #include "InspectorDOMAgent.h"
 #include "InspectorDOMStorageAgent.h"
 #include "InspectorDatabaseAgent.h"
-#include "InspectorWebFrontendDispatchers.h"
+#include <inspector/InspectorFrontendDispatchers.h>
 #include "Pasteboard.h"
 #include "Storage.h"
 #include "markup.h"
@@ -52,17 +51,13 @@
 #include <wtf/RefPtr.h>
 #include <wtf/StdLibExtras.h>
 
-#if ENABLE(SQL_DATABASE)
-#include "Database.h"
-#endif
-
 using namespace Inspector;
 
 namespace WebCore {
 
-PassRefPtr<CommandLineAPIHost> CommandLineAPIHost::create()
+Ref<CommandLineAPIHost> CommandLineAPIHost::create()
 {
-    return adoptRef(new CommandLineAPIHost);
+    return adoptRef(*new CommandLineAPIHost);
 }
 
 CommandLineAPIHost::CommandLineAPIHost()
@@ -70,9 +65,7 @@ CommandLineAPIHost::CommandLineAPIHost()
     , m_consoleAgent(nullptr)
     , m_domAgent(nullptr)
     , m_domStorageAgent(nullptr)
-#if ENABLE(SQL_DATABASE)
     , m_databaseAgent(nullptr)
-#endif
 {
     m_defaultInspectableObject = std::make_unique<InspectableObject>();
 }
@@ -87,12 +80,10 @@ void CommandLineAPIHost::disconnect()
     m_consoleAgent = nullptr;
     m_domAgent = nullptr;
     m_domStorageAgent = nullptr;
-#if ENABLE(SQL_DATABASE)
     m_databaseAgent = nullptr;
-#endif
 }
 
-void CommandLineAPIHost::inspectImpl(PassRefPtr<InspectorValue> object, PassRefPtr<InspectorValue> hints)
+void CommandLineAPIHost::inspectImpl(RefPtr<InspectorValue>&& object, RefPtr<InspectorValue>&& hints)
 {
     if (!m_inspectorAgent)
         return;
@@ -101,8 +92,8 @@ void CommandLineAPIHost::inspectImpl(PassRefPtr<InspectorValue> object, PassRefP
     if (!hints->asObject(hintsObject))
         return;
 
-    RefPtr<Inspector::Protocol::Runtime::RemoteObject> remoteObject = BindingTraits<Inspector::Protocol::Runtime::RemoteObject>::runtimeCast(object);
-    m_inspectorAgent->inspect(remoteObject.release(), hintsObject.release());
+    auto remoteObject = BindingTraits<Inspector::Protocol::Runtime::RemoteObject>::runtimeCast(WTF::move(object));
+    m_inspectorAgent->inspect(WTF::move(remoteObject), WTF::move(hintsObject));
 }
 
 void CommandLineAPIHost::getEventListenersImpl(Node* node, Vector<EventListenerInfo>& listenersArray)
@@ -149,14 +140,12 @@ CommandLineAPIHost::InspectableObject* CommandLineAPIHost::inspectedObject(unsig
     return m_inspectedObjects[index].get();
 }
 
-#if ENABLE(SQL_DATABASE)
 String CommandLineAPIHost::databaseIdImpl(Database* database)
 {
     if (m_databaseAgent)
         return m_databaseAgent->databaseId(database);
     return String();
 }
-#endif
 
 String CommandLineAPIHost::storageIdImpl(Storage* storage)
 {
@@ -166,5 +155,3 @@ String CommandLineAPIHost::storageIdImpl(Storage* storage)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

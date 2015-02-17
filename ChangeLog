@@ -1,3 +1,682 @@
+2015-02-05  Youenn Fablet  <youenn.fablet@crf.canon.fr> and Xabier Rodriguez Calvar <calvaris@igalia.com>
+
+        [Streams API] Implement a barebone ReadableStream interface
+        https://bugs.webkit.org/show_bug.cgi?id=141045
+
+        Reviewed by Benjamin Poulain.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake: Made streams API compilation on by default.
+
+2015-02-02  Filip Pizlo  <fpizlo@apple.com>
+
+        Revert accidental change in r179490.
+
+        * Makefile.shared:
+
+2015-02-02  Filip Pizlo  <fpizlo@apple.com>
+
+        Unreviewed, revert accidental change to Makefile.shared in r179478
+
+        * Makefile.shared:
+
+2015-01-28  Carlos Alberto Lopez Perez  <clopez@igalia.com>
+
+        [CMake] Minimum python version should be 2.7.
+        https://bugs.webkit.org/show_bug.cgi?id=140997
+
+        Reviewed by Csaba Osztrogonác.
+
+        * CMakeLists.txt:
+
+2015-01-26  Nikos Andronikos  <nikos.andronikos-webkit@cisra.canon.com.au>
+
+        Apply feTurbulence spec change to fix zero length vector generation
+        https://bugs.webkit.org/show_bug.cgi?id=140812
+        
+        Reviewed by Darin Adler.
+
+        Recently a bug with the turbulence algorithm was corrected in the
+        Filter Effects specification.
+        For some seed values this bug allowed zero length vectors to be generated.
+        This resulted in large solid color squares being present in the generated image.
+        The feTurbulence algorithm was updated to reject zero length vectors. This patch
+        applies that change in WebCore.
+
+        Test: svg/filters/feTurbulence_bad_seeds.html
+
+        * platform/graphics/filters/FETurbulence.cpp:
+        (WebCore::FETurbulence::initPaint):
+        Added rejection sampling during vector generation to avoid zero length vectors. 
+
+2015-01-26  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [cmake] Remove compiler version calculate cruft
+        https://bugs.webkit.org/show_bug.cgi?id=140885
+
+        Reviewed by Darin Adler.
+
+        * Source/cmake/WebKitHelpers.cmake:
+
+2015-01-26  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [cmake] Stop compiling with -Wno-error=uninitialized and -Wno-error=literal-suffix
+        https://bugs.webkit.org/show_bug.cgi?id=140886
+
+        Reviewed by Žan Doberšek.
+
+        * Source/cmake/WebKitHelpers.cmake:
+
+2015-01-26  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] gtkdoc does not appear in DevHelp
+        https://bugs.webkit.org/show_bug.cgi?id=139369
+
+        Reviewed by Philippe Normand.
+
+        Expect the gtkdoc to be generated in folders named with the API version.
+
+        * Source/PlatformGTK.cmake:
+
+2015-01-26  Zan Dobersek  <zdobersek@igalia.com>
+
+        [EFL][GTK] Stop compiling with fno-omit-frame-pointer, -fno-tree-dce
+        https://bugs.webkit.org/show_bug.cgi?id=140609
+
+        Reviewed by Csaba Osztrogonác.
+
+        The latest releases of GCC versions 4.7, 4.8 and 4.9 all compile and
+        run JSC tests fine without the -fno-tree-dce and -fno-omit-frame-pointer
+        compilation flags. Those were added after the jsCStack branch merge, but
+        can now be removed since the -ftree-dce issues were fixed in GCC, and
+        changes in r173282 and r173298 again enable compiling with -fomit-frame-pointer.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-01-26  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r179107.
+        https://bugs.webkit.org/show_bug.cgi?id=140880
+
+        The GCC in the bots doesn't support the AsyncTask
+        implementation (Requested by KaL on #webkit).
+
+        Reverted changeset:
+
+        "[GTK] Enable IndexedDB"
+        https://bugs.webkit.org/show_bug.cgi?id=98932
+        http://trac.webkit.org/changeset/179107
+
+2015-01-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Enable IndexedDB
+        https://bugs.webkit.org/show_bug.cgi?id=98932
+
+        Reviewed by Žan Doberšek.
+
+        * Source/cmake/OptionsGTK.cmake: Enable DATABASE_PROCESS and INDEXED_DATABASE.
+        * Source/cmake/WebKitFeatures.cmake: Add ENABLE_DATABASE_PROCESS.
+
+2015-01-23  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add initial database process support
+        https://bugs.webkit.org/show_bug.cgi?id=139491
+
+        Reviewed by Sergio Villar Senin.
+
+        * Source/cmake/OptionsGTK.cmake: Set WebKit2_DatabaseProcess_OUTPUT_NAME.
+
+2015-01-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add a build flag for ES6 class syntax
+        https://bugs.webkit.org/show_bug.cgi?id=140760
+
+        Reviewed by Michael Saboff.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2015-01-21  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [EFL][WK2] EFL MiniBrowser doesn't run because shared library is not found
+        https://bugs.webkit.org/show_bug.cgi?id=140049
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2015-01-21  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove ENABLE(INSPECTOR) ifdef guards
+        https://bugs.webkit.org/show_bug.cgi?id=140668
+
+        Reviewed by Darin Adler.
+
+        * Source/PlatformEfl.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2015-01-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.7.4 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2015-01-19  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Fix cmake warning
+        https://bugs.webkit.org/show_bug.cgi?id=140497
+
+        Reviewed by Gustavo Noronha Silva.
+
+        r173155 already tried to fix cmake warning though, the warning is still exist.
+        CMAKE_LINK_INTERFACE_LIBRARIES seems to cause this warning. Individual target is
+        already set for their libraries though, INTERFACE_LINK_LIBRARIES contains the list
+        of transitive link dependencies, and CMAKE_LINK_INTERFACE_LIBRARIES can override
+        the INTERFACE_LINK_LIBRARIES property when CMP0022 is not set. CMake warns this override.
+        To avoid it, EFL port doesn't set CMAKE_LINK_INTERFACE_LIBRARIES.
+
+        * CMakeLists.txt:
+
+2015-01-19  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Generate the make dist manifest from a CMake template file
+        https://bugs.webkit.org/show_bug.cgi?id=139387
+
+        Reviewed by Martin Robinson.
+
+        Generate manifest.txt from manifest.txt.in. Only expose the dist and
+        distcheck targets for developer builds, as they won't work when
+        building from a tarball because the manifest is not distributed.
+
+        * Source/PlatformGTK.cmake:
+
+2015-01-15  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove ENABLE(SQL_DATABASE) guards
+        https://bugs.webkit.org/show_bug.cgi?id=140434
+
+        Reviewed by Darin Adler.
+
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2015-01-11  Sam Weinig  <sam@webkit.org>
+
+        Remove support for SharedWorkers
+        https://bugs.webkit.org/show_bug.cgi?id=140344
+
+        Reviewed by Anders Carlsson.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2015-01-10  Dan Bernstein  <mitz@apple.com>
+
+        [Xcode, iOS] Files are recompiled when alternating between using make and the Xcode IDE
+        https://bugs.webkit.org/show_bug.cgi?id=140339
+
+        Reviewed by Mark Rowe.
+
+        * Makefile.shared: Run xcodebuild with the same PATH with which the Xcode IDE runs. This
+        prevents unnecessary rebuilding due to PATH differences.
+
+2015-01-07  Gwang Yoon Hwang  <yoon@igalia.com>
+
+        [GTK][ThreadedCompositor] Add support for threaded compositor.
+        https://bugs.webkit.org/show_bug.cgi?id=118265
+
+        Reviewed by Martin Robinson.
+
+        Added the ENABLE_THREADED_COMPOSITOR feature flag to the cmake and
+        autotools build systems. The feature is disabled by default.
+        And remove deprecated the WTF_USE_TILED_BACKING_STORE feature flag
+        from the feature flags.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2014-12-23  Alexey Proskuryakov  <ap@apple.com>
+
+        Simplify building with ASan
+        https://bugs.webkit.org/show_bug.cgi?id=139916
+
+        Reviewed by Mark Rowe.
+
+        * Makefile.shared: Invoke set-webkit-configuration to store ASan choice as appropriate.
+
+2014-12-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.7.3 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2014-12-10  Jon Honeycutt  <jhoneycutt@apple.com>
+
+        Null dereference performing a "TapAndAHalf" gesture in Google search field
+
+        <https://bugs.webkit.org/show_bug.cgi?id=139506>
+        <rdar://problem/19028828>
+
+        Reviewed by Darin Adler.
+
+        * ManualTests/ios/tap-and-a-half-gesture-in-empty-text-field.html: Added.
+
+2014-12-10  Dean Jackson  <dino@apple.com>
+
+        Blur filter performance test doesn't provide results
+        https://bugs.webkit.org/show_bug.cgi?id=139462
+
+        Reviewed by Sam Weinig.
+
+        This can't currently work under our performance test
+        infrastructure. Move it to a manual test to avoid
+        putting FAILures into the results.
+
+        * ManualTests/blur-filter-timing.html: Renamed from PerformanceTests/Interactive/blur-filter-timing.html.
+
+2014-12-09  Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
+
+        [GTK][WK2] Add HTML5 Notifications support
+        https://bugs.webkit.org/show_bug.cgi?id=61140
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/FindLibNotify.cmake: Added.
+        * Source/cmake/OptionsGTK.cmake: add option to enable notifications, look for
+        libnotify and use it for a default implementation when found.
+
+2014-12-09  Bem Jones-Bey  <bjonesbe@adobe.com>
+
+        REGRESSION(r155906): Page content disappears on Tuaw article after loading
+        https://bugs.webkit.org/show_bug.cgi?id=138100
+
+        Reviewed by Simon Fraser.
+
+        DRT causes an extra paint which makes it impossible to test this with
+        an automated test.
+
+        * ManualTests/float-layer-not-painting.html: Added.
+
+2014-12-07  Alberto Garcia  <berto@igalia.com>
+
+        [GTK] WebKit has a new required dependency on GnuTLS
+        https://bugs.webkit.org/show_bug.cgi?id=136158
+
+        Reviewed by Martin Robinson.
+
+        Detect if GnuTLS is installed and enable or disable subtle crypto
+        support accordingly.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2014-12-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Missing API detected in GObject DOM bindings after r176630
+        https://bugs.webkit.org/show_bug.cgi?id=139201
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Change GENERATE_BINDINGS macro to receive a list of optional
+        additional dependencies, so that we can add more dependecies
+        without having to change the macro.
+
+        * Source/cmake/WebKitMacros.cmake:
+
+2014-12-05  Simon Fraser  <simon.fraser@apple.com>
+
+        Programmatic scrolling and content changes are not always synchronized
+        https://bugs.webkit.org/show_bug.cgi?id=139245
+        rdar://problem/18833612
+
+        Reviewed by Anders Carlsson.
+        
+        Manual test that tries to sync layout with programmatic scrolling.
+
+        * ManualTests/programmatic-scroll-flicker.html: Added.
+
+2014-12-04  Alberto Garcia  <berto@igalia.com>
+
+        can not find cairo-gl.h when build webkit with gtk on ubuntu 14.04
+        https://bugs.webkit.org/show_bug.cgi?id=136576
+
+        Reviewed by Carlos Garcia Campos.
+
+        CMake should complain if Accelerated 2D Canvas is explicitly
+        enabled but cairo-gl is not found.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2014-12-03  Eva Balazsfalvi  <evab.u-szeged@partner.samsung.com>
+
+        [EFL] Add subtle crypto to the build system
+        https://bugs.webkit.org/show_bug.cgi?id=138612
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2014-12-01  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL] Add a ENABLE_CSS_SCROLL_SNAP macro to CMake build system
+        https://bugs.webkit.org/show_bug.cgi?id=139085
+
+        Reviewed by Andreas Kling.
+
+        * Source/cmake/OptionsEfl.cmake: Add ENABLE_CSS_SCROLL_SNAP.
+        * Source/cmake/WebKitFeatures.cmake: ditto.
+        * Source/cmakeconfig.h.cmake: ditto.
+
+2014-11-30  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        [EFL] Drop support for the EFL 1.7
+        https://bugs.webkit.org/show_bug.cgi?id=139114
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/EFLHelpers.cmake: Removed.
+        * Source/cmake/FindEcore.cmake: Removed.
+        * Source/cmake/FindEdje.cmake: Removed.
+        * Source/cmake/FindEet.cmake: Removed.
+        * Source/cmake/FindEeze.cmake: Removed.
+        * Source/cmake/FindEfreet.cmake: Removed.
+        * Source/cmake/FindEina.cmake: Removed.
+        * Source/cmake/FindElementary.cmake: Removed.
+        * Source/cmake/FindEvas.cmake: Removed.
+        * Source/cmake/OptionsEfl.cmake:
+
+2014-11-28  Philippe Normand  <pnormand@igalia.com>
+
+        [CMake] Build failure against GStreamer git master
+        https://bugs.webkit.org/show_bug.cgi?id=138872
+
+        Reviewed by Csaba Osztrogon.
+
+        * Source/cmake/FindGStreamer.cmake: Simplified the
+        FIND_GSTREAMER_COMPONENT macro. Trust pkg-config for include
+        headers lookup, there's no need to do this manually. Also
+        explicitely check the version specified in GStreamer_FIND_VERSION.
+
+2014-11-27  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        [EFL] Remove E_Dbus dependency
+        https://bugs.webkit.org/show_bug.cgi?id=136355
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/FindE_DBus.cmake: Removed.
+        * Source/cmake/OptionsEfl.cmake:
+
+2014-11-24  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.7.1 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2014-11-20  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [CMake] Use ld.gold if it is available to speedup builds
+        https://bugs.webkit.org/show_bug.cgi?id=137953
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2014-11-19  Akos Kiss  <akiss@inf.u-szeged.hu>
+
+        Fix the detection of toolchain support for Cortex-A53 erratum 835769 workaround
+        https://bugs.webkit.org/show_bug.cgi?id=138840
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2014-11-13  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove Source/Platform cruft
+        https://bugs.webkit.org/show_bug.cgi?id=138658
+
+        Reviewed by Anders Carlsson.
+
+        * CMakeLists.txt:
+        * Source/Platform: Removed.
+
+2014-11-10  Akos Kiss  <akiss@inf.u-szeged.hu>
+
+        Enable Cortex-A53-specific code paths by default if core is detected.
+        https://bugs.webkit.org/show_bug.cgi?id=138499
+
+        Reviewed by Csaba Osztrogonác.
+
+        On ARM64/Linux, check /proc/cpuinfo for CPU part 0xd03 (signaling
+        Cortex-A53) and set the initial value of WTF_CPU_ARM64_CORTEXA53 to true
+        if found.
+
+        Since on ARM64/Linux the part number that cpuinfo reports depends on
+        the core the query is run on, the check is bound to and executed on the
+        available cores one by one.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2014-11-10  Eva Balazsfalvi  <evab.u-szeged@partner.samsung.com>
+
+        [EFL] Remove unnecessary version check from OptionsEfl.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=138498
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2014-11-07  Eva Balazsfalvi  <evab.u-szeged@partner.samsung.com>
+
+        [EFL] Require at least EFL 1.9 if ENABLE(ACCESSIBILITY) after r175098
+        https://bugs.webkit.org/show_bug.cgi?id=138465
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2014-11-03  Dean Jackson  <dino@apple.com>
+
+        Add ENABLE_FILTERS_LEVEL_2 feature guard.
+        https://bugs.webkit.org/show_bug.cgi?id=138362
+
+        Reviewed by Tim Horton.
+
+        Add a new feature define for Level 2 of CSS Filters.
+        http://dev.w3.org/fxtf/filters-2/
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2014-11-03  Akos Kiss  <akiss@inf.u-szeged.hu>
+
+        Workaround for Cortex-A53 erratum 835769
+        https://bugs.webkit.org/show_bug.cgi?id=138315
+
+        Reviewed by Filip Pizlo.
+
+        This patch introduces CMake variable and preprocessor macro
+        WTF_CPU_ARM64_CORTEXA53 with the aim of enabling Cortex-A53-specific
+        code paths, if set true.
+
+        * Source/cmake/OptionsCommon.cmake:
+        Add -mfix-cortex-a53-835769 to the compiler flags if compiler supports
+        it.
+        * Source/cmakeconfig.h.cmake:
+        #cmakedefine01 for WTF_CPU_ARM64_CORTEXA53
+
+2014-11-02  Akos Kiss  <akiss@inf.u-szeged.hu>
+
+        [GTK] Fix the build of FTL JIT
+        https://bugs.webkit.org/show_bug.cgi?id=138298
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/OptionsGTK.cmake:
+        Remove the need for the LIBCXXABI package.
+
+2014-11-01  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        REGRESSION(CMake): Make it possible to build without introspection
+        https://bugs.webkit.org/show_bug.cgi?id=138006
+
+        Reviewed by Philippe Normand.
+
+        Add ENABLE_INTROSPECTION option.
+
+        * Source/PlatformGTK.cmake: Dot not add gir global target if
+        introspection is disabled.
+        * Source/cmake/OptionsGTK.cmake: Do not add gir individual targets if
+        introspection is disabled.
+
+2014-10-31  Adrian Perez de Castro  <aperez@igalia.com>
+
+        [GTK] Support script message handlers WebKitUserContentManager
+        https://bugs.webkit.org/show_bug.cgi?id=133730
+
+        Reviewed by Carlos Garcia Campos.
+
+        Support user script message handlers in WebKitUserContentManager.
+        This needs building with ENABLE_USER_MESSAGE_HANDLERS, for which
+        an option is added to the CMake build files. The option is disabled
+        globally by default, and the WebKitGTK port enables it. On the API
+        level, two new methods to register and unregister names are provided
+        in the "window.webkit" namespace, and on message reception the
+        "WebKitUserContentManager::script-message-received" signal is
+        emitted, using the registered names as signal detail.
+
+        * Source/cmake/OptionsGTK.cmake: For the GTK port, enable the
+        ENABLE_USER_MESSAGE_HANDLERS feature by default.
+        * Source/cmake/WebKitFeatures.cmake: Add feature description for
+        ENABLE_USER_MESSAGE_HANDLERS, disabled by default.
+
+2014-10-29  Raphael Kubo da Costa  <rakuco@FreeBSD.org>
+
+        [GTK] Bump libsoup's minimum version to 2.42.0.
+        https://bugs.webkit.org/show_bug.cgi?id=138086
+
+        Reviewed by Martin Robinson.
+
+        The SOUP_CHECK_VERSION macro was added in libsoup 2.41.1, and the
+        soup-version.h header was added to soup.h in 2.41.4, which then becomes
+        the minimum version required to build the port these days.
+
+        In addition, since the autotools build system required 2.42.0 before
+        being retired, require the same version here. Version 2.42.0 was also
+        recommended in
+        https://lists.webkit.org/pipermail/webkit-gtk/2013-March/001387.html.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2014-10-28  Tibor Meszaros  <tmeszaros.u-szeged@partner.samsung.com>
+
+        [EFL] Remove unnecessary defines from OptionsEfl.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=138132
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2014-10-28  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.7.1 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2014-10-21  Ryuan Choi  <ryuan.choi@gmail.com>
+
+        [EFL] Remove unnecessary ENABLE_3D_RENDERING definition from OptionsEfl.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=137946
+
+        Reviewed by Gyuyoung Kim.
+
+        ENABLE_3D_RENDERING is already enabled as WEBKIT_OPTION_DEFAULT_PORT_VALUE since r135813.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2014-10-21  Dániel Bátyai  <dbatyai.u-szeged@partner.samsung.com>
+
+        Fix FTL Native Inlining for EFL
+        https://bugs.webkit.org/show_bug.cgi?id=137774
+
+        Reviewed by Michael Saboff.
+
+        Updated CMake for FTL Native Inlining.
+
+        * CMakeLists.txt:
+        * Source/cmake/FindClang.cmake: Added.
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2014-10-20  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Generate all Inspector domains together in JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=137748
+
+        Reviewed by Brian Burg.
+
+        * Source/PlatformEfl.cmake:
+
+2014-10-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add initial gestures support
+        https://bugs.webkit.org/show_bug.cgi?id=137812
+
+        Reviewed by Sergio Villar Senin.
+
+        Check if the GTK+ version supports gestures or not.
+
+        * Source/cmake/FindGTK3.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+
+2014-10-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        REGRESSION(CMake): [GTK] WebKitSettings:enable-smooth-scrolling does nothing
+        https://bugs.webkit.org/show_bug.cgi?id=137781
+
+        Reviewed by Martin Robinson.
+
+        We used to enable smooth scrolling unconditionally in autotools
+        (via WebKitFeatures.m4), but since the switch to CMake it's
+        unconditionally disabled, so changing the setting doesn't have any
+        effect.
+
+        * Source/cmake/OptionsGTK.cmake: Enable smooth scrolling.
+
+2014-10-16  Pascal Jacquemart  <p.jacquemart@samsung.com>
+
+        Removing CUSTOM_PROTOCOLS guard
+        https://bugs.webkit.org/show_bug.cgi?id=137741
+
+        Reviewed by Benjamin Poulain.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2014-10-11  KwangHyuk Kim  <hyuki.kim@samsung.com>
+
+        [EFL] Enable WebP support.
+        https://bugs.webkit.org/show_bug.cgi?id=136156
+
+        Reviewed by Gyuyoung Kim.
+
+        Add WebP package finding rule.
+
+        * Source/cmake/OptionsEfl.cmake:
+
 2014-10-07  Pascal Jacquemart  <p.jacquemart@samsung.com>
 
         [EFL] Enable custom URI schemes with CustomProtocols

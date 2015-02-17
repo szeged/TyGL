@@ -43,41 +43,51 @@ class RenderRubyText;
 
 class RenderRubyRun final : public RenderBlockFlow {
 public:
-    RenderRubyRun(Document&, PassRef<RenderStyle>);
+    RenderRubyRun(Document&, Ref<RenderStyle>&&);
     virtual ~RenderRubyRun();
 
     bool hasRubyText() const;
     bool hasRubyBase() const;
-    bool isEmpty() const;
+    virtual bool isEmpty() const override;
     RenderRubyText* rubyText() const;
     RenderRubyBase* rubyBase() const;
     RenderRubyBase* rubyBaseSafe(); // creates the base if it doesn't already exist
 
-    virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren);
-    virtual void layout();
+    virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren) override;
+    virtual void layout() override;
 
-    virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const;
-    virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
-    virtual RenderObject* removeChild(RenderObject&) override;
+    virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const override;
+    virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0) override;
+    virtual void removeChild(RenderObject&) override;
 
-    virtual RenderBlock* firstLineBlock() const;
-    virtual void updateFirstLetter();
+    virtual RenderBlock* firstLineBlock() const override;
+    virtual void updateFirstLetter() override;
 
-    void getOverhang(bool firstLine, RenderObject* startRenderer, RenderObject* endRenderer, int& startOverhang, int& endOverhang) const;
+    void getOverhang(bool firstLine, RenderObject* startRenderer, RenderObject* endRenderer, float& startOverhang, float& endOverhang) const;
 
     static RenderRubyRun* staticCreateRubyRun(const RenderObject* parentRuby);
+    
+    void updatePriorContextFromCachedBreakIterator(LazyLineBreakIterator&) const;
+    void setCachedPriorCharacters(UChar last, UChar secondToLast)
+    {
+        m_lastCharacter = last;
+        m_secondToLastCharacter = secondToLast;
+    }
+    bool canBreakBefore(const LazyLineBreakIterator&) const;
     
 protected:
     RenderRubyBase* createRubyBase() const;
 
 private:
-    virtual bool isRubyRun() const { return true; }
-    virtual const char* renderName() const { return "RenderRubyRun (anonymous)"; }
-    virtual bool createsAnonymousWrapper() const { return true; }
-    virtual void removeLeftoverAnonymousBlock(RenderBlock*) { }
-};
+    virtual bool isRubyRun() const override { return true; }
+    virtual const char* renderName() const override { return "RenderRubyRun (anonymous)"; }
+    virtual bool createsAnonymousWrapper() const override { return true; }
+    virtual void removeLeftoverAnonymousBlock(RenderBlock*) override { }
 
-RENDER_OBJECT_TYPE_CASTS(RenderRubyRun, isRubyRun())
+private:
+    UChar m_lastCharacter;
+    UChar m_secondToLastCharacter;
+};
 
 } // namespace WebCore
 

@@ -69,15 +69,16 @@ WebVideoFullscreenManager::WebVideoFullscreenManager(PassRefPtr<WebPage> page)
     : m_page(page.get())
     , m_isAnimating(false)
     , m_targetIsFullscreen(false)
+    , m_fullscreenMode(HTMLMediaElement::VideoFullscreenModeNone)
     , m_isFullscreen(false)
 {
     setWebVideoFullscreenInterface(this);
-    WebProcess::shared().addMessageReceiver(Messages::WebVideoFullscreenManager::messageReceiverName(), page->pageID(), *this);
+    WebProcess::singleton().addMessageReceiver(Messages::WebVideoFullscreenManager::messageReceiverName(), page->pageID(), *this);
 }
 
 WebVideoFullscreenManager::~WebVideoFullscreenManager()
 {
-    WebProcess::shared().removeMessageReceiver(Messages::WebVideoFullscreenManager::messageReceiverName(), m_page->pageID());
+    WebProcess::singleton().removeMessageReceiver(Messages::WebVideoFullscreenManager::messageReceiverName(), m_page->pageID());
 }
 
 bool WebVideoFullscreenManager::supportsVideoFullscreen() const
@@ -85,11 +86,14 @@ bool WebVideoFullscreenManager::supportsVideoFullscreen() const
     return Settings::avKitEnabled();
 }
 
-void WebVideoFullscreenManager::enterVideoFullscreenForVideoElement(HTMLVideoElement* videoElement)
+void WebVideoFullscreenManager::enterVideoFullscreenForVideoElement(HTMLVideoElement* videoElement, HTMLMediaElement::VideoFullscreenMode mode)
 {
+    ASSERT(mode != HTMLMediaElement::VideoFullscreenModeNone);
+
     m_videoElement = videoElement;
 
     m_targetIsFullscreen = true;
+    m_fullscreenMode = mode;
 
     if (m_isAnimating)
         return;
@@ -98,8 +102,9 @@ void WebVideoFullscreenManager::enterVideoFullscreenForVideoElement(HTMLVideoEle
     setVideoElement(videoElement);
 
     m_layerHostingContext = LayerHostingContext::createForExternalHostingProcess();
+    bool allowOptimizedFullscreen = m_videoElement->mediaSession().allowsAlternateFullscreen(*m_videoElement.get());
     
-    m_page->send(Messages::WebVideoFullscreenManagerProxy::SetupFullscreenWithID(m_layerHostingContext->contextID(), clientRectForElement(videoElement), m_page->deviceScaleFactor()), m_page->pageID());
+    m_page->send(Messages::WebVideoFullscreenManagerProxy::SetupFullscreenWithID(m_layerHostingContext->contextID(), clientRectForElement(videoElement), m_page->deviceScaleFactor(), m_fullscreenMode, allowOptimizedFullscreen), m_page->pageID());
 }
 
 void WebVideoFullscreenManager::exitVideoFullscreen()
@@ -114,6 +119,11 @@ void WebVideoFullscreenManager::exitVideoFullscreen()
     m_page->send(Messages::WebVideoFullscreenManagerProxy::ExitFullscreen(clientRectForElement(videoElement.get())), m_page->pageID());
 }
 
+void WebVideoFullscreenManager::resetMediaState()
+{
+    m_page->send(Messages::WebVideoFullscreenManagerProxy::ResetMediaState(), m_page->pageID());
+}
+    
 void WebVideoFullscreenManager::setDuration(double duration)
 {
     m_page->send(Messages::WebVideoFullscreenManagerProxy::SetDuration(duration), m_page->pageID());
@@ -215,9 +225,12 @@ void WebVideoFullscreenManager::didExitFullscreen()
     __block RefPtr<WebVideoFullscreenModelVideoElement> protect(this);
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        m_layerHostingContext->setRootLayer(nullptr);
-        m_layerHostingContext = nullptr;
-        m_page->send(Messages::WebVideoFullscreenManagerProxy::CleanupFullscreen(), m_page->pageID());
+        if (m_layerHostingContext) {
+            m_layerHostingContext->setRootLayer(nullptr);
+            m_layerHostingContext = nullptr;
+        }
+        if (m_page)
+            m_page->send(Messages::WebVideoFullscreenManagerProxy::CleanupFullscreen(), m_page->pageID());
         protect.clear();
     });
 }
@@ -235,7 +248,7 @@ void WebVideoFullscreenManager::didCleanupFullscreen()
     // enter fullscreen now if it was previously requested during an animation.
     __block RefPtr<WebVideoFullscreenModelVideoElement> protect(this);
     WebThreadRun(^ {
-        enterVideoFullscreenForVideoElement(m_videoElement.get());
+        enterVideoFullscreenForVideoElement(m_videoElement.get(), m_fullscreenMode);
         protect.clear();
     });
 }
@@ -247,7 +260,8 @@ void WebVideoFullscreenManager::setVideoLayerGravityEnum(unsigned gravity)
     
 void WebVideoFullscreenManager::setVideoLayerFrameFenced(WebCore::FloatRect bounds, IPC::Attachment fencePort)
 {
-    m_layerHostingContext->setFencePort(fencePort.port());
+    if (m_layerHostingContext)
+        m_layerHostingContext->setFencePort(fencePort.port());
     setVideoLayerFrame(bounds);
     mach_port_deallocate(mach_task_self(), fencePort.port());
 }

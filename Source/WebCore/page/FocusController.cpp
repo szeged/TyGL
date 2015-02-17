@@ -127,10 +127,10 @@ static inline void dispatchEventsOnWindowAndFocusedElement(Document* document, b
     }
 
     if (!focused && document->focusedElement())
-        document->focusedElement()->dispatchBlurEvent(0);
+        document->focusedElement()->dispatchBlurEvent(nullptr);
     document->dispatchWindowEvent(Event::create(focused ? eventNames().focusEvent : eventNames().blurEvent, false, false));
     if (focused && document->focusedElement())
-        document->focusedElement()->dispatchFocusEvent(0, FocusDirectionNone);
+        document->focusedElement()->dispatchFocusEvent(nullptr, FocusDirectionNone);
 }
 
 static inline bool hasCustomFocusLogic(Element& element)
@@ -164,7 +164,7 @@ FocusController::FocusController(Page& page, ViewState::Flags viewState)
     : m_page(page)
     , m_isChangingFocusedFrame(false)
     , m_viewState(viewState)
-    , m_focusRepaintTimer(this, &FocusController::focusRepaintTimerFired)
+    , m_focusRepaintTimer(*this, &FocusController::focusRepaintTimerFired)
 {
 }
 
@@ -544,7 +544,7 @@ static bool relinquishesEditingFocus(Node *node)
     if (!frame || !root)
         return false;
 
-    return frame->editor().shouldEndEditing(rangeOfContents(*root).get());
+    return frame->editor().shouldEndEditing(rangeOfContents(*root).ptr());
 }
 
 static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFrame, Node* newFocusedNode)
@@ -587,9 +587,9 @@ static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFram
 bool FocusController::setFocusedElement(Element* element, PassRefPtr<Frame> newFocusedFrame, FocusDirection direction)
 {
     RefPtr<Frame> oldFocusedFrame = focusedFrame();
-    RefPtr<Document> oldDocument = oldFocusedFrame ? oldFocusedFrame->document() : 0;
+    RefPtr<Document> oldDocument = oldFocusedFrame ? oldFocusedFrame->document() : nullptr;
     
-    Element* oldFocusedElement = oldDocument ? oldDocument->focusedElement() : 0;
+    Element* oldFocusedElement = oldDocument ? oldDocument->focusedElement() : nullptr;
     if (oldFocusedElement == element)
         return true;
 
@@ -597,29 +597,29 @@ bool FocusController::setFocusedElement(Element* element, PassRefPtr<Frame> newF
     if (oldFocusedElement && oldFocusedElement->isRootEditableElement() && !relinquishesEditingFocus(oldFocusedElement))
         return false;
 
-    m_page.editorClient()->willSetInputMethodState();
+    m_page.editorClient().willSetInputMethodState();
 
     clearSelectionIfNeeded(oldFocusedFrame.get(), newFocusedFrame.get(), element);
 
     if (!element) {
         if (oldDocument)
-            oldDocument->setFocusedElement(0);
-        m_page.editorClient()->setInputMethodState(false);
+            oldDocument->setFocusedElement(nullptr);
+        m_page.editorClient().setInputMethodState(false);
         return true;
     }
 
     Ref<Document> newDocument(element->document());
 
     if (newDocument->focusedElement() == element) {
-        m_page.editorClient()->setInputMethodState(element->shouldUseInputMethod());
+        m_page.editorClient().setInputMethodState(element->shouldUseInputMethod());
         return true;
     }
     
-    if (oldDocument && oldDocument != &newDocument.get())
-        oldDocument->setFocusedElement(0);
+    if (oldDocument && oldDocument != newDocument.ptr())
+        oldDocument->setFocusedElement(nullptr);
 
     if (newFocusedFrame && !newFocusedFrame->page()) {
-        setFocusedFrame(0);
+        setFocusedFrame(nullptr);
         return false;
     }
     setFocusedFrame(newFocusedFrame);
@@ -631,7 +631,7 @@ bool FocusController::setFocusedElement(Element* element, PassRefPtr<Frame> newF
         return false;
 
     if (newDocument->focusedElement() == element)
-        m_page.editorClient()->setInputMethodState(element->shouldUseInputMethod());
+        m_page.editorClient().setInputMethodState(element->shouldUseInputMethod());
 
     m_focusSetTime = monotonicallyIncreasingTime();
     m_focusRepaintTimer.stop();
@@ -756,9 +756,8 @@ static void updateFocusCandidateIfNeeded(FocusDirection direction, const FocusCa
         closest = candidate;
 }
 
-void FocusController::findFocusCandidateInContainer(Node* container, const LayoutRect& startingRect, FocusDirection direction, KeyboardEvent* event, FocusCandidate& closest)
+void FocusController::findFocusCandidateInContainer(Node& container, const LayoutRect& startingRect, FocusDirection direction, KeyboardEvent* event, FocusCandidate& closest)
 {
-    ASSERT(container);
     Node* focusedNode = (focusedFrame() && focusedFrame()->document()) ? focusedFrame()->document()->focusedElement() : 0;
 
     Element* element = ElementTraversal::firstWithin(container);
@@ -769,8 +768,8 @@ void FocusController::findFocusCandidateInContainer(Node* container, const Layou
 
     unsigned candidateCount = 0;
     for (; element; element = (element->isFrameOwnerElement() || canScrollInDirection(element, direction))
-        ? ElementTraversal::nextSkippingChildren(element, container)
-        : ElementTraversal::next(element, container)) {
+        ? ElementTraversal::nextSkippingChildren(*element, &container)
+        : ElementTraversal::next(*element, &container)) {
         if (element == focusedNode)
             continue;
 
@@ -785,7 +784,7 @@ void FocusController::findFocusCandidateInContainer(Node* container, const Layou
             continue;
 
         candidateCount++;
-        candidate.enclosingScrollableBox = container;
+        candidate.enclosingScrollableBox = &container;
         updateFocusCandidateIfNeeded(direction, current, candidate, closest);
     }
 
@@ -809,7 +808,7 @@ bool FocusController::advanceFocusDirectionallyInContainer(Node* container, cons
 
     // Find the closest node within current container in the direction of the navigation.
     FocusCandidate focusCandidate;
-    findFocusCandidateInContainer(container, newStartingRect, direction, event, focusCandidate);
+    findFocusCandidateInContainer(*container, newStartingRect, direction, event, focusCandidate);
 
     if (focusCandidate.isNull()) {
         // Nothing to focus, scroll if possible.
@@ -912,7 +911,7 @@ void FocusController::setFocusedElementNeedsRepaint()
     m_focusRepaintTimer.startOneShot(0.033);
 }
 
-void FocusController::focusRepaintTimerFired(Timer<FocusController>&)
+void FocusController::focusRepaintTimerFired()
 {
     Document* focusedDocument = focusedOrMainFrame().document();
     if (!focusedDocument)

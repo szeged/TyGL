@@ -29,12 +29,6 @@
 
 #include "JIT.h"
 
-// This probably does not belong here; adding here for now as a quick Windows build fix.
-#if ENABLE(ASSEMBLER) && CPU(X86) && !OS(MAC_OS_X)
-#include "MacroAssembler.h"
-JSC::MacroAssemblerX86Common::SSE2CheckState JSC::MacroAssemblerX86Common::s_sse2CheckState = NotCheckedSSE2;
-#endif
-
 #include "ArityCheckFailReturnThunks.h"
 #include "CodeBlock.h"
 #include "DFGCapabilities.h"
@@ -216,6 +210,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_end)
         DEFINE_OP(op_enter)
         DEFINE_OP(op_create_lexical_environment)
+        DEFINE_OP(op_get_scope)
         DEFINE_OP(op_eq)
         DEFINE_OP(op_eq_null)
         case op_get_by_id_out_of_line:
@@ -267,6 +262,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_profile_did_call)
         DEFINE_OP(op_profile_will_call)
         DEFINE_OP(op_profile_type)
+        DEFINE_OP(op_profile_control_flow)
         DEFINE_OP(op_push_name_scope)
         DEFINE_OP(op_push_with_scope)
         case op_put_by_id_out_of_line:
@@ -284,7 +280,6 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_init_global_const)
 
         DEFINE_OP(op_ret)
-        DEFINE_OP(op_ret_object_or_this)
         DEFINE_OP(op_rshift)
         DEFINE_OP(op_unsigned)
         DEFINE_OP(op_urshift)
@@ -502,7 +497,7 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
         m_vm->typeProfilerLog()->processLogEntries(ASCIILiteral("Preparing for JIT compilation."));
     
     if (Options::showDisassembly() || m_vm->m_perBytecodeProfiler)
-        m_disassembler = adoptPtr(new JITDisassembler(m_codeBlock));
+        m_disassembler = std::make_unique<JITDisassembler>(m_codeBlock);
     if (m_vm->m_perBytecodeProfiler) {
         m_compilation = adoptRef(
             new Profiler::Compilation(

@@ -302,6 +302,9 @@ static inline bool handleWheelEventInAppropriateEnclosingBoxForSingleAxis(Node* 
     bool shouldHandleEvent = (axis == ScrollEventAxis::Vertical && wheelEvent->deltaY()) || (axis == ScrollEventAxis::Horizontal && wheelEvent->deltaX());
 #if PLATFORM(MAC)
     shouldHandleEvent |= wheelEvent->phase() == PlatformWheelEventPhaseEnded;
+#if ENABLE(CSS_SCROLL_SNAP)
+    shouldHandleEvent |= wheelEvent->momentumPhase() == PlatformWheelEventPhaseEnded;
+#endif
 #endif
     if (!startNode->renderer() || !shouldHandleEvent)
         return false;
@@ -376,17 +379,17 @@ EventHandler::EventHandler(Frame& frame)
 #endif
     , m_mouseDownWasSingleClickInSelection(false)
     , m_selectionInitiationState(HaveNotStartedSelection)
-    , m_hoverTimer(this, &EventHandler::hoverTimerFired)
+    , m_hoverTimer(*this, &EventHandler::hoverTimerFired)
 #if ENABLE(CURSOR_SUPPORT)
-    , m_cursorUpdateTimer(this, &EventHandler::cursorUpdateTimerFired)
+    , m_cursorUpdateTimer(*this, &EventHandler::cursorUpdateTimerFired)
 #endif
-    , m_longMousePressTimer(this, &EventHandler::recognizeLongMousePress)
+    , m_longMousePressTimer(*this, &EventHandler::recognizeLongMousePress)
     , m_didRecognizeLongMousePress(false)
     , m_autoscrollController(std::make_unique<AutoscrollController>())
     , m_mouseDownMayStartAutoscroll(false)
     , m_mouseDownWasInSubframe(false)
 #if !ENABLE(IOS_TOUCH_EVENTS)
-    , m_fakeMouseMoveEventTimer(this, &EventHandler::fakeMouseMoveEventTimerFired)
+    , m_fakeMouseMoveEventTimer(*this, &EventHandler::fakeMouseMoveEventTimerFired)
 #endif
     , m_svgPan(false)
     , m_resizeLayer(0)
@@ -420,7 +423,7 @@ EventHandler::EventHandler(Frame& frame)
     , m_didLongPressInvokeContextMenu(false)
     , m_isHandlingWheelEvent(false)
 #if ENABLE(CURSOR_VISIBILITY)
-    , m_autoHideCursorTimer(this, &EventHandler::autoHideCursorTimerFired)
+    , m_autoHideCursorTimer(*this, &EventHandler::autoHideCursorTimerFired)
 #endif
 {
 }
@@ -459,8 +462,6 @@ void EventHandler::clear()
     m_resizeLayer = nullptr;
     m_elementUnderMouse = nullptr;
     m_lastElementUnderMouse = nullptr;
-    m_instanceUnderMouse = nullptr;
-    m_lastInstanceUnderMouse = nullptr;
     m_lastMouseMoveEventSubframe = nullptr;
     m_lastScrollbarUnderMouse = nullptr;
     m_clickCount = 0;
@@ -503,10 +504,10 @@ void EventHandler::clear()
     m_didLongPressInvokeContextMenu = false;
 }
 
-void EventHandler::nodeWillBeRemoved(Node* nodeToBeRemoved)
+void EventHandler::nodeWillBeRemoved(Node& nodeToBeRemoved)
 {
-    if (nodeToBeRemoved->contains(m_clickNode.get()))
-        m_clickNode = 0;
+    if (nodeToBeRemoved.contains(m_clickNode.get()))
+        m_clickNode = nullptr;
 }
 
 static void setSelectionIfNeeded(FrameSelection& selection, const VisibleSelection& newSelection)
@@ -1067,9 +1068,9 @@ void EventHandler::didPanScrollStop()
 void EventHandler::startPanScrolling(RenderElement* renderer)
 {
 #if !PLATFORM(IOS)
-    if (!renderer->isBox())
+    if (!is<RenderBox>(*renderer))
         return;
-    m_autoscrollController->startPanScrolling(toRenderBox(renderer), lastKnownMousePosition());
+    m_autoscrollController->startPanScrolling(downcast<RenderBox>(renderer), lastKnownMousePosition());
     invalidateClick();
 #endif
 }
@@ -1310,7 +1311,7 @@ bool EventHandler::useHandCursor(Node* node, bool isOverLink, bool shiftKey)
     return ((isOverLink || isSubmitImage(node)) && (!editable || editableLinkEnabled));
 }
 
-void EventHandler::cursorUpdateTimerFired(Timer<EventHandler>&)
+void EventHandler::cursorUpdateTimerFired()
 {
     ASSERT(m_frame.document());
     updateCursor();
@@ -1553,9 +1554,8 @@ void EventHandler::cancelAutoHideCursorTimer()
         m_autoHideCursorTimer.stop();
 }
 
-void EventHandler::autoHideCursorTimerFired(Timer<EventHandler>& timer)
+void EventHandler::autoHideCursorTimerFired()
 {
-    ASSERT_UNUSED(timer, &timer == &m_autoHideCursorTimer);
     m_currentMouseCursor = noneCursor();
     FrameView* view = m_frame.view();
     if (view && view->isActive())
@@ -1576,10 +1576,8 @@ void EventHandler::beginTrackingPotentialLongMousePress(const HitTestResult& hit
     page->chrome().didBeginTrackingPotentialLongMousePress(m_mouseDownPos, hitTestResult);
 }
     
-void EventHandler::recognizeLongMousePress(Timer<EventHandler>& timer)
+void EventHandler::recognizeLongMousePress()
 {
-    ASSERT_UNUSED(timer, &timer == &m_longMousePressTimer);
-
     Page* page = m_frame.page();
     if (!page)
         return;
@@ -1639,7 +1637,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
 {
     RefPtr<FrameView> protector(m_frame.view());
 
-    if (InspectorInstrumentation::handleMousePress(m_frame.page())) {
+    if (InspectorInstrumentation::handleMousePress(m_frame)) {
         invalidateClick();
         return true;
     }
@@ -1653,7 +1651,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
         return true;
 #endif
 
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture, m_frame.document());
 
     // FIXME (bug 68185): this call should be made at another abstraction layer
     m_frame.loader().resetMultipleFormSubmissionProtection();
@@ -1790,7 +1788,7 @@ bool EventHandler::handleMouseDoubleClickEvent(const PlatformMouseEvent& platfor
 
     m_frame.selection().setCaretBlinkingSuspended(false);
 
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture, m_frame.document());
 
     // We get this instead of a second mouse-up 
     m_mousePressed = false;
@@ -2035,7 +2033,7 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& platformMou
         return true;
 #endif
 
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture, m_frame.document());
 
 #if ENABLE(PAN_SCROLLING)
     m_autoscrollController->handleMouseReleaseEvent(platformMouseEvent);
@@ -2356,22 +2354,6 @@ MouseEventWithHitTestResults EventHandler::prepareMouseEvent(const HitTestReques
     return m_frame.document()->prepareMouseEvent(request, documentPointForWindowPoint(m_frame, mouseEvent.position()), mouseEvent);
 }
 
-static inline SVGElementInstance* instanceAssociatedWithShadowTreeElement(Node* referenceNode)
-{
-    if (!referenceNode || !referenceNode->isSVGElement())
-        return nullptr;
-
-    ShadowRoot* shadowRoot = referenceNode->containingShadowRoot();
-    if (!shadowRoot)
-        return nullptr;
-
-    Element* shadowTreeParentElement = shadowRoot->hostElement();
-    if (!shadowTreeParentElement || !shadowTreeParentElement->hasTagName(useTag))
-        return nullptr;
-
-    return downcast<SVGUseElement>(*shadowTreeParentElement).instanceForShadowTreeElement(referenceNode);
-}
-
 static RenderElement* nearestCommonHoverAncestor(RenderElement* obj1, RenderElement* obj2)
 {
     if (!obj1 || !obj2)
@@ -2412,38 +2394,6 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
     }
 
     m_elementUnderMouse = targetElement;
-    m_instanceUnderMouse = instanceAssociatedWithShadowTreeElement(targetElement);
-
-    // <use> shadow tree elements may have been recloned, update node under mouse in any case
-    if (m_lastInstanceUnderMouse) {
-        SVGElement* lastCorrespondingElement = m_lastInstanceUnderMouse->correspondingElement();
-        SVGElement* lastCorrespondingUseElement = m_lastInstanceUnderMouse->correspondingUseElement();
-
-        if (lastCorrespondingElement && lastCorrespondingUseElement) {
-            HashSet<SVGElementInstance*> instances = lastCorrespondingElement->instancesForElement();
-
-            // Locate the recloned shadow tree element for our corresponding instance
-            HashSet<SVGElementInstance*>::iterator end = instances.end();
-            for (HashSet<SVGElementInstance*>::iterator it = instances.begin(); it != end; ++it) {
-                SVGElementInstance* instance = (*it);
-                ASSERT(instance->correspondingElement() == lastCorrespondingElement);
-
-                if (instance == m_lastInstanceUnderMouse)
-                    continue;
-
-                if (instance->correspondingUseElement() != lastCorrespondingUseElement)
-                    continue;
-
-                SVGElement* shadowTreeElement = instance->shadowTreeElement();
-                if (!shadowTreeElement->inDocument() || m_lastElementUnderMouse == shadowTreeElement)
-                    continue;
-
-                m_lastElementUnderMouse = shadowTreeElement;
-                m_lastInstanceUnderMouse = instance;
-                break;
-            }
-        }
-    }
 
     // Fire mouseout/mouseover if the mouse has shifted to a different node.
     if (fireMouseOverOut) {
@@ -2486,7 +2436,6 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
         if (m_lastElementUnderMouse && &m_lastElementUnderMouse->document() != m_frame.document()) {
             m_lastElementUnderMouse = nullptr;
             m_lastScrollbarUnderMouse = nullptr;
-            m_lastInstanceUnderMouse = nullptr;
         }
 
         if (m_lastElementUnderMouse != m_elementUnderMouse) {
@@ -2544,7 +2493,6 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
             }
         }
         m_lastElementUnderMouse = m_elementUnderMouse;
-        m_lastInstanceUnderMouse = instanceAssociatedWithShadowTreeElement(m_elementUnderMouse.get());
     }
 }
 
@@ -2690,7 +2638,7 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
 
 #if PLATFORM(MAC)
     if (event.phase() == PlatformWheelEventPhaseNone && event.momentumPhase() == PlatformWheelEventPhaseNone)
-        m_frame.mainFrame().latchingState()->clear();
+        m_frame.mainFrame().resetLatchingState();
 #endif
 
     // FIXME: It should not be necessary to do this mutation here.
@@ -2737,7 +2685,7 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
 void EventHandler::clearLatchedState()
 {
 #if PLATFORM(MAC)
-    m_frame.mainFrame().latchingState()->clear();
+    m_frame.mainFrame().resetLatchingState();
 #endif
     m_frame.mainFrame().wheelEventDeltaTracker()->endTrackingDeltas();
 }
@@ -2751,8 +2699,7 @@ void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEv
 
 #if PLATFORM(MAC)
     ScrollLatchingState* latchedState = m_frame.mainFrame().latchingState();
-    ASSERT(latchedState);
-    Element* stopElement = latchedState->previousWheelScrolledElement();
+    Element* stopElement = latchedState ? latchedState->previousWheelScrolledElement() : nullptr;
 
     // Workaround for scrolling issues <rdar://problem/14758615>.
     if (m_frame.mainFrame().wheelEventDeltaTracker()->isTrackingDeltas())
@@ -2770,7 +2717,7 @@ void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEv
         wheelEvent->setDefaultHandled();
     
 #if PLATFORM(MAC)
-    if (!latchedState->wheelEventElement())
+    if (latchedState && !latchedState->wheelEventElement())
         latchedState->setPreviousWheelScrolledElement(stopElement);
 #endif
 }
@@ -2904,8 +2851,10 @@ void EventHandler::dispatchFakeMouseMoveEventSoon()
     if (m_mousePositionIsUnknown)
         return;
 
-    if (!m_frame.settings().deviceSupportsMouse())
-        return;
+    if (Page* page = m_frame.page()) {
+        if (!page->chrome().client().shouldDispatchFakeMouseMoveEvents())
+            return;
+    }
 
     // If the content has ever taken longer than fakeMouseMoveShortInterval we
     // reschedule the timer and use a longer time. This will cause the content
@@ -2944,13 +2893,9 @@ void EventHandler::cancelFakeMouseMoveEvent()
     m_fakeMouseMoveEventTimer.stop();
 }
 
-void EventHandler::fakeMouseMoveEventTimerFired(Timer<EventHandler>& timer)
+void EventHandler::fakeMouseMoveEventTimerFired()
 {
-    ASSERT_UNUSED(timer, &timer == &m_fakeMouseMoveEventTimer);
     ASSERT(!m_mousePressed);
-
-    if (!m_frame.settings().deviceSupportsMouse())
-        return;
 
     FrameView* view = m_frame.view();
     if (!view)
@@ -2980,7 +2925,7 @@ void EventHandler::resizeLayerDestroyed()
     m_resizeLayer = 0;
 }
 
-void EventHandler::hoverTimerFired(Timer<EventHandler>&)
+void EventHandler::hoverTimerFired()
 {
     m_hoverTimer.stop();
 
@@ -3071,7 +3016,7 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
     if (!element)
         return false;
 
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture, m_frame.document());
     UserTypingGestureIndicator typingGestureIndicator(m_frame);
 
     if (FrameView* view = m_frame.view())
@@ -3690,11 +3635,11 @@ void EventHandler::defaultTabEventHandler(KeyboardEvent* event)
 
 void EventHandler::capsLockStateMayHaveChanged()
 {
-    Document* d = m_frame.document();
-    if (Element* element = d->focusedElement()) {
-        if (RenderObject* r = element->renderer()) {
-            if (r->isTextField())
-                toRenderTextControlSingleLine(r)->capsLockStateMayHaveChanged();
+    Document* document = m_frame.document();
+    if (auto* element = document->focusedElement()) {
+        if (auto* renderer = element->renderer()) {
+            if (is<RenderTextControlSingleLine>(*renderer))
+                downcast<RenderTextControlSingleLine>(*renderer).capsLockStateMayHaveChanged();
         }
     }
 }
@@ -3799,7 +3744,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
 
     const Vector<PlatformTouchPoint>& points = event.touchPoints();
 
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture, m_frame.document());
 
     unsigned i;
     bool freshTouchEvents = true;
@@ -3865,7 +3810,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
             Node* node = result.innerElement();
             ASSERT(node);
 
-            if (InspectorInstrumentation::handleTouchEvent(m_frame.page(), node))
+            if (node && InspectorInstrumentation::handleTouchEvent(m_frame, *node))
                 return true;
 
             Document& doc = node->document();

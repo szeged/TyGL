@@ -44,6 +44,7 @@ enum GraphicsLayerPaintingPhaseFlags {
     GraphicsLayerPaintMask = (1 << 2),
     GraphicsLayerPaintOverflowContents = (1 << 3),
     GraphicsLayerPaintCompositedScroll = (1 << 4),
+    GraphicsLayerPaintChildClippingMask = (1 << 5),
     GraphicsLayerPaintAllWithOverflowClip = (GraphicsLayerPaintBackground | GraphicsLayerPaintForeground | GraphicsLayerPaintMask)
 };
 typedef unsigned GraphicsLayerPaintingPhase;
@@ -72,7 +73,6 @@ class GraphicsLayerClient {
 public:
     virtual ~GraphicsLayerClient() {}
 
-    virtual bool shouldUseTiledBacking(const GraphicsLayer*) const { return false; }
     virtual void tiledBackingUsageChanged(const GraphicsLayer*, bool /*usingTiledBacking*/) { }
     
     // Callback for when hardware-accelerated animation started.
@@ -115,6 +115,8 @@ public:
     virtual bool shouldTemporarilyRetainTileCohorts(const GraphicsLayer*) const { return true; }
 
     virtual bool needsPixelAligment() const { return false; }
+
+    virtual bool needsIOSDumpRenderTreeMainFrameRenderViewLayerIsAlwaysOpaqueHack(const GraphicsLayer&) const { return false; }
 
 #ifndef NDEBUG
     // RenderLayerBacking overrides this to verify that it is not

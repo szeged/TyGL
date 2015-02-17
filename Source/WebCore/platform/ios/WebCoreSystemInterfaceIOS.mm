@@ -37,7 +37,6 @@ WEBCORE_EXPORT void (*wkSetBaseCTM)(CGContextRef, CGAffineTransform);
 WEBCORE_EXPORT void (*wkSetPatternPhaseInUserSpace)(CGContextRef, CGPoint point);
 WEBCORE_EXPORT CGAffineTransform (*wkGetUserToBaseCTM)(CGContextRef);
 WEBCORE_EXPORT bool (*wkCGContextIsPDFContext)(CGContextRef);
-WEBCORE_EXPORT void (*wkSetUpFontCache)();
 WEBCORE_EXPORT NSString* (*wkCopyNSURLResponseStatusLine)(NSURLResponse*);
 WEBCORE_EXPORT void (*wkSetNSURLConnectionDefersCallbacks)(NSURLConnection *, BOOL);
 WEBCORE_EXPORT void (*wkSetNSURLRequestShouldContentSniff)(NSMutableURLRequest *, BOOL);
@@ -70,14 +69,6 @@ WEBCORE_EXPORT WKCFURLCredentialRef (*wkCopyCredentialFromCFPersistentStorage)(C
 WEBCORE_EXPORT void (*wkSetCFURLRequestShouldContentSniff)(CFMutableURLRequestRef, bool);
 WEBCORE_EXPORT void (*wkSetRequestStorageSession)(CFURLStorageSessionRef, CFMutableURLRequestRef);
 #endif
-
-WEBCORE_EXPORT bool (*wkGetVerticalGlyphsForCharacters)(CTFontRef, const UniChar[], CGGlyph[], size_t);
-WEBCORE_EXPORT CTLineRef (*wkCreateCTLineWithUniCharProvider)(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*);
-WEBCORE_EXPORT bool (*wkCTFontTransformGlyphs)(CTFontRef font, CGGlyph glyphs[], CGSize advances[], CFIndex count, wkCTFontTransformOptions options);
-
-WEBCORE_EXPORT CGSize (*wkCTRunGetInitialAdvance)(CTRunRef);
-
-WEBCORE_EXPORT CTTypesetterRef (*wkCreateCTTypesetterWithUniCharProviderAndOptions)(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*, CFDictionaryRef options);
 
 #if !PLATFORM(IOS_SIMULATOR)
 WEBCORE_EXPORT CGContextRef (*wkIOSurfaceContextCreate)(IOSurfaceRef surface, unsigned width, unsigned height, CGColorSpaceRef colorSpace);
@@ -129,6 +120,9 @@ WEBCORE_EXPORT CFStringRef (*wkGetDeviceName)(void);
 WEBCORE_EXPORT CFStringRef (*wkGetOSNameForUserAgent)(void);
 WEBCORE_EXPORT CFStringRef (*wkGetPlatformNameForNavigator)(void);
 WEBCORE_EXPORT CFStringRef (*wkGetVendorNameForNavigator)(void);
+
+WEBCORE_EXPORT bool (*wkIsOptimizedFullscreenSupported)(void);
+WEBCORE_EXPORT CFStringRef (*wkGetMediaUIImageData)(int);
 
 WEBCORE_EXPORT int (*wkExernalDeviceTypeForPlayer)(AVPlayer *);
 WEBCORE_EXPORT NSString *(*wkExernalDeviceDisplayNameForPlayer)(AVPlayer *);

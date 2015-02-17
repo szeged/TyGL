@@ -43,7 +43,31 @@ class RenderStyle;
 
 class SelectorChecker {
     WTF_MAKE_NONCOPYABLE(SelectorChecker);
-    enum Match { SelectorMatches, SelectorFailsLocally, SelectorFailsAllSiblings, SelectorFailsCompletely };
+    enum class Match { SelectorMatches, SelectorFailsLocally, SelectorFailsAllSiblings, SelectorFailsCompletely };
+
+    enum class MatchType { VirtualPseudoElementOnly, Element };
+
+    struct MatchResult {
+        Match match;
+        MatchType matchType;
+
+        static MatchResult matches(MatchType matchType)
+        {
+            return { Match::SelectorMatches, matchType };
+        }
+
+        static MatchResult updateWithMatchType(MatchResult result, MatchType matchType)
+        {
+            if (matchType == MatchType::VirtualPseudoElementOnly)
+                result.matchType = MatchType::VirtualPseudoElementOnly;
+            return result;
+        }
+
+        static MatchResult fails(Match match)
+        {
+            return { match, MatchType::Element };
+        }
+    };
 
 public:
     enum class Mode : unsigned char {
@@ -72,9 +96,8 @@ public:
 
     struct CheckingContextWithStatus;
 
-    bool match(const CSSSelector*, Element*, const CheckingContext&) const;
+    bool match(const CSSSelector*, Element*, const CheckingContext&, unsigned& specificity) const;
 
-    static bool tagMatches(const Element*, const QualifiedName&);
     static bool isCommonPseudoClassSelector(const CSSSelector*);
     static bool matchesFocusPseudoClass(const Element*);
     static bool checkExactAttribute(const Element*, const CSSSelector*, const QualifiedName& selectorAttributeName, const AtomicStringImpl* value);
@@ -83,8 +106,9 @@ public:
     static unsigned determineLinkMatchType(const CSSSelector*);
 
 private:
-    Match matchRecursively(const CheckingContextWithStatus&, PseudoId&) const;
-    bool checkOne(const CheckingContextWithStatus&) const;
+    MatchResult matchRecursively(const CheckingContextWithStatus&, PseudoIdSet&, unsigned& specificity) const;
+    bool checkOne(const CheckingContextWithStatus&, PseudoIdSet&, MatchType&, unsigned& specificity) const;
+    bool matchSelectorList(const CheckingContextWithStatus&, Element&, const CSSSelectorList&, unsigned& specificity) const;
 
     bool checkScrollbarPseudoClass(const CheckingContextWithStatus&, const CSSSelector*) const;
 
@@ -98,20 +122,12 @@ inline bool SelectorChecker::isCommonPseudoClassSelector(const CSSSelector* sele
         return false;
     CSSSelector::PseudoClassType pseudoType = selector->pseudoClassType();
     return pseudoType == CSSSelector::PseudoClassLink
+#if ENABLE(CSS_SELECTORS_LEVEL4)
         || pseudoType == CSSSelector::PseudoClassAnyLink
+#endif
+        || pseudoType == CSSSelector::PseudoClassAnyLinkDeprecated
         || pseudoType == CSSSelector::PseudoClassVisited
         || pseudoType == CSSSelector::PseudoClassFocus;
-}
-
-inline bool SelectorChecker::tagMatches(const Element* element, const QualifiedName& tagQName)
-{
-    if (tagQName == anyQName())
-        return true;
-    const AtomicString& localName = tagQName.localName();
-    if (localName != starAtom && localName != element->localName())
-        return false;
-    const AtomicString& namespaceURI = tagQName.namespaceURI();
-    return namespaceURI == starAtom || namespaceURI == element->namespaceURI();
 }
 
 inline bool SelectorChecker::checkExactAttribute(const Element* element, const CSSSelector* selector, const QualifiedName& selectorAttributeName, const AtomicStringImpl* value)

@@ -33,7 +33,7 @@
 
 namespace WebCore {
 
-class WebGLTexture : public WebGLSharedObject {
+class WebGLTexture final : public WebGLSharedObject {
 public:
 
     enum TextureExtensionFlag {
@@ -44,7 +44,7 @@ public:
 
     virtual ~WebGLTexture();
 
-    static PassRefPtr<WebGLTexture> create(WebGLRenderingContext*);
+    static PassRefPtr<WebGLTexture> create(WebGLRenderingContextBase*);
 
     void setTarget(GC3Denum target, GC3Dint maxLevel);
     void setParameteri(GC3Denum pname, GC3Dint param);
@@ -81,12 +81,11 @@ public:
 
     static GC3Dint computeLevelCount(GC3Dsizei width, GC3Dsizei height);
 
-protected:
-    WebGLTexture(WebGLRenderingContext*);
+private:
+    WebGLTexture(WebGLRenderingContextBase*);
 
     virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject) override;
 
-private:
     class LevelInfo {
     public:
         LevelInfo()

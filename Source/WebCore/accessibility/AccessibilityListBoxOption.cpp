@@ -54,9 +54,9 @@ AccessibilityListBoxOption::~AccessibilityListBoxOption()
 {
 }    
     
-PassRefPtr<AccessibilityListBoxOption> AccessibilityListBoxOption::create()
+Ref<AccessibilityListBoxOption> AccessibilityListBoxOption::create()
 {
-    return adoptRef(new AccessibilityListBoxOption());
+    return adoptRef(*new AccessibilityListBoxOption());
 }
     
 bool AccessibilityListBoxOption::isEnabled() const
@@ -100,14 +100,14 @@ LayoutRect AccessibilityListBoxOption::elementRect() const
     if (!listBoxParentNode)
         return rect;
     
-    RenderObject* listBoxRenderer = listBoxParentNode->renderer();
+    RenderElement* listBoxRenderer = listBoxParentNode->renderer();
     if (!listBoxRenderer)
         return rect;
     
     LayoutRect parentRect = listBoxRenderer->document().axObjectCache()->getOrCreate(listBoxRenderer)->boundingBoxRect();
     int index = listBoxOptionIndex();
     if (index != -1)
-        rect = toRenderListBox(listBoxRenderer)->itemBoundingBoxRect(parentRect.location(), index);
+        rect = downcast<RenderListBox>(*listBoxRenderer).itemBoundingBoxRect(parentRect.location(), index);
     
     return rect;
 }

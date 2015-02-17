@@ -42,7 +42,6 @@
 #include "SourceCode.h"
 #include "TypeSet.h"
 #include "UnlinkedCodeBlock.h"
-#include <wtf/PassOwnPtr.h>
 
 namespace JSC {
 
@@ -64,8 +63,7 @@ inline bool isCall(CodeSpecializationKind kind)
     return false;
 }
 
-class ExecutableBase : public JSCell, public DoublyLinkedListNode<ExecutableBase> {
-    friend class WTF::DoublyLinkedListNode<ExecutableBase>;
+class ExecutableBase : public JSCell {
     friend class JIT;
 
 protected:
@@ -272,9 +270,6 @@ public:
     void dump(PrintStream&) const;
         
 protected:
-    ExecutableBase* m_prev;
-    ExecutableBase* m_next;
-
     RefPtr<JITCode> m_jitCodeForCall;
     RefPtr<JITCode> m_jitCodeForConstruct;
     MacroAssemblerCodePtr m_jitCodeForCallWithArityCheck;

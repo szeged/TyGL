@@ -35,7 +35,7 @@ class SVGScriptElement final : public SVGElement
                              , public SVGExternalResourcesRequired
                              , public ScriptElement {
 public:
-    static PassRefPtr<SVGScriptElement> create(const QualifiedName&, Document&, bool wasInsertedByParser);
+    static Ref<SVGScriptElement> create(const QualifiedName&, Document&, bool wasInsertedByParser);
 
 private:
     SVGScriptElement(const QualifiedName&, Document&, bool wasInsertedByParser, bool alreadyStarted);
@@ -65,14 +65,14 @@ private:
 
     virtual void dispatchLoadEvent() override { SVGExternalResourcesRequired::dispatchLoadEvent(this); }
 
-    virtual PassRefPtr<Element> cloneElementWithoutAttributesAndChildren() override;
+    virtual RefPtr<Element> cloneElementWithoutAttributesAndChildren(Document&) override;
     virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }
 
     // SVGExternalResourcesRequired
     virtual void setHaveFiredLoadEvent(bool haveFiredLoadEvent) override { ScriptElement::setHaveFiredLoadEvent(haveFiredLoadEvent); }
     virtual bool isParserInserted() const override { return ScriptElement::isParserInserted(); }
     virtual bool haveFiredLoadEvent() const override { return ScriptElement::haveFiredLoadEvent(); }
-    virtual Timer<SVGElement>* svgLoadEventTimer() override { return &m_svgLoadEventTimer; }
+    virtual Timer* svgLoadEventTimer() override { return &m_svgLoadEventTimer; }
 
 #ifndef NDEBUG
     virtual bool filterOutAnimatableAttribute(const QualifiedName&) const override;
@@ -83,7 +83,7 @@ private:
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 
-    Timer<SVGElement> m_svgLoadEventTimer;
+    Timer m_svgLoadEventTimer;
 };
 
 } // namespace WebCore

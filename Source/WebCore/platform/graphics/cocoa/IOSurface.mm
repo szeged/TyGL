@@ -30,24 +30,13 @@
 
 #import "GraphicsContextCG.h"
 #import "IOSurfacePool.h"
-#import <IOSurface/IOSurface.h>
+#import "IOSurfaceSPI.h"
+#import "MachSendRight.h"
 #import <wtf/Assertions.h>
-
-#if __has_include(<IOSurface/IOSurfacePrivate.h>)
-#import <IOSurface/IOSurfacePrivate.h>
-#else
-enum {
-    kIOSurfacePurgeableNonVolatile = 0,
-    kIOSurfacePurgeableVolatile = 1,
-    kIOSurfacePurgeableEmpty = 2,
-    kIOSurfacePurgeableKeepCurrent = 3,
-};
-#endif
 
 extern "C" {
 CGContextRef CGIOSurfaceContextCreate(IOSurfaceRef, size_t, size_t, size_t, size_t, CGColorSpaceRef, CGBitmapInfo);
 CGImageRef CGIOSurfaceContextCreateImage(CGContextRef);
-IOReturn IOSurfaceSetPurgeable(IOSurfaceRef, uint32_t, uint32_t *);
 }
 
 using namespace WebCore;
@@ -59,9 +48,9 @@ PassRefPtr<IOSurface> IOSurface::create(IntSize size, ColorSpace colorSpace)
     return adoptRef(new IOSurface(size, colorSpace));
 }
 
-PassRefPtr<IOSurface> IOSurface::createFromMachPort(mach_port_t machPort, ColorSpace colorSpace)
+PassRefPtr<IOSurface> IOSurface::createFromSendRight(const MachSendRight& sendRight, ColorSpace colorSpace)
 {
-    RetainPtr<IOSurfaceRef> surface = adoptCF(IOSurfaceLookupFromMachPort(machPort));
+    RetainPtr<IOSurfaceRef> surface = adoptCF(IOSurfaceLookupFromMachPort(sendRight.sendRight()));
     return IOSurface::createFromSurface(surface.get(), colorSpace);
 }
 
@@ -129,9 +118,9 @@ IntSize IOSurface::maximumSize()
     return IntSize(IOSurfaceGetPropertyMaximum(kIOSurfaceWidth), IOSurfaceGetPropertyMaximum(kIOSurfaceHeight));
 }
 
-mach_port_t IOSurface::createMachPort() const
+MachSendRight IOSurface::createSendRight() const
 {
-    return IOSurfaceCreateMachPort(m_surface.get());
+    return MachSendRight::adopt(IOSurfaceCreateMachPort(m_surface.get()));
 }
 
 RetainPtr<CGImageRef> IOSurface::createImage()
@@ -164,40 +153,28 @@ GraphicsContext& IOSurface::ensureGraphicsContext()
 
 IOSurface::SurfaceState IOSurface::state() const
 {
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     uint32_t previousState = 0;
     IOReturn ret = IOSurfaceSetPurgeable(m_surface.get(), kIOSurfacePurgeableKeepCurrent, &previousState);
     ASSERT_UNUSED(ret, ret == kIOReturnSuccess);
     return previousState == kIOSurfacePurgeableEmpty ? IOSurface::SurfaceState::Empty : IOSurface::SurfaceState::Valid;
-#else
-    return SurfaceState::Valid;
-#endif
 }
 
 bool IOSurface::isVolatile() const
 {
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     uint32_t previousState = 0;
     IOReturn ret = IOSurfaceSetPurgeable(m_surface.get(), kIOSurfacePurgeableKeepCurrent, &previousState);
     ASSERT_UNUSED(ret, ret == kIOReturnSuccess);
     return previousState != kIOSurfacePurgeableNonVolatile;
-#else
-    return false;
-#endif
 }
 
 IOSurface::SurfaceState IOSurface::setIsVolatile(bool isVolatile)
 {
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     uint32_t previousState = 0;
     IOReturn ret = IOSurfaceSetPurgeable(m_surface.get(), isVolatile ? kIOSurfacePurgeableVolatile : kIOSurfacePurgeableNonVolatile, &previousState);
     ASSERT_UNUSED(ret, ret == kIOReturnSuccess);
 
     if (previousState == kIOSurfacePurgeableEmpty)
         return IOSurface::SurfaceState::Empty;
-#else
-    UNUSED_PARAM(isVolatile);
-#endif
 
     return IOSurface::SurfaceState::Valid;
 }

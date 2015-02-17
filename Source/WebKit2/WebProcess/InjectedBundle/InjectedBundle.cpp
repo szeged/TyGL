@@ -27,26 +27,28 @@
 #include "InjectedBundle.h"
 
 #include "APIArray.h"
+#include "APIData.h"
 #include "Arguments.h"
 #include "InjectedBundleScriptWorld.h"
-#include "InjectedBundleUserMessageCoders.h"
 #include "NotificationPermissionRequestManager.h"
 #include "SessionTracker.h"
+#include "UserData.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WebApplicationCacheManager.h"
 #include "WebConnectionToUIProcess.h"
-#include "WebContextMessageKinds.h"
 #include "WebCookieManager.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebDatabaseManager.h"
 #include "WebFrame.h"
 #include "WebFrameNetworkingContext.h"
 #include "WebPage.h"
+#include "WebPageGroupProxy.h"
 #include "WebPreferencesKeys.h"
 #include "WebPreferencesStore.h"
 #include "WebProcess.h"
 #include "WebProcessCreationParameters.h"
+#include "WebProcessPoolMessages.h"
 #include <JavaScriptCore/APICast.h>
 #include <JavaScriptCore/JSLock.h>
 #include <WebCore/ApplicationCache.h>
@@ -70,6 +72,7 @@
 #include <WebCore/SecurityPolicy.h>
 #include <WebCore/SessionID.h>
 #include <WebCore/Settings.h>
+#include <WebCore/UserContentController.h>
 #include <WebCore/UserGestureIndicator.h>
 
 #if ENABLE(CSS_REGIONS) || ENABLE(CSS_COMPOSITING)
@@ -113,47 +116,34 @@ void InjectedBundle::initializeClient(const WKBundleClientBase* client)
 
 void InjectedBundle::postMessage(const String& messageName, API::Object* messageBody)
 {
-    auto encoder = std::make_unique<IPC::MessageEncoder>(WebContextLegacyMessages::messageReceiverName(), WebContextLegacyMessages::postMessageMessageName(), 0);
-    encoder->encode(messageName);
-    encoder->encode(InjectedBundleUserMessageEncoder(messageBody));
-
-    WebProcess::shared().parentProcessConnection()->sendMessage(WTF::move(encoder));
+    auto& webProcess = WebProcess::singleton();
+    webProcess.parentProcessConnection()->send(Messages::WebProcessPool::HandleMessage(messageName, UserData(webProcess.transformObjectsToHandles(messageBody))), 0);
 }
 
 void InjectedBundle::postSynchronousMessage(const String& messageName, API::Object* messageBody, RefPtr<API::Object>& returnData)
 {
-    InjectedBundleUserMessageDecoder messageDecoder(returnData);
+    UserData returnUserData;
 
-    uint64_t syncRequestID;
-    std::unique_ptr<IPC::MessageEncoder> encoder = WebProcess::shared().parentProcessConnection()->createSyncMessageEncoder(WebContextLegacyMessages::messageReceiverName(), WebContextLegacyMessages::postSynchronousMessageMessageName(), 0, syncRequestID);
-    encoder->encode(messageName);
-    encoder->encode(InjectedBundleUserMessageEncoder(messageBody));
-
-    std::unique_ptr<IPC::MessageDecoder> replyDecoder = WebProcess::shared().parentProcessConnection()->sendSyncMessage(syncRequestID, WTF::move(encoder), std::chrono::milliseconds::max());
-    if (!replyDecoder || !replyDecoder->decode(messageDecoder)) {
+    auto& webProcess = WebProcess::singleton();
+    if (!webProcess.parentProcessConnection()->sendSync(Messages::WebProcessPool::HandleSynchronousMessage(messageName, UserData(webProcess.transformObjectsToHandles(messageBody))), Messages::WebProcessPool::HandleSynchronousMessage::Reply(returnUserData), 0))
         returnData = nullptr;
-        return;
-    }
+    else
+        returnData = webProcess.transformHandlesToObjects(returnUserData.object());
 }
 
 WebConnection* InjectedBundle::webConnectionToUIProcess() const
 {
-    return WebProcess::shared().webConnectionToUIProcess();
+    return WebProcess::singleton().webConnectionToUIProcess();
 }
 
 void InjectedBundle::setAlwaysAcceptCookies(bool accept)
 {
-    WebProcess::shared().supplement<WebCookieManager>()->setHTTPCookieAcceptPolicy(accept ? HTTPCookieAcceptPolicyAlways : HTTPCookieAcceptPolicyOnlyFromMainDocumentDomain);
-}
-
-void InjectedBundle::removeAllVisitedLinks()
-{
-    PageGroup::removeAllVisitedLinks();
+    WebProcess::singleton().supplement<WebCookieManager>()->setHTTPCookieAcceptPolicy(accept ? HTTPCookieAcceptPolicyAlways : HTTPCookieAcceptPolicyOnlyFromMainDocumentDomain);
 }
 
 void InjectedBundle::setCacheModel(uint32_t cacheModel)
 {
-    WebProcess::shared().setCacheModel(cacheModel);
+    WebProcess::singleton().setCacheModel(cacheModel);
 }
 
 void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* pageGroup, const String& preference, bool enabled)
@@ -332,12 +322,12 @@ void InjectedBundle::setSpatialNavigationEnabled(WebPageGroupProxy* pageGroup, b
 
 void InjectedBundle::addOriginAccessWhitelistEntry(const String& sourceOrigin, const String& destinationProtocol, const String& destinationHost, bool allowDestinationSubdomains)
 {
-    SecurityPolicy::addOriginAccessWhitelistEntry(*SecurityOrigin::createFromString(sourceOrigin), destinationProtocol, destinationHost, allowDestinationSubdomains);
+    SecurityPolicy::addOriginAccessWhitelistEntry(SecurityOrigin::createFromString(sourceOrigin).get(), destinationProtocol, destinationHost, allowDestinationSubdomains);
 }
 
 void InjectedBundle::removeOriginAccessWhitelistEntry(const String& sourceOrigin, const String& destinationProtocol, const String& destinationHost, bool allowDestinationSubdomains)
 {
-    SecurityPolicy::removeOriginAccessWhitelistEntry(*SecurityOrigin::createFromString(sourceOrigin), destinationProtocol, destinationHost, allowDestinationSubdomains);
+    SecurityPolicy::removeOriginAccessWhitelistEntry(SecurityOrigin::createFromString(sourceOrigin).get(), destinationProtocol, destinationHost, allowDestinationSubdomains);
 }
 
 void InjectedBundle::resetOriginAccessWhitelists()
@@ -354,25 +344,19 @@ void InjectedBundle::setAsynchronousSpellCheckingEnabled(WebPageGroupProxy* page
 
 void InjectedBundle::clearAllDatabases()
 {
-#if ENABLE(SQL_DATABASE)
-    WebProcess::shared().supplement<WebDatabaseManager>()->deleteAllDatabases();
-#endif
+    WebProcess::singleton().supplement<WebDatabaseManager>()->deleteAllDatabases();
 }
 
 void InjectedBundle::setDatabaseQuota(uint64_t quota)
 {
-#if ENABLE(SQL_DATABASE)
     // Historically, we've used the following (somewhat non-sensical) string
     // for the databaseIdentifier of local files.
-    WebProcess::shared().supplement<WebDatabaseManager>()->setQuotaForOrigin("file__0", quota);
-#else
-    UNUSED_PARAM(quota);
-#endif
+    WebProcess::singleton().supplement<WebDatabaseManager>()->setQuotaForOrigin("file__0", quota);
 }
 
 void InjectedBundle::clearApplicationCache()
 {
-    WebProcess::shared().supplement<WebApplicationCacheManager>()->deleteAllEntries();
+    WebProcess::singleton().supplement<WebApplicationCacheManager>()->deleteAllEntries();
 }
 
 void InjectedBundle::clearApplicationCacheForOrigin(const String& originString)
@@ -383,7 +367,7 @@ void InjectedBundle::clearApplicationCacheForOrigin(const String& originString)
 
 void InjectedBundle::setAppCacheMaximumSize(uint64_t size)
 {
-    WebProcess::shared().supplement<WebApplicationCacheManager>()->setAppCacheMaximumSize(size);
+    WebProcess::singleton().supplement<WebApplicationCacheManager>()->setAppCacheMaximumSize(size);
 }
 
 uint64_t InjectedBundle::appCacheUsageForOrigin(const String& originString)
@@ -475,40 +459,44 @@ bool InjectedBundle::isProcessingUserGesture()
 void InjectedBundle::addUserScript(WebPageGroupProxy* pageGroup, InjectedBundleScriptWorld* scriptWorld, const String& source, const String& url, API::Array* whitelist, API::Array* blacklist, WebCore::UserScriptInjectionTime injectionTime, WebCore::UserContentInjectedFrames injectedFrames)
 {
     // url is not from URL::string(), i.e. it has not already been parsed by URL, so we have to use the relative URL constructor for URL instead of the ParsedURLStringTag version.
-    PageGroup::pageGroup(pageGroup->identifier())->addUserScriptToWorld(scriptWorld->coreWorld(), source, URL(URL(), url), whitelist ? whitelist->toStringVector() : Vector<String>(), blacklist ? blacklist->toStringVector() : Vector<String>(), injectionTime, injectedFrames);
+    auto userScript = std::make_unique<UserScript>(source, URL(URL(), url), whitelist ? whitelist->toStringVector() : Vector<String>(), blacklist ? blacklist->toStringVector() : Vector<String>(), injectionTime, injectedFrames);
+
+    pageGroup->userContentController().addUserScript(scriptWorld->coreWorld(), WTF::move(userScript));
 }
 
 void InjectedBundle::addUserStyleSheet(WebPageGroupProxy* pageGroup, InjectedBundleScriptWorld* scriptWorld, const String& source, const String& url, API::Array* whitelist, API::Array* blacklist, WebCore::UserContentInjectedFrames injectedFrames)
 {
     // url is not from URL::string(), i.e. it has not already been parsed by URL, so we have to use the relative URL constructor for URL instead of the ParsedURLStringTag version.
-    PageGroup::pageGroup(pageGroup->identifier())->addUserStyleSheetToWorld(scriptWorld->coreWorld(), source, URL(URL(), url), whitelist ? whitelist->toStringVector() : Vector<String>(), blacklist ? blacklist->toStringVector() : Vector<String>(), injectedFrames);
+    auto userStyleSheet = std::make_unique<UserStyleSheet>(source, URL(URL(), url), whitelist ? whitelist->toStringVector() : Vector<String>(), blacklist ? blacklist->toStringVector() : Vector<String>(), injectedFrames, UserStyleUserLevel);
+
+    pageGroup->userContentController().addUserStyleSheet(scriptWorld->coreWorld(), WTF::move(userStyleSheet), InjectInExistingDocuments);
 }
 
 void InjectedBundle::removeUserScript(WebPageGroupProxy* pageGroup, InjectedBundleScriptWorld* scriptWorld, const String& url)
 {
     // url is not from URL::string(), i.e. it has not already been parsed by URL, so we have to use the relative URL constructor for URL instead of the ParsedURLStringTag version.
-    PageGroup::pageGroup(pageGroup->identifier())->removeUserScriptFromWorld(scriptWorld->coreWorld(), URL(URL(), url));
+    pageGroup->userContentController().removeUserScript(scriptWorld->coreWorld(), URL(URL(), url));
 }
 
 void InjectedBundle::removeUserStyleSheet(WebPageGroupProxy* pageGroup, InjectedBundleScriptWorld* scriptWorld, const String& url)
 {
     // url is not from URL::string(), i.e. it has not already been parsed by URL, so we have to use the relative URL constructor for URL instead of the ParsedURLStringTag version.
-    PageGroup::pageGroup(pageGroup->identifier())->removeUserStyleSheetFromWorld(scriptWorld->coreWorld(), URL(URL(), url));
+    pageGroup->userContentController().removeUserStyleSheet(scriptWorld->coreWorld(), URL(URL(), url));
 }
 
 void InjectedBundle::removeUserScripts(WebPageGroupProxy* pageGroup, InjectedBundleScriptWorld* scriptWorld)
 {
-    PageGroup::pageGroup(pageGroup->identifier())->removeUserScriptsFromWorld(scriptWorld->coreWorld());
+    pageGroup->userContentController().removeUserScripts(scriptWorld->coreWorld());
 }
 
 void InjectedBundle::removeUserStyleSheets(WebPageGroupProxy* pageGroup, InjectedBundleScriptWorld* scriptWorld)
 {
-    PageGroup::pageGroup(pageGroup->identifier())->removeUserStyleSheetsFromWorld(scriptWorld->coreWorld());
+    pageGroup->userContentController().removeUserStyleSheets(scriptWorld->coreWorld());
 }
 
 void InjectedBundle::removeAllUserContent(WebPageGroupProxy* pageGroup)
 {
-    PageGroup::pageGroup(pageGroup->identifier())->removeAllUserContent();
+    pageGroup->userContentController().removeAllUserContent();
 }
 
 void InjectedBundle::garbageCollectJavaScriptObjects()
@@ -600,7 +588,7 @@ uint64_t InjectedBundle::webNotificationID(JSContextRef jsContext, JSValueRef js
     WebCore::Notification* notification = JSNotification::toWrapped(toJS(toJS(jsContext), jsNotification));
     if (!notification)
         return 0;
-    return WebProcess::shared().supplement<WebNotificationManager>()->notificationIDForTesting(notification);
+    return WebProcess::singleton().supplement<WebNotificationManager>()->notificationIDForTesting(notification);
 #else
     UNUSED_PARAM(jsContext);
     UNUSED_PARAM(jsNotification);

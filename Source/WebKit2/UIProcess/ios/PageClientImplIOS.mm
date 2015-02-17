@@ -31,15 +31,16 @@
 #import "APIData.h"
 #import "DataReference.h"
 #import "DownloadProxy.h"
-#import "FindIndicator.h"
 #import "InteractionInformationAtPosition.h"
 #import "NativeWebKeyboardEvent.h"
 #import "NavigationState.h"
+#import "UIKitSPI.h"
 #import "ViewSnapshotStore.h"
 #import "WKContentView.h"
 #import "WKContentViewInteraction.h"
 #import "WKGeolocationProviderIOS.h"
 #import "WKProcessPoolInternal.h"
+#import "WKViewPrivate.h"
 #import "WKWebViewConfigurationInternal.h"
 #import "WKWebViewContentProviderRegistry.h"
 #import "WKWebViewInternal.h"
@@ -47,19 +48,12 @@
 #import "WebEditCommandProxy.h"
 #import "WebProcessProxy.h"
 #import "_WKDownloadInternal.h"
-#import <UIKit/UIImagePickerController_Private.h>
-#import <UIKit/UIWebTouchEventsGestureRecognizer.h>
 #import <WebCore/NotImplemented.h>
 #import <WebCore/PlatformScreen.h>
 #import <WebCore/SharedBuffer.h>
+#import <WebCore/TextIndicator.h>
 
 #define MESSAGE_CHECK(assertion) MESSAGE_CHECK_BASE(assertion, m_webView->_page->process().connection())
-
-@interface UIView (IPI)
-- (UIScrollView *)_scroller;
-- (CGPoint)accessibilityConvertPointFromSceneReferenceCoordinates:(CGPoint)point;
-- (CGRect)accessibilityConvertRectToSceneReferenceCoordinates:(CGRect)rect;
-@end
 
 using namespace WebCore;
 using namespace WebKit;
@@ -117,6 +111,15 @@ namespace WebKit {
 PageClientImpl::PageClientImpl(WKContentView *contentView, WKWebView *webView)
     : m_contentView(contentView)
     , m_webView(webView)
+    , m_wkView(nil)
+    , m_undoTarget(adoptNS([[WKEditorUndoTargetObjC alloc] init]))
+{
+}
+
+PageClientImpl::PageClientImpl(WKContentView *contentView, WKView *wkView)
+    : m_contentView(contentView)
+    , m_webView(nil)
+    , m_wkView(wkView)
     , m_undoTarget(adoptNS([[WKEditorUndoTargetObjC alloc] init]))
 {
 }
@@ -179,7 +182,16 @@ bool PageClientImpl::isViewFocused()
 
 bool PageClientImpl::isViewVisible()
 {
-    return isViewInWindow() && !m_contentView.isBackground;
+    if (isViewInWindow() && !m_contentView.isBackground)
+        return true;
+    
+    if ([m_webView _isShowingVideoOptimized])
+        return true;
+    
+    if ([m_webView _mayAutomaticallyShowVideoOptimized])
+        return true;
+    
+    return false;
 }
 
 bool PageClientImpl::isViewInWindow()
@@ -211,6 +223,7 @@ void PageClientImpl::didRelaunchProcess()
 {
     [m_contentView _didRelaunchProcess];
     [m_webView _didRelaunchProcess];
+    [m_wkView _didRelaunchProcess];
 }
 
 void PageClientImpl::pageClosed()
@@ -228,9 +241,9 @@ void PageClientImpl::toolTipChanged(const String&, const String&)
     notImplemented();
 }
 
-bool PageClientImpl::decidePolicyForGeolocationPermissionRequest(WebFrameProxy& frame, WebSecurityOrigin& origin, GeolocationPermissionRequestProxy& request)
+bool PageClientImpl::decidePolicyForGeolocationPermissionRequest(WebFrameProxy& frame, API::SecurityOrigin& origin, GeolocationPermissionRequestProxy& request)
 {
-    [[wrapper(m_webView->_page->process().context()) _geolocationProvider] decidePolicyForGeolocationRequestFromOrigin:origin.securityOrigin() frame:frame request:request view:m_webView];
+    [[wrapper(m_webView->_page->process().processPool()) _geolocationProvider] decidePolicyForGeolocationRequestFromOrigin:origin.securityOrigin() frame:frame request:request view:m_webView];
     return true;
 }
 
@@ -250,11 +263,6 @@ void PageClientImpl::handleDownloadRequest(DownloadProxy* download)
 void PageClientImpl::didChangeViewportMetaTagWidth(float newWidth)
 {
     [m_webView _setViewportMetaTagWidth:newWidth];
-}
-
-void PageClientImpl::setUsesMinimalUI(bool usesMinimalUI)
-{
-    [m_webView _setUsesMinimalUI:usesMinimalUI];
 }
 
 double PageClientImpl::minimumZoomScale() const
@@ -440,7 +448,11 @@ PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPagePr
     return 0;
 }
 
-void PageClientImpl::setFindIndicator(PassRefPtr<FindIndicator> findIndicator, bool fadeOut, bool animate)
+void PageClientImpl::setTextIndicator(PassRefPtr<TextIndicator> textIndicator, bool fadeOut)
+{
+}
+
+void PageClientImpl::setTextIndicatorAnimationProgress(float)
 {
 }
 
@@ -553,7 +565,6 @@ bool PageClientImpl::handleRunOpenPanel(WebPageProxy*, WebFrameProxy*, WebOpenPa
     return true;
 }
 
-#if ENABLE(INSPECTOR)
 void PageClientImpl::showInspectorHighlight(const WebCore::Highlight& highlight)
 {
     [m_contentView _showInspectorHighlight:highlight];
@@ -583,7 +594,6 @@ void PageClientImpl::disableInspectorNodeSearch()
 {
     [m_contentView _disableInspectorNodeSearch];
 }
-#endif
 
 #if ENABLE(FULLSCREEN_API)
 

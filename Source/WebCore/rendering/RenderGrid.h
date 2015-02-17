@@ -42,7 +42,7 @@ class GridItemWithSpan;
 
 class RenderGrid final : public RenderBlock {
 public:
-    RenderGrid(Element&, PassRef<RenderStyle>);
+    RenderGrid(Element&, Ref<RenderStyle>&&);
     virtual ~RenderGrid();
 
     Element& element() const { return downcast<Element>(nodeForNonAnonymous()); }
@@ -71,14 +71,14 @@ private:
     LayoutUnit computeUsedBreadthOfSpecifiedLength(GridTrackSizingDirection, const Length&) const;
     void resolveContentBasedTrackSizingFunctions(GridTrackSizingDirection, GridSizingData&);
 
-    void ensureGridSize(size_t maximumRowIndex, size_t maximumColumnIndex);
+    void ensureGridSize(unsigned maximumRowIndex, unsigned maximumColumnIndex);
     void insertItemIntoGrid(RenderBox&, const GridCoordinate&);
     void placeItemsOnGrid();
     void populateExplicitGridAndOrderIterator();
     std::unique_ptr<GridCoordinate> createEmptyGridAreaAtSpecifiedPositionsOutsideGrid(const RenderBox&, GridTrackSizingDirection, const GridSpan&) const;
     void placeSpecifiedMajorAxisItemsOnGrid(const Vector<RenderBox*>&);
     void placeAutoMajorAxisItemsOnGrid(const Vector<RenderBox*>&);
-    typedef std::pair<size_t, size_t> AutoPlacementCursor;
+    typedef std::pair<unsigned, unsigned> AutoPlacementCursor;
     void placeAutoMajorAxisItemOnGrid(RenderBox&, AutoPlacementCursor&);
     GridTrackSizingDirection autoPlacementMajorAxisDirection() const;
     GridTrackSizingDirection autoPlacementMinorAxisDirection() const;
@@ -91,12 +91,12 @@ private:
     typedef LayoutUnit (GridTrack::* AccumulatorGetter)() const;
     typedef void (GridTrack::* AccumulatorGrowFunction)(LayoutUnit);
     typedef bool (GridTrackSize::* FilterFunction)() const;
-    void resolveContentBasedTrackSizingFunctionsForItems(GridTrackSizingDirection, GridSizingData&, GridItemWithSpan&, FilterFunction, SizingFunction, AccumulatorGetter, AccumulatorGrowFunction);
-    void distributeSpaceToTracks(Vector<GridTrack*>&, Vector<GridTrack*>* tracksForGrowthAboveMaxBreadth, AccumulatorGetter, AccumulatorGrowFunction, GridSizingData&, LayoutUnit& availableLogicalSpace);
+    void resolveContentBasedTrackSizingFunctionsForItems(GridTrackSizingDirection, GridSizingData&, GridItemWithSpan&, FilterFunction, SizingFunction, AccumulatorGetter, AccumulatorGrowFunction, FilterFunction growAboveMaxBreadthFilterFunction = nullptr);
+    void distributeSpaceToTracks(Vector<GridTrack*>&, Vector<unsigned>* growAboveMaxBreadthTrackIndexes, AccumulatorGetter, AccumulatorGrowFunction, GridSizingData&, LayoutUnit& availableLogicalSpace);
 
     double computeNormalizedFractionBreadth(Vector<GridTrack>&, const GridSpan& tracksSpan, GridTrackSizingDirection, LayoutUnit availableLogicalSpace) const;
 
-    GridTrackSize gridTrackSize(GridTrackSizingDirection, size_t) const;
+    GridTrackSize gridTrackSize(GridTrackSizingDirection, unsigned) const;
 
     LayoutUnit logicalContentHeightForChild(RenderBox&, Vector<GridTrack>&);
     LayoutUnit minContentForChild(RenderBox&, GridTrackSizingDirection, Vector<GridTrack>& columnTracks);
@@ -106,19 +106,22 @@ private:
 
     LayoutUnit gridAreaBreadthForChild(const RenderBox& child, GridTrackSizingDirection, const Vector<GridTrack>&) const;
 
-    virtual void paintChildren(PaintInfo& forSelf, const LayoutPoint& paintOffset, PaintInfo& forChild, bool usePrintRect) override final;
+    virtual void paintChildren(PaintInfo& forSelf, const LayoutPoint& paintOffset, PaintInfo& forChild, bool usePrintRect) override;
 
 #ifndef NDEBUG
     bool tracksAreWiderThanMinTrackBreadth(GridTrackSizingDirection, const Vector<GridTrack>&);
-    bool gridWasPopulated() const { return !m_grid.isEmpty() && !m_grid[0].isEmpty(); }
 #endif
 
-    size_t gridColumnCount() const
+    bool gridWasPopulated() const { return !m_grid.isEmpty() && !m_grid[0].isEmpty(); }
+
+    bool spanningItemCrossesFlexibleSizedTracks(const GridCoordinate&, GridTrackSizingDirection) const;
+
+    unsigned gridColumnCount() const
     {
         ASSERT(gridWasPopulated());
         return m_grid[0].size();
     }
-    size_t gridRowCount() const
+    unsigned gridRowCount() const
     {
         ASSERT(gridWasPopulated());
         return m_grid.size();
@@ -130,8 +133,6 @@ private:
     HashMap<const RenderBox*, GridCoordinate> m_gridItemCoordinate;
     OrderIterator m_orderIterator;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderGrid, isRenderGrid())
 
 } // namespace WebCore
 

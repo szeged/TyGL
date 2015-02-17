@@ -31,9 +31,7 @@
 #ifndef PageRuntimeAgent_h
 #define PageRuntimeAgent_h
 
-#if ENABLE(INSPECTOR)
-
-#include <inspector/InspectorJSFrontendDispatchers.h>
+#include <inspector/InspectorFrontendDispatchers.h>
 #include <inspector/agents/InspectorRuntimeAgent.h>
 
 namespace JSC {
@@ -57,14 +55,14 @@ class PageRuntimeAgent final : public Inspector::InspectorRuntimeAgent {
 public:
     PageRuntimeAgent(Inspector::InjectedScriptManager*, Page*, InspectorPageAgent*);
     virtual ~PageRuntimeAgent() { }
-    
+
     virtual void didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, Inspector::InspectorBackendDispatcher*) override;
     virtual void willDestroyFrontendAndBackend(Inspector::InspectorDisconnectReason) override;
     virtual void enable(ErrorString&) override;
     virtual void disable(ErrorString&) override;
 
-    void didCreateMainWorldContext(Frame*);
-    void didCreateIsolatedContext(Frame*, JSC::ExecState*, SecurityOrigin*);
+    // InspectorInstrumentation callbacks.
+    void didCreateMainWorldContext(Frame&);
 
 private:
     virtual JSC::VM& globalVM() override;
@@ -82,7 +80,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(InspectorPagerAgent_h)

@@ -24,6 +24,9 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "InjectedBundleTest.h"
 
 #include "PlatformUtilities.h"
@@ -54,7 +57,7 @@ static void didAssociateFormControls(WKBundlePageRef page, WKArrayRef elementHan
     WKRetainPtr<WKUInt64Ref> numberOfElements = adoptWK(WKUInt64Create(WKArrayGetSize(elementHandles)));
     WKDictionarySetItem(messageBody.get(), Util::toWK("NumberOfControls").get(), numberOfElements.get());
 
-    WKBundlePostMessage(InjectedBundleController::shared().bundle(), Util::toWK("DidReceiveDidAssociateFormControls").get(), messageBody.get());
+    WKBundlePostMessage(InjectedBundleController::singleton().bundle(), Util::toWK("DidReceiveDidAssociateFormControls").get(), messageBody.get());
 }
 
 DidAssociateFormControlsTest::DidAssociateFormControlsTest(const std::string& identifier)
@@ -76,3 +79,5 @@ void DidAssociateFormControlsTest::didCreatePage(WKBundleRef bundle, WKBundlePag
 }
 
 } // namespace TestWebKitAPI
+
+#endif

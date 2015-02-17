@@ -92,11 +92,11 @@ typedef unsigned CompositingReasons;
 // 
 // There is one RenderLayerCompositor per RenderView.
 
-class RenderLayerCompositor : public GraphicsLayerClient, public GraphicsLayerUpdaterClient {
+class RenderLayerCompositor final : public GraphicsLayerClient, public GraphicsLayerUpdaterClient {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit RenderLayerCompositor(RenderView&);
-    ~RenderLayerCompositor();
+    virtual ~RenderLayerCompositor();
 
     // Return true if this RenderView is in "compositing mode" (i.e. has one or more
     // composited RenderLayers)
@@ -336,14 +336,14 @@ private:
     void addToOverlapMap(OverlapMap&, RenderLayer&, IntRect& layerBounds, bool& boundsComputed);
     void addToOverlapMapRecursive(OverlapMap&, RenderLayer&, RenderLayer* ancestorLayer = nullptr);
 
-    void updateCompositingLayersTimerFired(Timer<RenderLayerCompositor>&);
+    void updateCompositingLayersTimerFired();
 
     // Returns true if any layer's compositing changed
-    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer&, OverlapMap*, struct CompositingState&, bool& layersChanged, bool& descendantHas3DTransform);
+    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer&, OverlapMap&, struct CompositingState&, bool& layersChanged, bool& descendantHas3DTransform);
 
-    void computeRegionCompositingRequirements(RenderNamedFlowFragment*, OverlapMap*, CompositingState&, bool& layersChanged, bool& anyDescendantHas3DTransform);
+    void computeRegionCompositingRequirements(RenderNamedFlowFragment*, OverlapMap&, CompositingState&, bool& layersChanged, bool& anyDescendantHas3DTransform);
 
-    void computeCompositingRequirementsForNamedFlowFixed(RenderLayer&, OverlapMap*, CompositingState&, bool& layersChanged, bool& anyDescendantHas3DTransform);
+    void computeCompositingRequirementsForNamedFlowFixed(RenderLayer&, OverlapMap&, CompositingState&, bool& layersChanged, bool& anyDescendantHas3DTransform);
 
     // Recurses down the tree, parenting descendant compositing layers and collecting an array of child layers for the current compositing layer.
     void rebuildCompositingLayerTree(RenderLayer&, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, int depth);
@@ -393,7 +393,7 @@ private:
     ScrollingCoordinator* scrollingCoordinator() const;
 
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
-    PassRefPtr<DisplayRefreshMonitor> createDisplayRefreshMonitor(PlatformDisplayID) const;
+    PassRefPtr<DisplayRefreshMonitor> createDisplayRefreshMonitor(PlatformDisplayID) const override;
 #endif
 
     bool requiresCompositingForAnimation(RenderLayerModelObject&) const;
@@ -454,9 +454,9 @@ private:
     bool isThrottlingLayerFlushes() const;
     void startInitialLayerFlushTimerIfNeeded();
     void startLayerFlushTimerIfNeeded();
-    void layerFlushTimerFired(Timer<RenderLayerCompositor>&);
+    void layerFlushTimerFired();
 
-    void paintRelatedMilestonesTimerFired(Timer<RenderLayerCompositor>&);
+    void paintRelatedMilestonesTimerFired();
 
 #if !LOG_DISABLED
     const char* logReasonsForCompositing(const RenderLayer&);
@@ -468,7 +468,7 @@ private:
 private:
     RenderView& m_renderView;
     std::unique_ptr<GraphicsLayer> m_rootContentLayer;
-    Timer<RenderLayerCompositor> m_updateCompositingLayersTimer;
+    Timer m_updateCompositingLayersTimer;
 
     bool m_hasAcceleratedCompositing;
     ChromeClient::CompositingTriggerFlags m_compositingTriggers;
@@ -525,12 +525,12 @@ private:
 
     std::unique_ptr<GraphicsLayerUpdater> m_layerUpdater; // Updates tiled layer visible area periodically while animations are running.
 
-    Timer<RenderLayerCompositor> m_layerFlushTimer;
+    Timer m_layerFlushTimer;
     bool m_layerFlushThrottlingEnabled;
     bool m_layerFlushThrottlingTemporarilyDisabledForInteraction;
     bool m_hasPendingLayerFlush;
 
-    Timer<RenderLayerCompositor> m_paintRelatedMilestonesTimer;
+    Timer m_paintRelatedMilestonesTimer;
 
 #if !LOG_DISABLED
     int m_rootLayerUpdateCount;

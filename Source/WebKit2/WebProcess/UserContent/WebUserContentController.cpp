@@ -70,14 +70,14 @@ WebUserContentController::WebUserContentController(uint64_t identifier)
     : m_identifier(identifier)
     , m_userContentController(*UserContentController::create())
 {
-    WebProcess::shared().addMessageReceiver(Messages::WebUserContentController::messageReceiverName(), m_identifier, *this);
+    WebProcess::singleton().addMessageReceiver(Messages::WebUserContentController::messageReceiverName(), m_identifier, *this);
 }
 
 WebUserContentController::~WebUserContentController()
 {
     ASSERT(userContentControllers().contains(m_identifier));
 
-    WebProcess::shared().removeMessageReceiver(Messages::WebUserContentController::messageReceiverName(), m_identifier);
+    WebProcess::singleton().removeMessageReceiver(Messages::WebUserContentController::messageReceiverName(), m_identifier);
 
     userContentControllers().remove(m_identifier);
 }
@@ -133,7 +133,7 @@ public:
         if (!webPage)
             return;
 
-        WebProcess::shared().parentProcessConnection()->send(Messages::WebUserContentControllerProxy::DidPostMessage(webPage->pageID(), webFrame->frameID(), m_identifier, IPC::DataReference(value->data())), m_controller->identifier());
+        WebProcess::singleton().parentProcessConnection()->send(Messages::WebUserContentControllerProxy::DidPostMessage(webPage->pageID(), webFrame->frameID(), m_identifier, IPC::DataReference(value->data())), m_controller->identifier());
     }
 
     WebCore::UserMessageHandlerDescriptor& descriptor() { return *m_descriptor; }
@@ -179,5 +179,18 @@ void WebUserContentController::removeUserScriptMessageHandler(uint64_t identifie
     UNUSED_PARAM(identifier);
 #endif
 }
+
+#if ENABLE(CONTENT_EXTENSIONS)
+void WebUserContentController::addUserContentFilters(const Vector<std::pair<String, String>>& userContentFilters)
+{
+    for (const auto& userContentFilter : userContentFilters)
+        m_userContentController->addUserContentFilter(userContentFilter.first, userContentFilter.second);
+}
+
+void WebUserContentController::removeAllUserContentFilters()
+{
+    m_userContentController->removeAllUserContentFilters();
+}
+#endif
 
 } // namespace WebKit

@@ -25,6 +25,7 @@
 #ifndef FontDescription_h
 #define FontDescription_h
 
+#include "CSSValueKeywords.h"
 #include "FontFeatureSettings.h"
 #include "FontOrientation.h"
 #include "FontRenderingMode.h"
@@ -69,9 +70,6 @@ enum FontSmallCaps {
 
 class FontDescription {
 public:
-    enum GenericFamilyType { NoFamily, StandardFamily, SerifFamily, SansSerifFamily, 
-                             MonospaceFamily, CursiveFamily, FantasyFamily, PictographFamily };
-
     enum Kerning { AutoKerning, NormalKerning, NoneKerning };
 
     enum LigaturesState { NormalLigaturesState, DisabledLigaturesState, EnabledLigaturesState };
@@ -87,8 +85,6 @@ public:
         , m_smallCaps(FontSmallCapsOff)
         , m_isAbsoluteSize(false)
         , m_weight(FontWeightNormal)
-        , m_genericFamily(NoFamily)
-        , m_usePrinterFont(false)
         , m_renderingMode(NormalRenderingMode)
         , m_kerning(AutoKerning)
         , m_commonLigaturesState(NormalLigaturesState)
@@ -119,16 +115,20 @@ public:
     FontWeight weight() const { return static_cast<FontWeight>(m_weight); }
     FontWeight lighterWeight() const;
     FontWeight bolderWeight() const;
-    GenericFamilyType genericFamily() const { return static_cast<GenericFamilyType>(m_genericFamily); }
-    bool usePrinterFont() const { return m_usePrinterFont; }
     // only use fixed default size when there is only one font family, and that family is "monospace"
-    bool useFixedDefaultSize() const { return genericFamily() == MonospaceFamily && familyCount() == 1 && firstFamily() == monospaceFamily; }
+    bool useFixedDefaultSize() const { return familyCount() == 1 && firstFamily() == monospaceFamily; }
     FontRenderingMode renderingMode() const { return static_cast<FontRenderingMode>(m_renderingMode); }
     Kerning kerning() const { return static_cast<Kerning>(m_kerning); }
     LigaturesState commonLigaturesState() const { return static_cast<LigaturesState>(m_commonLigaturesState); }
     LigaturesState discretionaryLigaturesState() const { return static_cast<LigaturesState>(m_discretionaryLigaturesState); }
     LigaturesState historicalLigaturesState() const { return static_cast<LigaturesState>(m_historicalLigaturesState); }
     unsigned keywordSize() const { return m_keywordSize; }
+    CSSValueID keywordSizeAsIdentifier() const
+    {
+        CSSValueID identifier = m_keywordSize ? static_cast<CSSValueID>(CSSValueXxSmall + m_keywordSize - 1) : CSSValueInvalid;
+        ASSERT(identifier == CSSValueInvalid || (identifier >= CSSValueXxSmall && identifier <= CSSValueWebkitXxxLarge));
+        return identifier;
+    }
     FontSmoothingMode fontSmoothing() const { return static_cast<FontSmoothingMode>(m_fontSmoothing); }
     TextRenderingMode textRenderingMode() const { return static_cast<TextRenderingMode>(m_textRendering); }
     UScriptCode script() const { return static_cast<UScriptCode>(m_script); }
@@ -139,7 +139,6 @@ public:
     NonCJKGlyphOrientation nonCJKGlyphOrientation() const { return static_cast<NonCJKGlyphOrientation>(m_nonCJKGlyphOrientation); }
     FontWidthVariant widthVariant() const { return static_cast<FontWidthVariant>(m_widthVariant); }
     FontFeatureSettings* featureSettings() const { return m_featureSettings.get(); }
-    FontDescription makeNormalFeatureSettings() const;
 
     void setOneFamily(const AtomicString& family) { ASSERT(m_families.size() == 1); m_families[0] = family; }
     void setFamilies(const Vector<AtomicString>& families) { m_families = RefCountedArray<AtomicString>(families); }
@@ -147,19 +146,29 @@ public:
     void setComputedSize(float s) { m_computedSize = clampToFloat(s); }
     void setSpecifiedSize(float s) { m_specifiedSize = clampToFloat(s); }
     void setItalic(FontItalic i) { m_italic = i; }
-    void setItalic(bool i) { setItalic(i ? FontItalicOn : FontItalicOff); }
+    void setIsItalic(bool i) { setItalic(i ? FontItalicOn : FontItalicOff); }
     void setSmallCaps(FontSmallCaps c) { m_smallCaps = c; }
-    void setSmallCaps(bool c) { setSmallCaps(c ? FontSmallCapsOn : FontSmallCapsOff); }
+    void setIsSmallCaps(bool c) { setSmallCaps(c ? FontSmallCapsOn : FontSmallCapsOff); }
     void setIsAbsoluteSize(bool s) { m_isAbsoluteSize = s; }
     void setWeight(FontWeight w) { m_weight = w; }
-    void setGenericFamily(GenericFamilyType genericFamily) { m_genericFamily = genericFamily; }
-    void setUsePrinterFont(bool p) { m_usePrinterFont = p; }
     void setRenderingMode(FontRenderingMode mode) { m_renderingMode = mode; }
     void setKerning(Kerning kerning) { m_kerning = kerning; }
     void setCommonLigaturesState(LigaturesState commonLigaturesState) { m_commonLigaturesState = commonLigaturesState; }
     void setDiscretionaryLigaturesState(LigaturesState discretionaryLigaturesState) { m_discretionaryLigaturesState = discretionaryLigaturesState; }
     void setHistoricalLigaturesState(LigaturesState historicalLigaturesState) { m_historicalLigaturesState = historicalLigaturesState; }
-    void setKeywordSize(unsigned s) { m_keywordSize = s; }
+    void setKeywordSize(unsigned size)
+    {
+        ASSERT(size <= 8);
+        m_keywordSize = size;
+        ASSERT(m_keywordSize == size); // Make sure it fits in the bitfield.
+    }
+    void setKeywordSizeFromIdentifier(CSSValueID identifier)
+    {
+        ASSERT(!identifier || (identifier >= CSSValueXxSmall && identifier <= CSSValueWebkitXxxLarge));
+        static_assert(CSSValueWebkitXxxLarge - CSSValueXxSmall + 1 == 8, "Maximum keyword size should be 8.");
+        setKeywordSize(identifier ? identifier - CSSValueXxSmall + 1 : 0);
+    }
+
     void setFontSmoothing(FontSmoothingMode smoothing) { m_fontSmoothing = smoothing; }
     void setTextRenderingMode(TextRenderingMode rendering) { m_textRendering = rendering; }
     void setIsSpecifiedFont(bool isSpecifiedFont) { m_isSpecifiedFont = isSpecifiedFont; }
@@ -177,11 +186,16 @@ public:
         return familiesEqualForTextAutoSizing(other)
             && m_specifiedSize == other.m_specifiedSize
             && m_smallCaps == other.m_smallCaps
-            && m_isAbsoluteSize == other.m_isAbsoluteSize
-            && m_genericFamily == other.m_genericFamily
-            && m_usePrinterFont == other.m_usePrinterFont;
+            && m_isAbsoluteSize == other.m_isAbsoluteSize;
     }
 #endif
+
+    // Initial values for font properties.
+    static FontItalic initialItalic() { return FontItalicOff; }
+    static FontSmallCaps initialSmallCaps() { return FontSmallCapsOff; }
+    static Kerning initialKerning() { return AutoKerning; }
+    static FontSmoothingMode initialFontSmoothing() { return AutoSmoothing; }
+    static TextRenderingMode initialTextRenderingMode() { return AutoTextRendering; }
 
 private:
     RefCountedArray<AtomicString> m_families;
@@ -201,8 +215,6 @@ private:
     unsigned m_isAbsoluteSize : 1; // Whether or not CSS specified an explicit size
                                   // (logical sizes like "medium" don't count).
     unsigned m_weight : 8; // FontWeight
-    unsigned m_genericFamily : 3; // GenericFamilyType
-    unsigned m_usePrinterFont : 1;
 
     unsigned m_renderingMode : 1;  // Used to switch between CG and GDI text on Windows.
     unsigned m_kerning : 2; // Kerning
@@ -230,8 +242,6 @@ inline bool FontDescription::operator==(const FontDescription& other) const
         && m_smallCaps == other.m_smallCaps
         && m_isAbsoluteSize == other.m_isAbsoluteSize
         && m_weight == other.m_weight
-        && m_genericFamily == other.m_genericFamily
-        && m_usePrinterFont == other.m_usePrinterFont
         && m_renderingMode == other.m_renderingMode
         && m_kerning == other.m_kerning
         && m_commonLigaturesState == other.m_commonLigaturesState

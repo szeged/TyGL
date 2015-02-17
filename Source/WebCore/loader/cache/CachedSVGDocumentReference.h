@@ -37,11 +37,11 @@ class CachedResourceLoader;
 
 class CachedSVGDocumentReference : public CachedSVGDocumentClient {
 public:
-    CachedSVGDocumentReference(const String&);
+    CachedSVGDocumentReference(const String& url, CachedSVGDocumentClient* additionalDocumentClient = nullptr, bool canReuseResource = true);
 
     virtual ~CachedSVGDocumentReference();
 
-    void load(CachedResourceLoader*);
+    void load(CachedResourceLoader&);
     bool loadRequested() const { return m_loadRequested; }
 
     CachedSVGDocument* document() { return m_document.get(); }
@@ -50,6 +50,8 @@ private:
     String m_url;
     CachedResourceHandle<CachedSVGDocument> m_document;
     bool m_loadRequested;
+    CachedSVGDocumentClient* m_additionalDocumentClient;
+    bool m_canReuseResource;
 };
 
 };

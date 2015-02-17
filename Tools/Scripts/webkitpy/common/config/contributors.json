@@ -440,6 +440,16 @@
             "abinader"
          ]
       },
+      "Byungseon Shin" : {
+         "emails" : [
+            "sun.shin@webkit.org",
+            "sun.shin@lge.com"
+         ],
+         "expertise" : "WTF, GPU Accelerated Rendering and Compositing",
+         "nicks" : [
+            "xingri"
+         ]
+      },
       "Byungwoo Lee" : {
          "emails" : [
             "bw80.lee@samsung.com",
@@ -562,6 +572,14 @@
             "collinjackson"
          ]
       },
+      "Conrad Shultz" : {
+         "emails" : [
+            "conrad_shultz@apple.com"
+         ],
+         "nicks" : [
+            "shultzc"
+         ]
+      },
       "Cosmin Truta" : {
          "emails" : [
             "ctruta@gmail.com",
@@ -682,6 +700,14 @@
          "expertise" : "The WebKitGTK+ Port",
          "nicks" : [
             "dnomi"
+         ]
+      },
+      "Dhi Aurrahman" : {
+         "emails" : [
+            "diorahman@rockybars.com"
+         ],
+         "nicks" : [
+            "diorahman"
          ]
       },
       "Diego Gonzalez" : {
@@ -1625,6 +1651,15 @@
             "kseo"
          ]
       },
+      "KwangHyuk Kim" : {
+         "emails" : [
+            "hyuki.kim@samsung.com"
+         ],
+         "expertise" : "Webkit-EFL, Tiled BackingStore",
+         "nicks" : [
+            "hyuki"
+         ]
+      },
       "L\u00E1szl\u00F3 Lang\u00F3" : {
          "emails" : [
             "llango.u-szeged@partner.samsung.com",
@@ -1982,14 +2017,6 @@
             "MPozdnyakov"
          ]
       },
-      "Myles C. Maxfield" : {
-         "emails" : [
-            "mmaxfield@apple.com"
-         ],
-         "nicks" : [
-            "litherum"
-         ]
-      },
       "Nadav Rotem" : {
          "emails" : [
             "nrotem@apple.com"
@@ -2314,8 +2341,8 @@
       },
       "Ryuan Choi" : {
          "emails" : [
-            "ryuan.choi@gmail.com",
             "ryuan.choi@navercorp.com",
+            "ryuan.choi@gmail.com",
             "ryuan.choi@webkit.org",
             "ryuan.choi@samsung.com"
          ],
@@ -2339,6 +2366,14 @@
          "nicks" : [
             "sadrul",
             "sadrulhc"
+         ]
+      },
+      "Said Abou-Hallawa" : {
+         "emails" : [
+            "sabouhallawa@apple.com"
+         ],
+         "nicks" : [
+            "sabouhallawa"
          ]
       },
       "Sami Ky\u00f6stil\u00e4" : {
@@ -2413,6 +2448,16 @@
          ],
          "nicks" : [
             "shinyak"
+         ]
+      },
+      "Shivakumar J M" : {
+         "emails" : [
+            "shiva.jm@samsung.com",
+            "shivakumarjm@gmail.com"
+         ],
+         "expertise" : "The EFLWebKit Port, DOM, HTML",
+         "nicks" : [
+            "shivajm"
          ]
       },
       "Siddharth Mathur" : {
@@ -2538,6 +2583,16 @@
          ],
          "nicks" : [
             "tsepez"
+         ]
+      },
+      "Tibor Meszaros" : {
+         "emails" : [
+            "tmeszaros.u-szeged@partner.samsung.com",
+            "mtibor@inf.u-szeged.hu",
+            "tmeszaros@inf.u-szeged.hu"
+         ],
+         "nicks" : [
+            "mtibor"
          ]
       },
       "Tom Hudson" : {
@@ -2767,6 +2822,15 @@
             "yosin"
          ]
       },
+      "Youenn Fablet" : {
+         "emails" : [
+            "youennf@gmail.com",
+            "youenn.fablet@crf.canon.fr"
+         ],
+         "nicks" : [
+            "youenn"
+         ]
+      },
       "Yuqiang Xian" : {
          "emails" : [
             "yuqiang.xian@intel.com"
@@ -2825,15 +2889,6 @@
          ],
          "nicks" : [
             "bzsolt"
-         ]
-      },
-      "\u017dan Dober\u0161ek" : {
-         "emails" : [
-            "zandobersek@gmail.com",
-            "zdobersek@igalia.com"
-         ],
-         "nicks" : [
-            "zdobersek"
          ]
       }
    },
@@ -3268,14 +3323,6 @@
             "rmondello"
          ]
       },
-      "Said Abou-Hallawa" : {
-         "emails" : [
-            "sabouhallawa@apple.com"
-         ],
-         "nicks" : [
-            "sabouhallawa"
-         ]
-      },
       "Tab Atkins" : {
          "emails" : [
             "tabatkins@google.com",
@@ -3292,16 +3339,6 @@
          ],
          "nicks" : [
             "tczene"
-         ]
-      },
-      "Tibor Meszaros" : {
-         "emails" : [
-            "tmeszaros.u-szeged@partner.samsung.com",
-            "mtibor@inf.u-szeged.hu",
-            "tmeszaros@inf.u-szeged.hu"
-         ],
-         "nicks" : [
-            "mtibor"
          ]
       },
       "Tien-Ren Chen" : {
@@ -3712,6 +3749,20 @@
             "cblu"
          ]
       },
+      "Chris Dumez" : {
+         "emails" : [
+            "cdumez@apple.com",
+            "dchris@gmail.com",
+            "ch.dumez@samsung.com",
+            "ch.dumez@sta.samsung.com",
+            "ch.dumez@sisa.samsung.com",
+            "christophe.dumez@intel.com"
+         ],
+         "expertise" : "Performance, DOM, HTML, Bindings generator, EFLWebKit Port",
+         "nicks" : [
+            "cdumez"
+         ]
+      },
       "Chris Fleizach" : {
          "emails" : [
             "cfleizach@apple.com"
@@ -3743,20 +3794,6 @@
          ],
          "nicks" : [
             "crogers"
-         ]
-      },
-      "Christophe Dumez" : {
-         "emails" : [
-            "cdumez@apple.com",
-            "dchris@gmail.com",
-            "ch.dumez@samsung.com",
-            "ch.dumez@sta.samsung.com",
-            "ch.dumez@sisa.samsung.com",
-            "christophe.dumez@intel.com"
-         ],
-         "expertise" : "The EFLWebKit Port, Bindings generator, Performance",
-         "nicks" : [
-            "cdumez"
          ]
       },
       "Csaba Osztrogon\u00e1c" : {
@@ -4355,6 +4392,15 @@
             "mihnea"
          ]
       },
+      "Myles C. Maxfield" : {
+         "emails" : [
+            "mmaxfield@apple.com"
+         ],
+         "expertise" : "Text layout and rendering",
+         "nicks" : [
+            "litherum"
+         ]
+      },
       "Nate Chapin" : {
          "emails" : [
             "japhet@chromium.org"
@@ -4726,6 +4772,16 @@
          "expertise" : "CSS Shapes, Line layout, Custom Allocation Framework, PerformanceTests, QtWebKit",
          "nicks" : [
             "zoltan"
+         ]
+      },
+      "\u017dan Dober\u0161ek" : {
+         "emails" : [
+            "zan@falconsigh.net",
+            "zdobersek@igalia.com",
+            "zandobersek@gmail.com"
+         ],
+         "nicks" : [
+            "zdobersek"
          ]
       }
    }

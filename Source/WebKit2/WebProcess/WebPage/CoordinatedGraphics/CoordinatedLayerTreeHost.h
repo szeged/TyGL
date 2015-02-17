@@ -62,7 +62,7 @@ public:
     virtual void deviceOrPageScaleFactorChanged() override;
     virtual void pageBackgroundTransparencyChanged() override;
 
-    virtual void didReceiveCoordinatedLayerTreeHostMessage(IPC::Connection*, IPC::MessageDecoder&);
+    virtual void didReceiveCoordinatedLayerTreeHostMessage(IPC::Connection&, IPC::MessageDecoder&);
     virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() override;
     WebCore::CoordinatedGraphicsLayer* mainContentsLayer();
 
@@ -70,7 +70,7 @@ public:
     virtual void scheduleAnimation() override;
 #endif
 
-    void setViewOverlayRootLayer(WebCore::GraphicsLayer*);
+    virtual void setViewOverlayRootLayer(WebCore::GraphicsLayer*) override;
 
     static PassRefPtr<WebCore::CoordinatedSurface> createCoordinatedSurface(const WebCore::IntSize&, WebCore::CoordinatedSurface::Flags);
 
@@ -86,7 +86,7 @@ private:
     void purgeBackingStores();
     void commitScrollOffset(uint32_t layerID, const WebCore::IntSize& offset);
 
-    void layerFlushTimerFired(WebCore::Timer<CoordinatedLayerTreeHost>*);
+    void layerFlushTimerFired();
 
     void updateRootLayers();
 
@@ -105,7 +105,7 @@ private:
 
     LayerTreeContext m_layerTreeContext;
 
-    WebCore::Timer<CoordinatedLayerTreeHost> m_layerFlushTimer;
+    WebCore::Timer m_layerFlushTimer;
     bool m_layerFlushSchedulingEnabled;
     uint64_t m_forceRepaintAsyncCallbackID;
 

@@ -73,6 +73,7 @@
 #include "RenderMenuList.h"
 #include "RenderMeter.h"
 #include "RenderProgress.h"
+#include "RenderSVGRoot.h"
 #include "RenderSlider.h"
 #include "RenderTable.h"
 #include "RenderTableCell.h"
@@ -127,7 +128,7 @@ void AXObjectCache::setEnhancedUserInterfaceAccessibility(bool flag)
 
 AXObjectCache::AXObjectCache(Document& document)
     : m_document(document)
-    , m_notificationPostTimer(this, &AXObjectCache::notificationPostTimerFired)
+    , m_notificationPostTimer(*this, &AXObjectCache::notificationPostTimerFired)
 {
 }
 
@@ -158,10 +159,10 @@ AccessibilityObject* AXObjectCache::focusedImageMapUIElement(HTMLAreaElement* ar
         return nullptr;
     
     for (const auto& child : axRenderImage->children()) {
-        if (!child->isImageMapLink())
+        if (!is<AccessibilityImageMapLink>(*child))
             continue;
         
-        if (toAccessibilityImageMapLink(child.get())->areaElement() == areaElement)
+        if (downcast<AccessibilityImageMapLink>(*child).areaElement() == areaElement)
             return child.get();
     }    
     
@@ -265,7 +266,7 @@ bool nodeHasRole(Node* node, const String& role)
     return SpaceSplitString(roleValue, true).contains(role);
 }
 
-static PassRefPtr<AccessibilityObject> createFromRenderer(RenderObject* renderer)
+static Ref<AccessibilityObject> createFromRenderer(RenderObject* renderer)
 {
     // FIXME: How could renderer->node() ever not be an Element?
     Node* node = renderer->node();
@@ -290,46 +291,46 @@ static PassRefPtr<AccessibilityObject> createFromRenderer(RenderObject* renderer
         return AccessibilityMediaControl::create(renderer);
 #endif
 
-    if (renderer->isSVGRoot())
+    if (is<RenderSVGRoot>(*renderer))
         return AccessibilitySVGRoot::create(renderer);
     
     // Search field buttons
     if (is<Element>(node) && downcast<Element>(*node).isSearchFieldCancelButtonElement())
         return AccessibilitySearchFieldCancelButton::create(renderer);
     
-    if (renderer->isBoxModelObject()) {
-        RenderBoxModelObject* cssBox = toRenderBoxModelObject(renderer);
-        if (cssBox->isListBox())
-            return AccessibilityListBox::create(toRenderListBox(cssBox));
-        if (cssBox->isMenuList())
-            return AccessibilityMenuList::create(toRenderMenuList(cssBox));
+    if (is<RenderBoxModelObject>(*renderer)) {
+        RenderBoxModelObject& cssBox = downcast<RenderBoxModelObject>(*renderer);
+        if (is<RenderListBox>(cssBox))
+            return AccessibilityListBox::create(&downcast<RenderListBox>(cssBox));
+        if (is<RenderMenuList>(cssBox))
+            return AccessibilityMenuList::create(&downcast<RenderMenuList>(cssBox));
 
         // standard tables
-        if (cssBox->isTable())
-            return AccessibilityTable::create(toRenderTable(cssBox));
-        if (cssBox->isTableRow())
-            return AccessibilityTableRow::create(toRenderTableRow(cssBox));
-        if (cssBox->isTableCell())
-            return AccessibilityTableCell::create(toRenderTableCell(cssBox));
+        if (is<RenderTable>(cssBox))
+            return AccessibilityTable::create(&downcast<RenderTable>(cssBox));
+        if (is<RenderTableRow>(cssBox))
+            return AccessibilityTableRow::create(&downcast<RenderTableRow>(cssBox));
+        if (is<RenderTableCell>(cssBox))
+            return AccessibilityTableCell::create(&downcast<RenderTableCell>(cssBox));
 
         // progress bar
-        if (cssBox->isProgress())
-            return AccessibilityProgressIndicator::create(toRenderProgress(cssBox));
+        if (is<RenderProgress>(cssBox))
+            return AccessibilityProgressIndicator::create(&downcast<RenderProgress>(cssBox));
 
 #if ENABLE(METER_ELEMENT)
-        if (cssBox->isMeter())
-            return AccessibilityProgressIndicator::create(toRenderMeter(cssBox));
+        if (is<RenderMeter>(cssBox))
+            return AccessibilityProgressIndicator::create(&downcast<RenderMeter>(cssBox));
 #endif
 
         // input type=range
-        if (cssBox->isSlider())
-            return AccessibilitySlider::create(toRenderSlider(cssBox));
+        if (is<RenderSlider>(cssBox))
+            return AccessibilitySlider::create(&downcast<RenderSlider>(cssBox));
     }
 
     return AccessibilityRenderObject::create(renderer);
 }
 
-static PassRefPtr<AccessibilityObject> createFromNode(Node* node)
+static Ref<AccessibilityObject> createFromNode(Node* node)
 {
     return AccessibilityNodeObject::create(node);
 }
@@ -699,7 +700,7 @@ void AXObjectCache::childrenChanged(AccessibilityObject* obj)
     obj->childrenChanged();
 }
     
-void AXObjectCache::notificationPostTimerFired(Timer<AXObjectCache>&)
+void AXObjectCache::notificationPostTimerFired()
 {
     Ref<Document> protectorForCacheOwner(m_document);
     m_notificationPostTimer.stop();
@@ -719,10 +720,8 @@ void AXObjectCache::notificationPostTimerFired(Timer<AXObjectCache>&)
 #ifndef NDEBUG
         // Make sure none of the render views are in the process of being layed out.
         // Notifications should only be sent after the renderer has finished
-        if (obj->isAccessibilityRenderObject()) {
-            AccessibilityRenderObject* renderObj = toAccessibilityRenderObject(obj);
-            RenderObject* renderer = renderObj->renderer();
-            if (renderer)
+        if (is<AccessibilityRenderObject>(*obj)) {
+            if (auto* renderer = downcast<AccessibilityRenderObject>(*obj).renderer())
                 ASSERT(!renderer->view().layoutState());
         }
 #endif

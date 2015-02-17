@@ -4,8 +4,8 @@ layer at (0,0) size 800x148
   RenderBlock {HTML} at (0,0) size 800x148
     RenderBody {BODY} at (8,16) size 784x124
       RenderBlock {P} at (0,0) size 784x20
-        RenderText {#text} at (0,0) size 568x19
-          text run at (0,0) width 568: "To PASS this test case the text of the button label should not be selected in the selection."
+        RenderText {#text} at (0,0) size 566x19
+          text run at (0,0) width 566: "To PASS this test case the text of the button label should not be selected in the selection."
       RenderBlock {DIV} at (0,36) size 784x88
         RenderBlock (anonymous) at (0,0) size 784x44
           RenderText {#text} at (0,0) size 50x19

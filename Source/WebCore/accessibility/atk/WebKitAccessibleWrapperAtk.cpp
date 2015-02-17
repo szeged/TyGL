@@ -37,6 +37,7 @@
 #include "AXObjectCache.h"
 #include "AccessibilityList.h"
 #include "AccessibilityListBoxOption.h"
+#include "AccessibilityTable.h"
 #include "Document.h"
 #include "Frame.h"
 #include "FrameView.h"
@@ -90,7 +91,7 @@ struct _WebKitAccessiblePrivate {
 
 static AccessibilityObject* fallbackObject()
 {
-    static AccessibilityObject* object = AccessibilityListBoxOption::create().leakRef();
+    static AccessibilityObject* object = &AccessibilityListBoxOption::create().leakRef();
     return object;
 }
 
@@ -108,10 +109,6 @@ static const gchar* webkitAccessibleGetName(AtkObject* object)
     returnValIfWebKitAccessibleIsInvalid(WEBKIT_ACCESSIBLE(object), 0);
 
     AccessibilityObject* coreObject = core(object);
-
-    if (!coreObject->isAccessibilityRenderObject())
-        return cacheAndReturnAtkProperty(object, AtkCachedAccessibleName, coreObject->stringValue());
-
     if (coreObject->isFieldset()) {
         AccessibilityObject* label = coreObject->titleUIElement();
         if (label) {
@@ -135,7 +132,7 @@ static const gchar* webkitAccessibleGetName(AtkObject* object)
             return cacheAndReturnAtkProperty(object, AtkCachedAccessibleName, textUnder);
     }
 
-    if (coreObject->isImage() || coreObject->isInputImage()) {
+    if (coreObject->isImage() || coreObject->isInputImage() || coreObject->isImageMap() || coreObject->isImageMapLink()) {
         Node* node = coreObject->node();
         if (is<HTMLElement>(node)) {
             // Get the attribute rather than altText String so as not to fall back on title.
@@ -330,22 +327,6 @@ static AtkObject* webkitAccessibleGetParent(AtkObject* object)
     return coreParent->wrapper();
 }
 
-static gint getNChildrenForTable(AccessibilityObject* coreObject)
-{
-    const AccessibilityObject::AccessibilityChildrenVector& tableChildren = coreObject->children();
-    size_t cellsCount = 0;
-
-    // Look for the actual index of the cell inside the table.
-    for (const auto& tableChild : tableChildren) {
-        if (tableChild->isTableRow())
-            cellsCount += tableChild->children().size();
-        else
-            cellsCount++;
-    }
-
-    return cellsCount;
-}
-
 static gint webkitAccessibleGetNChildren(AtkObject* object)
 {
     g_return_val_if_fail(WEBKIT_IS_ACCESSIBLE(object), 0);
@@ -353,36 +334,7 @@ static gint webkitAccessibleGetNChildren(AtkObject* object)
 
     AccessibilityObject* coreObject = core(object);
 
-    // Tables should be treated in a different way because rows should
-    // be bypassed when exposing the accessible hierarchy.
-    if (coreObject->isAccessibilityTable())
-        return getNChildrenForTable(coreObject);
-
     return coreObject->children().size();
-}
-
-static AccessibilityObject* getChildForTable(AccessibilityObject* coreObject, gint index)
-{
-    const AccessibilityObject::AccessibilityChildrenVector& tableChildren = coreObject->children();
-    size_t cellsCount = 0;
-
-    // Look for the actual index of the cell inside the table.
-    size_t current = static_cast<size_t>(index);
-    for (const auto& tableChild : tableChildren) {
-        if (tableChild->isTableRow()) {
-            const AccessibilityObject::AccessibilityChildrenVector& rowChildren = tableChild->children();
-            size_t rowChildrenCount = rowChildren.size();
-            if (current < cellsCount + rowChildrenCount)
-                return rowChildren.at(current - cellsCount).get();
-            cellsCount += rowChildrenCount;
-        } else if (cellsCount == current)
-            return tableChild.get();
-        else
-            cellsCount++;
-    }
-
-    // Shouldn't reach if the child was found.
-    return 0;
 }
 
 static AtkObject* webkitAccessibleRefChild(AtkObject* object, gint index)
@@ -396,16 +348,10 @@ static AtkObject* webkitAccessibleRefChild(AtkObject* object, gint index)
     AccessibilityObject* coreObject = core(object);
     AccessibilityObject* coreChild = 0;
 
-    // Tables are special cases because rows should be bypassed, but
-    // still taking their cells into account.
-    if (coreObject->isAccessibilityTable())
-        coreChild = getChildForTable(coreObject, index);
-    else {
-        const AccessibilityObject::AccessibilityChildrenVector& children = coreObject->children();
-        if (static_cast<unsigned>(index) >= children.size())
-            return 0;
-        coreChild = children.at(index).get();
-    }
+    const AccessibilityObject::AccessibilityChildrenVector& children = coreObject->children();
+    if (static_cast<size_t>(index) >= children.size())
+        return 0;
+    coreChild = children.at(index).get();
 
     if (!coreChild)
         return 0;
@@ -415,40 +361,6 @@ static AtkObject* webkitAccessibleRefChild(AtkObject* object, gint index)
     g_object_ref(child);
 
     return child;
-}
-
-static gint getIndexInParentForCellInRow(AccessibilityObject* coreObject)
-{
-    AccessibilityObject* parent = coreObject->parentObjectUnignored();
-    if (!parent)
-        return -1;
-
-    AccessibilityObject* grandParent = parent->parentObjectUnignored();
-    if (!grandParent)
-        return -1;
-
-    const AccessibilityObject::AccessibilityChildrenVector& rows = grandParent->children();
-    size_t previousCellsCount = 0;
-
-    // Look for the actual index of the cell inside the table.
-    for (const auto& row : rows) {
-        if (!row->isTableRow())
-            continue;
-
-        const AccessibilityObject::AccessibilityChildrenVector& cells = row->children();
-        size_t cellsCount = cells.size();
-
-        if (row == parent) {
-            for (unsigned j = 0; j < cellsCount; ++j) {
-                if (cells[j] == coreObject)
-                    return previousCellsCount + j;
-            }
-        }
-
-        previousCellsCount += cellsCount;
-    }
-
-    return -1;
 }
 
 static gint webkitAccessibleGetIndexInParent(AtkObject* object)
@@ -473,11 +385,6 @@ static gint webkitAccessibleGetIndexInParent(AtkObject* object)
                 return i;
         }
     }
-
-    // Need to calculate the index of the cell in the table, as
-    // rows won't be exposed to assistive technologies.
-    if (parent && parent->isTableRow() && coreObject->isTableCell())
-        return getIndexInParentForCellInRow(coreObject);
 
     if (!parent)
         return -1;
@@ -505,9 +412,9 @@ static AtkAttributeSet* webkitAccessibleGetAttributes(AtkObject* object)
     // Hack needed for WebKit2 tests because obtaining an element by its ID
     // cannot be done from the UIProcess. Assistive technologies have no need
     // for this information.
-    Node* node = coreObject->node();
-    if (is<Element>(node)) {
-        String id = downcast<Element>(*node).getIdAttribute().string();
+    Element* element = coreObject->element() ? coreObject->element() : coreObject->actionElement();
+    if (element) {
+        String id = element->getIdAttribute().string();
         if (!id.isEmpty())
             attributeSet = addToAtkAttributeSet(attributeSet, "html-id", id.utf8().data());
     }
@@ -518,9 +425,16 @@ static AtkAttributeSet* webkitAccessibleGetAttributes(AtkObject* object)
         attributeSet = addToAtkAttributeSet(attributeSet, "level", value.utf8().data());
     }
 
+    if (coreObject->roleValue() == MathElementRole) {
+        if (coreObject->isMathMultiscriptObject(PreSuperscript) || coreObject->isMathMultiscriptObject(PreSubscript))
+            attributeSet = addToAtkAttributeSet(attributeSet, "multiscript-type", "pre");
+        else if (coreObject->isMathMultiscriptObject(PostSuperscript) || coreObject->isMathMultiscriptObject(PostSubscript))
+            attributeSet = addToAtkAttributeSet(attributeSet, "multiscript-type", "post");
+    }
+
     // Set the 'layout-guess' attribute to help Assistive
     // Technologies know when an exposed table is not data table.
-    if (coreObject->isAccessibilityTable() && !coreObject->isDataTable())
+    if (is<AccessibilityTable>(*coreObject) && downcast<AccessibilityTable>(*coreObject).isExposableThroughAccessibility() && !coreObject->isDataTable())
         attributeSet = addToAtkAttributeSet(attributeSet, "layout-guess", "true");
 
     String placeholder = coreObject->placeholderValue();
@@ -586,7 +500,13 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
     case UnknownRole:
         return ATK_ROLE_UNKNOWN;
     case AudioRole:
+#if ATK_CHECK_VERSION(2, 11, 3)
+        return ATK_ROLE_AUDIO;
+#endif
     case VideoRole:
+#if ATK_CHECK_VERSION(2, 11, 3)
+        return ATK_ROLE_VIDEO;
+#endif
         return ATK_ROLE_EMBEDDED;
     case ButtonRole:
         return ATK_ROLE_PUSH_BUTTON;
@@ -627,8 +547,7 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
         // return ATK_ROLE_TABLE_COLUMN_HEADER; // Is this right?
         return ATK_ROLE_UNKNOWN; // Matches Mozilla
     case RowRole:
-        // return ATK_ROLE_TABLE_ROW_HEADER; // Is this right?
-        return ATK_ROLE_LIST_ITEM; // Matches Mozilla
+        return ATK_ROLE_TABLE_ROW;
     case ToolbarRole:
         return ATK_ROLE_TOOL_BAR;
     case BusyIndicatorRole:
@@ -658,6 +577,7 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
         return ATK_ROLE_TABLE;
     case ApplicationRole:
         return ATK_ROLE_APPLICATION;
+    case DocumentRegionRole:
     case GroupRole:
     case RadioGroupRole:
     case TabPanelRole:
@@ -666,6 +586,8 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
         return ATK_ROLE_ROW_HEADER;
     case ColumnHeaderRole:
         return ATK_ROLE_COLUMN_HEADER;
+    case CaptionRole:
+        return ATK_ROLE_CAPTION;
     case CellRole:
         return coreObject->inheritsPresentationalRole() ? ATK_ROLE_SECTION : ATK_ROLE_TABLE_CELL;
     case LinkRole:
@@ -673,6 +595,7 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
     case ImageMapLinkRole:
         return ATK_ROLE_LINK;
     case ImageMapRole:
+        return ATK_ROLE_IMAGE_MAP;
     case ImageRole:
         return ATK_ROLE_IMAGE;
     case ListMarkerRole:
@@ -688,7 +611,7 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
     case HeadingRole:
         return ATK_ROLE_HEADING;
     case ListBoxRole:
-        return ATK_ROLE_LIST;
+        return ATK_ROLE_LIST_BOX;
     case ListItemRole:
         return coreObject->inheritsPresentationalRole() ? ATK_ROLE_SECTION : ATK_ROLE_LIST_ITEM;
     case ListBoxOptionRole:
@@ -698,8 +621,14 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
     case LabelRole:
     case LegendRole:
         return ATK_ROLE_LABEL;
+    case BlockquoteRole:
+#if ATK_CHECK_VERSION(2, 11, 3)
+        return ATK_ROLE_BLOCK_QUOTE;
+#endif
     case DivRole:
         return ATK_ROLE_SECTION;
+    case FooterRole:
+        return ATK_ROLE_FOOTER;
     case FormRole:
         return ATK_ROLE_FORM;
     case CanvasRole:
@@ -727,6 +656,34 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
         return ATK_ROLE_DEFINITION;
     case DocumentMathRole:
         return ATK_ROLE_MATH;
+    case MathElementRole:
+        if (coreObject->isMathRow())
+            return ATK_ROLE_PANEL;
+        if (coreObject->isMathTable())
+            return ATK_ROLE_TABLE;
+        if (coreObject->isMathTableRow())
+            return ATK_ROLE_TABLE_ROW;
+        if (coreObject->isMathTableCell())
+            return ATK_ROLE_TABLE_CELL;
+        if (coreObject->isMathSubscriptSuperscript() || coreObject->isMathMultiscript())
+            return ATK_ROLE_SECTION;
+#if ATK_CHECK_VERSION(2, 15, 4)
+        if (coreObject->isMathFraction())
+            return ATK_ROLE_MATH_FRACTION;
+        if (coreObject->isMathSquareRoot() || coreObject->isMathRoot())
+            return ATK_ROLE_MATH_ROOT;
+        if (coreObject->isMathScriptObject(Subscript)
+            || coreObject->isMathMultiscriptObject(PreSubscript) || coreObject->isMathMultiscriptObject(PostSubscript))
+            return ATK_ROLE_SUBSCRIPT;
+        if (coreObject->isMathScriptObject(Superscript)
+            || coreObject->isMathMultiscriptObject(PreSuperscript) || coreObject->isMathMultiscriptObject(PostSuperscript))
+            return ATK_ROLE_SUPERSCRIPT;
+#endif
+#if ATK_CHECK_VERSION(2, 15, 2)
+        if (coreObject->isMathToken())
+            return ATK_ROLE_STATIC;
+#endif
+        return ATK_ROLE_UNKNOWN;
     case LandmarkBannerRole:
     case LandmarkComplementaryRole:
     case LandmarkContentInfoRole:
@@ -743,6 +700,10 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
     case DescriptionListDetailRole:
         return ATK_ROLE_DESCRIPTION_VALUE;
 #endif
+#if ATK_CHECK_VERSION(2, 15, 2)
+    case InlineRole:
+        return ATK_ROLE_STATIC;
+#endif
     default:
         return ATK_ROLE_UNKNOWN;
     }
@@ -750,13 +711,15 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
 
 static AtkRole webkitAccessibleGetRole(AtkObject* object)
 {
-    g_return_val_if_fail(WEBKIT_IS_ACCESSIBLE(object), ATK_ROLE_UNKNOWN);
-    returnValIfWebKitAccessibleIsInvalid(WEBKIT_ACCESSIBLE(object), ATK_ROLE_UNKNOWN);
+    // ATK_ROLE_UNKNOWN should only be applied in cases where there is a valid
+    // WebCore accessible object for which the platform role mapping is unknown.
+    g_return_val_if_fail(WEBKIT_IS_ACCESSIBLE(object), ATK_ROLE_INVALID);
+    returnValIfWebKitAccessibleIsInvalid(WEBKIT_ACCESSIBLE(object), ATK_ROLE_INVALID);
 
     AccessibilityObject* coreObject = core(object);
 
     if (!coreObject)
-        return ATK_ROLE_UNKNOWN;
+        return ATK_ROLE_INVALID;
 
     // Note: Why doesn't WebCore have a password field for this
     if (coreObject->isPasswordField())
@@ -1153,7 +1116,7 @@ static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)
     } else if (!coreObject->isWebArea()) {
         if (role != TableRole) {
             interfaceMask |= 1 << WAIHypertext;
-            if ((renderer && renderer->childrenInline()) || roleIsTextType(role))
+            if ((renderer && renderer->childrenInline()) || roleIsTextType(role) || coreObject->isMathToken())
                 interfaceMask |= 1 << WAIText;
         }
 

@@ -94,11 +94,10 @@
 #include "MapPrototype.h"
 #include "MathObject.h"
 #include "Microtask.h"
-#include "NameConstructor.h"
-#include "NameInstance.h"
-#include "NamePrototype.h"
 #include "NativeErrorConstructor.h"
 #include "NativeErrorPrototype.h"
+#include "NullGetterFunction.h"
+#include "NullSetterFunction.h"
 #include "NumberConstructor.h"
 #include "NumberPrototype.h"
 #include "ObjCCallbackFunction.h"
@@ -116,6 +115,9 @@
 #include "StrictEvalActivation.h"
 #include "StringConstructor.h"
 #include "StringPrototype.h"
+#include "Symbol.h"
+#include "SymbolConstructor.h"
+#include "SymbolPrototype.h"
 #include "VariableWatchpointSetInlines.h"
 #include "WeakMapConstructor.h"
 #include "WeakMapPrototype.h"
@@ -203,7 +205,7 @@ void JSGlobalObject::init(VM& vm)
 {
     ASSERT(vm.currentThreadIsHoldingAPILock());
 
-    JSGlobalObject::globalExec()->init(0, 0, this, CallFrame::noCaller(), 0, 0);
+    JSGlobalObject::globalExec()->init(0, 0, CallFrame::noCaller(), 0, 0);
 
     m_debugger = 0;
 
@@ -232,10 +234,12 @@ void JSGlobalObject::init(VM& vm)
     m_functionPrototype->addFunctionProperties(exec, this, &callFunction, &applyFunction);
     m_callFunction.set(vm, this, callFunction);
     m_applyFunction.set(vm, this, applyFunction);
+    m_nullGetterFunction.set(vm, this, NullGetterFunction::create(vm, NullGetterFunction::createStructure(vm, this, m_functionPrototype.get())));
+    m_nullSetterFunction.set(vm, this, NullSetterFunction::create(vm, NullSetterFunction::createStructure(vm, this, m_functionPrototype.get())));
     m_objectPrototype.set(vm, this, ObjectPrototype::create(vm, this, ObjectPrototype::createStructure(vm, this, jsNull())));
-    GetterSetter* protoAccessor = GetterSetter::create(vm);
-    protoAccessor->setGetter(vm, JSFunction::create(vm, this, 0, String(), globalFuncProtoGetter));
-    protoAccessor->setSetter(vm, JSFunction::create(vm, this, 0, String(), globalFuncProtoSetter));
+    GetterSetter* protoAccessor = GetterSetter::create(vm, this);
+    protoAccessor->setGetter(vm, this, JSFunction::create(vm, this, 0, String(), globalFuncProtoGetter));
+    protoAccessor->setSetter(vm, this, JSFunction::create(vm, this, 0, String(), globalFuncProtoSetter));
     m_objectPrototype->putDirectNonIndexAccessor(vm, vm.propertyNames->underscoreProto, protoAccessor, Accessor | DontEnum);
     m_functionPrototype->structure()->setPrototypeWithoutTransition(vm, m_objectPrototype.get());
     
@@ -288,8 +292,8 @@ void JSGlobalObject::init(VM& vm)
     m_originalArrayStructureForIndexingShape[SlowPutArrayStorageShape >> IndexingShapeShift].set(vm, this, JSArray::createStructure(vm, this, m_arrayPrototype.get(), ArrayWithSlowPutArrayStorage));
     for (unsigned i = 0; i < NumberOfIndexingShapes; ++i)
         m_arrayStructureForIndexingShapeDuringAllocation[i] = m_originalArrayStructureForIndexingShape[i];
-    
-    m_regExpMatchesArrayStructure.set(vm, this, RegExpMatchesArray::createStructure(vm, this, m_arrayPrototype.get()));
+
+    m_regExpMatchesArrayStructure.set(vm, this, Structure::create(vm, this, m_arrayPrototype.get(), TypeInfo(ObjectType, StructureFlags), JSArray::info(), ArrayWithSlowPutArrayStorage));
     
     RegExp* emptyRegex = RegExp::create(vm, "", NoFlags);
     
@@ -420,15 +424,6 @@ putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Construct
     m_consoleStructure.set(vm, this, JSConsole::createStructure(vm, this, consolePrototype));
     JSConsole* consoleObject = JSConsole::create(vm, m_consoleStructure.get());
     putDirectWithoutTransition(vm, Identifier(exec, "console"), consoleObject, DontEnum);
-    
-    if (m_experimentsEnabled) {
-        NamePrototype* privateNamePrototype = NamePrototype::create(exec, NamePrototype::createStructure(vm, this, m_objectPrototype.get()));
-        m_privateNameStructure.set(vm, this, NameInstance::createStructure(vm, this, privateNamePrototype));
-        
-        JSCell* privateNameConstructor = NameConstructor::create(vm, NameConstructor::createStructure(vm, this, m_functionPrototype.get()), privateNamePrototype);
-        privateNamePrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, privateNameConstructor, DontEnum);
-        putDirectWithoutTransition(vm, Identifier(exec, "Name"), privateNameConstructor, DontEnum);
-    }
     
     resetPrototype(vm, prototype());
 }
@@ -609,9 +604,9 @@ bool JSGlobalObject::stringPrototypeChainIsSane()
 void JSGlobalObject::createThrowTypeError(VM& vm)
 {
     JSFunction* thrower = JSFunction::create(vm, this, 0, String(), globalFuncThrowTypeError);
-    GetterSetter* getterSetter = GetterSetter::create(vm);
-    getterSetter->setGetter(vm, thrower);
-    getterSetter->setSetter(vm, thrower);
+    GetterSetter* getterSetter = GetterSetter::create(vm, this);
+    getterSetter->setGetter(vm, this, thrower);
+    getterSetter->setSetter(vm, this, thrower);
     m_throwTypeErrorGetterSetter.set(vm, this, getterSetter);
 }
 
@@ -651,6 +646,9 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_promiseConstructor);
 #endif
 
+    visitor.append(&thisObject->m_nullGetterFunction);
+    visitor.append(&thisObject->m_nullSetterFunction);
+
     visitor.append(&thisObject->m_evalFunction);
     visitor.append(&thisObject->m_callFunction);
     visitor.append(&thisObject->m_applyFunction);
@@ -688,7 +686,7 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_functionStructure);
     visitor.append(&thisObject->m_boundFunctionStructure);
     visitor.append(&thisObject->m_namedFunctionStructure);
-    visitor.append(&thisObject->m_privateNameStructure);
+    visitor.append(&thisObject->m_symbolObjectStructure);
     visitor.append(&thisObject->m_regExpMatchesArrayStructure);
     visitor.append(&thisObject->m_regExpStructure);
     visitor.append(&thisObject->m_consoleStructure);
@@ -749,7 +747,7 @@ bool JSGlobalObject::getOwnPropertySlot(JSObject* object, ExecState* exec, Prope
 
 void JSGlobalObject::clearRareData(JSCell* cell)
 {
-    jsCast<JSGlobalObject*>(cell)->m_rareData.clear();
+    jsCast<JSGlobalObject*>(cell)->m_rareData = nullptr;
 }
 
 void slowValidateCell(JSGlobalObject* globalObject)

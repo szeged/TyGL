@@ -66,10 +66,10 @@ class Notification final : public RefCounted<Notification>, public ActiveDOMObje
 public:
     WEBCORE_EXPORT Notification();
 #if ENABLE(LEGACY_NOTIFICATIONS)
-    static PassRef<Notification> create(const String& title, const String& body, const String& iconURI, ScriptExecutionContext*, ExceptionCode&, PassRefPtr<NotificationCenter> provider);
+    static Ref<Notification> create(const String& title, const String& body, const String& iconURI, ScriptExecutionContext*, ExceptionCode&, PassRefPtr<NotificationCenter> provider);
 #endif
 #if ENABLE(NOTIFICATIONS)
-    static PassRef<Notification> create(ScriptExecutionContext&, const String& title, const Dictionary& options);
+    static Ref<Notification> create(Document&, const String& title, const Dictionary& options);
 #endif
     
     WEBCORE_EXPORT virtual ~Notification();
@@ -153,11 +153,13 @@ private:
     virtual void refEventTarget() override { ref(); }
     virtual void derefEventTarget() override { deref(); }
 
+    virtual const char* activeDOMObjectName() const override { return "Notification"; }
+
     void startLoadingIcon();
     void finishLoadingIcon();
 
 #if ENABLE(NOTIFICATIONS)
-    void taskTimerFired(Timer<Notification>&);
+    void taskTimerFired();
 #endif
 
     // Text notifications.
@@ -179,7 +181,7 @@ private:
     RefPtr<NotificationCenter> m_notificationCenter;
 
 #if ENABLE(NOTIFICATIONS)
-    std::unique_ptr<Timer<Notification>> m_taskTimer;
+    std::unique_ptr<Timer> m_taskTimer;
 #endif
 };
 

@@ -37,8 +37,7 @@ static void releaseCustomFontData(void* data)
 }
 
 FontCustomPlatformData::FontCustomPlatformData(FT_Face freeTypeFace, SharedBuffer& buffer)
-    : m_freeTypeFace(freeTypeFace)
-    , m_fontFace(cairo_ft_font_face_create_for_ft_face(freeTypeFace, 0))
+    : m_fontFace(cairo_ft_font_face_create_for_ft_face(freeTypeFace, 0))
 {
     // FIXME Should we be setting some hinting options here?
 
@@ -56,7 +55,6 @@ FontCustomPlatformData::FontCustomPlatformData(FT_Face freeTypeFace, SharedBuffe
 
 FontCustomPlatformData::~FontCustomPlatformData()
 {
-    // m_freeTypeFace will be destroyed along with m_fontFace. See the constructor.
     cairo_font_face_destroy(m_fontFace);
 }
 

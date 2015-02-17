@@ -29,68 +29,49 @@
 #if WK_API_ENABLED
 
 #import "WKFrameInfoInternal.h"
+#import "WKNSArray.h"
 #import "WKScriptMessageHandler.h"
 #import "WKScriptMessageInternal.h"
 #import "WKUserScriptInternal.h"
 #import "WKWebViewInternal.h"
 #import "WebScriptMessageHandler.h"
 #import "WebUserContentControllerProxy.h"
+#import "_WKUserContentFilterInternal.h"
 #import <JavaScriptCore/JSContext.h>
 #import <JavaScriptCore/JSValue.h>
 #import <WebCore/SerializedScriptValue.h>
-#import <WebCore/UserScript.h>
-#import <wtf/text/StringBuilder.h>
 
-@implementation WKUserContentController {
-    RetainPtr<NSMutableArray> _userScripts;
-}
+@implementation WKUserContentController
 
 - (instancetype)init
 {
     if (!(self = [super init]))
         return nil;
 
-    _userContentControllerProxy = WebKit::WebUserContentControllerProxy::create();
-    _userScripts = adoptNS([[NSMutableArray alloc] init]);
+    API::Object::constructInWrapper<WebKit::WebUserContentControllerProxy>(self);
 
     return self;
 }
 
-- (NSArray *)userScripts
+- (void)dealloc
 {
-    return _userScripts.get();
+    _userContentControllerProxy->~WebUserContentControllerProxy();
+
+    [super dealloc];
 }
 
-static WebCore::UserScriptInjectionTime toWebCoreUserScriptInjectionTime(WKUserScriptInjectionTime injectionTime)
+- (NSArray *)userScripts
 {
-    switch (injectionTime) {
-    case WKUserScriptInjectionTimeAtDocumentStart:
-        return WebCore::InjectAtDocumentStart;
-
-    case WKUserScriptInjectionTimeAtDocumentEnd:
-        return WebCore::InjectAtDocumentEnd;
-    }
-
-    ASSERT_NOT_REACHED();
-    return WebCore::InjectAtDocumentEnd;
+    return wrapper(_userContentControllerProxy->userScripts());
 }
 
 - (void)addUserScript:(WKUserScript *)userScript
 {
-    [_userScripts addObject:userScript];
-
-    StringBuilder urlStringBuilder;
-    urlStringBuilder.append("user-script:");
-    urlStringBuilder.appendNumber([_userScripts count]);
-
-    WebCore::URL url { WebCore::URL { }, urlStringBuilder.toString() };
-    _userContentControllerProxy->addUserScript(WebCore::UserScript { userScript->_source.get(), url, { }, { }, toWebCoreUserScriptInjectionTime(userScript->_injectionTime), userScript->_forMainFrameOnly ? WebCore::InjectInTopFrameOnly : WebCore::InjectInAllFrames });
+    _userContentControllerProxy->addUserScript(*userScript->_userScript);
 }
 
 - (void)removeAllUserScripts
 {
-    [_userScripts removeAllObjects];
-
     _userContentControllerProxy->removeAllUserScripts();
 }
 
@@ -105,7 +86,7 @@ public:
     
     virtual void didPostMessage(WebKit::WebPageProxy& page, WebKit::WebFrameProxy& frame, WebCore::SerializedScriptValue& serializedScriptValue)
     {
-        RetainPtr<WKFrameInfo> frameInfo = adoptNS([[WKFrameInfo alloc] initWithWebFrameProxy:frame]);
+        RetainPtr<WKFrameInfo> frameInfo = wrapper(API::FrameInfo::create(frame));
 
         RetainPtr<JSContext> context = adoptNS([[JSContext alloc] init]);
         JSValueRef valueRef = serializedScriptValue.deserialize([context JSGlobalContextRef], 0);
@@ -133,6 +114,31 @@ private:
 - (void)removeScriptMessageHandlerForName:(NSString *)name
 {
     _userContentControllerProxy->removeUserMessageHandlerForName(name);
+}
+
+#pragma mark WKObject protocol implementation
+
+- (API::Object&)_apiObject
+{
+    return *_userContentControllerProxy;
+}
+
+@end
+
+@implementation WKUserContentController (WKPrivate)
+
+- (void)_addUserContentFilter:(_WKUserContentFilter *)userContentFilter
+{
+#if ENABLE(CONTENT_EXTENSIONS)
+    _userContentControllerProxy->addUserContentFilter(*userContentFilter->_userContentFilter);
+#endif
+}
+
+- (void)_removeAllUserContentFilters
+{
+#if ENABLE(CONTENT_EXTENSIONS)
+    _userContentControllerProxy->removeAllUserContentFilters();
+#endif
 }
 
 @end

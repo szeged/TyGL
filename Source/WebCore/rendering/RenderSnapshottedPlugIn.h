@@ -36,7 +36,7 @@ class HTMLPlugInImageElement;
 
 class RenderSnapshottedPlugIn final : public RenderEmbeddedObject {
 public:
-    RenderSnapshottedPlugIn(HTMLPlugInImageElement&, PassRef<RenderStyle>);
+    RenderSnapshottedPlugIn(HTMLPlugInImageElement&, Ref<RenderStyle>&&);
     virtual ~RenderSnapshottedPlugIn();
 
     HTMLPlugInImageElement& plugInImageElement() const;
@@ -47,13 +47,13 @@ public:
 
 private:
     void frameOwnerElement() const = delete;
-    virtual const char* renderName() const { return "RenderSnapshottedPlugIn"; }
+    virtual const char* renderName() const override { return "RenderSnapshottedPlugIn"; }
 
-    virtual CursorDirective getCursor(const LayoutPoint&, Cursor&) const override final;
-    virtual bool isSnapshottedPlugIn() const override final { return true; }
+    virtual CursorDirective getCursor(const LayoutPoint&, Cursor&) const override;
+    virtual bool isSnapshottedPlugIn() const override { return true; }
     virtual void paint(PaintInfo&, const LayoutPoint&) override;
     
-    virtual bool canHaveWidget() const override final { return false; }
+    virtual bool canHaveWidget() const override { return false; }
 
     void paintSnapshot(PaintInfo&, const LayoutPoint&);
 
@@ -62,8 +62,6 @@ private:
     std::unique_ptr<RenderImageResource> m_snapshotResource;
     bool m_isPotentialMouseActivation;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderSnapshottedPlugIn, isSnapshottedPlugIn())
 
 } // namespace WebCore
 

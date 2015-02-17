@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,18 +40,20 @@ void Cache::operator delete(void* p, size_t size)
     vmDeallocate(p, vmSize(size));
 }
 
-Cache::Cache()
-    : m_deallocator()
-    , m_allocator(m_deallocator)
-{
-    // Ensure that the heap exists, so Allocator and Deallocator can assume it does.
-    PerProcess<Heap>::get();
-}
-    
 void Cache::scavenge()
 {
-    m_allocator.scavenge();
-    m_deallocator.scavenge();
+    Cache* cache = PerThread<Cache>::getFastCase();
+    if (!cache)
+        return;
+
+    cache->allocator().scavenge();
+    cache->deallocator().scavenge();
+}
+
+Cache::Cache()
+    : m_deallocator(PerProcess<Heap>::get())
+    , m_allocator(PerProcess<Heap>::get(), m_deallocator)
+{
 }
 
 NO_INLINE void* Cache::allocateSlowCaseNullCache(size_t size)
@@ -59,9 +61,19 @@ NO_INLINE void* Cache::allocateSlowCaseNullCache(size_t size)
     return PerThread<Cache>::getSlowCase()->allocator().allocate(size);
 }
 
+NO_INLINE void* Cache::allocateSlowCaseNullCache(size_t alignment, size_t size)
+{
+    return PerThread<Cache>::getSlowCase()->allocator().allocate(alignment, size);
+}
+
 NO_INLINE void Cache::deallocateSlowCaseNullCache(void* object)
 {
     PerThread<Cache>::getSlowCase()->deallocator().deallocate(object);
+}
+
+NO_INLINE void* Cache::reallocateSlowCaseNullCache(void* object, size_t newSize)
+{
+    return PerThread<Cache>::getSlowCase()->allocator().reallocate(object, newSize);
 }
 
 } // namespace bmalloc

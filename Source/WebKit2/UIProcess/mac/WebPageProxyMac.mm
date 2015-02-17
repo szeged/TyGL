@@ -43,7 +43,6 @@
 #import "StringUtilities.h"
 #import "TextChecker.h"
 #import "WKBrowsingContextControllerInternal.h"
-#import "WebContext.h"
 #import "WebPageMessages.h"
 #import "WebProcessProxy.h"
 #import <WebCore/DictationAlternative.h>
@@ -312,7 +311,7 @@ void WebPageProxy::attributedSubstringForCharacterRangeAsync(const EditingRange&
         return;
     }
 
-    uint64_t callbackID = m_callbacks.put(WTF::move(callbackFunction), std::make_unique<ProcessThrottler::BackgroundActivityToken>(m_process->throttler()));
+    uint64_t callbackID = m_callbacks.put(WTF::move(callbackFunction), m_process->throttler().backgroundActivityToken());
 
     process().send(Messages::WebPage::AttributedSubstringForCharacterRangeAsync(range, callbackID), m_pageID);
 }
@@ -378,11 +377,10 @@ void WebPageProxy::replaceSelectionWithPasteboardData(const Vector<String>& type
 #if ENABLE(DRAG_SUPPORT)
 void WebPageProxy::setDragImage(const WebCore::IntPoint& clientPosition, const ShareableBitmap::Handle& dragImageHandle, bool isLinkDrag)
 {
-    RefPtr<ShareableBitmap> dragImage = ShareableBitmap::create(dragImageHandle);
-    if (!dragImage)
-        return;
-    
-    m_pageClient.setDragImage(clientPosition, dragImage.release(), isLinkDrag);
+    if (RefPtr<ShareableBitmap> dragImage = ShareableBitmap::create(dragImageHandle))
+        m_pageClient.setDragImage(clientPosition, dragImage.release(), isLinkDrag);
+
+    process().send(Messages::WebPage::DidStartDrag(), m_pageID);
 }
 
 void WebPageProxy::setPromisedData(const String& pasteboardName, const SharedMemory::Handle& imageHandle, uint64_t imageSize, const String& filename, const String& extension,
@@ -406,6 +404,14 @@ void WebPageProxy::performDictionaryLookupAtLocation(const WebCore::FloatPoint& 
         return;
 
     process().send(Messages::WebPage::PerformDictionaryLookupAtLocation(point), m_pageID);
+}
+
+void WebPageProxy::performDictionaryLookupOfCurrentSelection()
+{
+    if (!isValid())
+        return;
+
+    process().send(Messages::WebPage::PerformDictionaryLookupOfCurrentSelection(), m_pageID);
 }
 
 // Complex text input support for plug-ins.
@@ -442,9 +448,9 @@ void WebPageProxy::setSmartInsertDeleteEnabled(bool isSmartInsertDeleteEnabled)
     process().send(Messages::WebPage::SetSmartInsertDeleteEnabled(isSmartInsertDeleteEnabled), m_pageID);
 }
 
-void WebPageProxy::didPerformDictionaryLookup(const AttributedString& text, const DictionaryPopupInfo& dictionaryPopupInfo)
+void WebPageProxy::didPerformDictionaryLookup(const DictionaryPopupInfo& dictionaryPopupInfo)
 {
-    m_pageClient.didPerformDictionaryLookup(text, dictionaryPopupInfo);
+    m_pageClient.didPerformDictionaryLookup(dictionaryPopupInfo);
 }
     
 void WebPageProxy::registerWebProcessAccessibilityToken(const IPC::DataReference& data)
@@ -635,21 +641,8 @@ void WebPageProxy::openPDFFromTemporaryFolderWithNativeApplication(const String&
 #if ENABLE(TELEPHONE_NUMBER_DETECTION)
 void WebPageProxy::showTelephoneNumberMenu(const String& telephoneNumber, const WebCore::IntPoint& point)
 {
-    NSArray *menuItems = menuItemsForTelephoneNumber(telephoneNumber);
-
-    Vector<WebContextMenuItemData> items;
-    for (NSMenuItem *item in menuItems) {
-        RetainPtr<NSMenuItem> retainedItem = item;
-        std::function<void()> handler = [retainedItem]() {
-            NSMenuItem *item = retainedItem.get();
-            [[item target] performSelector:[item action] withObject:item];
-        };
-        
-        items.append(WebContextMenuItemData(ContextMenuItem(item), handler));
-    }
-    
-    ContextMenuContextData contextData(TelephoneNumberContext);
-    internalShowContextMenu(point, contextData, items, ContextMenuClientEligibility::NotEligibleForClient, nullptr);
+    RetainPtr<NSMenu> menu = menuForTelephoneNumber(telephoneNumber);
+    m_pageClient.showPlatformContextMenu(menu.get(), point);
 }
 #endif
 
@@ -659,7 +652,7 @@ void WebPageProxy::showSelectionServiceMenu(const IPC::DataReference& selectionA
     Vector<WebContextMenuItemData> items;
     ContextMenuContextData contextData(selectionAsRTFD.vector(), telephoneNumbers, isEditable);
 
-    internalShowContextMenu(point, contextData, items, ContextMenuClientEligibility::NotEligibleForClient, nullptr);
+    internalShowContextMenu(point, contextData, items, ContextMenuClientEligibility::NotEligibleForClient, UserData());
 }
 #endif
 

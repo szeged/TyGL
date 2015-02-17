@@ -71,8 +71,10 @@ public:
 private:
     RTCDTMFSender(ScriptExecutionContext*, PassRefPtr<MediaStreamTrack>, std::unique_ptr<RTCDTMFSenderHandler>);
 
+    virtual const char* activeDOMObjectName() const override { return "RTCDTMFSender"; }
+
     void scheduleDispatchEvent(PassRefPtr<Event>);
-    void scheduledEventTimerFired(Timer<RTCDTMFSender>*);
+    void scheduledEventTimerFired();
 
     // EventTarget
     virtual void refEventTarget() override { ref(); }
@@ -89,7 +91,7 @@ private:
 
     bool m_stopped;
 
-    Timer<RTCDTMFSender> m_scheduledEventTimer;
+    Timer m_scheduledEventTimer;
     Vector<RefPtr<Event>> m_scheduledEvents;
 };
 

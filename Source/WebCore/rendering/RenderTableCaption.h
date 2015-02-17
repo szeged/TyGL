@@ -28,7 +28,7 @@ class RenderTable;
 
 class RenderTableCaption final : public RenderBlockFlow {
 public:
-    RenderTableCaption(Element&, PassRef<RenderStyle>);
+    RenderTableCaption(Element&, Ref<RenderStyle>&&);
     virtual ~RenderTableCaption();
 
     Element& element() const { return downcast<Element>(nodeForNonAnonymous()); }
@@ -43,8 +43,6 @@ private:
 
     RenderTable* table() const;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderTableCaption, isTableCaption())
 
 } // namespace WebCore
 

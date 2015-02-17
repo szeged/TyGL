@@ -38,6 +38,9 @@ using namespace WebCore;
 - (void)setContextId:(uint32_t)contextID;
 @end
 
+@interface CABackdropLayer : CALayer
+@end
+
 @interface UIView (WKHitTesting)
 - (UIView *)_findDescendantViewAtPoint:(CGPoint)point withEvent:(UIEvent *)event;
 @end
@@ -80,6 +83,7 @@ using namespace WebCore;
 @end
 
 @implementation WKCompositingView
+
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
 {
     return [self _findDescendantViewAtPoint:point withEvent:event];
@@ -91,15 +95,40 @@ using namespace WebCore;
     NSString *webKitDetails = [NSString stringWithFormat:@" layerID = %llu \"%@\"", WebKit::RemoteLayerTreeHost::layerID(self.layer), self.layer.name ? self.layer.name : @""];
     return [viewDescription stringByAppendingString:webKitDetails];
 }
+
 @end
 
 @interface WKTransformView : WKCompositingView
 @end
 
 @implementation WKTransformView
+
 + (Class)layerClass
 {
     return [CATransformLayer self];
+}
+
+@end
+
+@interface WKBackdropView : WKCompositingView
+@end
+
+@implementation WKBackdropView
++ (Class)layerClass
+{
+    return [CABackdropLayer self];
+}
+
+@end
+
+@interface WKShapeView : WKCompositingView
+@end
+
+@implementation WKShapeView
+
++ (Class)layerClass
+{
+    return [CAShapeLayer self];
 }
 
 @end
@@ -108,6 +137,7 @@ using namespace WebCore;
 @end
 
 @implementation WKRemoteView
+
 - (instancetype)initWithFrame:(CGRect)frame contextID:(uint32_t)contextID hostingDeviceScaleFactor:(float)scaleFactor
 {
     if ((self = [super initWithFrame:frame])) {
@@ -143,13 +173,10 @@ LayerOrView *RemoteLayerTreeHost::createLayer(const RemoteLayerTreeTransaction::
     case PlatformCALayer::LayerTypeTiledBackingLayer:
     case PlatformCALayer::LayerTypePageTiledBackingLayer:
     case PlatformCALayer::LayerTypeTiledBackingTileLayer:
-        if (layerProperties && layerProperties->customBehavior == GraphicsLayer::CustomScrollingBehavior) {
-            if (!m_isDebugLayerTreeHost)
-                view = adoptNS([[UIScrollView alloc] init]);
-            else // The debug indicator parents views under layers, which can cause crashes with UIScrollView.
-                view = adoptNS([[UIView alloc] init]);
-        } else
-            view = adoptNS([[WKCompositingView alloc] init]);
+        view = adoptNS([[WKCompositingView alloc] init]);
+        break;
+    case PlatformCALayer::LayerTypeBackdropLayer:
+        view = adoptNS([[WKBackdropView alloc] init]);
         break;
     case PlatformCALayer::LayerTypeTransformLayer:
         view = adoptNS([[WKTransformView alloc] init]);
@@ -161,6 +188,15 @@ LayerOrView *RemoteLayerTreeHost::createLayer(const RemoteLayerTreeTransaction::
             view = adoptNS([[WKRemoteView alloc] initWithFrame:CGRectZero contextID:properties.hostingContextID hostingDeviceScaleFactor:properties.hostingDeviceScaleFactor]);
         else
             view = adoptNS([[WKCompositingView alloc] init]);
+        break;
+    case PlatformCALayer::LayerTypeShapeLayer:
+        view = adoptNS([[WKShapeView alloc] init]);
+        break;
+    case PlatformCALayer::LayerTypeScrollingLayer:
+        if (!m_isDebugLayerTreeHost)
+            view = adoptNS([[UIScrollView alloc] init]);
+        else // The debug indicator parents views under layers, which can cause crashes with UIScrollView.
+            view = adoptNS([[UIView alloc] init]);
         break;
     default:
         ASSERT_NOT_REACHED();

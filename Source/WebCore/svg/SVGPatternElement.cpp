@@ -86,9 +86,9 @@ inline SVGPatternElement::SVGPatternElement(const QualifiedName& tagName, Docume
     registerAnimatedPropertiesForSVGPatternElement();
 }
 
-PassRefPtr<SVGPatternElement> SVGPatternElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGPatternElement> SVGPatternElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGPatternElement(tagName, document));
+    return adoptRef(*new SVGPatternElement(tagName, document));
 }
 
 bool SVGPatternElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -159,7 +159,7 @@ void SVGPatternElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::xAttr
         || attrName == SVGNames::yAttr
@@ -184,7 +184,7 @@ void SVGPatternElement::childrenChanged(const ChildChange& change)
         object->setNeedsLayout();
 }
 
-RenderPtr<RenderElement> SVGPatternElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGPatternElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGResourcePattern>(*this, WTF::move(style));
 }

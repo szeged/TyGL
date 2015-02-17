@@ -28,14 +28,19 @@
 #include "WKPagePrivate.h"
 
 #include "APIArray.h"
+#include "APIContextMenuClient.h"
 #include "APIData.h"
+#include "APIDictionary.h"
 #include "APIFindClient.h"
+#include "APIFrameInfo.h"
 #include "APILoaderClient.h"
+#include "APINavigationClient.h"
 #include "APIPolicyClient.h"
 #include "APISessionState.h"
 #include "APIUIClient.h"
-#include "ImmutableDictionary.h"
+#include "AuthenticationChallengeProxy.h"
 #include "LegacySessionStateCoding.h"
+#include "Logging.h"
 #include "NativeWebKeyboardEvent.h"
 #include "NativeWebWheelEvent.h"
 #include "NavigationActionData.h"
@@ -43,13 +48,19 @@
 #include "PrintInfo.h"
 #include "WKAPICast.h"
 #include "WKPagePolicyClientInternal.h"
+#include "WKPageRenderingProgressEventsInternal.h"
 #include "WKPluginInformation.h"
 #include "WebBackForwardList.h"
-#include "WebContext.h"
 #include "WebFormClient.h"
+#include "WebInspectorProxy.h"
+#include "WebOpenPanelParameters.h"
+#include "WebOpenPanelResultListenerProxy.h"
+#include "WebPageGroup.h"
 #include "WebPageMessages.h"
 #include "WebPageProxy.h"
+#include "WebProcessPool.h"
 #include "WebProcessProxy.h"
+#include "WebProtectionSpace.h"
 #include <WebCore/Page.h>
 #include <WebCore/WindowFeatures.h>
 
@@ -69,13 +80,23 @@ template<> struct ClientTraits<WKPageLoaderClientBase> {
     typedef std::tuple<WKPageLoaderClientV0, WKPageLoaderClientV1, WKPageLoaderClientV2, WKPageLoaderClientV3, WKPageLoaderClientV4, WKPageLoaderClientV5> Versions;
 };
 
+template<> struct ClientTraits<WKPageNavigationClientBase> {
+    typedef std::tuple<WKPageNavigationClientV0> Versions;
+};
+
 template<> struct ClientTraits<WKPagePolicyClientBase> {
     typedef std::tuple<WKPagePolicyClientV0, WKPagePolicyClientV1, WKPagePolicyClientInternal> Versions;
 };
 
 template<> struct ClientTraits<WKPageUIClientBase> {
-    typedef std::tuple<WKPageUIClientV0, WKPageUIClientV1, WKPageUIClientV2, WKPageUIClientV3, WKPageUIClientV4> Versions;
+    typedef std::tuple<WKPageUIClientV0, WKPageUIClientV1, WKPageUIClientV2, WKPageUIClientV3, WKPageUIClientV4, WKPageUIClientV5> Versions;
 };
+
+#if ENABLE(CONTEXT_MENUS)
+template<> struct ClientTraits<WKPageContextMenuClientBase> {
+    typedef std::tuple<WKPageContextMenuClientV0, WKPageContextMenuClientV1, WKPageContextMenuClientV2, WKPageContextMenuClientV3> Versions;
+};
+#endif
 
 }
 
@@ -86,7 +107,7 @@ WKTypeID WKPageGetTypeID()
 
 WKContextRef WKPageGetContext(WKPageRef pageRef)
 {
-    return toAPI(&toImpl(pageRef)->process().context());
+    return toAPI(&toImpl(pageRef)->process().processPool());
 }
 
 WKPageGroupRef WKPageGetPageGroup(WKPageRef pageRef)
@@ -271,12 +292,7 @@ uint64_t WKPageGetRenderTreeSize(WKPageRef page)
 
 WKInspectorRef WKPageGetInspector(WKPageRef pageRef)
 {
-#if defined(ENABLE_INSPECTOR) && ENABLE_INSPECTOR
     return toAPI(toImpl(pageRef)->inspector());
-#else
-    UNUSED_PARAM(pageRef);
-    return 0;
-#endif
 }
 
 WKVibrationRef WKPageGetVibration(WKPageRef page)
@@ -714,11 +730,106 @@ void WKPageCountStringMatches(WKPageRef pageRef, WKStringRef string, WKFindOptio
 void WKPageSetPageContextMenuClient(WKPageRef pageRef, const WKPageContextMenuClientBase* wkClient)
 {
 #if ENABLE(CONTEXT_MENUS)
-    toImpl(pageRef)->initializeContextMenuClient(wkClient);
+    class ContextMenuClient final : public API::Client<WKPageContextMenuClientBase>, public API::ContextMenuClient {
+    public:
+        explicit ContextMenuClient(const WKPageContextMenuClientBase* client)
+        {
+            initialize(client);
+        }
+
+    private:
+        virtual bool getContextMenuFromProposedMenu(WebPageProxy& page, const Vector<WebContextMenuItemData>& proposedMenuVector, Vector<WebContextMenuItemData>& customMenu, const WebHitTestResult::Data& hitTestResultData, API::Object* userData) override
+        {
+            if (!m_client.getContextMenuFromProposedMenu && !m_client.getContextMenuFromProposedMenu_deprecatedForUseWithV0)
+                return false;
+
+            if (m_client.base.version >= 2 && !m_client.getContextMenuFromProposedMenu)
+                return false;
+
+            Vector<RefPtr<API::Object>> proposedMenuItems;
+            proposedMenuItems.reserveInitialCapacity(proposedMenuVector.size());
+
+            for (const auto& menuItem : proposedMenuVector)
+                proposedMenuItems.uncheckedAppend(WebContextMenuItem::create(menuItem));
+
+            WKArrayRef newMenu = nullptr;
+            if (m_client.base.version >= 2) {
+                RefPtr<WebHitTestResult> webHitTestResult = WebHitTestResult::create(hitTestResultData);
+                m_client.getContextMenuFromProposedMenu(toAPI(&page), toAPI(API::Array::create(WTF::move(proposedMenuItems)).get()), &newMenu, toAPI(webHitTestResult.get()), toAPI(userData), m_client.base.clientInfo);
+            } else
+                m_client.getContextMenuFromProposedMenu_deprecatedForUseWithV0(toAPI(&page), toAPI(API::Array::create(WTF::move(proposedMenuItems)).get()), &newMenu, toAPI(userData), m_client.base.clientInfo);
+
+            RefPtr<API::Array> array = adoptRef(toImpl(newMenu));
+
+            customMenu.clear();
+
+            size_t newSize = array ? array->size() : 0;
+            for (size_t i = 0; i < newSize; ++i) {
+                WebContextMenuItem* item = array->at<WebContextMenuItem>(i);
+                if (!item) {
+                    LOG(ContextMenu, "New menu entry at index %i is not a WebContextMenuItem", (int)i);
+                    continue;
+                }
+
+                customMenu.append(*item->data());
+            }
+
+            return true;
+        }
+
+        virtual void customContextMenuItemSelected(WebPageProxy& page, const WebContextMenuItemData& itemData) override
+        {
+            if (!m_client.customContextMenuItemSelected)
+                return;
+
+            m_client.customContextMenuItemSelected(toAPI(&page), toAPI(WebContextMenuItem::create(itemData).get()), m_client.base.clientInfo);
+        }
+
+        virtual void contextMenuDismissed(WebPageProxy& page) override
+        {
+            if (!m_client.contextMenuDismissed)
+                return;
+
+            m_client.contextMenuDismissed(toAPI(&page), m_client.base.clientInfo);
+        }
+
+        virtual bool showContextMenu(WebPageProxy& page, const WebCore::IntPoint& menuLocation, const Vector<WebContextMenuItemData>& menuItemsVector) override
+        {
+            if (!m_client.showContextMenu)
+                return false;
+
+            Vector<RefPtr<API::Object>> menuItems;
+            menuItems.reserveInitialCapacity(menuItemsVector.size());
+
+            for (const auto& menuItem : menuItemsVector)
+                menuItems.uncheckedAppend(WebContextMenuItem::create(menuItem));
+
+            m_client.showContextMenu(toAPI(&page), toAPI(menuLocation), toAPI(API::Array::create(WTF::move(menuItems)).get()), m_client.base.clientInfo);
+
+            return true;
+        }
+
+        virtual bool hideContextMenu(WebPageProxy& page) override
+        {
+            if (!m_client.hideContextMenu)
+                return false;
+
+            m_client.hideContextMenu(toAPI(&page), m_client.base.clientInfo);
+
+            return true;
+        }
+    };
+
+    toImpl(pageRef)->setContextMenuClient(std::make_unique<ContextMenuClient>(wkClient));
 #else
     UNUSED_PARAM(pageRef);
     UNUSED_PARAM(wkClient);
 #endif
+}
+
+void WKPageSetPageDiagnosticLoggingClient(WKPageRef pageRef, const WKPageDiagnosticLoggingClientBase* wkClient)
+{
+    toImpl(pageRef)->setDiagnosticLoggingClient(std::make_unique<WebPageDiagnosticLoggingClient>(wkClient));
 }
 
 void WKPageSetPageFindClient(WKPageRef pageRef, const WKPageFindClientBase* wkClient)
@@ -779,207 +890,207 @@ void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClientBase* 
         }
 
     private:
-        virtual void didStartProvisionalLoadForFrame(WebPageProxy* page, WebFrameProxy* frame, uint64_t, API::Object* userData) override
+        virtual void didStartProvisionalLoadForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Navigation*, API::Object* userData) override
         {
             if (!m_client.didStartProvisionalLoadForFrame)
                 return;
 
-            m_client.didStartProvisionalLoadForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didStartProvisionalLoadForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didReceiveServerRedirectForProvisionalLoadForFrame(WebPageProxy* page, WebFrameProxy* frame, uint64_t, API::Object* userData) override
+        virtual void didReceiveServerRedirectForProvisionalLoadForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Navigation*, API::Object* userData) override
         {
             if (!m_client.didReceiveServerRedirectForProvisionalLoadForFrame)
                 return;
 
-            m_client.didReceiveServerRedirectForProvisionalLoadForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didReceiveServerRedirectForProvisionalLoadForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didFailProvisionalLoadWithErrorForFrame(WebPageProxy* page, WebFrameProxy* frame, uint64_t, const ResourceError& error, API::Object* userData) override
+        virtual void didFailProvisionalLoadWithErrorForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Navigation*, const ResourceError& error, API::Object* userData) override
         {
             if (!m_client.didFailProvisionalLoadWithErrorForFrame)
                 return;
 
-            m_client.didFailProvisionalLoadWithErrorForFrame(toAPI(page), toAPI(frame), toAPI(error), toAPI(userData), m_client.base.clientInfo);
+            m_client.didFailProvisionalLoadWithErrorForFrame(toAPI(&page), toAPI(&frame), toAPI(error), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didCommitLoadForFrame(WebPageProxy* page, WebFrameProxy* frame, uint64_t, API::Object* userData) override
+        virtual void didCommitLoadForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Navigation*, API::Object* userData) override
         {
             if (!m_client.didCommitLoadForFrame)
                 return;
 
-            m_client.didCommitLoadForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didCommitLoadForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didFinishDocumentLoadForFrame(WebPageProxy* page, WebFrameProxy* frame, uint64_t, API::Object* userData) override
+        virtual void didFinishDocumentLoadForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Navigation*, API::Object* userData) override
         {
             if (!m_client.didFinishDocumentLoadForFrame)
                 return;
 
-            m_client.didFinishDocumentLoadForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didFinishDocumentLoadForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didFinishLoadForFrame(WebPageProxy* page, WebFrameProxy* frame, uint64_t, API::Object* userData) override
+        virtual void didFinishLoadForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Navigation*, API::Object* userData) override
         {
             if (!m_client.didFinishLoadForFrame)
                 return;
 
-            m_client.didFinishLoadForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didFinishLoadForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didFailLoadWithErrorForFrame(WebPageProxy* page, WebFrameProxy* frame, uint64_t, const ResourceError& error, API::Object* userData) override
+        virtual void didFailLoadWithErrorForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Navigation*, const ResourceError& error, API::Object* userData) override
         {
             if (!m_client.didFailLoadWithErrorForFrame)
                 return;
 
-            m_client.didFailLoadWithErrorForFrame(toAPI(page), toAPI(frame), toAPI(error), toAPI(userData), m_client.base.clientInfo);
+            m_client.didFailLoadWithErrorForFrame(toAPI(&page), toAPI(&frame), toAPI(error), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didSameDocumentNavigationForFrame(WebPageProxy* page, WebFrameProxy* frame, uint64_t, SameDocumentNavigationType type, API::Object* userData) override
+        virtual void didSameDocumentNavigationForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Navigation*, SameDocumentNavigationType type, API::Object* userData) override
         {
             if (!m_client.didSameDocumentNavigationForFrame)
                 return;
 
-            m_client.didSameDocumentNavigationForFrame(toAPI(page), toAPI(frame), toAPI(type), toAPI(userData), m_client.base.clientInfo);
+            m_client.didSameDocumentNavigationForFrame(toAPI(&page), toAPI(&frame), toAPI(type), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didReceiveTitleForFrame(WebPageProxy* page, const String& title, WebFrameProxy* frame, API::Object* userData) override
+        virtual void didReceiveTitleForFrame(WebPageProxy& page, const String& title, WebFrameProxy& frame, API::Object* userData) override
         {
             if (!m_client.didReceiveTitleForFrame)
                 return;
 
-            m_client.didReceiveTitleForFrame(toAPI(page), toAPI(title.impl()), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didReceiveTitleForFrame(toAPI(&page), toAPI(title.impl()), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didFirstLayoutForFrame(WebPageProxy* page, WebFrameProxy* frame, API::Object* userData) override
+        virtual void didFirstLayoutForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Object* userData) override
         {
             if (!m_client.didFirstLayoutForFrame)
                 return;
 
-            m_client.didFirstLayoutForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didFirstLayoutForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didFirstVisuallyNonEmptyLayoutForFrame(WebPageProxy* page, WebFrameProxy* frame, API::Object* userData) override
+        virtual void didFirstVisuallyNonEmptyLayoutForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Object* userData) override
         {
             if (!m_client.didFirstVisuallyNonEmptyLayoutForFrame)
                 return;
 
-            m_client.didFirstVisuallyNonEmptyLayoutForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didFirstVisuallyNonEmptyLayoutForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didLayout(WebPageProxy* page, LayoutMilestones milestones, API::Object* userData) override
+        virtual void didLayout(WebPageProxy& page, LayoutMilestones milestones, API::Object* userData) override
         {
             if (!m_client.didLayout)
                 return;
 
-            m_client.didLayout(toAPI(page), toWKLayoutMilestones(milestones), toAPI(userData), m_client.base.clientInfo);
+            m_client.didLayout(toAPI(&page), toWKLayoutMilestones(milestones), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didRemoveFrameFromHierarchy(WebPageProxy* page, WebFrameProxy* frame, API::Object* userData) override
+        virtual void didRemoveFrameFromHierarchy(WebPageProxy& page, WebFrameProxy& frame, API::Object* userData) override
         {
             if (!m_client.didRemoveFrameFromHierarchy)
                 return;
 
-            m_client.didRemoveFrameFromHierarchy(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didRemoveFrameFromHierarchy(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didDisplayInsecureContentForFrame(WebPageProxy* page, WebFrameProxy* frame, API::Object* userData) override
+        virtual void didDisplayInsecureContentForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Object* userData) override
         {
             if (!m_client.didDisplayInsecureContentForFrame)
                 return;
 
-            m_client.didDisplayInsecureContentForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didDisplayInsecureContentForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didRunInsecureContentForFrame(WebPageProxy* page, WebFrameProxy* frame, API::Object* userData) override
+        virtual void didRunInsecureContentForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Object* userData) override
         {
             if (!m_client.didRunInsecureContentForFrame)
                 return;
 
-            m_client.didRunInsecureContentForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didRunInsecureContentForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didDetectXSSForFrame(WebPageProxy* page, WebFrameProxy* frame, API::Object* userData) override
+        virtual void didDetectXSSForFrame(WebPageProxy& page, WebFrameProxy& frame, API::Object* userData) override
         {
             if (!m_client.didDetectXSSForFrame)
                 return;
 
-            m_client.didDetectXSSForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.base.clientInfo);
+            m_client.didDetectXSSForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual bool canAuthenticateAgainstProtectionSpaceInFrame(WebPageProxy* page, WebFrameProxy* frame, WebProtectionSpace* protectionSpace) override
+        virtual bool canAuthenticateAgainstProtectionSpaceInFrame(WebPageProxy& page, WebFrameProxy& frame, WebProtectionSpace* protectionSpace) override
         {
             if (!m_client.canAuthenticateAgainstProtectionSpaceInFrame)
                 return false;
 
-            return m_client.canAuthenticateAgainstProtectionSpaceInFrame(toAPI(page), toAPI(frame), toAPI(protectionSpace), m_client.base.clientInfo);
+            return m_client.canAuthenticateAgainstProtectionSpaceInFrame(toAPI(&page), toAPI(&frame), toAPI(protectionSpace), m_client.base.clientInfo);
         }
 
-        virtual void didReceiveAuthenticationChallengeInFrame(WebPageProxy* page, WebFrameProxy* frame, AuthenticationChallengeProxy* authenticationChallenge) override
+        virtual void didReceiveAuthenticationChallengeInFrame(WebPageProxy& page, WebFrameProxy& frame, AuthenticationChallengeProxy* authenticationChallenge) override
         {
             if (!m_client.didReceiveAuthenticationChallengeInFrame)
                 return;
 
-            m_client.didReceiveAuthenticationChallengeInFrame(toAPI(page), toAPI(frame), toAPI(authenticationChallenge), m_client.base.clientInfo);
+            m_client.didReceiveAuthenticationChallengeInFrame(toAPI(&page), toAPI(&frame), toAPI(authenticationChallenge), m_client.base.clientInfo);
         }
 
-        virtual void didStartProgress(WebPageProxy* page) override
+        virtual void didStartProgress(WebPageProxy& page) override
         {
             if (!m_client.didStartProgress)
                 return;
 
-            m_client.didStartProgress(toAPI(page), m_client.base.clientInfo);
+            m_client.didStartProgress(toAPI(&page), m_client.base.clientInfo);
         }
 
-        virtual void didChangeProgress(WebPageProxy* page) override
+        virtual void didChangeProgress(WebPageProxy& page) override
         {
             if (!m_client.didChangeProgress)
                 return;
 
-            m_client.didChangeProgress(toAPI(page), m_client.base.clientInfo);
+            m_client.didChangeProgress(toAPI(&page), m_client.base.clientInfo);
         }
 
-        virtual void didFinishProgress(WebPageProxy* page) override
+        virtual void didFinishProgress(WebPageProxy& page) override
         {
             if (!m_client.didFinishProgress)
                 return;
 
-            m_client.didFinishProgress(toAPI(page), m_client.base.clientInfo);
+            m_client.didFinishProgress(toAPI(&page), m_client.base.clientInfo);
         }
 
-        virtual void processDidBecomeUnresponsive(WebPageProxy* page) override
+        virtual void processDidBecomeUnresponsive(WebPageProxy& page) override
         {
             if (!m_client.processDidBecomeUnresponsive)
                 return;
 
-            m_client.processDidBecomeUnresponsive(toAPI(page), m_client.base.clientInfo);
+            m_client.processDidBecomeUnresponsive(toAPI(&page), m_client.base.clientInfo);
         }
 
-        virtual void interactionOccurredWhileProcessUnresponsive(WebPageProxy* page) override
+        virtual void interactionOccurredWhileProcessUnresponsive(WebPageProxy& page) override
         {
             if (!m_client.interactionOccurredWhileProcessUnresponsive)
                 return;
 
-            m_client.interactionOccurredWhileProcessUnresponsive(toAPI(page), m_client.base.clientInfo);
+            m_client.interactionOccurredWhileProcessUnresponsive(toAPI(&page), m_client.base.clientInfo);
         }
 
-        virtual void processDidBecomeResponsive(WebPageProxy* page) override
+        virtual void processDidBecomeResponsive(WebPageProxy& page) override
         {
             if (!m_client.processDidBecomeResponsive)
                 return;
 
-            m_client.processDidBecomeResponsive(toAPI(page), m_client.base.clientInfo);
+            m_client.processDidBecomeResponsive(toAPI(&page), m_client.base.clientInfo);
         }
 
-        virtual void processDidCrash(WebPageProxy* page) override
+        virtual void processDidCrash(WebPageProxy& page) override
         {
             if (!m_client.processDidCrash)
                 return;
 
-            m_client.processDidCrash(toAPI(page), m_client.base.clientInfo);
+            m_client.processDidCrash(toAPI(&page), m_client.base.clientInfo);
         }
 
-        virtual void didChangeBackForwardList(WebPageProxy* page, WebBackForwardListItem* addedItem, Vector<RefPtr<WebBackForwardListItem>> removedItems) override
+        virtual void didChangeBackForwardList(WebPageProxy& page, WebBackForwardListItem* addedItem, Vector<RefPtr<WebBackForwardListItem>> removedItems) override
         {
             if (!m_client.didChangeBackForwardList)
                 return;
@@ -994,59 +1105,59 @@ void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClientBase* 
                 removedItemsArray = API::Array::create(WTF::move(removedItemsVector));
             }
 
-            m_client.didChangeBackForwardList(toAPI(page), toAPI(addedItem), toAPI(removedItemsArray.get()), m_client.base.clientInfo);
+            m_client.didChangeBackForwardList(toAPI(&page), toAPI(addedItem), toAPI(removedItemsArray.get()), m_client.base.clientInfo);
         }
 
-        virtual bool shouldKeepCurrentBackForwardListItemInList(WebKit::WebPageProxy* page, WebKit::WebBackForwardListItem* item) override
+        virtual bool shouldKeepCurrentBackForwardListItemInList(WebKit::WebPageProxy& page, WebKit::WebBackForwardListItem* item) override
         {
             if (!m_client.shouldKeepCurrentBackForwardListItemInList)
                 return true;
 
-            return m_client.shouldKeepCurrentBackForwardListItemInList(toAPI(page), toAPI(item), m_client.base.clientInfo);
+            return m_client.shouldKeepCurrentBackForwardListItemInList(toAPI(&page), toAPI(item), m_client.base.clientInfo);
         }
 
-        virtual void willGoToBackForwardListItem(WebPageProxy* page, WebBackForwardListItem* item, API::Object* userData) override
+        virtual void willGoToBackForwardListItem(WebPageProxy& page, WebBackForwardListItem* item, API::Object* userData) override
         {
             if (m_client.willGoToBackForwardListItem)
-                m_client.willGoToBackForwardListItem(toAPI(page), toAPI(item), toAPI(userData), m_client.base.clientInfo);
+                m_client.willGoToBackForwardListItem(toAPI(&page), toAPI(item), toAPI(userData), m_client.base.clientInfo);
         }
 
         virtual PassRefPtr<API::Data> webCryptoMasterKey(WebPageProxy& page) override
         {
-            return page.process().context().client().copyWebCryptoMasterKey(&page.process().context());
+            return page.process().processPool().client().copyWebCryptoMasterKey(&page.process().processPool());
         }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
-        virtual void didFailToInitializePlugin(WebPageProxy* page, ImmutableDictionary* pluginInformation) override
+        virtual void didFailToInitializePlugin(WebPageProxy& page, API::Dictionary* pluginInformation) override
         {
             if (m_client.didFailToInitializePlugin_deprecatedForUseWithV0)
-                m_client.didFailToInitializePlugin_deprecatedForUseWithV0(toAPI(page), toAPI(pluginInformation->get<API::String>(pluginInformationMIMETypeKey())), m_client.base.clientInfo);
+                m_client.didFailToInitializePlugin_deprecatedForUseWithV0(toAPI(&page), toAPI(pluginInformation->get<API::String>(pluginInformationMIMETypeKey())), m_client.base.clientInfo);
 
             if (m_client.pluginDidFail_deprecatedForUseWithV1)
-                m_client.pluginDidFail_deprecatedForUseWithV1(toAPI(page), kWKErrorCodeCannotLoadPlugIn, toAPI(pluginInformation->get<API::String>(pluginInformationMIMETypeKey())), 0, 0, m_client.base.clientInfo);
+                m_client.pluginDidFail_deprecatedForUseWithV1(toAPI(&page), kWKErrorCodeCannotLoadPlugIn, toAPI(pluginInformation->get<API::String>(pluginInformationMIMETypeKey())), 0, 0, m_client.base.clientInfo);
 
             if (m_client.pluginDidFail)
-                m_client.pluginDidFail(toAPI(page), kWKErrorCodeCannotLoadPlugIn, toAPI(pluginInformation), m_client.base.clientInfo);
+                m_client.pluginDidFail(toAPI(&page), kWKErrorCodeCannotLoadPlugIn, toAPI(pluginInformation), m_client.base.clientInfo);
         }
 
-        virtual void didBlockInsecurePluginVersion(WebPageProxy* page, ImmutableDictionary* pluginInformation) override
+        virtual void didBlockInsecurePluginVersion(WebPageProxy& page, API::Dictionary* pluginInformation) override
         {
             if (m_client.pluginDidFail_deprecatedForUseWithV1)
-                m_client.pluginDidFail_deprecatedForUseWithV1(toAPI(page), kWKErrorCodeInsecurePlugInVersion, toAPI(pluginInformation->get<API::String>(pluginInformationMIMETypeKey())), toAPI(pluginInformation->get<API::String>(pluginInformationBundleIdentifierKey())), toAPI(pluginInformation->get<API::String>(pluginInformationBundleVersionKey())), m_client.base.clientInfo);
+                m_client.pluginDidFail_deprecatedForUseWithV1(toAPI(&page), kWKErrorCodeInsecurePlugInVersion, toAPI(pluginInformation->get<API::String>(pluginInformationMIMETypeKey())), toAPI(pluginInformation->get<API::String>(pluginInformationBundleIdentifierKey())), toAPI(pluginInformation->get<API::String>(pluginInformationBundleVersionKey())), m_client.base.clientInfo);
 
             if (m_client.pluginDidFail)
-                m_client.pluginDidFail(toAPI(page), kWKErrorCodeInsecurePlugInVersion, toAPI(pluginInformation), m_client.base.clientInfo);
+                m_client.pluginDidFail(toAPI(&page), kWKErrorCodeInsecurePlugInVersion, toAPI(pluginInformation), m_client.base.clientInfo);
         }
 
-        virtual PluginModuleLoadPolicy pluginLoadPolicy(WebPageProxy* page, PluginModuleLoadPolicy currentPluginLoadPolicy, ImmutableDictionary* pluginInformation, String& unavailabilityDescription) override
+        virtual PluginModuleLoadPolicy pluginLoadPolicy(WebPageProxy& page, PluginModuleLoadPolicy currentPluginLoadPolicy, API::Dictionary* pluginInformation, String& unavailabilityDescription) override
         {
             WKStringRef unavailabilityDescriptionOut = 0;
             PluginModuleLoadPolicy loadPolicy = currentPluginLoadPolicy;
 
             if (m_client.pluginLoadPolicy_deprecatedForUseWithV2)
-                loadPolicy = toPluginModuleLoadPolicy(m_client.pluginLoadPolicy_deprecatedForUseWithV2(toAPI(page), toWKPluginLoadPolicy(currentPluginLoadPolicy), toAPI(pluginInformation), m_client.base.clientInfo));
+                loadPolicy = toPluginModuleLoadPolicy(m_client.pluginLoadPolicy_deprecatedForUseWithV2(toAPI(&page), toWKPluginLoadPolicy(currentPluginLoadPolicy), toAPI(pluginInformation), m_client.base.clientInfo));
             else if (m_client.pluginLoadPolicy)
-                loadPolicy = toPluginModuleLoadPolicy(m_client.pluginLoadPolicy(toAPI(page), toWKPluginLoadPolicy(currentPluginLoadPolicy), toAPI(pluginInformation), &unavailabilityDescriptionOut, m_client.base.clientInfo));
+                loadPolicy = toPluginModuleLoadPolicy(m_client.pluginLoadPolicy(toAPI(&page), toWKPluginLoadPolicy(currentPluginLoadPolicy), toAPI(pluginInformation), &unavailabilityDescriptionOut, m_client.base.clientInfo));
 
             if (unavailabilityDescriptionOut) {
                 RefPtr<API::String> webUnavailabilityDescription = adoptRef(toImpl(unavailabilityDescriptionOut));
@@ -1058,22 +1169,22 @@ void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClientBase* 
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #if ENABLE(WEBGL)
-        virtual WebCore::WebGLLoadPolicy webGLLoadPolicy(WebPageProxy* page, const String& url) const override
+        virtual WebCore::WebGLLoadPolicy webGLLoadPolicy(WebPageProxy& page, const String& url) const override
         {
             WebCore::WebGLLoadPolicy loadPolicy = WebGLAllowCreation;
 
             if (m_client.webGLLoadPolicy)
-                loadPolicy = toWebGLLoadPolicy(m_client.webGLLoadPolicy(toAPI(page), toAPI(url.impl()), m_client.base.clientInfo));
+                loadPolicy = toWebGLLoadPolicy(m_client.webGLLoadPolicy(toAPI(&page), toAPI(url.impl()), m_client.base.clientInfo));
 
             return loadPolicy;
         }
 
-        virtual WebCore::WebGLLoadPolicy resolveWebGLLoadPolicy(WebPageProxy* page, const String& url) const override
+        virtual WebCore::WebGLLoadPolicy resolveWebGLLoadPolicy(WebPageProxy& page, const String& url) const override
         {
             WebCore::WebGLLoadPolicy loadPolicy = WebGLAllowCreation;
 
             if (m_client.resolveWebGLLoadPolicy)
-                loadPolicy = toWebGLLoadPolicy(m_client.resolveWebGLLoadPolicy(toAPI(page), toAPI(url.impl()), m_client.base.clientInfo));
+                loadPolicy = toWebGLLoadPolicy(m_client.resolveWebGLLoadPolicy(toAPI(&page), toAPI(url.impl()), m_client.base.clientInfo));
 
             return loadPolicy;
         }
@@ -1110,7 +1221,7 @@ void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClientBase* 
         }
 
     private:
-        virtual void decidePolicyForNavigationAction(WebPageProxy* page, WebFrameProxy* frame, const NavigationActionData& navigationActionData, WebFrameProxy* originatingFrame, const WebCore::ResourceRequest& originalResourceRequest, const WebCore::ResourceRequest& resourceRequest, RefPtr<WebFramePolicyListenerProxy> listener, API::Object* userData) override
+        virtual void decidePolicyForNavigationAction(WebPageProxy& page, WebFrameProxy* frame, const NavigationActionData& navigationActionData, WebFrameProxy* originatingFrame, const WebCore::ResourceRequest& originalResourceRequest, const WebCore::ResourceRequest& resourceRequest, Ref<WebFramePolicyListenerProxy>&& listener, API::Object* userData) override
         {
             if (!m_client.decidePolicyForNavigationAction_deprecatedForUseWithV0 && !m_client.decidePolicyForNavigationAction_deprecatedForUseWithV1 && !m_client.decidePolicyForNavigationAction) {
                 listener->use();
@@ -1121,14 +1232,14 @@ void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClientBase* 
             RefPtr<API::URLRequest> request = API::URLRequest::create(resourceRequest);
 
             if (m_client.decidePolicyForNavigationAction_deprecatedForUseWithV0)
-                m_client.decidePolicyForNavigationAction_deprecatedForUseWithV0(toAPI(page), toAPI(frame), toAPI(navigationActionData.navigationType), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), toAPI(request.get()), toAPI(listener.get()), toAPI(userData), m_client.base.clientInfo);
+                m_client.decidePolicyForNavigationAction_deprecatedForUseWithV0(toAPI(&page), toAPI(frame), toAPI(navigationActionData.navigationType), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), toAPI(request.get()), toAPI(listener.ptr()), toAPI(userData), m_client.base.clientInfo);
             else if (m_client.decidePolicyForNavigationAction_deprecatedForUseWithV1)
-                m_client.decidePolicyForNavigationAction_deprecatedForUseWithV1(toAPI(page), toAPI(frame), toAPI(navigationActionData.navigationType), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), toAPI(originatingFrame), toAPI(request.get()), toAPI(listener.get()), toAPI(userData), m_client.base.clientInfo);
+                m_client.decidePolicyForNavigationAction_deprecatedForUseWithV1(toAPI(&page), toAPI(frame), toAPI(navigationActionData.navigationType), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), toAPI(originatingFrame), toAPI(request.get()), toAPI(listener.ptr()), toAPI(userData), m_client.base.clientInfo);
             else
-                m_client.decidePolicyForNavigationAction(toAPI(page), toAPI(frame), toAPI(navigationActionData.navigationType), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), toAPI(originatingFrame), toAPI(originalRequest.get()), toAPI(request.get()), toAPI(listener.get()), toAPI(userData), m_client.base.clientInfo);
+                m_client.decidePolicyForNavigationAction(toAPI(&page), toAPI(frame), toAPI(navigationActionData.navigationType), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), toAPI(originatingFrame), toAPI(originalRequest.get()), toAPI(request.get()), toAPI(listener.ptr()), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void decidePolicyForNewWindowAction(WebPageProxy* page, WebFrameProxy* frame, const NavigationActionData& navigationActionData, const ResourceRequest& resourceRequest, const String& frameName, RefPtr<WebFramePolicyListenerProxy> listener, API::Object* userData) override
+        virtual void decidePolicyForNewWindowAction(WebPageProxy& page, WebFrameProxy& frame, const NavigationActionData& navigationActionData, const ResourceRequest& resourceRequest, const String& frameName, Ref<WebFramePolicyListenerProxy>&& listener, API::Object* userData) override
         {
             if (!m_client.decidePolicyForNewWindowAction) {
                 listener->use();
@@ -1137,10 +1248,10 @@ void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClientBase* 
 
             RefPtr<API::URLRequest> request = API::URLRequest::create(resourceRequest);
 
-            m_client.decidePolicyForNewWindowAction(toAPI(page), toAPI(frame), toAPI(navigationActionData.navigationType), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), toAPI(request.get()), toAPI(frameName.impl()), toAPI(listener.get()), toAPI(userData), m_client.base.clientInfo);
+            m_client.decidePolicyForNewWindowAction(toAPI(&page), toAPI(&frame), toAPI(navigationActionData.navigationType), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), toAPI(request.get()), toAPI(frameName.impl()), toAPI(listener.ptr()), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void decidePolicyForResponse(WebPageProxy* page, WebFrameProxy* frame, const ResourceResponse& resourceResponse, const ResourceRequest& resourceRequest, bool canShowMIMEType, RefPtr<WebFramePolicyListenerProxy> listener, API::Object* userData) override
+        virtual void decidePolicyForResponse(WebPageProxy& page, WebFrameProxy& frame, const ResourceResponse& resourceResponse, const ResourceRequest& resourceRequest, bool canShowMIMEType, Ref<WebFramePolicyListenerProxy>&& listener, API::Object* userData) override
         {
             if (!m_client.decidePolicyForResponse_deprecatedForUseWithV0 && !m_client.decidePolicyForResponse) {
                 listener->use();
@@ -1151,17 +1262,17 @@ void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClientBase* 
             RefPtr<API::URLRequest> request = API::URLRequest::create(resourceRequest);
 
             if (m_client.decidePolicyForResponse_deprecatedForUseWithV0)
-                m_client.decidePolicyForResponse_deprecatedForUseWithV0(toAPI(page), toAPI(frame), toAPI(response.get()), toAPI(request.get()), toAPI(listener.get()), toAPI(userData), m_client.base.clientInfo);
+                m_client.decidePolicyForResponse_deprecatedForUseWithV0(toAPI(&page), toAPI(&frame), toAPI(response.get()), toAPI(request.get()), toAPI(listener.ptr()), toAPI(userData), m_client.base.clientInfo);
             else
-                m_client.decidePolicyForResponse(toAPI(page), toAPI(frame), toAPI(response.get()), toAPI(request.get()), canShowMIMEType, toAPI(listener.get()), toAPI(userData), m_client.base.clientInfo);
+                m_client.decidePolicyForResponse(toAPI(&page), toAPI(&frame), toAPI(response.get()), toAPI(request.get()), canShowMIMEType, toAPI(listener.ptr()), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void unableToImplementPolicy(WebPageProxy* page, WebFrameProxy* frame, const ResourceError& error, API::Object* userData) override
+        virtual void unableToImplementPolicy(WebPageProxy& page, WebFrameProxy& frame, const ResourceError& error, API::Object* userData) override
         {
             if (!m_client.unableToImplementPolicy)
                 return;
             
-            m_client.unableToImplementPolicy(toAPI(page), toAPI(frame), toAPI(error), toAPI(userData), m_client.base.clientInfo);
+            m_client.unableToImplementPolicy(toAPI(&page), toAPI(&frame), toAPI(error), toAPI(userData), m_client.base.clientInfo);
         }
     };
 
@@ -1186,7 +1297,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             if (m_client.base.version > 0 && !m_client.createNewPage)
                 return 0;
 
-            ImmutableDictionary::MapType map;
+            API::Dictionary::MapType map;
             if (windowFeatures.xSet)
                 map.set("x", API::Double::create(windowFeatures.x));
             if (windowFeatures.ySet)
@@ -1203,7 +1314,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             map.set("resizable", API::Boolean::create(windowFeatures.resizable));
             map.set("fullscreen", API::Boolean::create(windowFeatures.fullscreen));
             map.set("dialog", API::Boolean::create(windowFeatures.dialog));
-            RefPtr<ImmutableDictionary> featuresMap = ImmutableDictionary::create(WTF::move(map));
+            RefPtr<API::Dictionary> featuresMap = API::Dictionary::create(WTF::move(map));
 
             if (!m_client.base.version)
                 return adoptRef(toImpl(m_client.createNewPage_deprecatedForUseWithV0(toAPI(page), toAPI(featuresMap.get()), toAPI(navigationActionData.modifiers), toAPI(navigationActionData.mouseButton), m_client.base.clientInfo)));
@@ -1316,7 +1427,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
         }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
-        virtual void unavailablePluginButtonClicked(WebPageProxy* page, WKPluginUnavailabilityReason pluginUnavailabilityReason, ImmutableDictionary* pluginInformation) override
+        virtual void unavailablePluginButtonClicked(WebPageProxy* page, WKPluginUnavailabilityReason pluginUnavailabilityReason, API::Dictionary* pluginInformation) override
         {
             if (pluginUnavailabilityReason == kWKPluginUnavailabilityReasonPluginMissing) {
                 if (m_client.missingPluginButtonClicked_deprecatedForUseWithV0)
@@ -1471,7 +1582,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             m_client.pageDidScroll(toAPI(page), m_client.base.clientInfo);
         }
 
-        virtual void exceededDatabaseQuota(WebPageProxy* page, WebFrameProxy* frame, WebSecurityOrigin* origin, const String& databaseName, const String& databaseDisplayName, unsigned long long currentQuota, unsigned long long currentOriginUsage, unsigned long long currentDatabaseUsage, unsigned long long expectedUsage, std::function<void (unsigned long long)> completionHandler) override
+        virtual void exceededDatabaseQuota(WebPageProxy* page, WebFrameProxy* frame, API::SecurityOrigin* origin, const String& databaseName, const String& databaseDisplayName, unsigned long long currentQuota, unsigned long long currentOriginUsage, unsigned long long currentDatabaseUsage, unsigned long long expectedUsage, std::function<void (unsigned long long)> completionHandler) override
         {
             if (!m_client.exceededDatabaseQuota) {
                 completionHandler(currentQuota);
@@ -1490,7 +1601,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             return true;
         }
 
-        virtual bool decidePolicyForGeolocationPermissionRequest(WebPageProxy* page, WebFrameProxy* frame, WebSecurityOrigin* origin, GeolocationPermissionRequestProxy* permissionRequest) override
+        virtual bool decidePolicyForGeolocationPermissionRequest(WebPageProxy* page, WebFrameProxy* frame, API::SecurityOrigin* origin, GeolocationPermissionRequestProxy* permissionRequest) override
         {
             if (!m_client.decidePolicyForGeolocationPermissionRequest)
                 return false;
@@ -1499,7 +1610,16 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             return true;
         }
 
-        virtual bool decidePolicyForNotificationPermissionRequest(WebPageProxy* page, WebSecurityOrigin* origin, NotificationPermissionRequest* permissionRequest) override
+        virtual bool decidePolicyForUserMediaPermissionRequest(WebPageProxy& page, WebFrameProxy& frame, API::SecurityOrigin& origin, UserMediaPermissionRequestProxy& permissionRequest) override
+        {
+            if (!m_client.decidePolicyForUserMediaPermissionRequest)
+                return false;
+
+            m_client.decidePolicyForUserMediaPermissionRequest(toAPI(&page), toAPI(&frame), toAPI(&origin), toAPI(&permissionRequest), m_client.base.clientInfo);
+            return true;
+        }
+
+        virtual bool decidePolicyForNotificationPermissionRequest(WebPageProxy* page, API::SecurityOrigin* origin, NotificationPermissionRequest* permissionRequest) override
         {
             if (!m_client.decidePolicyForNotificationPermissionRequest)
                 return false;
@@ -1586,7 +1706,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             m_client.pinnedStateDidChange(toAPI(&page), m_client.base.clientInfo);
         }
 
-        virtual void didBeginTrackingPotentialLongMousePress(WebPageProxy* page, const IntPoint& mouseDownPosition, const WebHitTestResult::Data& data, API::Object* userInfo)
+        virtual void didBeginTrackingPotentialLongMousePress(WebPageProxy* page, const IntPoint& mouseDownPosition, const WebHitTestResult::Data& data, API::Object* userInfo) override
         {
             if (!m_client.didBeginTrackingPotentialLongMousePress)
                 return;
@@ -1595,7 +1715,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             m_client.didBeginTrackingPotentialLongMousePress(toAPI(page), toAPI(mouseDownPosition), toAPI(webHitTestResult.get()), toAPI(userInfo), m_client.base.clientInfo);
         }
 
-        virtual void didRecognizeLongMousePress(WebPageProxy* page, API::Object* userInfo)
+        virtual void didRecognizeLongMousePress(WebPageProxy* page, API::Object* userInfo) override
         {
             if (!m_client.didRecognizeLongMousePress)
                 return;
@@ -1603,7 +1723,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             m_client.didRecognizeLongMousePress(toAPI(page), toAPI(userInfo), m_client.base.clientInfo);
         }
 
-        virtual void didCancelTrackingPotentialLongMousePress(WebPageProxy* page, API::Object* userInfo)
+        virtual void didCancelTrackingPotentialLongMousePress(WebPageProxy* page, API::Object* userInfo) override
         {
             if (!m_client.didCancelTrackingPotentialLongMousePress)
                 return;
@@ -1611,7 +1731,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             m_client.didCancelTrackingPotentialLongMousePress(toAPI(page), toAPI(userInfo), m_client.base.clientInfo);
         }
 
-        virtual void isPlayingAudioDidChange(WebPageProxy& page)
+        virtual void isPlayingAudioDidChange(WebPageProxy& page) override
         {
             if (!m_client.isPlayingAudioDidChange)
                 return;
@@ -1623,9 +1743,156 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
     toImpl(pageRef)->setUIClient(std::make_unique<UIClient>(wkClient));
 }
 
+void WKPageSetPageNavigationClient(WKPageRef pageRef, const WKPageNavigationClientBase* wkClient)
+{
+    class NavigationClient : public API::Client<WKPageNavigationClientBase>, public API::NavigationClient {
+    public:
+        explicit NavigationClient(const WKPageNavigationClientBase* client)
+        {
+            initialize(client);
+        }
+
+    private:
+        virtual void decidePolicyForNavigationAction(WebPageProxy& page, API::NavigationAction& navigationAction, Ref<WebKit::WebFramePolicyListenerProxy>&& listener, API::Object* userData) override
+        {
+            if (!m_client.decidePolicyForNavigationAction)
+                return;
+            m_client.decidePolicyForNavigationAction(toAPI(&page), toAPI(&navigationAction), toAPI(listener.ptr()), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void decidePolicyForNavigationResponse(WebPageProxy& page, API::NavigationResponse& navigationResponse, Ref<WebKit::WebFramePolicyListenerProxy>&& listener, API::Object* userData) override
+        {
+            if (!m_client.decidePolicyForNavigationResponse)
+                return;
+            m_client.decidePolicyForNavigationResponse(toAPI(&page), toAPI(&navigationResponse), toAPI(listener.ptr()), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didStartProvisionalNavigation(WebPageProxy& page, API::Navigation* navigation, API::Object* userData) override
+        {
+            if (!m_client.didStartProvisionalNavigation)
+                return;
+            m_client.didStartProvisionalNavigation(toAPI(&page), toAPI(navigation), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didReceiveServerRedirectForProvisionalNavigation(WebPageProxy& page, API::Navigation* navigation, API::Object* userData) override
+        {
+            if (!m_client.didReceiveServerRedirectForProvisionalNavigation)
+                return;
+            m_client.didReceiveServerRedirectForProvisionalNavigation(toAPI(&page), toAPI(navigation), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didFailProvisionalNavigationWithError(WebPageProxy& page, WebFrameProxy&, API::Navigation* navigation, const WebCore::ResourceError& error, API::Object* userData) override
+        {
+            if (!m_client.didFailProvisionalNavigation)
+                return;
+            m_client.didFailProvisionalNavigation(toAPI(&page), toAPI(navigation), toAPI(error), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didCommitNavigation(WebPageProxy& page, API::Navigation* navigation, API::Object* userData) override
+        {
+            if (!m_client.didCommitNavigation)
+                return;
+            m_client.didCommitNavigation(toAPI(&page), toAPI(navigation), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didFinishNavigation(WebPageProxy& page, API::Navigation* navigation, API::Object* userData) override
+        {
+            if (!m_client.didFinishNavigation)
+                return;
+            m_client.didFinishNavigation(toAPI(&page), toAPI(navigation), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didFailNavigationWithError(WebPageProxy& page, WebFrameProxy&, API::Navigation* navigation, const WebCore::ResourceError& error, API::Object* userData) override
+        {
+            if (!m_client.didFailNavigation)
+                return;
+            m_client.didFailNavigation(toAPI(&page), toAPI(navigation), toAPI(error), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didFailProvisionalLoadInSubframeWithError(WebPageProxy& page, WebFrameProxy& subframe, API::Navigation* navigation, const WebCore::ResourceError& error, API::Object* userData) override
+        {
+            if (!m_client.didFailProvisionalLoadInSubframe)
+                return;
+            m_client.didFailProvisionalLoadInSubframe(toAPI(&page), toAPI(navigation), toAPI(API::FrameInfo::create(subframe).ptr()), toAPI(error), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didFinishDocumentLoad(WebPageProxy& page, API::Navigation* navigation, API::Object* userData) override
+        {
+            if (!m_client.didFinishDocumentLoad)
+                return;
+            m_client.didFinishDocumentLoad(toAPI(&page), toAPI(navigation), toAPI(userData), m_client.base.clientInfo);
+        }
+
+        virtual void didSameDocumentNavigation(WebPageProxy& page, API::Navigation* navigation, WebKit::SameDocumentNavigationType navigationType, API::Object* userData) override
+        {
+            if (!m_client.didSameDocumentNavigation)
+                return;
+            m_client.didSameDocumentNavigation(toAPI(&page), toAPI(navigation), toAPI(navigationType), toAPI(userData), m_client.base.clientInfo);
+        }
+        
+        virtual void renderingProgressDidChange(WebPageProxy& page, WebCore::LayoutMilestones milestones, API::Object* userData) override
+        {
+            if (!m_client.renderingProgressDidChange)
+                return;
+            m_client.renderingProgressDidChange(toAPI(&page), pageRenderingProgressEvents(milestones), toAPI(userData), m_client.base.clientInfo);
+        }
+        
+        virtual bool canAuthenticateAgainstProtectionSpace(WebPageProxy& page, WebProtectionSpace* protectionSpace) override
+        {
+            if (!m_client.canAuthenticateAgainstProtectionSpace)
+                return false;
+            return m_client.canAuthenticateAgainstProtectionSpace(toAPI(&page), toAPI(protectionSpace), m_client.base.clientInfo);
+        }
+        
+        virtual void didReceiveAuthenticationChallenge(WebPageProxy& page, AuthenticationChallengeProxy* authenticationChallenge) override
+        {
+            if (!m_client.didReceiveAuthenticationChallenge)
+                return;
+            m_client.didReceiveAuthenticationChallenge(toAPI(&page), toAPI(authenticationChallenge), m_client.base.clientInfo);
+        }
+
+        virtual void processDidCrash(WebPageProxy& page) override
+        {
+            if (!m_client.webProcessDidCrash)
+                return;
+            m_client.webProcessDidCrash(toAPI(&page), m_client.base.clientInfo);
+        }
+
+        virtual PassRefPtr<API::Data> webCryptoMasterKey(WebPageProxy& page) override
+        {
+            if (!m_client.copyWebCryptoMasterKey)
+                return nullptr;
+            return adoptRef(toImpl(m_client.copyWebCryptoMasterKey(toAPI(&page), m_client.base.clientInfo)));
+        }
+        
+#if ENABLE(NETSCAPE_PLUGIN_API)
+        virtual PluginModuleLoadPolicy decidePolicyForPluginLoad(WebPageProxy& page, PluginModuleLoadPolicy currentPluginLoadPolicy, API::Dictionary* pluginInformation, String& unavailabilityDescription) override
+        {
+            WKStringRef unavailabilityDescriptionOut = 0;
+            PluginModuleLoadPolicy loadPolicy = currentPluginLoadPolicy;
+            
+            if (m_client.decidePolicyForPluginLoad)
+                loadPolicy = toPluginModuleLoadPolicy(m_client.decidePolicyForPluginLoad(toAPI(&page), toWKPluginLoadPolicy(currentPluginLoadPolicy), toAPI(pluginInformation), &unavailabilityDescriptionOut, m_client.base.clientInfo));
+            
+            if (unavailabilityDescriptionOut) {
+                RefPtr<API::String> webUnavailabilityDescription = adoptRef(toImpl(unavailabilityDescriptionOut));
+                unavailabilityDescription = webUnavailabilityDescription->string();
+            }
+            
+            return loadPolicy;
+        }
+#endif
+    };
+
+    WebPageProxy* webPageProxy = toImpl(pageRef);
+
+    auto navigationClient = std::make_unique<NavigationClient>(wkClient);
+    webPageProxy->setNavigationClient(WTF::move(navigationClient));
+}
+
 void WKPageSetSession(WKPageRef pageRef, WKSessionRef session)
 {
-    toImpl(pageRef)->setSession(*toImpl(session));
+    toImpl(pageRef)->setSessionID(toImpl(session)->getID());
 }
 
 void WKPageRunJavaScriptInMainFrame(WKPageRef pageRef, WKStringRef scriptRef, void* context, WKPageRunJavaScriptFunction callback)
@@ -1804,6 +2071,11 @@ void WKPageSetAllowsRemoteInspection(WKPageRef page, bool allow)
 void WKPageSetMediaVolume(WKPageRef page, float volume)
 {
     toImpl(page)->setMediaVolume(volume);    
+}
+
+void WKPageSetMuted(WKPageRef page, bool muted)
+{
+    toImpl(page)->setMuted(muted);
 }
 
 void WKPagePostMessageToInjectedBundle(WKPageRef pageRef, WKStringRef messageNameRef, WKTypeRef messageBodyRef)

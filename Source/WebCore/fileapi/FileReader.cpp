@@ -45,11 +45,11 @@ namespace WebCore {
 
 static const auto progressNotificationInterval = std::chrono::milliseconds(50);
 
-PassRefPtr<FileReader> FileReader::create(ScriptExecutionContext& context)
+Ref<FileReader> FileReader::create(ScriptExecutionContext& context)
 {
-    RefPtr<FileReader> fileReader(adoptRef(new FileReader(context)));
+    Ref<FileReader> fileReader = adoptRef(*new FileReader(context));
     fileReader->suspendIfNeeded();
-    return fileReader.release();
+    return fileReader;
 }
 
 FileReader::FileReader(ScriptExecutionContext& context)
@@ -152,7 +152,7 @@ void FileReader::abort()
     m_aborting = true;
 
     // Schedule to have the abort done later since abort() might be called from the event handler and we do not want the resource loading code to be in the stack.
-    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+    scriptExecutionContext()->postTask([this] (ScriptExecutionContext&) {
         ASSERT(m_state != DONE);
 
         terminate();

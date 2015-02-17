@@ -65,14 +65,16 @@ private:
     void destroyPluginControllerProxy(PluginControllerProxy*);
 
     // IPC::Connection::Client
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
-    virtual void didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
-    virtual void didClose(IPC::Connection*);
-    virtual void didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference messageReceiverName, IPC::StringReference messageName);
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    virtual void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
+    virtual void didClose(IPC::Connection&) override;
+    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::Plugin; }
+    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Web; }
 
     // Message handlers.
-    void didReceiveWebProcessConnectionMessage(IPC::Connection*, IPC::MessageDecoder&);
-    void didReceiveSyncWebProcessConnectionMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
+    void didReceiveWebProcessConnectionMessage(IPC::Connection&, IPC::MessageDecoder&);
+    void didReceiveSyncWebProcessConnectionMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
     void createPlugin(const PluginCreationParameters&, PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply>);
     void createPluginAsynchronously(const PluginCreationParameters&);
     void destroyPlugin(uint64_t pluginInstanceID, bool asynchronousCreationIncomplete, PassRefPtr<Messages::WebProcessConnection::DestroyPlugin::DelayedReply>);

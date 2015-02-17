@@ -52,7 +52,7 @@ PassRefPtr<ScrollingCoordinator> ScrollingCoordinator::create(Page* page)
 
 ScrollingCoordinatorIOS::ScrollingCoordinatorIOS(Page* page)
     : AsyncScrollingCoordinator(page)
-    , m_scrollingStateTreeCommitterTimer(this, &ScrollingCoordinatorIOS::scrollingStateTreeCommitterTimerFired)
+    , m_scrollingStateTreeCommitterTimer(*this, &ScrollingCoordinatorIOS::scrollingStateTreeCommitterTimerFired)
 {
     setScrollingTree(ScrollingTreeIOS::create(this));
 }
@@ -91,7 +91,7 @@ void ScrollingCoordinatorIOS::scheduleTreeStateCommit()
     m_scrollingStateTreeCommitterTimer.startOneShot(0);
 }
 
-void ScrollingCoordinatorIOS::scrollingStateTreeCommitterTimerFired(Timer<ScrollingCoordinatorIOS>*)
+void ScrollingCoordinatorIOS::scrollingStateTreeCommitterTimerFired()
 {
     commitTreeState();
 }
@@ -100,7 +100,7 @@ void ScrollingCoordinatorIOS::commitTreeState()
 {
     ASSERT(scrollingStateTree()->hasChangedProperties());
 
-    OwnPtr<ScrollingStateTree> treeState = scrollingStateTree()->commit(LayerRepresentation::PlatformLayerRepresentation);
+    scrollingStateTree()->commit(LayerRepresentation::PlatformLayerRepresentation);
     // FIXME: figure out how to commit.
 }
 

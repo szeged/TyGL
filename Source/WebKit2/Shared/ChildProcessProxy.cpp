@@ -119,12 +119,12 @@ void ChildProcessProxy::removeMessageReceiver(IPC::StringReference messageReceiv
     m_messageReceiverMap.removeMessageReceiver(messageReceiverName, destinationID);
 }
 
-bool ChildProcessProxy::dispatchMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder)
+bool ChildProcessProxy::dispatchMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
 {
     return m_messageReceiverMap.dispatchMessage(connection, decoder);
 }
 
-bool ChildProcessProxy::dispatchSyncMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
+bool ChildProcessProxy::dispatchSyncMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
 {
     return m_messageReceiverMap.dispatchSyncMessage(connection, decoder, replyEncoder);
 }
@@ -133,12 +133,12 @@ void ChildProcessProxy::didFinishLaunching(ProcessLauncher*, IPC::Connection::Id
 {
     ASSERT(!m_connection);
 
-    m_connection = IPC::Connection::createServerConnection(connectionIdentifier, this, RunLoop::main());
+    m_connection = IPC::Connection::createServerConnection(connectionIdentifier, *this, RunLoop::main());
 #if PLATFORM(MAC)
     m_connection->setShouldCloseConnectionOnMachExceptions();
 #endif
 
-    connectionWillOpen(m_connection.get());
+    connectionWillOpen(*m_connection);
     m_connection->open();
 
     for (size_t i = 0; i < m_pendingMessages.size(); ++i) {
@@ -164,17 +164,18 @@ void ChildProcessProxy::clearConnection()
     if (!m_connection)
         return;
 
-    connectionWillClose(m_connection.get());
+    // FIXME: Call this after the connection has been invalidated.
+    connectionDidClose(*m_connection);
 
     m_connection->invalidate();
     m_connection = nullptr;
 }
 
-void ChildProcessProxy::connectionWillOpen(IPC::Connection*)
+void ChildProcessProxy::connectionWillOpen(IPC::Connection&)
 {
 }
 
-void ChildProcessProxy::connectionWillClose(IPC::Connection*)
+void ChildProcessProxy::connectionDidClose(IPC::Connection&)
 {
 }
 

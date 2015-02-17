@@ -70,6 +70,9 @@ public:
     void updateCaptionDisplaySizes();
     void enteredFullscreen();
     void exitedFullscreen();
+    void enterFullscreenOptimized();
+    bool optimizedFullscreenSupported();
+    String mediaUIImageData(const String&) const;
 
     String externalDeviceDisplayName() const;
     String externalDeviceType() const;

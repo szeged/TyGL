@@ -19,6 +19,7 @@ xcopy /y /d "%CONFIGURATIONBUILDDIR%\obj%PlatformArchitecture%\WebCore\DerivedSo
 xcopy /y /d "%ProjectDir%..\Modules\filesystem\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\Modules\gamepad\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\Modules\geolocation\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
+xcopy /y /d "%ProjectDir%..\Modules\indexeddb\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\Modules\mediacontrols\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\Modules\mediasource\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\Modules\navigatorcontentutils\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
@@ -58,6 +59,8 @@ xcopy /y /d "%ProjectDir%..\platform\graphics\gstreamer\*.h" "%CONFIGURATIONBUIL
 xcopy /y /d "%ProjectDir%..\platform\graphics\win\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\graphics\win\%1\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\graphics\opentype\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
+xcopy /y /d "%ProjectDir%..\platform\graphics\opengl\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
+xcopy /y /d "%ProjectDir%..\platform\graphics\texmap\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\mock\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\text\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\text\icu\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
@@ -65,6 +68,7 @@ xcopy /y /d "%ProjectDir%..\platform\text\transcoder\*.h" "%CONFIGURATIONBUILDDI
 xcopy /y /d "%ProjectDir%..\platform\win\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\network\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\network\%2\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
+xcopy /y /d "%ProjectDir%..\platform\spi\cg\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\sql\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\platform\cairo\cairo\src\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\bindings\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
@@ -75,6 +79,7 @@ xcopy /y /d "%ProjectDir%..\page\scrolling\*.h" "%CONFIGURATIONBUILDDIR%\include
 xcopy /y /d "%ProjectDir%..\page\animation\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\page\win\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\bridge\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
+xcopy /y /d "%ProjectDir%..\bridge\c\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\bridge\jsc\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\plugins\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
 xcopy /y /d "%ProjectDir%..\plugins\win\*.h" "%CONFIGURATIONBUILDDIR%\include\WebCore"
@@ -107,6 +112,5 @@ xcopy /y /d "%ProjectDir%..\testing\js\WebCoreTestSupport.h" "%CONFIGURATIONBUIL
 
 set DerivedSourcesDirectory=%CONFIGURATIONBUILDDIR%\obj%PlatformArchitecture%\WebCore\DerivedSources
 set PrivateHeadersDirectory=%CONFIGURATIONBUILDDIR%\include\private\WebCore
-xcopy /y "%DerivedSourcesDirectory%\InspectorWebBackendCommands.js" "%PrivateHeadersDirectory%"
 
 if exist "%CONFIGURATIONBUILDDIR%\buildfailed" del "%CONFIGURATIONBUILDDIR%\buildfailed"

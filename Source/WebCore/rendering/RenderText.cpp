@@ -1,7 +1,7 @@
 /*
  * (C) 1999 Lars Knoll (knoll@kde.org)
  * (C) 2000 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2007, 2013-2015 Apple Inc. All rights reserved.
  * Copyright (C) 2006 Andrew Wellington (proton@wiretapped.net)
  * Copyright (C) 2006 Graham Dennis (graham.dennis@gmail.com)
  *
@@ -75,37 +75,52 @@ struct SameSizeAsRenderText : public RenderObject {
 
 COMPILE_ASSERT(sizeof(RenderText) == sizeof(SameSizeAsRenderText), RenderText_should_stay_small);
 
-class SecureTextTimer;
-typedef HashMap<RenderText*, SecureTextTimer*> SecureTextTimerMap;
-static SecureTextTimerMap* gSecureTextTimers = 0;
-
-class SecureTextTimer : public TimerBase {
+class SecureTextTimer final : private TimerBase {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    SecureTextTimer(RenderText* renderText)
-        : m_renderText(renderText)
-        , m_lastTypedCharacterOffset(-1)
-    {
-    }
+    explicit SecureTextTimer(RenderText&);
+    void restart(unsigned offsetAfterLastTypedCharacter);
 
-    void restartWithNewText(unsigned lastTypedCharacterOffset)
-    {
-        m_lastTypedCharacterOffset = lastTypedCharacterOffset;
-        const Settings& settings = m_renderText->frame().settings();
-        startOneShot(settings.passwordEchoDurationInSeconds());
-    }
-    void invalidate() { m_lastTypedCharacterOffset = -1; }
-    unsigned lastTypedCharacterOffset() { return m_lastTypedCharacterOffset; }
+    unsigned takeOffsetAfterLastTypedCharacter();
 
 private:
-    virtual void fired()
-    {
-        ASSERT(gSecureTextTimers->contains(m_renderText));
-        m_renderText->setText(m_renderText->text(), true /* forcing setting text as it may be masked later */);
-    }
-
-    RenderText* m_renderText;
-    int m_lastTypedCharacterOffset;
+    virtual void fired() override;
+    RenderText& m_renderer;
+    unsigned m_offsetAfterLastTypedCharacter { 0 };
 };
+
+typedef HashMap<RenderText*, std::unique_ptr<SecureTextTimer>> SecureTextTimerMap;
+
+static SecureTextTimerMap& secureTextTimers()
+{
+    static NeverDestroyed<SecureTextTimerMap> map;
+    return map.get();
+}
+
+inline SecureTextTimer::SecureTextTimer(RenderText& renderer)
+    : m_renderer(renderer)
+{
+}
+
+inline void SecureTextTimer::restart(unsigned offsetAfterLastTypedCharacter)
+{
+    m_offsetAfterLastTypedCharacter = offsetAfterLastTypedCharacter;
+    startOneShot(m_renderer.frame().settings().passwordEchoDurationInSeconds());
+}
+
+inline unsigned SecureTextTimer::takeOffsetAfterLastTypedCharacter()
+{
+    unsigned offset = m_offsetAfterLastTypedCharacter;
+    m_offsetAfterLastTypedCharacter = 0;
+    return offset;
+}
+
+void SecureTextTimer::fired()
+{
+    ASSERT(secureTextTimers().get(&m_renderer) == this);
+    m_offsetAfterLastTypedCharacter = 0;
+    m_renderer.setText(m_renderer.text(), true /* forcing setting text as it may be masked later */);
+}
 
 static HashMap<const RenderText*, String>& originalTextMap()
 {
@@ -164,6 +179,7 @@ inline RenderText::RenderText(Node& node, const String& text)
     , m_knownToHaveNoOverflowAndNoFallbackFonts(false)
     , m_useBackslashAsYenSymbol(false)
     , m_originalTextDiffersFromRendered(false)
+    , m_contentIsKnownToFollow(false)
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     , m_candidateComputedTextSize(0)
 #endif
@@ -213,8 +229,8 @@ bool RenderText::isTextFragment() const
 bool RenderText::computeUseBackslashAsYenSymbol() const
 {
     const RenderStyle& style = this->style();
-    const FontDescription& fontDescription = style.font().fontDescription();
-    if (style.font().useBackslashAsYenSymbol())
+    const FontDescription& fontDescription = style.fontCascade().fontDescription();
+    if (style.fontCascade().useBackslashAsYenSymbol())
         return true;
     if (fontDescription.isSpecifiedFont())
         return false;
@@ -240,7 +256,7 @@ void RenderText::styleDidChange(StyleDifference diff, const RenderStyle* oldStyl
     if (!oldStyle) {
         m_useBackslashAsYenSymbol = computeUseBackslashAsYenSymbol();
         needsResetText = m_useBackslashAsYenSymbol;
-    } else if (oldStyle->font().useBackslashAsYenSymbol() != newStyle.font().useBackslashAsYenSymbol()) {
+    } else if (oldStyle->fontCascade().useBackslashAsYenSymbol() != newStyle.fontCascade().useBackslashAsYenSymbol()) {
         m_useBackslashAsYenSymbol = computeUseBackslashAsYenSymbol();
         needsResetText = true;
     }
@@ -264,8 +280,7 @@ void RenderText::removeAndDestroyTextBoxes()
 
 void RenderText::willBeDestroyed()
 {
-    if (SecureTextTimer* secureTextTimer = gSecureTextTimers ? gSecureTextTimers->take(this) : 0)
-        delete secureTextTimer;
+    secureTextTimers().remove(this);
 
     removeAndDestroyTextBoxes();
     RenderObject::willBeDestroyed();
@@ -431,15 +446,15 @@ LayoutRect RenderText::localCaretRect(InlineBox* inlineBox, int caretOffset, Lay
     if (!inlineBox)
         return LayoutRect();
 
-    InlineTextBox* box = toInlineTextBox(inlineBox);
-    float left = box->positionForOffset(caretOffset);
-    return box->root().computeCaretRect(left, caretWidth, extraWidthToEndOfLine);
+    auto& box = downcast<InlineTextBox>(*inlineBox);
+    float left = box.positionForOffset(caretOffset);
+    return box.root().computeCaretRect(left, caretWidth, extraWidthToEndOfLine);
 }
 
-ALWAYS_INLINE float RenderText::widthFromCache(const Font& f, int start, int len, float xPos, HashSet<const SimpleFontData*>* fallbackFonts, GlyphOverflow* glyphOverflow, const RenderStyle& style) const
+ALWAYS_INLINE float RenderText::widthFromCache(const FontCascade& f, int start, int len, float xPos, HashSet<const Font*>* fallbackFonts, GlyphOverflow* glyphOverflow, const RenderStyle& style) const
 {
-    if (style.hasTextCombine() && isCombineText()) {
-        const RenderCombineText& combineText = toRenderCombineText(*this);
+    if (style.hasTextCombine() && is<RenderCombineText>(*this)) {
+        const RenderCombineText& combineText = downcast<RenderCombineText>(*this);
         if (combineText.isCombined())
             return combineText.combinedTextWidth(f);
     }
@@ -529,7 +544,7 @@ void RenderText::trimmedPrefWidths(float leadWidth,
     ASSERT(m_text);
     StringImpl& text = *m_text.impl();
     if (text[0] == ' ' || (text[0] == '\n' && !style.preserveNewline()) || text[0] == '\t') {
-        const Font& font = style.font(); // FIXME: This ignores first-line.
+        const FontCascade& font = style.fontCascade(); // FIXME: This ignores first-line.
         if (stripFrontSpaces) {
             const UChar space = ' ';
             float spaceWidth = font.width(RenderBlock::constructTextRun(this, font, &space, 1, style));
@@ -545,7 +560,7 @@ void RenderText::trimmedPrefWidths(float leadWidth,
 
     // Compute our max widths by scanning the string for newlines.
     if (hasBreak) {
-        const Font& f = style.font(); // FIXME: This ignores first-line.
+        const FontCascade& f = style.fontCascade(); // FIXME: This ignores first-line.
         bool firstLine = true;
         beginMaxW = maxW;
         endMaxW = maxW;
@@ -597,22 +612,38 @@ float RenderText::maxLogicalWidth() const
     return m_maxWidth;
 }
 
+LineBreakIteratorMode mapLineBreakToIteratorMode(LineBreak lineBreak)
+{
+    switch (lineBreak) {
+    case LineBreakAuto:
+    case LineBreakAfterWhiteSpace:
+        return LineBreakIteratorModeUAX14;
+    case LineBreakLoose:
+        return LineBreakIteratorModeUAX14Loose;
+    case LineBreakNormal:
+        return LineBreakIteratorModeUAX14Normal;
+    case LineBreakStrict:
+        return LineBreakIteratorModeUAX14Strict;
+    }
+    return LineBreakIteratorModeUAX14;
+}
+
 void RenderText::computePreferredLogicalWidths(float leadWidth)
 {
-    HashSet<const SimpleFontData*> fallbackFonts;
+    HashSet<const Font*> fallbackFonts;
     GlyphOverflow glyphOverflow;
     computePreferredLogicalWidths(leadWidth, fallbackFonts, glyphOverflow);
     if (fallbackFonts.isEmpty() && !glyphOverflow.left && !glyphOverflow.right && !glyphOverflow.top && !glyphOverflow.bottom)
         m_knownToHaveNoOverflowAndNoFallbackFonts = true;
 }
 
-static inline float hyphenWidth(RenderText* renderer, const Font& font)
+static inline float hyphenWidth(RenderText* renderer, const FontCascade& font)
 {
     const RenderStyle& style = renderer->style();
     return font.width(RenderBlock::constructTextRun(renderer, font, style.hyphenString().string(), style));
 }
 
-static float maxWordFragmentWidth(RenderText* renderer, const RenderStyle& style, const Font& font, StringView word, int minimumPrefixLength, unsigned minimumSuffixLength, int& suffixStart, HashSet<const SimpleFontData*>& fallbackFonts, GlyphOverflow& glyphOverflow)
+static float maxWordFragmentWidth(RenderText* renderer, const RenderStyle& style, const FontCascade& font, StringView word, int minimumPrefixLength, unsigned minimumSuffixLength, int& suffixStart, HashSet<const Font*>& fallbackFonts, GlyphOverflow& glyphOverflow)
 {
     suffixStart = 0;
     if (word.length() <= minimumSuffixLength)
@@ -652,7 +683,7 @@ static float maxWordFragmentWidth(RenderText* renderer, const RenderStyle& style
     return maxFragmentWidth;
 }
 
-void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const SimpleFontData*>& fallbackFonts, GlyphOverflow& glyphOverflow)
+void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Font*>& fallbackFonts, GlyphOverflow& glyphOverflow)
 {
     ASSERT(m_hasTab || preferredLogicalWidthsDirty() || !m_knownToHaveNoOverflowAndNoFallbackFonts);
 
@@ -670,10 +701,10 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
     m_hasEndWS = false;
 
     const RenderStyle& style = this->style();
-    const Font& font = style.font(); // FIXME: This ignores first-line.
+    const FontCascade& font = style.fontCascade(); // FIXME: This ignores first-line.
     float wordSpacing = font.wordSpacing();
     int len = textLength();
-    LazyLineBreakIterator breakIterator(m_text, style.locale());
+    LazyLineBreakIterator breakIterator(m_text, style.locale(), mapLineBreakToIteratorMode(style.lineBreak()));
     bool needsWordSpacing = false;
     bool ignoringSpaces = false;
     bool isSpace = false;
@@ -708,6 +739,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
 
     bool breakNBSP = style.autoWrap() && style.nbspMode() == SPACE;
     bool breakAll = (style.wordBreak() == BreakAllWordBreak || style.wordBreak() == BreakWordBreak) && style.autoWrap();
+    bool isLooseCJKMode = breakIterator.isLooseCJKMode();
 
     for (int i = 0; i < len; i++) {
         UChar c = uncheckedCharacterAt(i);
@@ -755,7 +787,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
             continue;
         }
 
-        bool hasBreak = breakAll || isBreakable(breakIterator, i, nextBreakable, breakNBSP);
+        bool hasBreak = breakAll || isBreakable(breakIterator, i, nextBreakable, breakNBSP, isLooseCJKMode);
         bool betweenWords = true;
         int j = i;
         while (c != '\n' && !isSpaceAccordingToStyle(c, style) && c != '\t' && (c != softHyphen || style.hyphens() == HyphensNone)) {
@@ -763,7 +795,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
             if (j == len)
                 break;
             c = uncheckedCharacterAt(j);
-            if (isBreakable(breakIterator, j, nextBreakable, breakNBSP) && characterAt(j - 1) != softHyphen)
+            if (isBreakable(breakIterator, j, nextBreakable, breakNBSP, isLooseCJKMode) && characterAt(j - 1) != softHyphen)
                 break;
             if (breakAll) {
                 betweenWords = false;
@@ -989,6 +1021,11 @@ UChar RenderText::previousCharacter() const
     return prev;
 }
 
+LayoutUnit RenderText::topOfFirstText() const
+{
+    return firstTextBox()->root().lineTop();
+}
+
 void applyTextTransform(const RenderStyle& style, String& text, UChar previousCharacter)
 {
     switch (style.textTransform()) {
@@ -1021,30 +1058,28 @@ void RenderText::setRenderedText(const String& text)
 
     applyTextTransform(style(), m_text, previousCharacter());
 
-    // We use the same characters here as for list markers.
-    // See the listMarkerText function in RenderListMarker.cpp.
     switch (style().textSecurity()) {
     case TSNONE:
         break;
+#if !PLATFORM(IOS)
+    // We use the same characters here as for list markers.
+    // See the listMarkerText function in RenderListMarker.cpp.
     case TSCIRCLE:
-#if PLATFORM(IOS)
-        secureText(blackCircle);
-#else
         secureText(whiteBullet);
-#endif
         break;
     case TSDISC:
-#if PLATFORM(IOS)
-        secureText(blackCircle);
-#else
         secureText(bullet);
-#endif
         break;
     case TSSQUARE:
-#if PLATFORM(IOS)
-        secureText(blackCircle);
-#else
         secureText(blackSquare);
+        break;
+#else
+    // FIXME: Why this quirk on iOS?
+    case TSCIRCLE:
+    case TSDISC:
+    case TSSQUARE:
+        secureText(blackCircle);
+        break;
 #endif
     }
 
@@ -1062,26 +1097,36 @@ void RenderText::setRenderedText(const String& text)
     }
 }
 
-void RenderText::secureText(UChar mask)
+void RenderText::secureText(UChar maskingCharacter)
 {
-    if (!textLength())
+    // This hides the text by replacing all the characters with the masking character.
+    // Offsets within the hidden text have to match offsets within the original text
+    // to handle things like carets and selection, so this won't work right if any
+    // of the characters are surrogate pairs or combining marks. Thus, this function
+    // does not attempt to handle either of those.
+
+    unsigned length = textLength();
+    if (!length)
         return;
 
-    int lastTypedCharacterOffsetToReveal = -1;
-    String revealedText;
-    SecureTextTimer* secureTextTimer = gSecureTextTimers ? gSecureTextTimers->get(this) : nullptr;
-    if (secureTextTimer && secureTextTimer->isActive()) {
-        lastTypedCharacterOffsetToReveal = secureTextTimer->lastTypedCharacterOffset();
-        if (lastTypedCharacterOffsetToReveal >= 0)
-            revealedText = m_text.substring(lastTypedCharacterOffsetToReveal, 1);
+    UChar characterToReveal = 0;
+    unsigned revealedCharactersOffset;
+
+    if (SecureTextTimer* timer = secureTextTimers().get(this)) {
+        // We take the offset out of the timer to make this one-shot. We count on this being called only once.
+        // If it's called a second time we assume the text is different and a character should not be revealed.
+        revealedCharactersOffset = timer->takeOffsetAfterLastTypedCharacter();
+        if (revealedCharactersOffset && revealedCharactersOffset <= length)
+            characterToReveal = m_text[--revealedCharactersOffset];
     }
 
-    m_text.fill(mask);
-    if (lastTypedCharacterOffsetToReveal >= 0) {
-        m_text.replace(lastTypedCharacterOffsetToReveal, 1, revealedText);
-        // m_text may be updated later before timer fires. We invalidate the lastTypedCharacterOffset to avoid inconsistency.
-        secureTextTimer->invalidate();
-    }
+    UChar* characters;
+    m_text = String::createUninitialized(length, characters);
+
+    for (unsigned i = 0; i < length; ++i)
+        characters[i] = maskingCharacter;
+    if (characterToReveal)
+        characters[revealedCharactersOffset] = characterToReveal;
 }
 
 void RenderText::setText(const String& text, bool force)
@@ -1161,7 +1206,7 @@ const SimpleLineLayout::Layout* RenderText::simpleLineLayout() const
     return downcast<RenderBlockFlow>(*parent()).simpleLineLayout();
 }
 
-float RenderText::width(unsigned from, unsigned len, float xPos, bool firstLine, HashSet<const SimpleFontData*>* fallbackFonts, GlyphOverflow* glyphOverflow) const
+float RenderText::width(unsigned from, unsigned len, float xPos, bool firstLine, HashSet<const Font*>* fallbackFonts, GlyphOverflow* glyphOverflow) const
 {
     if (from >= textLength())
         return 0;
@@ -1170,10 +1215,10 @@ float RenderText::width(unsigned from, unsigned len, float xPos, bool firstLine,
         len = textLength() - from;
 
     const RenderStyle& lineStyle = firstLine ? firstLineStyle() : style();
-    return width(from, len, lineStyle.font(), xPos, fallbackFonts, glyphOverflow);
+    return width(from, len, lineStyle.fontCascade(), xPos, fallbackFonts, glyphOverflow);
 }
 
-float RenderText::width(unsigned from, unsigned len, const Font& f, float xPos, HashSet<const SimpleFontData*>* fallbackFonts, GlyphOverflow* glyphOverflow) const
+float RenderText::width(unsigned from, unsigned len, const FontCascade& f, float xPos, HashSet<const Font*>* fallbackFonts, GlyphOverflow* glyphOverflow) const
 {
     ASSERT(from + len <= textLength());
     if (!textLength())
@@ -1181,7 +1226,7 @@ float RenderText::width(unsigned from, unsigned len, const Font& f, float xPos, 
 
     const RenderStyle& style = this->style();
     float w;
-    if (&f == &style.font()) {
+    if (&f == &style.fontCascade()) {
         if (!style.preserveNewline() && !from && len == textLength() && (!glyphOverflow || !glyphOverflow->computeBounds)) {
             if (fallbackFonts) {
                 ASSERT(glyphOverflow);
@@ -1376,21 +1421,31 @@ enum HangulState {
     HangulStateBreak
 };
 
-inline bool isHangulLVT(UChar32 character)
+static inline bool isHangulLVT(UChar32 character)
 {
     return (character - HANGUL_SYLLABLE_START) % HANGUL_JONGSEONG_COUNT;
 }
 
-inline bool isMark(UChar32 c)
+static inline bool isMark(UChar32 character)
 {
-    int8_t charType = u_charType(c);
+    int8_t charType = u_charType(character);
     return charType == U_NON_SPACING_MARK || charType == U_ENCLOSING_MARK || charType == U_COMBINING_SPACING_MARK;
 }
 
-inline bool isRegionalIndicator(UChar32 c)
+static inline bool isRegionalIndicator(UChar32 character)
 {
     // National flag emoji each consists of a pair of regional indicator symbols.
-    return 0x1F1E6 <= c && c <= 0x1F1FF;
+    return 0x1F1E6 <= character && character <= 0x1F1FF;
+}
+
+static inline bool isEmojiGroupCandidate(UChar32 character)
+{
+    return character >= 0x1F466 && character <= 0x1F469;
+}
+
+static inline bool isEmojiModifier(UChar32 character)
+{
+    return character >= 0x1F3FB && character <= 0x1F3FF;
 }
 
 #endif
@@ -1402,6 +1457,9 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
     StringImpl& text = *m_text.impl();
     UChar32 character;
     bool sawRegionalIndicator = false;
+    bool sawEmojiGroupCandidate = false;
+    bool sawEmojiModifier = false;
+    
     while (current > 0) {
         if (U16_IS_TRAIL(text[--current]))
             --current;
@@ -1409,6 +1467,22 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
             break;
 
         UChar32 character = text.characterStartingAt(current);
+
+        if (sawEmojiGroupCandidate) {
+            sawEmojiGroupCandidate = false;
+            if (character == zeroWidthJoiner)
+                continue;
+            // We could have two emoji group candidates without a joiner in between.
+            // Those should not be treated as a group.
+            U16_FWD_1_UNSAFE(text, current);
+            break;
+        }
+
+        if (sawEmojiModifier) {
+            if (isEmojiModifier(character))
+                U16_FWD_1_UNSAFE(text, current);
+            break;
+        }
 
         if (sawRegionalIndicator) {
             // We don't check if the pair of regional indicator symbols before current position can actually be combined
@@ -1426,6 +1500,16 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
 
         if (isRegionalIndicator(character)) {
             sawRegionalIndicator = true;
+            continue;
+        }
+        
+        if (isEmojiModifier(character)) {
+            sawEmojiModifier = true;
+            continue;
+        }
+
+        if (isEmojiGroupCandidate(character)) {
+            sawEmojiGroupCandidate = true;
             continue;
         }
 
@@ -1511,20 +1595,17 @@ bool RenderText::computeCanUseSimpleFontCodePath() const
 {
     if (isAllASCII() || m_text.is8Bit())
         return true;
-    return Font::characterRangeCodePath(characters16(), length()) == Font::Simple;
+    return FontCascade::characterRangeCodePath(characters16(), length()) == FontCascade::Simple;
 }
 
-void RenderText::momentarilyRevealLastTypedCharacter(unsigned lastTypedCharacterOffset)
+void RenderText::momentarilyRevealLastTypedCharacter(unsigned offsetAfterLastTypedCharacter)
 {
-    if (!gSecureTextTimers)
-        gSecureTextTimers = new SecureTextTimerMap;
-
-    SecureTextTimer* secureTextTimer = gSecureTextTimers->get(this);
-    if (!secureTextTimer) {
-        secureTextTimer = new SecureTextTimer(this);
-        gSecureTextTimers->add(this, secureTextTimer);
-    }
-    secureTextTimer->restartWithNewText(lastTypedCharacterOffset);
+    if (style().textSecurity() == TSNONE)
+        return;
+    auto& secureTextTimer = secureTextTimers().add(this, nullptr).iterator->value;
+    if (!secureTextTimer)
+        secureTextTimer = std::make_unique<SecureTextTimer>(*this);
+    secureTextTimer->restart(offsetAfterLastTypedCharacter);
 }
 
 StringView RenderText::stringView(int start, int stop) const

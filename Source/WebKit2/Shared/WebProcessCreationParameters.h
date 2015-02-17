@@ -29,7 +29,8 @@
 #include "CacheModel.h"
 #include "SandboxExtension.h"
 #include "TextCheckerState.h"
-#include <WebCore/SessionIDHash.h>
+#include "UserData.h"
+#include <WebCore/SessionID.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/StringHash.h>
@@ -37,7 +38,7 @@
 
 #if PLATFORM(COCOA)
 #include "MachPort.h"
-
+#include <WebCore/MachSendRight.h>
 #endif
 
 #if USE(SOUP)
@@ -49,20 +50,23 @@ class Data;
 }
 
 namespace IPC {
-    class ArgumentDecoder;
-    class ArgumentEncoder;
+class ArgumentDecoder;
+class ArgumentEncoder;
 }
 
 namespace WebKit {
 
 struct WebProcessCreationParameters {
     WebProcessCreationParameters();
+    ~WebProcessCreationParameters();
 
     void encode(IPC::ArgumentEncoder&) const;
     static bool decode(IPC::ArgumentDecoder&, WebProcessCreationParameters&);
 
     String injectedBundlePath;
     SandboxExtension::Handle injectedBundlePathExtensionHandle;
+
+    UserData initializationUserData;
 
     String applicationCacheDirectory;    
     SandboxExtension::Handle applicationCacheDirectoryExtensionHandle;
@@ -78,6 +82,8 @@ struct WebProcessCreationParameters {
     // FIXME: Remove this once <rdar://problem/17726660> is fixed.
     SandboxExtension::Handle hstsDatabasePathExtensionHandle;
 #endif
+    SandboxExtension::Handle mediaKeyStorageDirectoryExtensionHandle;
+    String mediaKeyStorageDirectory;
 
     bool shouldUseTestingNetworkSession;
 
@@ -91,13 +97,8 @@ struct WebProcessCreationParameters {
 #if ENABLE(CACHE_PARTITIONING)
     Vector<String> urlSchemesRegisteredAsCachePartitioned;
 #endif
-#if ENABLE(CUSTOM_PROTOCOLS)
     Vector<String> urlSchemesRegisteredForCustomProtocols;
-#endif
 #if USE(SOUP)
-#if !ENABLE(CUSTOM_PROTOCOLS)
-    Vector<String> urlSchemesRegistered;
-#endif
     String cookiePersistentStoragePath;
     uint32_t cookiePersistentStorageType;
     HTTPCookieAcceptPolicy cookieAcceptPolicy;
@@ -133,12 +134,11 @@ struct WebProcessCreationParameters {
     uint64_t nsURLCacheMemoryCapacity;
     uint64_t nsURLCacheDiskCapacity;
 
-    IPC::MachPort acceleratedCompositingPort;
+    WebCore::MachSendRight acceleratedCompositingPort;
 
     String uiProcessBundleResourcePath;
     SandboxExtension::Handle uiProcessBundleResourcePathExtensionHandle;
 
-    bool shouldForceScreenFontSubstitution;
     bool shouldEnableKerningAndLigaturesByDefault;
     bool shouldEnableJIT;
     bool shouldEnableFTLJIT;

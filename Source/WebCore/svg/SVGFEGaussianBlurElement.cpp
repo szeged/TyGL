@@ -53,9 +53,9 @@ inline SVGFEGaussianBlurElement::SVGFEGaussianBlurElement(const QualifiedName& t
     registerAnimatedPropertiesForSVGFEGaussianBlurElement();
 }
 
-PassRefPtr<SVGFEGaussianBlurElement> SVGFEGaussianBlurElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEGaussianBlurElement> SVGFEGaussianBlurElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEGaussianBlurElement(tagName, document));
+    return adoptRef(*new SVGFEGaussianBlurElement(tagName, document));
 }
 
 const AtomicString& SVGFEGaussianBlurElement::stdDeviationXIdentifier()
@@ -130,7 +130,7 @@ void SVGFEGaussianBlurElement::svgAttributeChanged(const QualifiedName& attrName
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::inAttr
         || attrName == SVGNames::stdDeviationAttr

@@ -38,14 +38,14 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderTableRow::RenderTableRow(Element& element, PassRef<RenderStyle> style)
+RenderTableRow::RenderTableRow(Element& element, Ref<RenderStyle>&& style)
     : RenderBox(element, WTF::move(style), 0)
     , m_rowIndex(unsetRowIndex)
 {
     setInline(false);
 }
 
-RenderTableRow::RenderTableRow(Document& document, PassRef<RenderStyle> style)
+RenderTableRow::RenderTableRow(Document& document, Ref<RenderStyle>&& style)
     : RenderBox(document, WTF::move(style), 0)
     , m_rowIndex(unsetRowIndex)
 {
@@ -109,28 +109,28 @@ const BorderValue& RenderTableRow::borderAdjoiningEndCell(const RenderTableCell*
 
 void RenderTableRow::addChild(RenderObject* child, RenderObject* beforeChild)
 {
-    if (!child->isTableCell()) {
+    if (!is<RenderTableCell>(*child)) {
         RenderObject* last = beforeChild;
         if (!last)
             last = lastCell();
-        if (last && last->isAnonymous() && last->isTableCell() && !last->isBeforeOrAfterContent()) {
-            RenderTableCell* cell = toRenderTableCell(last);
-            if (beforeChild == cell)
-                beforeChild = cell->firstChild();
-            cell->addChild(child, beforeChild);
+        if (last && last->isAnonymous() && is<RenderTableCell>(*last) && !last->isBeforeOrAfterContent()) {
+            RenderTableCell& cell = downcast<RenderTableCell>(*last);
+            if (beforeChild == &cell)
+                beforeChild = cell.firstChild();
+            cell.addChild(child, beforeChild);
             return;
         }
 
         if (beforeChild && !beforeChild->isAnonymous() && beforeChild->parent() == this) {
             RenderObject* cell = beforeChild->previousSibling();
-            if (cell && cell->isTableCell() && cell->isAnonymous()) {
-                toRenderTableCell(cell)->addChild(child);
+            if (is<RenderTableCell>(cell) && cell->isAnonymous()) {
+                downcast<RenderTableCell>(*cell).addChild(child);
                 return;
             }
         }
 
         // If beforeChild is inside an anonymous cell, insert into the cell.
-        if (last && !last->isTableCell() && last->parent() && last->parent()->isAnonymous() && !last->parent()->isBeforeOrAfterContent()) {
+        if (last && !is<RenderTableCell>(*last) && last->parent() && last->parent()->isAnonymous() && !last->parent()->isBeforeOrAfterContent()) {
             last->parent()->addChild(child, beforeChild);
             return;
         }
@@ -144,14 +144,14 @@ void RenderTableRow::addChild(RenderObject* child, RenderObject* beforeChild)
     if (beforeChild && beforeChild->parent() != this)
         beforeChild = splitAnonymousBoxesAroundChild(beforeChild);    
 
-    RenderTableCell* cell = toRenderTableCell(child);
+    RenderTableCell& cell = downcast<RenderTableCell>(*child);
 
     // Generated content can result in us having a null section so make sure to null check our parent.
     if (parent())
-        section()->addCell(cell, this);
+        section()->addCell(&cell, this);
 
-    ASSERT(!beforeChild || beforeChild->isTableCell());
-    RenderBox::addChild(cell, beforeChild);
+    ASSERT(!beforeChild || is<RenderTableCell>(*beforeChild));
+    RenderBox::addChild(&cell, beforeChild);
 
     if (beforeChild || nextRow())
         section()->setNeedsCellRecalc();
@@ -168,7 +168,7 @@ void RenderTableRow::layout()
     bool paginated = view().layoutState()->isPaginated();
                 
     for (RenderTableCell* cell = firstCell(); cell; cell = cell->nextCell()) {
-        if (!cell->needsLayout() && paginated && view().layoutState()->pageLogicalHeight() && view().layoutState()->pageLogicalOffset(cell, cell->logicalTop()) != cell->pageLogicalOffset())
+        if (!cell->needsLayout() && paginated && (view().layoutState()->pageLogicalHeightChanged() || (view().layoutState()->pageLogicalHeight() && view().layoutState()->pageLogicalOffset(cell, cell->logicalTop()) != cell->pageLogicalOffset())))
             cell->setChildNeedsLayout(MarkOnlyThis);
 
         if (cell->needsLayout()) {
@@ -195,18 +195,17 @@ void RenderTableRow::layout()
 LayoutRect RenderTableRow::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const
 {
     ASSERT(parent());
-
-    if (repaintContainer == this)
-        return RenderBox::clippedOverflowRectForRepaint(repaintContainer);
-
-    // For now, just repaint the whole table.
-    // FIXME: Find a better way to do this, e.g., need to repaint all the cells that we
-    // might have propagated a background color into.
-    // FIXME: do repaintContainer checks here
-    if (RenderTable* parentTable = table())
-        return parentTable->clippedOverflowRectForRepaint(repaintContainer);
-
-    return LayoutRect();
+    
+    // Rows and cells are in the same coordinate space. We need to both compute our overflow rect (which
+    // will accommodate a row outline and any visual effects on the row itself), but we also need to add in
+    // the repaint rects of cells.
+    LayoutRect result = RenderBox::clippedOverflowRectForRepaint(repaintContainer);
+    for (RenderTableCell* cell = firstCell(); cell; cell = cell->nextCell()) {
+        // Even if a cell is a repaint container, it's the row that paints the background behind it.
+        // So we don't care if a cell is a repaintContainer here.
+        result.uniteIfNonZero(cell->clippedOverflowRectForRepaint(repaintContainer));
+    }
+    return result;
 }
 
 // Hit Testing

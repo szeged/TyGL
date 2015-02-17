@@ -31,6 +31,7 @@
 #import "APIArray.h"
 #import "APIData.h"
 #import "APIString.h"
+#import "UIKitSPI.h"
 #import "WKContentViewInteraction.h"
 #import "WKData.h"
 #import "WKStringCF.h"
@@ -41,11 +42,6 @@
 #import <AVFoundation/AVFoundation.h>
 #import <CoreMedia/CoreMedia.h>
 #import <MobileCoreServices/MobileCoreServices.h>
-#import <UIKit/UIApplication_Private.h>
-#import <UIKit/UIImagePickerController_Private.h>
-#import <UIKit/UIImage_Private.h>
-#import <UIKit/UIViewController_Private.h>
-#import <UIKit/UIWindow_Private.h>
 #import <WebCore/LocalizedStrings.h>
 #import <WebCore/SoftLinking.h>
 #import <WebKit/WebNSFileManagerExtras.h>
@@ -56,8 +52,6 @@ using namespace WebKit;
 SOFT_LINK_FRAMEWORK(AVFoundation);
 SOFT_LINK_CLASS(AVFoundation, AVAssetImageGenerator);
 SOFT_LINK_CLASS(AVFoundation, AVURLAsset);
-#define AVAssetImageGenerator_class getAVAssetImageGeneratorClass()
-#define AVURLAsset_class getAVURLAssetClass()
 
 SOFT_LINK_FRAMEWORK(CoreMedia);
 SOFT_LINK_CONSTANT(CoreMedia, kCMTimeZero, CMTime);
@@ -207,8 +201,8 @@ static UIImage *thumbnailSizedImageForImage(UIImage *image)
 
 - (UIImage *)displayImage
 {
-    RetainPtr<AVURLAsset> asset = adoptNS([[AVURLAsset_class alloc] initWithURL:_mediaURL.get() options:nil]);
-    RetainPtr<AVAssetImageGenerator> generator = adoptNS([[AVAssetImageGenerator_class alloc] initWithAsset:asset.get()]);
+    RetainPtr<AVURLAsset> asset = adoptNS([allocAVURLAssetInstance() initWithURL:_mediaURL.get() options:nil]);
+    RetainPtr<AVAssetImageGenerator> generator = adoptNS([allocAVAssetImageGeneratorInstance() initWithAsset:asset.get()]);
     [generator setAppliesPreferredTrackTransform:YES];
 
     NSError *error = nil;

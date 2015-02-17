@@ -119,12 +119,9 @@ public:
     virtual void setToolTip(const WTF::String&, WebCore::TextDirection) override;
 
     virtual void print(WebCore::Frame*) override;
-#if ENABLE(SQL_DATABASE)
     virtual void exceededDatabaseQuota(WebCore::Frame*, const WTF::String& databaseName, WebCore::DatabaseDetails) override;
-#endif
     virtual void reachedMaxAppCacheSize(int64_t spaceNeeded) override;
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t totalSpaceNeeded) override;
-    virtual void populateVisitedLinks() override;
 
 #if ENABLE(DASHBOARD_SUPPORT)
     virtual void annotatedRegionsChanged() override;
@@ -167,7 +164,7 @@ public:
     virtual void setNeedsOneShotDrawingSynchronization() override;
     virtual void scheduleCompositingLayerFlush() override;
 
-    virtual CompositingTriggerFlags allowedCompositingTriggers() const
+    virtual CompositingTriggerFlags allowedCompositingTriggers() const override
     {
         return static_cast<CompositingTriggerFlags>(
             ThreeDTransformTrigger |
@@ -182,7 +179,7 @@ public:
 
 #if ENABLE(VIDEO)
     virtual bool supportsVideoFullscreen() override;
-    virtual void enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement*) override;
+    virtual void enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement*, WebCore::HTMLMediaElement::VideoFullscreenMode) override;
     virtual void exitVideoFullscreen() override;
 #endif
     
@@ -205,6 +202,11 @@ public:
     virtual bool unwrapCryptoKey(const Vector<uint8_t>&, Vector<uint8_t>&) const override;
 #endif
 
+#if ENABLE(SERVICE_CONTROLS)
+    virtual void handleSelectionServiceClick(WebCore::FrameSelection&, const Vector<String>& telephoneNumbers, const WebCore::IntPoint&) override;
+    virtual bool hasRelevantSelectionServices(bool isTextOnly) const override;
+#endif
+
 #if PLATFORM(IOS)
     WebView* webView() const { return m_webView; }
 #else
@@ -212,6 +214,5 @@ public:
 #endif
 
 private:
-
     WebView *m_webView;
 };

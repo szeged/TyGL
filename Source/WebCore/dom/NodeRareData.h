@@ -69,13 +69,13 @@ public:
             m_childNodeList->invalidateCache();
     }
 
-    PassRef<ChildNodeList> ensureChildNodeList(ContainerNode& node)
+    Ref<ChildNodeList> ensureChildNodeList(ContainerNode& node)
     {
         ASSERT(!m_emptyChildNodeList);
         if (m_childNodeList)
             return *m_childNodeList;
         auto list = ChildNodeList::create(node);
-        m_childNodeList = &list.get();
+        m_childNodeList = list.ptr();
         return list;
     }
 
@@ -87,13 +87,13 @@ public:
         m_childNodeList = nullptr;
     }
 
-    PassRef<EmptyNodeList> ensureEmptyChildNodeList(Node& node)
+    Ref<EmptyNodeList> ensureEmptyChildNodeList(Node& node)
     {
         ASSERT(!m_childNodeList);
         if (m_emptyChildNodeList)
             return *m_emptyChildNodeList;
         auto list = EmptyNodeList::create(node);
-        m_emptyChildNodeList = &list.get();
+        m_emptyChildNodeList = list.ptr();
         return list;
     }
 
@@ -119,7 +119,7 @@ public:
     typedef HashMap<QualifiedName, TagNodeList*> TagNodeListCacheNS;
 
     template<typename T, typename ContainerType>
-    ALWAYS_INLINE PassRef<T> addCacheWithAtomicName(ContainerType& container, const AtomicString& name)
+    ALWAYS_INLINE Ref<T> addCacheWithAtomicName(ContainerType& container, const AtomicString& name)
     {
         NodeListAtomicNameCacheMap::AddResult result = m_atomicNameCaches.fastAdd(namedNodeListKey<T>(name), nullptr);
         if (!result.isNewEntry)
@@ -130,7 +130,7 @@ public:
         return list;
     }
 
-    ALWAYS_INLINE PassRef<TagNodeList> addCacheWithQualifiedName(ContainerNode& node, const AtomicString& namespaceURI, const AtomicString& localName)
+    ALWAYS_INLINE Ref<TagNodeList> addCacheWithQualifiedName(ContainerNode& node, const AtomicString& namespaceURI, const AtomicString& localName)
     {
         QualifiedName name(nullAtom, localName, namespaceURI);
         TagNodeListCacheNS::AddResult result = m_tagNodeListCacheNS.fastAdd(name, nullptr);
@@ -138,12 +138,12 @@ public:
             return *result.iterator->value;
 
         auto list = TagNodeList::create(node, namespaceURI, localName);
-        result.iterator->value = &list.get();
+        result.iterator->value = list.ptr();
         return list;
     }
 
     template<typename T, typename ContainerType>
-    ALWAYS_INLINE PassRef<T> addCachedCollection(ContainerType& container, CollectionType collectionType, const AtomicString& name)
+    ALWAYS_INLINE Ref<T> addCachedCollection(ContainerType& container, CollectionType collectionType, const AtomicString& name)
     {
         CollectionCacheMap::AddResult result = m_cachedCollections.fastAdd(namedCollectionKey(collectionType, name), nullptr);
         if (!result.isNewEntry)
@@ -155,7 +155,7 @@ public:
     }
 
     template<typename T, typename ContainerType>
-    ALWAYS_INLINE PassRef<T> addCachedCollection(ContainerType& container, CollectionType collectionType)
+    ALWAYS_INLINE Ref<T> addCachedCollection(ContainerType& container, CollectionType collectionType)
     {
         CollectionCacheMap::AddResult result = m_cachedCollections.fastAdd(namedCollectionKey(collectionType, starAtom), nullptr);
         if (!result.isNewEntry)

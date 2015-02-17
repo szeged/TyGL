@@ -24,7 +24,6 @@
 
 #include "FrameView.h"
 #include "LayoutState.h"
-#include "PODFreeListArena.h"
 #include "Region.h"
 #include "RenderBlockFlow.h"
 #include "SelectionSubtreeRoot.h"
@@ -45,7 +44,7 @@ class RenderQuote;
 
 class RenderView final : public RenderBlockFlow, public SelectionSubtreeRoot {
 public:
-    RenderView(Document&, PassRef<RenderStyle>);
+    RenderView(Document&, Ref<RenderStyle>&&);
     virtual ~RenderView();
 
     WEBCORE_EXPORT bool hitTest(const HitTestRequest&, HitTestResult&);
@@ -203,8 +202,6 @@ public:
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
 
-    IntervalArena* intervalArena();
-
     IntSize viewportSizeForCSSViewportUnits() const;
 
     void setRenderQuoteHead(RenderQuote* head) { m_renderQuoteHead = head; }
@@ -227,7 +224,7 @@ public:
     void didCreateRenderer() { ++m_rendererCount; }
     void didDestroyRenderer() { --m_rendererCount; }
 
-    WEBCORE_EXPORT void resumePausedImageAnimationsIfNeeded();
+    void resumePausedImageAnimationsIfNeeded();
     void addRendererWithPausedImageAnimations(RenderElement&);
     void removeRendererWithPausedImageAnimations(RenderElement&);
 
@@ -295,16 +292,16 @@ private:
 
     void pushLayoutStateForCurrentFlowThread(const RenderObject&);
     void popLayoutStateForCurrentFlowThread();
-    
+
     friend class LayoutStateMaintainer;
     friend class LayoutStateDisabler;
 
     virtual bool isScrollableOrRubberbandableBox() const override;
 
-    void splitSelectionBetweenSubtrees(RenderObject* start, int startPos, RenderObject* end, int endPos, SelectionRepaintMode blockRepaintMode);
-    void clearSubtreeSelection(const SelectionSubtreeRoot&, SelectionRepaintMode, OldSelectionData&);
+    void splitSelectionBetweenSubtrees(const RenderObject* startRenderer, int startPos, const RenderObject* endRenderer, int endPos, SelectionRepaintMode blockRepaintMode);
+    void clearSubtreeSelection(const SelectionSubtreeRoot&, SelectionRepaintMode, OldSelectionData&) const;
     void updateSelectionForSubtrees(RenderSubtreesMap&, SelectionRepaintMode);
-    void applySubtreeSelection(SelectionSubtreeRoot&, RenderObject* start, RenderObject* end, int endPos, SelectionRepaintMode, const OldSelectionData&);
+    void applySubtreeSelection(const SelectionSubtreeRoot&, SelectionRepaintMode, const OldSelectionData&);
     LayoutRect subtreeSelectionBounds(const SelectionSubtreeRoot&, bool clipToVisibleContent = true) const;
     void repaintSubtreeSelection(const SelectionSubtreeRoot&) const;
 
@@ -342,9 +339,9 @@ private:
 
     bool shouldUsePrintingLayout() const;
 
-    void lazyRepaintTimerFired(Timer<RenderView>&);
+    void lazyRepaintTimerFired();
 
-    Timer<RenderView> m_lazyRepaintTimer;
+    Timer m_lazyRepaintTimer;
     HashSet<RenderBox*> m_renderersNeedingLazyRepaint;
 
     std::unique_ptr<ImageQualityController> m_imageQualityController;
@@ -354,7 +351,6 @@ private:
     unsigned m_layoutStateDisableCount;
     std::unique_ptr<RenderLayerCompositor> m_compositor;
     std::unique_ptr<FlowThreadController> m_flowThreadController;
-    RefPtr<IntervalArena> m_intervalArena;
 
     RenderQuote* m_renderQuoteHead;
     unsigned m_renderCounterCount;
@@ -368,8 +364,6 @@ private:
     SelectionRectGatherer m_selectionRectGatherer;
 #endif
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderView, isRenderView())
 
 // Stack-based class to assist with LayoutState push/pop
 class LayoutStateMaintainer {

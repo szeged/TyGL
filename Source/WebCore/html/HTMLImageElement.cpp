@@ -65,14 +65,14 @@ HTMLImageElement::HTMLImageElement(const QualifiedName& tagName, Document& docum
         form->registerImgElement(this);
 }
 
-PassRefPtr<HTMLImageElement> HTMLImageElement::create(Document& document)
+Ref<HTMLImageElement> HTMLImageElement::create(Document& document)
 {
-    return adoptRef(new HTMLImageElement(imgTag, document));
+    return adoptRef(*new HTMLImageElement(imgTag, document));
 }
 
-PassRefPtr<HTMLImageElement> HTMLImageElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
+Ref<HTMLImageElement> HTMLImageElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
 {
-    return adoptRef(new HTMLImageElement(tagName, document, form));
+    return adoptRef(*new HTMLImageElement(tagName, document, form));
 }
 
 HTMLImageElement::~HTMLImageElement()
@@ -81,14 +81,14 @@ HTMLImageElement::~HTMLImageElement()
         m_form->removeImgElement(this);
 }
 
-PassRefPtr<HTMLImageElement> HTMLImageElement::createForJSConstructor(Document& document, const int* optionalWidth, const int* optionalHeight)
+Ref<HTMLImageElement> HTMLImageElement::createForJSConstructor(Document& document, const int* optionalWidth, const int* optionalHeight)
 {
-    RefPtr<HTMLImageElement> image = adoptRef(new HTMLImageElement(imgTag, document));
+    Ref<HTMLImageElement> image = adoptRef(*new HTMLImageElement(imgTag, document));
     if (optionalWidth)
         image->setWidth(*optionalWidth);
     if (optionalHeight)
         image->setHeight(*optionalHeight);
-    return image.release();
+    return image;
 }
 
 bool HTMLImageElement::isPresentationAttribute(const QualifiedName& name) const
@@ -133,26 +133,21 @@ void HTMLImageElement::setBestFitURLAndDPRFromImageCandidate(const ImageCandidat
 #endif
     if (candidate.density >= 0)
         m_imageDevicePixelRatio = 1 / candidate.density;
-    if (renderer() && renderer()->isImage())
-        toRenderImage(renderer())->setImageDevicePixelRatio(m_imageDevicePixelRatio);
+    if (is<RenderImage>(renderer()))
+        downcast<RenderImage>(*renderer()).setImageDevicePixelRatio(m_imageDevicePixelRatio);
 }
 
 void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == altAttr) {
-        if (renderer() && renderer()->isRenderImage())
-            toRenderImage(renderer())->updateAltText();
+        if (is<RenderImage>(renderer()))
+            downcast<RenderImage>(*renderer()).updateAltText();
     } else if (name == srcAttr || name == srcsetAttr) {
-        unsigned sourceSize = 0;
-#if ENABLE(PICTURE_SIZES)
-        sourceSize = SourceSizeList::parseSizesAttribute(fastGetAttribute(sizesAttr), document().renderView(), document().frame());
-#endif
+        unsigned sourceSize = parseSizesAttribute(fastGetAttribute(sizesAttr).string(), document().renderView(), document().frame());
         ImageCandidate candidate = bestFitSourceForImageAttributes(document().deviceScaleFactor(), fastGetAttribute(srcAttr), fastGetAttribute(srcsetAttr), sourceSize);
         setBestFitURLAndDPRFromImageCandidate(candidate);
         m_imageLoader.updateFromElementIgnoringPreviousError();
     } else if (name == usemapAttr) {
-        setIsLink(!value.isNull() && !shouldProhibitLinks(this));
-
         if (inDocument() && !m_lowercasedUsemap.isNull())
             document().removeImageElementByLowercasedUsemap(*m_lowercasedUsemap.impl(), *this);
 
@@ -209,7 +204,7 @@ const AtomicString& HTMLImageElement::altText() const
     return fastGetAttribute(titleAttr);
 }
 
-RenderPtr<RenderElement> HTMLImageElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLImageElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     if (style.get().hasContent())
         return RenderElement::createFor(*this, WTF::move(style));
@@ -227,7 +222,7 @@ bool HTMLImageElement::canStartSelection() const
 
 void HTMLImageElement::didAttachRenderers()
 {
-    if (!renderer() || !renderer()->isRenderImage())
+    if (!is<RenderImage>(renderer()))
         return;
     if (m_imageLoader.hasPendingBeforeLoadEvent())
         return;
@@ -236,8 +231,8 @@ void HTMLImageElement::didAttachRenderers()
     updateImageControls();
 #endif
 
-    RenderImage* renderImage = toRenderImage(renderer());
-    RenderImageResource& renderImageResource = renderImage->imageResource();
+    auto& renderImage = downcast<RenderImage>(*renderer());
+    RenderImageResource& renderImageResource = renderImage.imageResource();
     if (renderImageResource.hasImage())
         return;
     renderImageResource.setCachedImage(m_imageLoader.image());
@@ -245,7 +240,7 @@ void HTMLImageElement::didAttachRenderers()
     // If we have no image at all because we have no src attribute, set
     // image height and width for the alt text instead.
     if (!m_imageLoader.image() && !renderImageResource.cachedImage())
-        renderImage->setImageSizeForAltText();
+        renderImage.setImageSizeForAltText();
 }
 
 Node::InsertionNotificationRequest HTMLImageElement::insertedInto(ContainerNode& insertionPoint)
@@ -507,11 +502,11 @@ void HTMLImageElement::createImageControls()
 
     ensureUserAgentShadowRoot().appendChild(imageControls);
 
-    RenderObject* renderObject = renderer();
+    auto* renderObject = renderer();
     if (!renderObject)
         return;
 
-    toRenderImage(renderObject)->setHasShadowControls(true);
+    downcast<RenderImage>(*renderObject).setHasShadowControls(true);
 }
 
 void HTMLImageElement::destroyImageControls()
@@ -525,11 +520,11 @@ void HTMLImageElement::destroyImageControls()
         shadowRoot->removeChild(node);
     }
 
-    RenderObject* renderObject = renderer();
+    auto* renderObject = renderer();
     if (!renderObject)
         return;
 
-    toRenderImage(renderObject)->setHasShadowControls(false);
+    downcast<RenderImage>(*renderObject).setHasShadowControls(false);
 }
 
 bool HTMLImageElement::hasImageControls() const

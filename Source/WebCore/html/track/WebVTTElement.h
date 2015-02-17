@@ -23,6 +23,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef WebVTTElement_h
+#define WebVTTElement_h
+
 #if ENABLE(VIDEO_TRACK)
 
 #include "HTMLElement.h"
@@ -46,7 +49,7 @@ public:
     static PassRefPtr<WebVTTElement> create(const WebVTTNodeType, Document&);
     PassRefPtr<HTMLElement> createEquivalentHTMLElement(Document&);
 
-    virtual PassRefPtr<Element> cloneElementWithoutAttributesAndChildren() override;
+    virtual RefPtr<Element> cloneElementWithoutAttributesAndChildren(Document&) override;
 
     void setWebVTTNodeType(WebVTTNodeType type) { m_webVTTNodeType = static_cast<unsigned>(type); }
     WebVTTNodeType webVTTNodeType() const { return static_cast<WebVTTNodeType>(m_webVTTNodeType); }
@@ -87,3 +90,5 @@ SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::WebVTTElement)
 SPECIALIZE_TYPE_TRAITS_END()
 
 #endif
+
+#endif // WebVTTElement_h

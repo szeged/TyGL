@@ -26,7 +26,7 @@
 #ifndef TypeSet_h
 #define TypeSet_h
 
-#include "StructureIDTable.h"
+#include "StructureSet.h"
 #include <wtf/HashSet.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
@@ -48,7 +48,7 @@ namespace JSC {
 
 class JSValue;
 
-enum RuntimeType {
+enum RuntimeType : uint8_t {
     TypeNothing            = 0x0,
     TypeFunction           = 0x1,
     TypeUndefined          = 0x2,
@@ -72,7 +72,7 @@ public:
     void addProperty(RefPtr<StringImpl>);
     String stringRepresentation();
     String toJSONString() const;
-    PassRefPtr<Inspector::Protocol::Runtime::StructureDescription> inspectorRepresentation();
+    Ref<Inspector::Protocol::Runtime::StructureDescription> inspectorRepresentation();
     void setConstructorName(String name) { m_constructorName = (name.isEmpty() ? "Object" : name); }
     String constructorName() { return m_constructorName; }
     void setProto(PassRefPtr<StructureShape> shape) { m_proto = shape; }
@@ -97,26 +97,26 @@ class TypeSet : public RefCounted<TypeSet> {
 public:
     static PassRefPtr<TypeSet> create() { return adoptRef(new TypeSet); }
     TypeSet();
-    void addTypeInformation(RuntimeType, PassRefPtr<StructureShape>, StructureID);
+    void addTypeInformation(RuntimeType, PassRefPtr<StructureShape>, Structure*);
     static RuntimeType getRuntimeTypeForValue(JSValue);
     void invalidateCache();
     String dumpTypes() const;
     String displayName() const;
-    PassRefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::StructureDescription>> allStructureRepresentations() const;
+    Ref<Inspector::Protocol::Array<Inspector::Protocol::Runtime::StructureDescription>> allStructureRepresentations() const;
     String toJSONString() const;
     bool isOverflown() const { return m_isOverflown; }
     String leastCommonAncestor() const;
-    PassRefPtr<Inspector::Protocol::Runtime::TypeSet> inspectorTypeSet() const;
+    Ref<Inspector::Protocol::Runtime::TypeSet> inspectorTypeSet() const;
     bool isEmpty() const { return m_seenTypes == TypeNothing; }
-    bool doesTypeConformTo(uint32_t test) const;
-    uint32_t seenTypes() const { return m_seenTypes; }
+    bool doesTypeConformTo(uint8_t test) const;
+    uint8_t seenTypes() const { return m_seenTypes; }
+    StructureSet structureSet() const { return m_structureSet; };
 
 private:
-
-    uint32_t m_seenTypes;
+    uint8_t m_seenTypes;
     bool m_isOverflown;
     Vector<RefPtr<StructureShape>> m_structureHistory;
-    HashSet<StructureID> m_structureIDCache;
+    StructureSet m_structureSet;
 };
 
 } //namespace JSC

@@ -40,6 +40,8 @@ if (config('debug')) {
 } else
     error_reporting(E_ERROR);
 
+date_default_timezone_set('UTC');
+
 class Database
 {
     private $connection = false;
@@ -62,7 +64,7 @@ class Database
     }
 
     private function prefixed_column_names($columns, $prefix = NULL) {
-        if (!$prefix)
+        if (!$prefix || !$columns)
             return join(', ', $columns);
         return $prefix . '_' . join(', ' . $prefix . '_', $columns);
     }
@@ -94,24 +96,29 @@ class Database
         $column_names = $this->prefixed_column_names($column_names, $prefix);
         $placeholders = join(', ', $placeholders);
 
+        $value_query = $column_names ? "($column_names) VALUES ($placeholders)" : ' VALUES (default)';
         if ($returning) {
             $returning_column_name = $this->prefixed_name($returning, $prefix);
-            $rows = $this->query_and_fetch_all("INSERT INTO $table ($column_names) VALUES ($placeholders) RETURNING $returning_column_name", $values);
+            $rows = $this->query_and_fetch_all("INSERT INTO $table $value_query RETURNING $returning_column_name", $values);
             return $rows ? $rows[0][$returning_column_name] : NULL;
         }
 
-        return $this->query_and_get_affected_rows("INSERT INTO $table ($column_names) VALUES ($placeholders)", $values) == 1;
+        return $this->query_and_get_affected_rows("INSERT INTO $table $value_query", $values) == 1;
     }
 
     function select_or_insert_row($table, $prefix, $select_params, $insert_params = NULL, $returning = 'id') {
-        return $this->_select_update_or_insert_row($table, $prefix, $select_params, $insert_params, $returning, FALSE);
+        return $this->_select_update_or_insert_row($table, $prefix, $select_params, $insert_params, $returning, FALSE, TRUE);
     }
 
     function update_or_insert_row($table, $prefix, $select_params, $insert_params = NULL, $returning = 'id') {
-        return $this->_select_update_or_insert_row($table, $prefix, $select_params, $insert_params, $returning, TRUE);
+        return $this->_select_update_or_insert_row($table, $prefix, $select_params, $insert_params, $returning, TRUE, TRUE);
     }
 
-    private function _select_update_or_insert_row($table, $prefix, $select_params, $insert_params, $returning, $should_update) {
+    function update_row($table, $prefix, $select_params, $update_params, $returning = 'id') {
+        return $this->_select_update_or_insert_row($table, $prefix, $select_params, $update_params, $returning, TRUE, FALSE);
+    }
+
+    private function _select_update_or_insert_row($table, $prefix, $select_params, $insert_params, $returning, $should_update, $should_insert) {
         $values = array();
 
         $select_placeholders = array();
@@ -139,7 +146,7 @@ class Database
             $rows = $this->query_and_fetch_all("UPDATE $table SET ($insert_column_names) = ($insert_placeholders)
                 WHERE ($select_column_names) = ($select_placeholders) RETURNING $returning_column_name", $values);
         }
-        if (!$rows) {
+        if (!$rows && $should_insert) {
             $rows = $this->query_and_fetch_all("INSERT INTO $table ($insert_column_names) SELECT $insert_placeholders
                 WHERE NOT EXISTS ($query) RETURNING $returning_column_name", $values);            
         }
@@ -158,10 +165,19 @@ class Database
     }
 
     private function select_first_or_last_row($table, $prefix, $params, $order_by, $descending_order) {
+        $rows = $this->select_rows($table, $prefix, $params, $order_by, $descending_order, 0, 1);
+        return $rows ? $rows[0] : NULL;
+    }
+
+    function select_rows($table, $prefix, $params,
+        $order_by = NULL, $descending_order = FALSE, $offset = NULL, $limit = NULL) {
+
         $placeholders = array();
         $values = array();
         $column_names = $this->prefixed_column_names($this->prepare_params($params, $placeholders, $values), $prefix);
         $placeholders = join(', ', $placeholders);
+        if (!$column_names && !$placeholders)
+            $column_names = $placeholders = '1';
         $query = "SELECT * FROM $table WHERE ($column_names) = ($placeholders)";
         if ($order_by) {
             assert(ctype_alnum_underscore($order_by));
@@ -169,9 +185,12 @@ class Database
             if ($descending_order)
                 $query .= ' DESC';
         }
-        $rows = $this->query_and_fetch_all($query . ' LIMIT 1', $values);
+        if ($offset !== NULL)
+            $query .= ' OFFSET ' . intval($offset);
+        if ($limit !== NULL)
+            $query .= ' LIMIT ' . intval($limit);
 
-        return $rows ? $rows[0] : NULL;
+        return $this->query_and_fetch_all($query, $values);
     }
 
     function query_and_get_affected_rows($query, $params = array()) {
@@ -185,10 +204,12 @@ class Database
 
     function query_and_fetch_all($query, $params = array()) {
         if (!$this->connection)
-            return false;
+            return NULL;
         $result = pg_query_params($this->connection, $query, $params);
         if (!$result)
-            return false;
+            return NULL;
+        if (pg_num_rows($result) == 0)
+            return array();
         return pg_fetch_all($result);
     }
 

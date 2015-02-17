@@ -133,7 +133,7 @@ void Structure::forEachPropertyConcurrently(const Functor& functor)
     }
 }
 
-inline PropertyOffset Structure::getConcurrently(StringImpl* uid)
+inline PropertyOffset Structure::getConcurrently(AtomicStringImpl* uid)
 {
     unsigned attributesIgnored;
     return getConcurrently(uid, attributesIgnored);
@@ -168,6 +168,8 @@ inline JSValue Structure::prototypeForLookup(JSGlobalObject* globalObject) const
 {
     if (isObject())
         return m_prototype.get();
+    if (typeInfo().type() == SymbolType)
+        return globalObject->symbolPrototype();
 
     ASSERT(typeInfo().type() == StringType);
     return globalObject->stringPrototype();

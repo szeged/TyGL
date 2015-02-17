@@ -41,6 +41,10 @@
 #include <utility>
 #include <wtf/text/StringBuilder.h>
 
+#if PLATFORM(COCOA)
+#include <WebCore/MachSendRight.h>
+#endif
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -442,6 +446,12 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             *(NPBool*)value = plugin->isPrivateBrowsingEnabled();
             break;
         }
+
+        case NPNVmuteAudioBool: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+            *(NPBool*)value = plugin->isMuted();
+            break;
+        }
 #if PLATFORM(COCOA)
         case NPNVsupportsCoreGraphicsBool:
             // Always claim to support the Core Graphics drawing model.
@@ -483,7 +493,7 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
         case WKNVCALayerRenderServerPort: {
             RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
 
-            *(mach_port_t*)value = plugin->compositingRenderServerPort();
+            *(mach_port_t*)value = plugin->compositingRenderServerPort().sendRight();
             break;
         }
 
@@ -572,6 +582,12 @@ static NPError NPN_SetValue(NPP npp, NPPVariable variable, void *value)
         case NPPVpluginTransparentBool: {
             RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
             plugin->setIsTransparent(value);
+            return NPERR_NO_ERROR;
+        }
+
+        case NPPVpluginIsPlayingAudio: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+            plugin->setIsPlayingAudio(value);
             return NPERR_NO_ERROR;
         }
 

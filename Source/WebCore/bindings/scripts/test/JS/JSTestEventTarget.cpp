@@ -144,9 +144,9 @@ void JSTestEventTargetPrototype::finishCreation(VM& vm)
 
 WEBCORE_EXPORT const ClassInfo JSTestEventTarget::s_info = { "TestEventTarget", &Base::s_info, &JSTestEventTargetTable, CREATE_METHOD_TABLE(JSTestEventTarget) };
 
-JSTestEventTarget::JSTestEventTarget(Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestEventTarget> impl)
+JSTestEventTarget::JSTestEventTarget(Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestEventTarget>&& impl)
     : JSDOMWrapper(structure, globalObject)
-    , m_impl(impl.leakRef())
+    , m_impl(&impl.leakRef())
 {
 }
 
@@ -240,7 +240,7 @@ EncodedJSValue JSC_HOST_CALL jsTestEventTargetPrototypeFunctionItem(ExecState* e
         return throwThisTypeError(*exec, "TestEventTarget", "item");
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestEventTarget::info());
     TestEventTarget& impl = castedThis->impl();
-    if (exec->argumentCount() < 1)
+    if (UNLIKELY(exec->argumentCount() < 1))
         return throwVMError(exec, createNotEnoughArgumentsError(exec));
     int index(toUInt32(exec, exec->argument(0), NormalConversion));
     if (index < 0) {
@@ -262,9 +262,9 @@ EncodedJSValue JSC_HOST_CALL jsTestEventTargetPrototypeFunctionAddEventListener(
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestEventTarget::info());
     TestEventTarget& impl = castedThis->impl();
     JSValue listener = exec->argument(1);
-    if (!listener.isObject())
+    if (UNLIKELY(!listener.isObject()))
         return JSValue::encode(jsUndefined());
-    impl.addEventListener(exec->argument(0).toString(exec)->value(exec), JSEventListener::create(asObject(listener), castedThis, false, currentWorld(exec)), exec->argument(2).toBoolean(exec));
+    impl.addEventListener(exec->argument(0).toString(exec)->toAtomicString(exec), createJSEventListenerForAdd(*exec, *asObject(listener), *castedThis), exec->argument(2).toBoolean(exec));
     return JSValue::encode(jsUndefined());
 }
 
@@ -277,9 +277,9 @@ EncodedJSValue JSC_HOST_CALL jsTestEventTargetPrototypeFunctionRemoveEventListen
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestEventTarget::info());
     TestEventTarget& impl = castedThis->impl();
     JSValue listener = exec->argument(1);
-    if (!listener.isObject())
+    if (UNLIKELY(!listener.isObject()))
         return JSValue::encode(jsUndefined());
-    impl.removeEventListener(exec->argument(0).toString(exec)->value(exec), JSEventListener::create(asObject(listener), castedThis, false, currentWorld(exec)).get(), exec->argument(2).toBoolean(exec));
+    impl.removeEventListener(exec->argument(0).toString(exec)->toAtomicString(exec), createJSEventListenerForRemove(*exec, *asObject(listener), *castedThis).ptr(), exec->argument(2).toBoolean(exec));
     return JSValue::encode(jsUndefined());
 }
 
@@ -291,7 +291,7 @@ EncodedJSValue JSC_HOST_CALL jsTestEventTargetPrototypeFunctionDispatchEvent(Exe
         return throwThisTypeError(*exec, "TestEventTarget", "dispatchEvent");
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestEventTarget::info());
     TestEventTarget& impl = castedThis->impl();
-    if (exec->argumentCount() < 1)
+    if (UNLIKELY(exec->argumentCount() < 1))
         return throwVMError(exec, createNotEnoughArgumentsError(exec));
     ExceptionCode ec = 0;
     Event* evt(JSEvent::toWrapped(exec->argument(0)));

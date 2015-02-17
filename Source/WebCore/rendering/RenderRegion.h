@@ -30,15 +30,13 @@
 #ifndef RenderRegion_h
 #define RenderRegion_h
 
+#include "LayerFragment.h"
 #include "RenderBlockFlow.h"
 #include "StyleInheritedData.h"
 #include "VisiblePosition.h"
 #include <memory>
 
 namespace WebCore {
-
-struct LayerFragment;
-typedef Vector<LayerFragment, 1> LayerFragments;
 
 class Element;
 class RenderBox;
@@ -48,8 +46,6 @@ class RenderNamedFlowThread;
 
 class RenderRegion : public RenderBlockFlow {
 public:
-    virtual bool isRenderRegion() const override final { return true; }
-
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
     void setFlowThreadPortionRect(const LayoutRect& rect) { m_flowThreadPortionRect = rect; }
@@ -113,9 +109,9 @@ public:
     void addLayoutOverflowForBox(const RenderBox*, const LayoutRect&);
     void addVisualOverflowForBox(const RenderBox*, const LayoutRect&);
     LayoutRect layoutOverflowRectForBox(const RenderBox*);
-    LayoutRect visualOverflowRectForBox(const RenderBoxModelObject*);
+    LayoutRect visualOverflowRectForBox(const RenderBoxModelObject&);
     LayoutRect layoutOverflowRectForBoxForPropagation(const RenderBox*);
-    LayoutRect visualOverflowRectForBoxForPropagation(const RenderBoxModelObject*);
+    LayoutRect visualOverflowRectForBoxForPropagation(const RenderBoxModelObject&);
 
     LayoutRect rectFlowPortionForBox(const RenderBox*, const LayoutRect&) const;
     
@@ -131,8 +127,8 @@ public:
     virtual void absoluteQuadsForBoxInRegion(Vector<FloatQuad>&, bool*, const RenderBox*, float, float) { }
 
 protected:
-    RenderRegion(Element&, PassRef<RenderStyle>, RenderFlowThread*);
-    RenderRegion(Document&, PassRef<RenderStyle>, RenderFlowThread*);
+    RenderRegion(Element&, Ref<RenderStyle>&&, RenderFlowThread*);
+    RenderRegion(Document&, Ref<RenderStyle>&&, RenderFlowThread*);
 
     void ensureOverflowForBox(const RenderBox*, RefPtr<RenderOverflow>&, bool);
 
@@ -150,7 +146,8 @@ protected:
     void computeOverflowFromFlowThread();
 
 private:
-    virtual const char* renderName() const { return "RenderRegion"; }
+    virtual bool isRenderRegion() const override final { return true; }
+    virtual const char* renderName() const override { return "RenderRegion"; }
 
     virtual void insertedIntoTree() override;
     virtual void willBeRemovedFromTree() override;

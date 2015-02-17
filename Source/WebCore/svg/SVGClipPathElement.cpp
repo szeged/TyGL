@@ -51,9 +51,9 @@ inline SVGClipPathElement::SVGClipPathElement(const QualifiedName& tagName, Docu
     registerAnimatedPropertiesForSVGClipPathElement();
 }
 
-PassRefPtr<SVGClipPathElement> SVGClipPathElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGClipPathElement> SVGClipPathElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGClipPathElement(tagName, document));
+    return adoptRef(*new SVGClipPathElement(tagName, document));
 }
 
 bool SVGClipPathElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -96,7 +96,7 @@ void SVGClipPathElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (RenderObject* object = renderer())
         object->setNeedsLayout();
@@ -113,7 +113,7 @@ void SVGClipPathElement::childrenChanged(const ChildChange& change)
         object->setNeedsLayout();
 }
 
-RenderPtr<RenderElement> SVGClipPathElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGClipPathElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGResourceClipper>(*this, WTF::move(style));
 }

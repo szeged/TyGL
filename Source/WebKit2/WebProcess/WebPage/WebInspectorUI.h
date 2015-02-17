@@ -26,8 +26,6 @@
 #ifndef WebInspectorUI_h
 #define WebInspectorUI_h
 
-#if ENABLE(INSPECTOR)
-
 #include "APIObject.h"
 #include "Connection.h"
 #include <WebCore/InspectorForwarding.h>
@@ -45,11 +43,13 @@ public:
     WebPage* page() const { return m_page; }
 
     // Implemented in generated WebInspectorUIMessageReceiver.cpp
-    void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&);
+    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     // IPC::Connection::Client
-    void didClose(IPC::Connection*) { closeWindow(); }
-    void didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference, IPC::StringReference) { closeWindow(); }
+    void didClose(IPC::Connection&) override { closeWindow(); }
+    void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference) override { closeWindow(); }
+    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::Web; }
+    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Web; }
 
     // Called by WebInspectorUI messages
     void establishConnection(IPC::Attachment connectionIdentifier, uint64_t inspectedPageIdentifier, bool underTest);
@@ -131,7 +131,5 @@ private:
 };
 
 } // namespace WebKit
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // WebInspectorUI_h

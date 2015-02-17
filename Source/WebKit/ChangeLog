@@ -1,3 +1,799 @@
+2015-02-05  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] 64-bit build fix after r179702 and r179709
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2015-02-05  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed attempt to fix Windows build after r179702.
+
+        Export a couple of extra symbols.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2015-02-02  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix after r179489.
+
+        Correct symbol export definitions for 32-bit and 64-bit builds.
+        Also add some drive-by fixes for 64-bit symbols.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2015-01-31  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed 64-bit build fix.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Correct symbol
+        definitions for 64-bit build.
+
+2015-01-30  Chris Dumez  <cdumez@apple.com>
+
+        Rename shared() static member functions to singleton() for singleton classes.
+        https://bugs.webkit.org/show_bug.cgi?id=141088
+
+        Reviewed by Ryosuke Niwa and Benjamin Poulain.
+
+        Rename shared() static member functions to singleton() for singleton
+        classes as per the recent coding style change.
+
+        * Storage/WebDatabaseProvider.cpp:
+        (WebDatabaseProvider::singleton):
+        (WebDatabaseProvider::shared): Deleted.
+        * Storage/WebDatabaseProvider.h:
+
+2015-01-29  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Build fix after r179368.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Remove missing symbol.
+
+2015-01-25  peavo@outlook.com  <peavo@outlook.com>
+
+        [Win] Add WebKit message loop interface.
+        https://bugs.webkit.org/show_bug.cgi?id=140857
+
+        Reviewed by Brent Fulgham.
+
+        Added message loop interface which will run the message loop,
+        and perform required tasks (like calling CFRunLoopRunInMode)
+        on each iteration of the loop.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj: Added new files to project.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters: Ditto.
+
+2015-01-22  Andreas Kling  <akling@apple.com>
+
+        Remove unused class EmojiFallbackFontSelector.
+        <https://webkit.org/b/140809>
+
+        Reviewed by Antti Koivisto.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2015-01-21  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove ENABLE(INSPECTOR) ifdef guards
+        https://bugs.webkit.org/show_bug.cgi?id=140668
+
+        Reviewed by Darin Adler.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2015-01-20  David Kilzer  <ddkilzer@apple.com>
+
+        Switch to comparing PLATFORM_NAME in terms of macosx
+        <http://webkit.org/b/139516>
+
+        Reviewed by Timothy Hatcher.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2015-01-19  Anders Carlsson  <andersca@apple.com>
+
+        Try to fix build warnings with newer versions of clang.
+
+        * Storage/StorageAreaImpl.h:
+
+2015-01-17  Brian J. Burg  <burg@cs.washington.edu>
+
+        Web Inspector: highlight data for overlay should use protocol type builders
+        https://bugs.webkit.org/show_bug.cgi?id=129441
+
+        Reviewed by Timothy Hatcher.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Update symbol.
+
+2015-01-14  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix after r178459 and r178462.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Add some
+        missing exports needed by the test infrastructure.
+
+2015-01-14  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix for DebugSuffix target.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj: Correct build flags for DebugSuffix
+        target to match Release and Debug builds.
+
+2015-01-14  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Build fix after r178255.
+
+        Correct path to PaintHooks.asm. This causes a build failure if you perform a
+        clean build from a new subversion checkout.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+
+2015-01-09  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Build fix after r178219.
+
+        Update the project file settings to understand how to process assembly files.
+        Also tidy up the plugin code in the project hieararchy.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+
+2015-01-06  Anders Carlsson  <andersca@apple.com>
+
+        Move the Windows only plug-in code to WebKit/win
+        https://bugs.webkit.org/show_bug.cgi?id=140133
+
+        Reviewed by Darin Adler.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+
+2015-01-08  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix after r178124.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Remove symbol that
+        is no longer part of WebCore.
+
+2015-01-07  Brian J. Burg  <burg@cs.washington.edu>
+
+        Web Inspector: purge PassRefPtr from Inspector code and use Ref for typed and untyped protocol objects
+        https://bugs.webkit.org/show_bug.cgi?id=140053
+
+        Reviewed by Andreas Kling.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: update symbol.
+
+2015-01-07  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r178039.
+        https://bugs.webkit.org/show_bug.cgi?id=140187
+
+        Breaks ObjC Inspector Protocol (Requested by JoePeck on
+        #webkit).
+
+        Reverted changeset:
+
+        "Web Inspector: purge PassRefPtr from Inspector code and use
+        Ref for typed and untyped protocol objects"
+        https://bugs.webkit.org/show_bug.cgi?id=140053
+        http://trac.webkit.org/changeset/178039
+
+2015-01-06  Brian J. Burg  <burg@cs.washington.edu>
+
+        Web Inspector: purge PassRefPtr from Inspector code and use Ref for typed and untyped protocol objects
+        https://bugs.webkit.org/show_bug.cgi?id=140053
+
+        Reviewed by Andreas Kling.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: update symbol.
+
+2015-01-06  Anders Carlsson  <andersca@apple.com>
+
+        Add a WebKit1 database provider
+        https://bugs.webkit.org/show_bug.cgi?id=140126
+
+        Reviewed by Sam Weinig.
+
+        Add a stubbed out database provider.
+
+        * Storage/WebDatabaseProvider.cpp: Added.
+        (WebDatabaseProvider::shared):
+        (WebDatabaseProvider::WebDatabaseProvider):
+        (WebDatabaseProvider::~WebDatabaseProvider):
+        (WebDatabaseProvider::createIDBFactoryBackend):
+        * Storage/WebDatabaseProvider.h: Added.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+        * WebKit.xcodeproj/project.pbxproj:
+
+2015-01-06  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r177963.
+        https://bugs.webkit.org/show_bug.cgi?id=140136
+
+        Caused lots of crashes (Requested by smfr on #webkit).
+
+        Reverted changeset:
+
+        "Add a WebKit1 database provider"
+        https://bugs.webkit.org/show_bug.cgi?id=140126
+        http://trac.webkit.org/changeset/177963
+
+2015-01-06  Anders Carlsson  <andersca@apple.com>
+
+        Add a WebKit1 database provider
+        https://bugs.webkit.org/show_bug.cgi?id=140126
+
+        Reviewed by Sam Weinig.
+
+        Add a stubbed out database provider.
+
+        * Storage/WebDatabaseProvider.cpp: Added.
+        (WebDatabaseProvider::shared):
+        (WebDatabaseProvider::WebDatabaseProvider):
+        (WebDatabaseProvider::~WebDatabaseProvider):
+        (WebDatabaseProvider::createIDBFactoryBackend):
+        * Storage/WebDatabaseProvider.h: Added.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+        * WebKit.xcodeproj/project.pbxproj:
+
+2015-01-05  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix after r177925.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Correct symbol name.
+
+2014-12-29  Anders Carlsson  <andersca@apple.com>
+
+        Remove unneeded StorageNamespace functions
+        https://bugs.webkit.org/show_bug.cgi?id=139997
+
+        Reviewed by Sam Weinig.
+
+        We can just cast to StorageNamespaceImpl directly, no need for virtual dispatch.
+
+        * Storage/StorageNamespaceImpl.h:
+        * Storage/WebStorageNamespaceProvider.cpp:
+        (WebStorageNamespaceProvider::closeLocalStorage):
+        (WebStorageNamespaceProvider::clearLocalStorageForAllOrigins):
+        (WebStorageNamespaceProvider::clearLocalStorageForOrigin):
+        (WebStorageNamespaceProvider::closeIdleLocalStorageDatabases):
+        (WebStorageNamespaceProvider::syncLocalStorage):
+
+2014-12-29  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of some PageGroup storage functions
+        https://bugs.webkit.org/show_bug.cgi?id=139996
+
+        Reviewed by Sam Weinig.
+
+        Call WebStorageNamespaceProvider directly instead.
+
+        * Storage/StorageTracker.cpp:
+        (WebCore::StorageTracker::deleteAllOrigins):
+        (WebCore::StorageTracker::deleteOrigin):
+
+2014-12-29  Anders Carlsson  <andersca@apple.com>
+
+        Move storage code from WebCore to WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=139558
+
+        Reviewed by Darin Adler.
+
+        * Storage/StorageAreaImpl.cpp: Renamed from Source/WebCore/storage/StorageAreaImpl.cpp.
+        (WebCore::StorageAreaImpl::~StorageAreaImpl):
+        (WebCore::StorageAreaImpl::StorageAreaImpl):
+        (WebCore::StorageAreaImpl::create):
+        (WebCore::StorageAreaImpl::copy):
+        (WebCore::StorageAreaImpl::canAccessStorage):
+        (WebCore::StorageAreaImpl::storageType):
+        (WebCore::StorageAreaImpl::length):
+        (WebCore::StorageAreaImpl::key):
+        (WebCore::StorageAreaImpl::item):
+        (WebCore::StorageAreaImpl::setItem):
+        (WebCore::StorageAreaImpl::removeItem):
+        (WebCore::StorageAreaImpl::clear):
+        (WebCore::StorageAreaImpl::contains):
+        (WebCore::StorageAreaImpl::importItems):
+        (WebCore::StorageAreaImpl::close):
+        (WebCore::StorageAreaImpl::clearForOriginDeletion):
+        (WebCore::StorageAreaImpl::sync):
+        (WebCore::StorageAreaImpl::blockUntilImportComplete):
+        (WebCore::StorageAreaImpl::memoryBytesUsedByCache):
+        (WebCore::StorageAreaImpl::incrementAccessCount):
+        (WebCore::StorageAreaImpl::decrementAccessCount):
+        (WebCore::StorageAreaImpl::closeDatabaseTimerFired):
+        (WebCore::StorageAreaImpl::closeDatabaseIfIdle):
+        (WebCore::StorageAreaImpl::dispatchStorageEvent):
+        * Storage/StorageAreaImpl.h: Renamed from Source/WebCore/storage/StorageAreaImpl.h.
+        * Storage/StorageAreaSync.cpp: Renamed from Source/WebCore/storage/StorageAreaSync.cpp.
+        (WebCore::StorageAreaSync::StorageAreaSync):
+        (WebCore::StorageAreaSync::create):
+        (WebCore::StorageAreaSync::~StorageAreaSync):
+        (WebCore::StorageAreaSync::scheduleFinalSync):
+        (WebCore::StorageAreaSync::scheduleItemForSync):
+        (WebCore::StorageAreaSync::scheduleClear):
+        (WebCore::StorageAreaSync::scheduleCloseDatabase):
+        (WebCore::StorageAreaSync::syncTimerFired):
+        (WebCore::StorageAreaSync::openDatabase):
+        (WebCore::StorageAreaSync::migrateItemTableIfNeeded):
+        (WebCore::StorageAreaSync::performImport):
+        (WebCore::StorageAreaSync::markImported):
+        (WebCore::StorageAreaSync::blockUntilImportComplete):
+        (WebCore::StorageAreaSync::sync):
+        (WebCore::StorageAreaSync::performSync):
+        (WebCore::StorageAreaSync::deleteEmptyDatabase):
+        (WebCore::StorageAreaSync::scheduleSync):
+        * Storage/StorageAreaSync.h: Renamed from Source/WebCore/storage/StorageAreaSync.h.
+        * Storage/StorageNamespaceImpl.cpp: Renamed from Source/WebCore/storage/StorageNamespaceImpl.cpp.
+        (WebCore::localStorageNamespaceMap):
+        (WebCore::StorageNamespaceImpl::createSessionStorageNamespace):
+        (WebCore::StorageNamespaceImpl::getOrCreateLocalStorageNamespace):
+        (WebCore::StorageNamespaceImpl::StorageNamespaceImpl):
+        (WebCore::StorageNamespaceImpl::~StorageNamespaceImpl):
+        (WebCore::StorageNamespaceImpl::copy):
+        (WebCore::StorageNamespaceImpl::storageArea):
+        (WebCore::StorageNamespaceImpl::close):
+        (WebCore::StorageNamespaceImpl::clearOriginForDeletion):
+        (WebCore::StorageNamespaceImpl::clearAllOriginsForDeletion):
+        (WebCore::StorageNamespaceImpl::sync):
+        (WebCore::StorageNamespaceImpl::closeIdleLocalStorageDatabases):
+        * Storage/StorageNamespaceImpl.h: Renamed from Source/WebCore/storage/StorageNamespaceImpl.h.
+        * Storage/StorageSyncManager.cpp: Renamed from Source/WebCore/storage/StorageSyncManager.cpp.
+        (WebCore::StorageSyncManager::create):
+        (WebCore::StorageSyncManager::StorageSyncManager):
+        (WebCore::StorageSyncManager::~StorageSyncManager):
+        (WebCore::StorageSyncManager::fullDatabaseFilename):
+        (WebCore::StorageSyncManager::dispatch):
+        (WebCore::StorageSyncManager::close):
+        * Storage/StorageSyncManager.h: Renamed from Source/WebCore/storage/StorageSyncManager.h.
+        * Storage/StorageThread.cpp: Renamed from Source/WebCore/storage/StorageThread.cpp.
+        (WebCore::activeStorageThreads):
+        (WebCore::StorageThread::StorageThread):
+        (WebCore::StorageThread::~StorageThread):
+        (WebCore::StorageThread::start):
+        (WebCore::StorageThread::threadEntryPointCallback):
+        (WebCore::StorageThread::threadEntryPoint):
+        (WebCore::StorageThread::dispatch):
+        (WebCore::StorageThread::terminate):
+        (WebCore::StorageThread::performTerminate):
+        (WebCore::StorageThread::releaseFastMallocFreeMemoryInAllThreads):
+        * Storage/StorageThread.h: Renamed from Source/WebCore/storage/StorageThread.h.
+        * Storage/StorageTracker.cpp: Renamed from Source/WebCore/storage/StorageTracker.cpp.
+        (WebCore::StorageTracker::initializeTracker):
+        (WebCore::StorageTracker::internalInitialize):
+        (WebCore::StorageTracker::tracker):
+        (WebCore::StorageTracker::StorageTracker):
+        (WebCore::StorageTracker::setDatabaseDirectoryPath):
+        (WebCore::StorageTracker::databaseDirectoryPath):
+        (WebCore::StorageTracker::trackerDatabasePath):
+        (WebCore::ensureDatabaseFileExists):
+        (WebCore::StorageTracker::openTrackerDatabase):
+        (WebCore::StorageTracker::importOriginIdentifiers):
+        (WebCore::StorageTracker::finishedImportingOriginIdentifiers):
+        (WebCore::StorageTracker::syncImportOriginIdentifiers):
+        (WebCore::StorageTracker::syncFileSystemAndTrackerDatabase):
+        (WebCore::StorageTracker::setOriginDetails):
+        (WebCore::StorageTracker::syncSetOriginDetails):
+        (WebCore::StorageTracker::origins):
+        (WebCore::StorageTracker::deleteAllOrigins):
+        (WebCore::truncateDatabaseFile):
+        (WebCore::StorageTracker::syncDeleteAllOrigins):
+        (WebCore::StorageTracker::deleteOriginWithIdentifier):
+        (WebCore::StorageTracker::deleteOrigin):
+        (WebCore::StorageTracker::syncDeleteOrigin):
+        (WebCore::StorageTracker::willDeleteAllOrigins):
+        (WebCore::StorageTracker::willDeleteOrigin):
+        (WebCore::StorageTracker::canDeleteOrigin):
+        (WebCore::StorageTracker::cancelDeletingOrigin):
+        (WebCore::StorageTracker::isActive):
+        (WebCore::StorageTracker::setIsActive):
+        (WebCore::StorageTracker::databasePathForOrigin):
+        (WebCore::StorageTracker::diskUsageForOrigin):
+        * Storage/StorageTracker.h: Renamed from Source/WebCore/storage/StorageTracker.h.
+        (WebCore::StorageTracker::storageDatabaseIdleInterval):
+        (WebCore::StorageTracker::setStorageDatabaseIdleInterval):
+        * Storage/StorageTrackerClient.h: Renamed from Source/WebCore/storage/StorageTrackerClient.h.
+        (WebCore::StorageTrackerClient::~StorageTrackerClient):
+        * Storage/WebStorageNamespaceProvider.cpp:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+        * WebKit.xcodeproj/project.pbxproj:
+
+2014-12-22  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Build fix after r177668.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Add missing export definition
+        for new symbols.
+
+2014-12-19  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Build fix after r177588.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Fix
+        symbol declaration.
+
+2014-12-19  Alex Christensen  <achristensen@webkit.org>
+
+        [Win64] Unreviewed build fix.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+        Fixed some 64-bit linker symbols.
+
+2014-12-18  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build correction after r177513.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Correct for new
+        method signature.
+
+2014-12-18  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Correct Windows tests after Bug 139149.
+        https://bugs.webkit.org/show_bug.cgi?id=139781
+
+        Reviewed by Anders Carlsson.
+
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj: Add new interface.
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj.filters: Ditto.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj: Add new application cache object.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters: Ditto.
+
+2014-12-18  Andreas Kling  <akling@apple.com>
+
+        Attempt to fix Windows build after Range::create() changes.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-12-17  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Correct DebugSuffix builds under MSBuild
+        https://bugs.webkit.org/show_bug.cgi?id=139733
+        <rdar://problem/19276880>
+
+        Reviewed by Simon Fraser.
+
+        * WebKit.vcxproj/WebKit.proj: Make sure to use the '_debug' suffix
+        when building the DebugSuffix target.
+
+2014-12-17  peavo@outlook.com  <peavo@outlook.com>
+
+        [Win] Link errors.
+        https://bugs.webkit.org/show_bug.cgi?id=139729
+
+        Reviewed by Anders Carlsson.
+
+        The list of exported symbols needs to be updated.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-12-12  Roger Fong  <roger_fong@apple.com>
+
+        [Windows] Unreviewed 64bit build fix.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-12-12  Anders Carlsson  <andersca@apple.com>
+
+        Handle null local storage database URLs
+        https://bugs.webkit.org/show_bug.cgi?id=139594
+        <rdar://problem/19236505>
+
+        Reviewed by Beth Dakin.
+
+        * Storage/WebStorageNamespaceProvider.cpp:
+        (WebStorageNamespaceProvider::WebStorageNamespaceProvider):
+
+2014-12-11  Anders Carlsson  <andersca@apple.com>
+
+        Build fix.
+
+        * Storage/WebStorageNamespaceProvider.h:
+
+2014-12-11  Anders Carlsson  <andersca@apple.com>
+
+        Replicate a bunch of PageGroup functions in WebStorageNamespaceProvider
+        https://bugs.webkit.org/show_bug.cgi?id=139544
+
+        Reviewed by Antti Koivisto.
+
+        This code is currently unused but will be called by StorageTracker once that class has been
+        moved from WebCore to WebKit.
+
+        * Storage/WebStorageNamespaceProvider.cpp:
+        (WebStorageNamespaceProvider::clearLocalStorageForAllOrigins):
+        (WebStorageNamespaceProvider::clearLocalStorageForOrigin):
+        (WebStorageNamespaceProvider::closeIdleLocalStorageDatabases):
+        (WebStorageNamespaceProvider::syncLocalStorage):
+        * Storage/WebStorageNamespaceProvider.h:
+
+2014-12-10  Beth Dakin  <bdakin@apple.com>
+
+        WK1: Add initial support for immediate actions
+        https://bugs.webkit.org/show_bug.cgi?id=139522
+
+        Reviewed by Dan Bernstein.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2014-12-10  Anders Carlsson  <andersca@apple.com>
+
+        Add session storage handling to StorageNamespaceProvider
+        https://bugs.webkit.org/show_bug.cgi?id=139507
+
+        Reviewed by Tim Horton.
+
+        * Storage/WebStorageNamespaceProvider.cpp:
+        (WebStorageNamespaceProvider::createSessionStorageNamespace):
+        * Storage/WebStorageNamespaceProvider.h:
+
+2014-12-10  Anders Carlsson  <andersca@apple.com>
+
+        Add WebStorageNamespaceProvider::closeLocalStorage
+        https://bugs.webkit.org/show_bug.cgi?id=139502
+
+        Reviewed by Tim Horton.
+
+        * Storage/WebStorageNamespaceProvider.cpp:
+        (storageNamespaceProviders):
+        (WebStorageNamespaceProvider::WebStorageNamespaceProvider):
+        (WebStorageNamespaceProvider::~WebStorageNamespaceProvider):
+        Keep track of all live storage namespace providers.
+        
+        (WebStorageNamespaceProvider::closeLocalStorage):
+        Loop through all storage namespace providers and call close() on their local storage namespaces.
+
+        * Storage/WebStorageNamespaceProvider.h:
+
+2014-12-09  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r177037.
+        https://bugs.webkit.org/show_bug.cgi?id=139464
+
+        broke ~50 API tests (Requested by thorton on #webkit).
+
+        Reverted changeset:
+
+        "Use the new storage namespace provider in WebKit1"
+        https://bugs.webkit.org/show_bug.cgi?id=139425
+        http://trac.webkit.org/changeset/177037
+
+2014-12-08  Anders Carlsson  <andersca@apple.com>
+
+        WebStorageNamespaceProvider should create StorageNamespaceImpls
+        https://bugs.webkit.org/show_bug.cgi?id=139419
+
+        Reviewed by Andreas Kling.
+
+        * Storage/WebStorageNamespaceProvider.cpp:
+        (WebStorageNamespaceProvider::createLocalStorageNamespace):
+        (WebStorageNamespaceProvider::createTransientLocalStorageNamespace):
+        Create StorageNamespaceImpls.
+
+        (WebStorageNamespaceProvider::createSessionStorageNamespace): Deleted.
+        Delete this for now.
+
+        * Storage/WebStorageNamespaceProvider.h:
+
+2014-12-08  Anders Carlsson  <andersca@apple.com>
+
+        WebStorageNamespaceProvider should know about its local storage database path
+        https://bugs.webkit.org/show_bug.cgi?id=139413
+
+        Reviewed by Andreas Kling.
+
+        * Storage/WebStorageNamespaceProvider.cpp:
+        (WebStorageNamespaceProvider::create):
+        (WebStorageNamespaceProvider::WebStorageNamespaceProvider):
+        * Storage/WebStorageNamespaceProvider.h:
+
+2014-12-06  Anders Carlsson  <andersca@apple.com>
+
+        Add a stubbed out version of WebStorageNamespaceProvider
+        https://bugs.webkit.org/show_bug.cgi?id=139213
+
+        Reviewed by Sam Weinig.
+
+        * Storage/WebStorageNamespaceProvider.cpp: Added.
+        * Storage/WebStorageNamespaceProvider.h: Added.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+        * WebKit.xcodeproj/project.pbxproj:
+        Add new files.
+
+2014-12-05  Roger Fong  <roger_fong@apple.com>
+
+        [Win] proj files copying over too many resources..
+        https://bugs.webkit.org/show_bug.cgi?id=139315.
+        <rdar://problem/19148278>
+
+        Reviewed by Brent Fulgham.
+
+        * WebKit.vcxproj/WebKit.proj: Only copy resource folders and WebKit.dll.
+
+2014-12-02  Sam Weinig  <sam@webkit.org>
+
+        Remove empty directories
+
+        Reviewed by Anders Carlsson.
+
+        * Source: Removed.
+        * Source/WebKit: Removed.
+        * Source/WebKit/mac: Removed.
+        * Source/WebKit/mac/Resources: Removed.
+
+2014-12-02  Tim Horton  <timothy_horton@apple.com>
+
+        Implement Lookup transition from selection for Legacy WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=139180
+        <rdar://problem/19067172>
+
+        Reviewed by Beth Dakin.
+
+        * WebKit.xcodeproj/project.pbxproj:
+        Add mac/WebView/DictionaryPopupInfo.h.
+
+2014-12-01  Anders Carlsson  <andersca@apple.com>
+
+        Remove IWebCookieManager on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=139144
+
+        Reviewed by Sam Weinig.
+
+        Remove files.
+
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj:
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj.filters:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+
+2014-11-27  Anders Carlsson  <andersca@apple.com>
+
+        Add a stubbed out WebVisitedLinkStore class on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=139078
+
+        Reviewed by Sam Weinig.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+
+2014-11-27  Anders Carlsson  <andersca@apple.com>
+
+        Add a stubbed out WebVisitedLinkStore to WebViewGroup
+        https://bugs.webkit.org/show_bug.cgi?id=139066
+
+        Reviewed by Antti Koivisto.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2014-11-21  Anders Carlsson  <andersca@apple.com>
+
+        Add a new symbol.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-11-21  Anders Carlsson  <andersca@apple.com>
+
+        Remove a symbol that's gone.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-11-11  Chris Dumez  <cdumez@apple.com>
+
+        Mark more virtual functions in HTMLInputElement as final
+        https://bugs.webkit.org/show_bug.cgi?id=138644
+
+        Reviewed by Andreas Kling.
+
+        Export an additional symbol to fix Windows build.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-11-08  Darin Adler  <darin@apple.com>
+
+        Replace FileThread class with a single function
+        https://bugs.webkit.org/show_bug.cgi?id=138282
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+        Removed exports of obsolete threading functions.
+
+2014-11-05  Dan Bernstein  <mitz@apple.com>
+
+        Removed references to deletion UI resources that have been removed.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters:
+
+2014-10-31  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed 64-bit Build Fix.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Correct symbol
+        export declarations.
+
+2014-10-30  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed Windows build fix after r175391.
+
+        Export a couple of symbols.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-10-30  Ada Chan  <adachan@apple.com>
+
+        Attempt to fix the Windows build after r175384.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-10-24  Alexey Proskuryakov  <ap@apple.com>
+
+        All plug-in tests fail on Yosemite WK1
+        https://bugs.webkit.org/show_bug.cgi?id=138040
+
+        Reviewed by Dan Bernstein.
+
+        Fix a symlink for WebKitPluginHost.app. There is also a broken symlink for WebKitPluginAgent,
+        which I don't know what to do about, but that seems harmless.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2014-10-19  Chris Dumez  <cdumez@apple.com>
+
+        Kill toRenderedDocumentMarker() by using tighter typing
+        https://bugs.webkit.org/show_bug.cgi?id=137858
+
+        Reviewed by Darin Adler.
+
+        Update symbol export for Windows due to argument type change.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2014-10-17  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Accelerated compositing is not implemented.
+        https://bugs.webkit.org/show_bug.cgi?id=137345
+
+        Reviewed by Brent Fulgham.
+
+        This patch is based on GTK, and the texture mapper graphics layer type.
+
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj: Added new accelerated compositing source files.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters: Ditto.
+
+2014-10-16  Tim Horton  <timothy_horton@apple.com>
+
+        Implement selection services menu for Legacy WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=137582
+        <rdar://problem/18604241>
+
+        Reviewed by Brady Eidson.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2014-10-14  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed gardening. Ignore Visual Studio *.sdf files.
+
+        * WebKit.vcxproj: Modified property svn:ignore.
+
+2014-10-10  Daniel Bates  <dabates@apple.com>
+
+        Remove unused classes WebRender{Node, Layer}
+        https://bugs.webkit.org/show_bug.cgi?id=137628
+
+        Reviewed by Simon Fraser.
+
+        We no longer make use of the WebKit1-specific classes WebRenderNode and WebRenderLayer.
+        For completeness, there is a WebKit2 analogue of WebRenderLayer by the same name.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
 2014-10-06  Brent Fulgham  <bfulgham@apple.com>
 
         [Win] Unreviewed 64-bit build fix after r174315.

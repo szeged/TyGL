@@ -27,7 +27,7 @@ CLANG_CXX_LANGUAGE_STANDARD = gnu++0x;
 CLANG_CXX_LIBRARY = libc++;
 CLANG_WARN_CXX0X_EXTENSIONS = NO;
 HEADER_SEARCH_PATHS = $(BUILT_PRODUCTS_DIR)/usr/local/include $(BUILT_PRODUCTS_DIR)/WebCoreTestSupport ForwardingHeaders $(HEADER_SEARCH_PATHS_$(PLATFORM_NAME)) $(SRCROOT)/../../Source/JavaScriptCore/icu;
-HEADER_SEARCH_PATHS_iphoneos = $(SDKROOT)/usr/local/include $(SDKROOT)/usr/local/include/WebCoreTestSupport;
+HEADER_SEARCH_PATHS_iphoneos = $(SDKROOT)/usr/local/include $(SDKROOT)/usr/local/include/WebCoreTestSupport $(SRCROOT)/../../Source/WebKit2/Platform/spi/ios;
 HEADER_SEARCH_PATHS_iphonesimulator = $(HEADER_SEARCH_PATHS_iphoneos);
 HEADER_SEARCH_PATHS_macosx = mac/InternalHeaders $(NEXT_ROOT)/usr/local/include/WebCoreTestSupport;
 FRAMEWORK_SEARCH_PATHS = $(FRAMEWORK_SEARCH_PATHS_$(PLATFORM_NAME));
@@ -59,17 +59,12 @@ DEBUG_DEFINES = $(DEBUG_DEFINES_$(CURRENT_VARIANT));
 
 TARGET_MAC_OS_X_VERSION_MAJOR = $(MAC_OS_X_VERSION_MAJOR);
 
-
 SDKROOT = macosx.internal;
 
 WEBKIT_SYSTEM_INTERFACE_LIBRARY = WebKitSystemInterface
 
-TOOLCHAINS = $(TOOLCHAINS_$(PLATFORM_NAME));
-TOOLCHAINS_iphoneos = $(TOOLCHAINS);
-TOOLCHAINS_iphonesimulator = $(TOOLCHAINS);
-TOOLCHAINS_macosx = $(TOOLCHAINS_macosx_$(MAC_OS_X_VERSION_MAJOR));
-TOOLCHAINS_macosx_1080 = default;
-TOOLCHAINS_macosx_1090 = $(TOOLCHAINS);
-TOOLCHAINS_macosx_101000 = $(TOOLCHAINS_macosx_1090);
-
 SUPPORTED_PLATFORMS = macosx iphoneos iphonesimulator;
+
+OTHER_CFLAGS = $(ASAN_OTHER_CFLAGS);
+OTHER_CPLUSPLUSFLAGS = $(ASAN_OTHER_CPLUSPLUSFLAGS);
+OTHER_LDFLAGS = $(ASAN_OTHER_LDFLAGS);

@@ -30,13 +30,13 @@
 #include <glib.h>
 
 #include <wtf/Forward.h>
-#include <wtf/gobject/GMainLoopSource.h>
+#include <wtf/gobject/GThreadSafeMainLoopSource.h>
 
 #if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
 #include "TextureMapperPlatformLayer.h"
 #endif
 
-typedef struct _GstBuffer GstBuffer;
+typedef struct _GstSample GstSample;
 typedef struct _GstElement GstElement;
 typedef struct _GstMessage GstMessage;
 typedef struct _GstStreamVolume GstStreamVolume;
@@ -77,7 +77,7 @@ public:
     void setSize(const IntSize&);
     void sizeChanged();
 
-    void triggerRepaint(GstBuffer*);
+    void triggerRepaint(GstSample*);
     void paint(GraphicsContext*, const IntRect&);
 
     virtual bool hasSingleSecurityOrigin() const { return true; }
@@ -110,7 +110,6 @@ public:
 protected:
     MediaPlayerPrivateGStreamerBase(MediaPlayer*);
     virtual GstElement* createVideoSink();
-    GRefPtr<GstCaps> currentVideoSinkCaps() const;
 
     void setStreamVolumeElement(GstStreamVolume*);
     virtual GstElement* createAudioSink() { return 0; }
@@ -123,10 +122,10 @@ protected:
     MediaPlayer::ReadyState m_readyState;
     MediaPlayer::NetworkState m_networkState;
     IntSize m_size;
-    GMutex m_bufferMutex;
-    GstBuffer* m_buffer;
-    GMainLoopSource m_volumeTimerHandler;
-    GMainLoopSource m_muteTimerHandler;
+    mutable GMutex m_sampleMutex;
+    GstSample* m_sample;
+    GThreadSafeMainLoopSource m_volumeTimerHandler;
+    GThreadSafeMainLoopSource m_muteTimerHandler;
     unsigned long m_repaintHandler;
     unsigned long m_volumeSignalHandler;
     unsigned long m_muteSignalHandler;

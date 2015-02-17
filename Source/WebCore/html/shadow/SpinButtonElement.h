@@ -56,7 +56,7 @@ public:
     // implementation, e.g. during event handling.
     static PassRefPtr<SpinButtonElement> create(Document&, SpinButtonOwner&);
     UpDownState upDownState() const { return m_upDownState; }
-    virtual void releaseCapture();
+    void releaseCapture();
     void removeSpinButtonOwner() { m_spinButtonOwner = 0; }
 
     void step(int amount);
@@ -78,7 +78,7 @@ private:
     void doStepAction(int);
     void startRepeatingTimer();
     void stopRepeatingTimer();
-    void repeatingTimerFired(Timer<SpinButtonElement>*);
+    void repeatingTimerFired();
     virtual void setHovered(bool = true) override;
     bool shouldRespondToMouseEvents();
     virtual bool isMouseFocusable() const override { return false; }
@@ -87,9 +87,14 @@ private:
     bool m_capturing;
     UpDownState m_upDownState;
     UpDownState m_pressStartingState;
-    Timer<SpinButtonElement> m_repeatingTimer;
+    Timer m_repeatingTimer;
 };
 
-} // namespace
+} // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SpinButtonElement)
+    static bool isType(const WebCore::Element& element) { return element.isSpinButtonElement(); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::Element>(node) && isType(downcast<WebCore::Element>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
+
+#endif // SpinButtonElement_h

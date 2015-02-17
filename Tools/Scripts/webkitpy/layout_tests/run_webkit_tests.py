@@ -205,9 +205,9 @@ def parse_args(args):
         optparse.make_option("--nocheck-sys-deps", action="store_true",
             default=False,
             help="Don't check the system dependencies (themes)"),
-        optparse.make_option("--nojava", action="store_true",
+        optparse.make_option("--java", action="store_true",
             default=False,
-            help="Don't build java support files"),
+            help="Build java support files"),
     ]))
 
     option_group_definitions.append(("Testing Options", [
@@ -223,7 +223,7 @@ def parse_args(args):
             help="Do everything but actually run the tests or upload results."),
         optparse.make_option("--wrapper",
             help="wrapper command to insert before invocations of "
-                 "DumpRenderTree; option is split on whitespace before "
+                 "DumpRenderTree or WebKitTestRunner; option is split on whitespace before "
                  "running. (Example: --wrapper='valgrind --smc-check=all')"),
         optparse.make_option("-i", "--ignore-tests", action="append", default=[],
             help="directories or test to ignore (may specify multiple times)"),
@@ -295,6 +295,10 @@ def parse_args(args):
                             "configurations. Does not run any tests.")),
     ]))
 
+    option_group_definitions.append(("Web Platform Test Server Options", [
+        optparse.make_option("--wptserver-doc-root", type="string", help=("Set web platform server document root, relative to LayoutTests directory")),
+    ]))
+
     # FIXME: Move these into json_results_generator.py
     option_group_definitions.append(("Result JSON Options", [
         optparse.make_option("--master-name", help="The name of the buildbot master."),
@@ -331,9 +335,6 @@ def _set_up_derived_options(port, options):
     if not options.child_processes:
         options.child_processes = os.environ.get("WEBKIT_TEST_CHILD_PROCESSES",
                                                  str(port.default_child_processes()))
-    if not options.max_locked_shards:
-        options.max_locked_shards = int(os.environ.get("WEBKIT_TEST_MAX_LOCKED_SHARDS",
-                                                       str(port.default_max_locked_shards())))
 
     if not options.configuration:
         options.configuration = port.default_configuration()
@@ -394,9 +395,11 @@ def _set_up_derived_options(port, options):
     if options.platform == 'ios-simulator':
         from webkitpy import xcode
         if options.runtime is None:
-            options.runtime = xcode.simulator.Simulator().latest_runtime
+            options.runtime = xcode.simulator.Simulator().latest_available_runtime
         else:
             options.runtime = xcode.simulator.Runtime.from_identifier(options.runtime)
+            if not options.runtime.available:
+                raise Exception('The iOS Simulator runtime with identifier "{identifier}" cannot be used because it is unavailable.'.format(identifier=options.runtime.identifier))
         if options.device_type is None:
             iphone5 = xcode.simulator.DeviceType.from_name('iPhone 5')
             iphone5s = xcode.simulator.DeviceType.from_name('iPhone 5s')

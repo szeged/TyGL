@@ -33,7 +33,6 @@
 #include <Ecore_IMF.h>
 #include <Eina.h>
 #include <Evas.h>
-
 #if USE(TYGL)
 #include <wtf/tygl/Evas_TyGL.h>
 #else
@@ -56,7 +55,6 @@ using EflUniquePtr = std::unique_ptr<T, EflPtrDeleter<T>>;
     macro(Eina_Hash, eina_hash_free) \
     macro(Eina_Module, eina_module_free) \
     macro(Evas_Object, evas_object_del) \
-    macro(Evas_GL, evas_gl_free)
 
 #define WTF_DEFINE_EFLPTR_DELETER(typeName, deleterFunc) \
     template<> struct EflPtrDeleter<typeName> \

@@ -31,9 +31,9 @@ class JSDictionary;
 class JSTestEventConstructor : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestEventConstructor* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestEventConstructor> impl)
+    static JSTestEventConstructor* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestEventConstructor>&& impl)
     {
-        JSTestEventConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestEventConstructor>(globalObject->vm().heap)) JSTestEventConstructor(structure, globalObject, impl);
+        JSTestEventConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestEventConstructor>(globalObject->vm().heap)) JSTestEventConstructor(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -66,7 +66,7 @@ public:
 private:
     TestEventConstructor* m_impl;
 protected:
-    JSTestEventConstructor(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestEventConstructor>);
+    JSTestEventConstructor(JSC::Structure*, JSDOMGlobalObject*, Ref<TestEventConstructor>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -88,12 +88,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestEventConstructor
     return &jsTestEventConstructorOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestEventConstructor*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestEventConstructor*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestEventConstructor& impl) { return toJS(exec, globalObject, &impl); }
 
 bool fillTestEventConstructorInit(TestEventConstructorInit&, JSDictionary&);
 

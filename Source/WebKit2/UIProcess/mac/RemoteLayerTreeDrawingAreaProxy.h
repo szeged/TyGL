@@ -71,7 +71,7 @@ private:
 
     float indicatorScale(WebCore::IntSize contentsSize) const;
     virtual void updateDebugIndicator() override;
-    void updateDebugIndicator(WebCore::IntSize contentsSize, bool rootLayerChanged, float scale);
+    void updateDebugIndicator(WebCore::IntSize contentsSize, bool rootLayerChanged, float scale, const WebCore::IntPoint& scrollPosition);
     void updateDebugIndicatorPosition();
     void initializeDebugIndicator();
 
@@ -81,7 +81,7 @@ private:
     WebCore::FloatPoint indicatorLocation() const;
 
     // IPC::MessageReceiver
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     // Message handlers
     void willCommitLayerTree(uint64_t transactionID);

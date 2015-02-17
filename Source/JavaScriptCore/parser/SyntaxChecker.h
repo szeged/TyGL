@@ -27,6 +27,7 @@
 #define SyntaxChecker_h
 
 #include "Lexer.h"
+#include "ParserFunctionInfo.h"
 #include "YarrSyntaxChecker.h"
 
 namespace JSC {
@@ -72,7 +73,7 @@ public:
     enum { NoneExpr = 0,
         ResolveEvalExpr, ResolveExpr, NumberExpr, StringExpr,
         ThisExpr, NullExpr, BoolExpr, RegExpExpr, ObjectLiteralExpr,
-        FunctionExpr, BracketExpr, DotExpr, CallExpr,
+        FunctionExpr, ClassExpr, BracketExpr, DotExpr, CallExpr,
         NewExpr, PreExpr, PostExpr, UnaryExpr, BinaryExpr,
         ConditionalExpr, AssignmentExpr, TypeofExpr,
         DeleteExpr, ArrayLiteralExpr, BindingDeconstruction,
@@ -112,6 +113,9 @@ public:
     typedef int ArgumentsList;
     typedef int FormalParameterList;
     typedef int FunctionBody;
+#if ENABLE(ES6_CLASS_SYNTAX)
+    typedef int ClassExpression;
+#endif
     typedef int Statement;
     typedef int ClauseList;
     typedef int Clause;
@@ -129,8 +133,8 @@ public:
 
     int createSourceElements() { return SourceElementsResult; }
     ExpressionType makeFunctionCallNode(const JSTokenLocation&, int, int, int, int, int) { return CallExpr; }
-    void appendToComma(ExpressionType& base, ExpressionType right) { base = right; }
-    ExpressionType createCommaExpr(const JSTokenLocation&, ExpressionType, ExpressionType right) { return right; }
+    ExpressionType createCommaExpr(const JSTokenLocation&, ExpressionType expr) { return expr; }
+    ExpressionType appendToCommaExpr(const JSTokenLocation&, ExpressionType& head, ExpressionType, ExpressionType next) { head = next; return next; }
     ExpressionType makeAssignNode(const JSTokenLocation&, ExpressionType, Operator, ExpressionType, bool, bool, int, int, int) { return AssignmentExpr; }
     ExpressionType makePrefixNode(const JSTokenLocation&, ExpressionType, Operator, int, int, int) { return PreExpr; }
     ExpressionType makePostfixNode(const JSTokenLocation&, ExpressionType, Operator, int, int, int) { return PostExpr; }
@@ -159,7 +163,10 @@ public:
     ExpressionType createConditionalExpr(const JSTokenLocation&, ExpressionType, ExpressionType, ExpressionType) { return ConditionalExpr; }
     ExpressionType createAssignResolve(const JSTokenLocation&, const Identifier&, ExpressionType, int, int, int) { return AssignmentExpr; }
     ExpressionType createEmptyVarExpression(const JSTokenLocation&, const Identifier&) { return AssignmentExpr; }
-    ExpressionType createFunctionExpr(const JSTokenLocation&, const Identifier*, int, int, int, int, int, int, int) { return FunctionExpr; }
+#if ENABLE(ES6_CLASS_SYNTAX)
+    ClassExpression createClassExpr(const JSTokenLocation&, const Identifier&, ExpressionType, ExpressionType, PropertyList, PropertyList) { return ClassExpr; }
+#endif
+    ExpressionType createFunctionExpr(const JSTokenLocation&, const ParserFunctionInfo<SyntaxChecker>&, int) { return FunctionExpr; }
     int createFunctionBody(const JSTokenLocation&, const JSTokenLocation&, int, int, bool) { return FunctionBodyResult; }
     void setFunctionNameStart(int, int) { }
     int createArguments() { return ArgumentsResult; }
@@ -174,13 +181,13 @@ public:
         ASSERT(name);
         return Property(name, type);
     }
-    Property createProperty(VM* vm, double name, int, PropertyNode::Type type, bool complete)
+    Property createProperty(VM* vm, ParserArena& parserArena, double name, int, PropertyNode::Type type, bool complete)
     {
         if (!complete)
             return Property(type);
-        return Property(&vm->parserArena->identifierArena().makeNumericIdentifier(vm, name), type);
+        return Property(&parserArena.identifierArena().makeNumericIdentifier(vm, name), type);
     }
-    Property createProperty(VM*, ExpressionNode*, int, PropertyNode::Type type, bool)
+    Property createProperty(int, int, PropertyNode::Type type, bool)
     {
         return Property(type);
     }
@@ -193,8 +200,11 @@ public:
     int createClause(int, int) { return ClauseResult; }
     int createClauseList(int) { return ClauseListResult; }
     int createClauseList(int, int) { return ClauseListResult; }
-    void setUsesArguments(int) { }
-    int createFuncDeclStatement(const JSTokenLocation&, const Identifier*, int, int, int, int, int, int, int) { return StatementResult; }
+    int createFuncDeclStatement(const JSTokenLocation&, const ParserFunctionInfo<SyntaxChecker>&, int) { return StatementResult; }
+#if ENABLE(ES6_CLASS_SYNTAX)
+    int createClassDeclStatement(const JSTokenLocation&, ClassExpression,
+        const JSTextPosition&, const JSTextPosition&, int, int) { return StatementResult; }
+#endif
     int createBlockStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
     int createExprStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
     int createIfStatement(const JSTokenLocation&, int, int, int, int) { return StatementResult; }
@@ -219,18 +229,18 @@ public:
     int createDebugger(const JSTokenLocation&, int, int) { return StatementResult; }
     int createConstStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
     int appendConstDecl(const JSTokenLocation&, int, const Identifier*, int) { return StatementResult; }
-    Property createGetterOrSetterProperty(const JSTokenLocation&, PropertyNode::Type type, bool strict, const Identifier* name, int, int, int, int, int, int, int)
+    Property createGetterOrSetterProperty(const JSTokenLocation&, PropertyNode::Type type, bool strict, const Identifier* name, const ParserFunctionInfo<SyntaxChecker>&, unsigned)
     {
         ASSERT(name);
         if (!strict)
             return Property(type);
         return Property(name, type);
     }
-    Property createGetterOrSetterProperty(VM* vm, const JSTokenLocation&, PropertyNode::Type type, bool strict, double name, int, int, int, int, int, int, int)
+    Property createGetterOrSetterProperty(VM* vm, ParserArena& parserArena, const JSTokenLocation&, PropertyNode::Type type, bool strict, double name, const ParserFunctionInfo<SyntaxChecker>&, unsigned)
     {
         if (!strict)
             return Property(type);
-        return Property(&vm->parserArena->identifierArena().makeNumericIdentifier(vm, name), type);
+        return Property(&parserArena.identifierArena().makeNumericIdentifier(vm, name), type);
     }
 
     void appendStatement(int, int) { }
@@ -296,6 +306,10 @@ public:
     {
         return pattern == BindingDeconstruction;
     }
+
+    void setEndOffset(int, int) { }
+    int endOffset(int) { return 0; }
+    void setStartOffset(int, int) { }
 
 private:
     int m_topBinaryExpr;

@@ -30,7 +30,11 @@
 #include <WebCore/FloatPoint.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/PageOverlay.h>
+#include <WebCore/Range.h>
 #include <wtf/PassRefPtr.h>
+#include <wtf/RetainPtr.h>
+
+OBJC_CLASS DDActionContext;
 
 namespace WebKit {
 
@@ -40,10 +44,9 @@ class WebPage;
 class WebPageOverlay : public API::ObjectImpl<API::Object::Type::BundlePageOverlay>, private WebCore::PageOverlay::Client {
 public:
     class Client {
-    protected:
+    public:
         virtual ~Client() { }
 
-    public:
         virtual void pageOverlayDestroyed(WebPageOverlay&) = 0;
         virtual void willMoveToPage(WebPageOverlay&, WebPage*) = 0;
         virtual void didMoveToPage(WebPageOverlay&, WebPage*) = 0;
@@ -51,12 +54,20 @@ public:
         virtual bool mouseEvent(WebPageOverlay&, const WebCore::PlatformMouseEvent&) = 0;
         virtual void didScrollFrame(WebPageOverlay&, WebFrame*) { }
 
+#if PLATFORM(MAC)
+        virtual DDActionContext *actionContextForResultAtPoint(WebPageOverlay&, WebCore::FloatPoint location, RefPtr<WebCore::Range>& rangeHandle) { return nullptr; }
+        virtual void dataDetectorsDidPresentUI(WebPageOverlay&) { }
+        virtual void dataDetectorsDidChangeUI(WebPageOverlay&) { }
+        virtual void dataDetectorsDidHideUI(WebPageOverlay&) { }
+#endif
+
         virtual bool copyAccessibilityAttributeStringValueForPoint(WebPageOverlay&, String /* attribute */, WebCore::FloatPoint /* parameter */, String& /* value */) { return false; }
         virtual bool copyAccessibilityAttributeBoolValueForPoint(WebPageOverlay&, String /* attribute */, WebCore::FloatPoint /* parameter */, bool& /* value */) { return false; }
         virtual Vector<String> copyAccessibilityAttributeNames(WebPageOverlay&, bool /* parameterizedNames */) { return Vector<String>(); }
     };
 
-    static PassRefPtr<WebPageOverlay> create(Client&, WebCore::PageOverlay::OverlayType = WebCore::PageOverlay::OverlayType::View);
+    static PassRefPtr<WebPageOverlay> create(std::unique_ptr<Client>, WebCore::PageOverlay::OverlayType = WebCore::PageOverlay::OverlayType::View);
+    static WebPageOverlay* fromCoreOverlay(WebCore::PageOverlay&);
     virtual ~WebPageOverlay();
 
     void setNeedsDisplay(const WebCore::IntRect& dirtyRect);
@@ -65,10 +76,17 @@ public:
     void clear();
 
     WebCore::PageOverlay* coreOverlay() const { return m_overlay.get(); }
-    Client& client() const { return m_client; }
+    Client& client() const { return *m_client; }
+
+#if PLATFORM(MAC)
+    DDActionContext *actionContextForResultAtPoint(WebCore::FloatPoint, RefPtr<WebCore::Range>&);
+    void dataDetectorsDidPresentUI();
+    void dataDetectorsDidChangeUI();
+    void dataDetectorsDidHideUI();
+#endif
 
 private:
-    WebPageOverlay(Client&, WebCore::PageOverlay::OverlayType);
+    WebPageOverlay(std::unique_ptr<Client>, WebCore::PageOverlay::OverlayType);
 
     // WebCore::PageOverlay::Client
     virtual void pageOverlayDestroyed(WebCore::PageOverlay&) override;
@@ -84,7 +102,7 @@ private:
 
 
     RefPtr<WebCore::PageOverlay> m_overlay;
-    Client& m_client;
+    std::unique_ptr<Client> m_client;
 };
 
 } // namespace WebKit

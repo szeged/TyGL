@@ -52,9 +52,9 @@ using namespace HTMLNames;
 // FIXME: Share more code with PluginDocumentParser.
 class MediaDocumentParser final : public RawDataDocumentParser {
 public:
-    static PassRefPtr<MediaDocumentParser> create(MediaDocument& document)
+    static Ref<MediaDocumentParser> create(MediaDocument& document)
     {
-        return adoptRef(new MediaDocumentParser(document));
+        return adoptRef(*new MediaDocumentParser(document));
     }
     
 private:
@@ -140,7 +140,7 @@ void MediaDocumentParser::appendBytes(DocumentWriter&, const char*, size_t)
     
 MediaDocument::MediaDocument(Frame* frame, const URL& url)
     : HTMLDocument(frame, url, MediaDocumentClass)
-    , m_replaceMediaElementTimer(this, &MediaDocument::replaceMediaElementTimerFired)
+    , m_replaceMediaElementTimer(*this, &MediaDocument::replaceMediaElementTimerFired)
 {
     setCompatibilityMode(DocumentCompatibilityMode::QuirksMode);
     lockCompatibilityMode();
@@ -153,7 +153,7 @@ MediaDocument::~MediaDocument()
     ASSERT(!m_replaceMediaElementTimer.isActive());
 }
 
-PassRefPtr<DocumentParser> MediaDocument::createParser()
+Ref<DocumentParser> MediaDocument::createParser()
 {
     return MediaDocumentParser::create(*this);
 }
@@ -231,9 +231,9 @@ void MediaDocument::mediaElementSawUnsupportedTracks()
     m_replaceMediaElementTimer.startOneShot(0);
 }
 
-void MediaDocument::replaceMediaElementTimerFired(Timer<MediaDocument>&)
+void MediaDocument::replaceMediaElementTimerFired()
 {
-    HTMLElement* htmlBody = body();
+    auto* htmlBody = bodyOrFrameset();
     if (!htmlBody)
         return;
 

@@ -73,7 +73,7 @@ public:
 
 protected:
     explicit ImageLoader(Element&);
-    virtual void notifyFinished(CachedResource*) override;
+    virtual void imageChanged(CachedImage*, const IntRect* = nullptr) override;
 
 private:
     virtual void dispatchLoadEvent() = 0;
@@ -91,11 +91,11 @@ private:
     void setImageWithoutConsideringPendingLoadEvent(CachedImage*);
     void clearFailedLoadURL();
 
-    void timerFired(Timer<ImageLoader>&);
+    void timerFired();
 
     Element& m_element;
     CachedResourceHandle<CachedImage> m_image;
-    Timer<ImageLoader> m_derefElementTimer;
+    Timer m_derefElementTimer;
     AtomicString m_failedLoadURL;
     bool m_hasPendingBeforeLoadEvent : 1;
     bool m_hasPendingLoadEvent : 1;

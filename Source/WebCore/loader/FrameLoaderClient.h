@@ -79,7 +79,7 @@ namespace WebCore {
     class NavigationAction;
     class Page;
     class ProtectionSpace;
-    class PluginView;
+    class PluginViewBase;
     class PolicyChecker;
     class ResourceError;
     class ResourceHandle;
@@ -104,7 +104,7 @@ namespace WebCore {
 
     typedef std::function<void (PolicyAction)> FramePolicyFunction;
 
-    class FrameLoaderClient {
+    class WEBCORE_EXPORT FrameLoaderClient {
     public:
         // An inline function cannot be the first non-abstract virtual function declared
         // in the class as it results in the vtable being generated as a weak symbol.
@@ -184,8 +184,6 @@ namespace WebCore {
 
         virtual void dispatchUnableToImplementPolicy(const ResourceError&) = 0;
 
-        virtual void dispatchWillRequestResource(CachedResourceRequest*) { }
-
         virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) = 0;
         virtual void dispatchWillSubmitForm(PassRefPtr<FormState>, FramePolicyFunction) = 0;
 
@@ -207,8 +205,6 @@ namespace WebCore {
 
         virtual bool shouldGoToHistoryItem(HistoryItem*) const = 0;
         virtual void updateGlobalHistoryItemForPage() { }
-
-        virtual void willChangeCurrentHistoryItem() { }
 
         // This frame has set its opener to null, disowning it for the lifetime of the frame.
         // See http://html.spec.whatwg.org/#dom-opener.
@@ -276,7 +272,7 @@ namespace WebCore {
 
         virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const URL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) = 0;
 
-        virtual void dispatchDidFailToStartPlugin(const PluginView*) const { }
+        virtual void dispatchDidFailToStartPlugin(const PluginViewBase*) const { }
 
         virtual ObjectContentType objectContentType(const URL&, const String& mimeType, bool shouldPreferPlugInsForImages) = 0;
         virtual String overrideMediaType() const = 0;
@@ -335,6 +331,8 @@ namespace WebCore {
 
         // FIXME (bug 116233): We need to get rid of EmptyFrameLoaderClient completely, then this will no longer be needed.
         virtual bool isEmptyFrameLoaderClient() { return false; }
+
+        virtual FrameLoader* dataProtocolLoader() const { return nullptr; }
 
 #if USE(QUICK_LOOK)
         virtual void didCreateQuickLookHandle(QuickLookHandle&) { }

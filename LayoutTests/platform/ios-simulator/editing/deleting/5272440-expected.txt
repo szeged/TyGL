@@ -7,7 +7,8 @@ layer at (0,0) size 800x600
         RenderText {#text} at (0,0) size 683x19
           text run at (0,0) width 683: "This tests for a bug where deleting the contents of an editable root that's inline would introduce a new line."
       RenderBlock {DIV} at (0,36) size 784x22 [border: (1px solid #000000)]
-        RenderInline {SPAN} at (0,0) size 22x19
-          RenderText {#text} at (1,1) size 22x19
-            text run at (1,1) width 22: "foo"
-caret: position 0 of child 0 {#text} of child 0 {P} of body
+        RenderInline {SPAN} at (0,0) size 394x19
+          RenderText {#text} at (1,1) size 394x19
+            text run at (1,1) width 394: "There shouldn't be any blank lines in the black bordered area."
+          RenderBR {BR} at (394,16) size 1x0
+caret: position 62 of child 0 {#text} of child 0 {SPAN} of child 2 {DIV} of body

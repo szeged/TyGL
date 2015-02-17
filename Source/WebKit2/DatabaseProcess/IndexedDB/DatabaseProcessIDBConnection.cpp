@@ -37,6 +37,8 @@
 #include "WebCoreArgumentCoders.h"
 #include "WebIDBServerConnectionMessages.h"
 #include <WebCore/IDBDatabaseMetadata.h>
+#include <WebCore/IDBIndexMetadata.h>
+#include <WebCore/IDBObjectStoreMetadata.h>
 #include <WebCore/IDBServerConnection.h>
 #include <WebCore/IndexedDB.h>
 
@@ -69,7 +71,7 @@ void DatabaseProcessIDBConnection::disconnectedFromWebProcess()
 
 void DatabaseProcessIDBConnection::establishConnection(const String& databaseName, const SecurityOriginData& openingOrigin, const SecurityOriginData& mainFrameOrigin)
 {
-    m_uniqueIDBDatabase = DatabaseProcess::shared().getOrCreateUniqueIDBDatabase(UniqueIDBDatabaseIdentifier(databaseName, openingOrigin, mainFrameOrigin));
+    m_uniqueIDBDatabase = DatabaseProcess::singleton().getOrCreateUniqueIDBDatabase(UniqueIDBDatabaseIdentifier(databaseName, openingOrigin, mainFrameOrigin));
     m_uniqueIDBDatabase->registerConnection(*this);
 }
 

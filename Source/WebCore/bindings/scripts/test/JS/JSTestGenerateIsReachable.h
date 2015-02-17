@@ -29,9 +29,9 @@ namespace WebCore {
 class JSTestGenerateIsReachable : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestGenerateIsReachable* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestGenerateIsReachable> impl)
+    static JSTestGenerateIsReachable* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestGenerateIsReachable>&& impl)
     {
-        JSTestGenerateIsReachable* ptr = new (NotNull, JSC::allocateCell<JSTestGenerateIsReachable>(globalObject->vm().heap)) JSTestGenerateIsReachable(structure, globalObject, impl);
+        JSTestGenerateIsReachable* ptr = new (NotNull, JSC::allocateCell<JSTestGenerateIsReachable>(globalObject->vm().heap)) JSTestGenerateIsReachable(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -64,7 +64,7 @@ public:
 private:
     TestGenerateIsReachable* m_impl;
 protected:
-    JSTestGenerateIsReachable(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestGenerateIsReachable>);
+    JSTestGenerateIsReachable(JSC::Structure*, JSDOMGlobalObject*, Ref<TestGenerateIsReachable>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -86,12 +86,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestGenerateIsReacha
     return &jsTestGenerateIsReachableOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestGenerateIsReachable*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestGenerateIsReachable*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestGenerateIsReachable& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

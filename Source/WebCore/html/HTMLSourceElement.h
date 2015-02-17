@@ -34,7 +34,7 @@ namespace WebCore {
 
 class HTMLSourceElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLSourceElement> create(const QualifiedName&, Document&);
+    static Ref<HTMLSourceElement> create(const QualifiedName&, Document&);
 
     String media() const;
     String type() const;
@@ -52,9 +52,9 @@ private:
     virtual void removedFrom(ContainerNode&) override;
     virtual bool isURLAttribute(const Attribute&) const override;
 
-    void errorEventTimerFired(Timer<HTMLSourceElement>&);
+    void errorEventTimerFired();
 
-    Timer<HTMLSourceElement> m_errorEventTimer;
+    Timer m_errorEventTimer;
 };
 
 } //namespace

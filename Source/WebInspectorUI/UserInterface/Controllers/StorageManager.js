@@ -37,6 +37,8 @@ WebInspector.StorageManager = function()
 
     WebInspector.Frame.addEventListener(WebInspector.Frame.Event.MainResourceDidChange, this._mainResourceDidChange, this);
 
+    WebInspector.notifications.addEventListener(WebInspector.Notification.ExtraDomainsActivated, this._extraDomainsActivated, this);
+
     // COMPATIBILITY (iOS 6): DOMStorage was discovered via a DOMStorageObserver event. Now DOM Storage
     // is added whenever a new securityOrigin is discovered. Check for DOMStorageAgent.getDOMStorageItems,
     // which was renamed at the same time the change to start using securityOrigin was made.
@@ -304,5 +306,12 @@ WebInspector.StorageManager.prototype = {
         }
 
         return null;
+    },
+
+    _extraDomainsActivated: function(event)
+    {
+        
+        if (event.data.domains.contains("DOMStorage") && window.DOMStorageAgent && DOMStorageAgent.getDOMStorageItems)
+            WebInspector.Frame.addEventListener(WebInspector.Frame.Event.SecurityOriginDidChange, this._securityOriginDidChange, this);
     }
 };

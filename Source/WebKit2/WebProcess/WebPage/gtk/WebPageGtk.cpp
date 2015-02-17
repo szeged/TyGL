@@ -37,6 +37,7 @@
 #include <WebCore/EventHandler.h>
 #include <WebCore/FocusController.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameView.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/Page.h>
 #include <WebCore/PasteboardHelper.h>
@@ -59,10 +60,6 @@ void WebPage::platformInitialize()
     m_accessibilityObject = adoptGRef(webPageAccessibilityObjectNew(this));
     GUniquePtr<gchar> plugID(atk_plug_get_id(ATK_PLUG(m_accessibilityObject.get())));
     send(Messages::WebPageProxy::BindAccessibilityTree(String(plugID.get())));
-#endif
-
-#if USE(TEXTURE_MAPPER_GL)
-    m_nativeWindowHandle = 0;
 #endif
 }
 
@@ -96,12 +93,6 @@ bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboard
         return false;
 
     switch (keyboardEvent.windowsVirtualKeyCode()) {
-    case VK_BACK:
-        if (keyboardEvent.shiftKey())
-            m_page->backForward().goForward();
-        else
-            m_page->backForward().goBack();
-        break;
     case VK_SPACE:
         scroll(m_page.get(), keyboardEvent.shiftKey() ? ScrollUp : ScrollDown, ScrollByPage);
         break;
@@ -166,12 +157,6 @@ PassRefPtr<SharedBuffer> WebPage::cachedResponseDataForURL(const URL&)
     return 0;
 }
 
-#if USE(TEXTURE_MAPPER_GL)
-void WebPage::setAcceleratedCompositingWindowId(uint64_t nativeWindowHandle)
-{
-    m_nativeWindowHandle = nativeWindowHandle;
-}
-#endif
 
 String WebPage::platformUserAgent(const URL& url) const
 {
@@ -180,5 +165,14 @@ String WebPage::platformUserAgent(const URL& url) const
 
     return WebCore::standardUserAgentForURL(url);
 }
+
+#if HAVE(GTK_GESTURES)
+void WebPage::getCenterForZoomGesture(const IntPoint& centerInViewCoordinates, IntPoint& result)
+{
+    result = mainFrameView()->rootViewToContents(centerInViewCoordinates);
+    double scale = m_page->pageScaleFactor();
+    result.scale(1 / scale, 1 / scale);
+}
+#endif
 
 } // namespace WebKit

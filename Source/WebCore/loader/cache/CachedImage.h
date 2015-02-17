@@ -24,6 +24,7 @@
 #define CachedImage_h
 
 #include "CachedResource.h"
+#include "Image.h"
 #include "ImageObserver.h"
 #include "IntRect.h"
 #include "IntSizeHash.h"
@@ -71,8 +72,8 @@ public:
     bool imageHasRelativeWidth() const;
     bool imageHasRelativeHeight() const;
 
-    virtual void addDataBuffer(ResourceBuffer*) override;
-    virtual void finishLoading(ResourceBuffer*) override;
+    virtual void addDataBuffer(SharedBuffer&) override;
+    virtual void finishLoading(SharedBuffer*) override;
 
     enum SizeType {
         UsedSize,
@@ -83,8 +84,8 @@ public:
     void computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio);
 
     bool isManuallyCached() const { return m_isManuallyCached; }
-    virtual bool mustRevalidateDueToCacheHeaders(CachePolicy) const;
-    virtual void load(CachedResourceLoader*, const ResourceLoaderOptions&) override;
+    virtual bool mustRevalidateDueToCacheHeaders(const CachedResourceLoader&, CachePolicy) const override;
+    virtual void load(CachedResourceLoader&, const ResourceLoaderOptions&) override;
 
     bool isOriginClean(SecurityOrigin*);
 
@@ -94,7 +95,7 @@ private:
     void createImage();
     void clearImage();
     // If not null, changeRect is the changed part of the image.
-    void notifyObservers(const IntRect* changeRect = 0);
+    void notifyObservers(const IntRect* changeRect = nullptr);
     void checkShouldPaintBrokenImage();
 
     virtual void switchClientsToRevalidatedResource() override;
@@ -115,6 +116,8 @@ private:
 
     virtual bool stillNeedsLoad() const override { return !errorOccurred() && status() == Unknown && !isLoading(); }
 
+    virtual bool decodedDataIsPurgeable() const override { return m_image && m_image->decodedDataIsPurgeable(); }
+
     // ImageObserver
     virtual void decodedSizeChanged(const Image*, int delta) override;
     virtual void didDraw(const Image*) override;
@@ -122,7 +125,7 @@ private:
     virtual void animationAdvanced(const Image*) override;
     virtual void changedInRect(const Image*, const IntRect&) override;
 
-    void addIncrementalDataBuffer(ResourceBuffer*);
+    void addIncrementalDataBuffer(SharedBuffer&);
 
     typedef std::pair<LayoutSize, float> SizeAndZoom;
     typedef HashMap<const CachedImageClient*, SizeAndZoom> ContainerSizeRequests;
@@ -130,8 +133,8 @@ private:
 
     RefPtr<Image> m_image;
     std::unique_ptr<SVGImageCache> m_svgImageCache;
-    unsigned char m_isManuallyCached : 1;
-    unsigned char m_shouldPaintBrokenImage : 1;
+    unsigned m_isManuallyCached : 1;
+    unsigned m_shouldPaintBrokenImage : 1;
 };
 
 } // namespace WebCore

@@ -49,10 +49,10 @@ public:
     bool shouldWaitForLoadingOfResource(AVCFAssetResourceLoadingRequestRef);
     void didCancelLoadingRequest(AVCFAssetResourceLoadingRequestRef);
     void didStopLoadingRequest(AVCFAssetResourceLoadingRequestRef);
-#endif
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
     RetainPtr<AVCFAssetResourceLoadingRequestRef> takeRequestForKeyURI(const String&);
+#endif
 #endif
 
     static void registerMediaEngine(MediaEngineRegistrar);
@@ -90,8 +90,8 @@ private:
     virtual MediaPlayerPrivateAVFoundation::AssetStatus assetStatus() const;
 
     virtual void checkPlayability();
-    virtual void updateRate();
-    virtual float rate() const;
+    virtual void setRate(float) override;
+    virtual double rate() const override;
     virtual void seekToTime(const MediaTime&, const MediaTime& negativeTolerance, const MediaTime& positiveTolerance);
     virtual unsigned long long totalBytes() const;
     virtual std::unique_ptr<PlatformTimeRanges> platformBufferedTimeRanges() const;
@@ -130,6 +130,8 @@ private:
 
     virtual void setCurrentTextTrack(InbandTextTrackPrivateAVF*) override;
     virtual InbandTextTrackPrivateAVF* currentTextTrack() const override;
+
+    virtual long assetErrorCode() const override final;
 
 #if !HAVE(AVFOUNDATION_LEGIBLE_OUTPUT_SUPPORT)
     void processLegacyClosedCaptionsTracks();

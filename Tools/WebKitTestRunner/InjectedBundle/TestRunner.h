@@ -38,7 +38,8 @@
 #include <CoreFoundation/CFRunLoop.h>
 typedef RetainPtr<CFRunLoopTimerRef> PlatformTimerRef;
 #elif PLATFORM(GTK)
-typedef unsigned int PlatformTimerRef;
+#include <wtf/gobject/GMainLoopSource.h>
+typedef GMainLoopSource PlatformTimerRef;
 #elif PLATFORM(EFL)
 typedef Ecore_Timer* PlatformTimerRef;
 #endif
@@ -56,6 +57,8 @@ public:
     void makeWindowObject(JSContextRef, JSObjectRef windowObject, JSValueRef* exception);
 
     // The basics.
+    WKURLRef testURL() const { return m_testURL.get(); }
+    void setTestURL(WKURLRef url) { m_testURL = url; }
     void dumpAsText(bool dumpPixels);
     void waitForPolicyDelegate();
     void dumpChildFramesAsText() { m_whatToDump = AllFramesText; }
@@ -252,12 +255,15 @@ public:
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy, JSValueRef altitude, JSValueRef altitudeAccuracy, JSValueRef heading, JSValueRef speed);
     void setMockGeolocationPositionUnavailableError(JSStringRef message);
 
+    // MediaStream
+    void setUserMediaPermission(bool);
+
     void setPageVisibility(JSStringRef state);
     void resetPageVisibility();
 
     bool callShouldCloseOnWebView();
 
-    void setCustomTimeout(int duration);
+    void setCustomTimeout(int duration) { m_timeout = duration; }
 
     // Work queue.
     void queueBackNavigation(unsigned howFarBackward);
@@ -274,12 +280,12 @@ public:
     JSValueRef neverInlineFunction(JSValueRef theFunction);
 
 private:
-    static const double waitToDumpWatchdogTimerInterval;
-
     TestRunner();
 
     void platformInitialize();
     void initializeWaitToDumpWatchdogTimerIfNeeded();
+
+    WKRetainPtr<WKURLRef> m_testURL; // Set by InjectedBundlePage once provisional load starts.
 
     WhatToDump m_whatToDump;
     bool m_shouldDumpAllFrameScrollPositions;

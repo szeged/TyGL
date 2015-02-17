@@ -32,8 +32,6 @@
 #include "config.h"
 #include "InspectorRuntimeAgent.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "Completion.h"
 #include "HeapIterationScope.h"
 #include "InjectedScript.h"
@@ -46,7 +44,6 @@
 #include "TypeProfiler.h"
 #include "TypeProfilerLog.h"
 #include "VMEntryScope.h"
-#include <wtf/PassRefPtr.h>
 #include <wtf/CurrentTime.h>
 
 using namespace JSC;
@@ -80,12 +77,12 @@ static ScriptDebugServer::PauseOnExceptionsState setPauseOnExceptionsState(Scrip
     return presentState;
 }
 
-static PassRefPtr<Inspector::Protocol::Runtime::ErrorRange> buildErrorRangeObject(const JSTokenLocation& tokenLocation)
+static Ref<Inspector::Protocol::Runtime::ErrorRange> buildErrorRangeObject(const JSTokenLocation& tokenLocation)
 {
-    RefPtr<Inspector::Protocol::Runtime::ErrorRange> result = Inspector::Protocol::Runtime::ErrorRange::create()
+    return Inspector::Protocol::Runtime::ErrorRange::create()
         .setStartOffset(tokenLocation.startOffset)
-        .setEndOffset(tokenLocation.endOffset);
-    return result.release();
+        .setEndOffset(tokenLocation.endOffset)
+        .release();
 }
 
 void InspectorRuntimeAgent::parse(ErrorString&, const String& expression, Inspector::Protocol::Runtime::SyntaxErrorType* result, Inspector::Protocol::OptOutput<String>* message, RefPtr<Inspector::Protocol::Runtime::ErrorRange>& range)
@@ -129,7 +126,7 @@ void InspectorRuntimeAgent::evaluate(ErrorString& errorString, const String& exp
     if (asBool(doNotPauseOnExceptionsAndMuteConsole))
         muteConsole();
 
-    injectedScript.evaluate(errorString, expression, objectGroup ? *objectGroup : "", asBool(includeCommandLineAPI), asBool(returnByValue), asBool(generatePreview), &result, wasThrown);
+    injectedScript.evaluate(errorString, expression, objectGroup ? *objectGroup : String(), asBool(includeCommandLineAPI), asBool(returnByValue), asBool(generatePreview), &result, wasThrown);
 
     if (asBool(doNotPauseOnExceptionsAndMuteConsole)) {
         unmuteConsole();
@@ -137,7 +134,7 @@ void InspectorRuntimeAgent::evaluate(ErrorString& errorString, const String& exp
     }
 }
 
-void InspectorRuntimeAgent::callFunctionOn(ErrorString& errorString, const String& objectId, const String& expression, const RefPtr<InspectorArray>* const optionalArguments, const bool* const doNotPauseOnExceptionsAndMuteConsole, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result, Inspector::Protocol::OptOutput<bool>* wasThrown)
+void InspectorRuntimeAgent::callFunctionOn(ErrorString& errorString, const String& objectId, const String& expression, const RefPtr<InspectorArray>&& optionalArguments, const bool* const doNotPauseOnExceptionsAndMuteConsole, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result, Inspector::Protocol::OptOutput<bool>* wasThrown)
 {
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
     if (injectedScript.hasNoValue()) {
@@ -147,7 +144,7 @@ void InspectorRuntimeAgent::callFunctionOn(ErrorString& errorString, const Strin
 
     String arguments;
     if (optionalArguments)
-        arguments = (*optionalArguments)->toJSONString();
+        arguments = optionalArguments->toJSONString();
 
     ScriptDebugServer::PauseOnExceptionsState previousPauseOnExceptionsState = ScriptDebugServer::DontPauseOnExceptions;
     if (asBool(doNotPauseOnExceptionsAndMuteConsole))
@@ -163,7 +160,7 @@ void InspectorRuntimeAgent::callFunctionOn(ErrorString& errorString, const Strin
     }
 }
 
-void InspectorRuntimeAgent::getProperties(ErrorString& errorString, const String& objectId, const bool* const ownProperties, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::PropertyDescriptor>>& result, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>& internalProperties)
+void InspectorRuntimeAgent::getProperties(ErrorString& errorString, const String& objectId, const bool* const ownProperties, const bool* const ownAndGetterProperties, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::PropertyDescriptor>>& result, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>& internalProperties)
 {
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
     if (injectedScript.hasNoValue()) {
@@ -174,11 +171,25 @@ void InspectorRuntimeAgent::getProperties(ErrorString& errorString, const String
     ScriptDebugServer::PauseOnExceptionsState previousPauseOnExceptionsState = setPauseOnExceptionsState(m_scriptDebugServer, ScriptDebugServer::DontPauseOnExceptions);
     muteConsole();
 
-    injectedScript.getProperties(errorString, objectId, ownProperties ? *ownProperties : false, &result);
+    injectedScript.getProperties(errorString, objectId, asBool(ownProperties), asBool(ownAndGetterProperties), &result);
     injectedScript.getInternalProperties(errorString, objectId, &internalProperties);
 
     unmuteConsole();
     setPauseOnExceptionsState(m_scriptDebugServer, previousPauseOnExceptionsState);
+}
+
+void InspectorRuntimeAgent::getCollectionEntries(ErrorString& errorString, const String& objectId, const String* objectGroup, const int* startIndex, const int* numberToFetch, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::CollectionEntry>>& entries)
+{
+    InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
+    if (injectedScript.hasNoValue()) {
+        errorString = ASCIILiteral("Inspected frame has gone");
+        return;
+    }
+
+    int start = startIndex && *startIndex >= 0 ? *startIndex : 0;
+    int fetch = numberToFetch && *numberToFetch >= 0 ? *numberToFetch : 0;
+
+    injectedScript.getCollectionEntries(errorString, objectId, objectGroup ? *objectGroup : String(), start, fetch, &entries);
 }
 
 void InspectorRuntimeAgent::releaseObject(ErrorString&, const String& objectId)
@@ -195,9 +206,10 @@ void InspectorRuntimeAgent::releaseObjectGroup(ErrorString&, const String& objec
 
 void InspectorRuntimeAgent::run(ErrorString&)
 {
+    // FIXME: <https://webkit.org/b/127634> Web Inspector: support debugging web workers
 }
 
-void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& errorString, const RefPtr<Inspector::InspectorArray>& locations, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::TypeDescription>>& typeDescriptions)
+void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& errorString, const RefPtr<Inspector::InspectorArray>&& locations, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::TypeDescription>>& typeDescriptions)
 {
     static const bool verbose = false;
     VM& vm = globalVM();
@@ -226,7 +238,8 @@ void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& er
         location->getInteger(ASCIILiteral("divot"), divot);
 
         bool okay;
-        TypeLocation* typeLocation = vm.typeProfiler()->findLocation(divot, sourceIDAsString.toIntPtrStrict(&okay), static_cast<TypeProfilerSearchDescriptor>(descriptor));
+        TypeLocation* typeLocation = vm.typeProfiler()->findLocation(divot, sourceIDAsString.toIntPtrStrict(&okay), static_cast<TypeProfilerSearchDescriptor>(descriptor), vm);
+        ASSERT(okay);
 
         RefPtr<TypeSet> typeSet;
         if (typeLocation) {
@@ -237,8 +250,9 @@ void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& er
         }
 
         bool isValid = typeLocation && typeSet && !typeSet->isEmpty();
-        RefPtr<Inspector::Protocol::Runtime::TypeDescription> description = Inspector::Protocol::Runtime::TypeDescription::create()
-            .setIsValid(isValid);
+        auto description = Inspector::Protocol::Runtime::TypeDescription::create()
+            .setIsValid(isValid)
+            .release();
 
         if (isValid) {
             description->setLeastCommonAncestor(typeSet->leastCommonAncestor());
@@ -247,7 +261,7 @@ void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& er
             description->setIsTruncated(typeSet->isOverflown());
         }
 
-        typeDescriptions->addItem(description);
+        typeDescriptions->addItem(WTF::move(description));
     }
 
     double end = currentTimeMS();
@@ -270,10 +284,12 @@ public:
 
 static void recompileAllJSFunctionsForTypeProfiling(VM& vm, bool shouldEnableTypeProfiling)
 {
-    vm.prepareToDiscardCode();
+    bool shouldRecompileFromTypeProfiler = (shouldEnableTypeProfiling ? vm.enableTypeProfiler() : vm.disableTypeProfiler());
+    bool shouldRecompileFromControlFlowProfiler = (shouldEnableTypeProfiling ? vm.enableControlFlowProfiler() : vm.disableControlFlowProfiler());
+    bool needsToRecompile = shouldRecompileFromTypeProfiler || shouldRecompileFromControlFlowProfiler;
 
-    bool needsToRecompile = (shouldEnableTypeProfiling ? vm.enableTypeProfiler() : vm.disableTypeProfiler());
     if (needsToRecompile) {
+        vm.prepareToDiscardCode();
         TypeRecompiler recompiler;
         HeapIterationScope iterationScope(vm.heap);
         vm.heap.objectSpace().forEachLiveCell(iterationScope, recompiler);
@@ -310,13 +326,34 @@ void InspectorRuntimeAgent::setTypeProfilerEnabledState(bool shouldEnableTypePro
     if (vm.entryScope) {
         vm.entryScope->setEntryScopeDidPopListener(this,
             [=] (VM& vm, JSGlobalObject*) {
-                recompileAllJSFunctionsForTypeProfiling(vm, shouldEnableTypeProfiling); 
+                recompileAllJSFunctionsForTypeProfiling(vm, shouldEnableTypeProfiling);
             }
         );
     } else
         recompileAllJSFunctionsForTypeProfiling(vm, shouldEnableTypeProfiling);
 }
 
-} // namespace Inspector
+void InspectorRuntimeAgent::getBasicBlocks(ErrorString& errorString, const String& sourceIDAsString, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::BasicBlock>>& basicBlocks)
+{
+    VM& vm = globalVM();
+    if (!vm.controlFlowProfiler()) {
+        errorString = ASCIILiteral("The VM does not currently have a Control Flow Profiler.");
+        return;
+    }
 
-#endif // ENABLE(INSPECTOR)
+    bool okay;
+    intptr_t sourceID = sourceIDAsString.toIntPtrStrict(&okay);
+    ASSERT(okay);
+    const Vector<BasicBlockRange>& basicBlockRanges = vm.controlFlowProfiler()->getBasicBlocksForSourceID(sourceID, vm);
+    basicBlocks = Inspector::Protocol::Array<Inspector::Protocol::Runtime::BasicBlock>::create();
+    for (const BasicBlockRange& block : basicBlockRanges) {
+        Ref<Inspector::Protocol::Runtime::BasicBlock> location = Inspector::Protocol::Runtime::BasicBlock::create()
+            .setStartOffset(block.m_startOffset)
+            .setEndOffset(block.m_endOffset)
+            .setHasExecuted(block.m_hasExecuted)
+            .release();
+        basicBlocks->addItem(WTF::move(location));
+    }
+}
+
+} // namespace Inspector

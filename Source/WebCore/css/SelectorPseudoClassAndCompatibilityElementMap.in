@@ -1,16 +1,22 @@
 -khtml-drag
 -webkit-any(
--webkit-any-link
+-webkit-any-link, PseudoClassAnyLinkDeprecated, PseudoElementUnknown
 -webkit-autofill
 -webkit-drag
 -webkit-full-page-media
 active
 after, PseudoClassUnknown, PseudoElementAfter
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+any-link
+#endif
 before, PseudoClassUnknown, PseudoElementBefore
 checked
 corner-present
 decrement
 default
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+dir(
+#endif
 disabled
 double-button
 empty
@@ -31,6 +37,7 @@ lang(
 last-child
 last-of-type
 link
+matches(
 no-button
 not(
 nth-child(
@@ -41,13 +48,13 @@ only-child
 only-of-type
 optional
 out-of-range
-#if ENABLE(CSS_SELECTORS_LEVEL4)
 placeholder-shown
-matches(
-#endif
 read-only
 read-write
 required
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+role(
+#endif
 root
 scope
 single-button

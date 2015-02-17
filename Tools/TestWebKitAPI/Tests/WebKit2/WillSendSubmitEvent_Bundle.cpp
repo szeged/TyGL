@@ -24,6 +24,9 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "InjectedBundleTest.h"
 
 #include "PlatformUtilities.h"
@@ -42,7 +45,7 @@ static InjectedBundleTest::Register<WillSendSubmitEventTest> registrar("WillSend
 
 static void willSendSubmitEvent(WKBundlePageRef, WKBundleNodeHandleRef, WKBundleFrameRef, WKBundleFrameRef, WKDictionaryRef values, const void*)
 {
-    WKBundlePostMessage(InjectedBundleController::shared().bundle(), Util::toWK("DidReceiveWillSendSubmitEvent").get(), values);
+    WKBundlePostMessage(InjectedBundleController::singleton().bundle(), Util::toWK("DidReceiveWillSendSubmitEvent").get(), values);
 }
 
 WillSendSubmitEventTest::WillSendSubmitEventTest(const std::string& identifier)
@@ -63,3 +66,5 @@ void WillSendSubmitEventTest::didCreatePage(WKBundleRef bundle, WKBundlePageRef 
 }
 
 } // namespace TestWebKitAPI
+
+#endif

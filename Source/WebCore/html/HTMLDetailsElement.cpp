@@ -40,9 +40,9 @@ static const AtomicString& summaryQuerySelector()
     return selector;
 };
 
-class DetailsContentElement : public InsertionPoint {
+class DetailsContentElement final : public InsertionPoint {
 public:
-    static PassRefPtr<DetailsContentElement> create(Document&);
+    static RefPtr<DetailsContentElement> create(Document&);
 
 private:
     DetailsContentElement(Document& document)
@@ -58,14 +58,14 @@ private:
     }
 };
 
-PassRefPtr<DetailsContentElement> DetailsContentElement::create(Document& document)
+RefPtr<DetailsContentElement> DetailsContentElement::create(Document& document)
 {
     return adoptRef(new DetailsContentElement(document));
 }
 
-class DetailsSummaryElement : public InsertionPoint {
+class DetailsSummaryElement final : public InsertionPoint {
 public:
-    static PassRefPtr<DetailsSummaryElement> create(Document&);
+    static Ref<DetailsSummaryElement> create(Document&);
 
     Element* fallbackSummary()
     {
@@ -87,21 +87,21 @@ private:
     }
 };
 
-PassRefPtr<DetailsSummaryElement> DetailsSummaryElement::create(Document& document)
+Ref<DetailsSummaryElement> DetailsSummaryElement::create(Document& document)
 {
     RefPtr<HTMLSummaryElement> summary = HTMLSummaryElement::create(summaryTag, document);
     summary->appendChild(Text::create(document, defaultDetailsSummaryText()), ASSERT_NO_EXCEPTION);
 
-    RefPtr<DetailsSummaryElement> detailsSummary = adoptRef(new DetailsSummaryElement(document));
+    Ref<DetailsSummaryElement> detailsSummary = adoptRef(*new DetailsSummaryElement(document));
     detailsSummary->appendChild(summary);
-    return detailsSummary.release();
+    return detailsSummary;
 }
 
-PassRefPtr<HTMLDetailsElement> HTMLDetailsElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLDetailsElement> HTMLDetailsElement::create(const QualifiedName& tagName, Document& document)
 {
-    RefPtr<HTMLDetailsElement> details = adoptRef(new HTMLDetailsElement(tagName, document));
+    Ref<HTMLDetailsElement> details = adoptRef(*new HTMLDetailsElement(tagName, document));
     details->ensureUserAgentShadowRoot();
-    return details.release();
+    return details;
 }
 
 HTMLDetailsElement::HTMLDetailsElement(const QualifiedName& tagName, Document& document)
@@ -111,7 +111,7 @@ HTMLDetailsElement::HTMLDetailsElement(const QualifiedName& tagName, Document& d
     ASSERT(hasTagName(detailsTag));
 }
 
-RenderPtr<RenderElement> HTMLDetailsElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLDetailsElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderBlockFlow>(*this, WTF::move(style));
 }

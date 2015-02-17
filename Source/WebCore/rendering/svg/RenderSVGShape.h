@@ -45,8 +45,8 @@ class SVGGraphicsElement;
 
 class RenderSVGShape : public RenderSVGModelObject {
 public:
-    RenderSVGShape(SVGGraphicsElement&, PassRef<RenderStyle>);
-    RenderSVGShape(SVGGraphicsElement&, PassRef<RenderStyle>, Path*, bool);
+    RenderSVGShape(SVGGraphicsElement&, Ref<RenderStyle>&&);
+    RenderSVGShape(SVGGraphicsElement&, Ref<RenderStyle>&&, Path*, bool);
     virtual ~RenderSVGShape();
 
     SVGGraphicsElement& graphicsElement() const { return downcast<SVGGraphicsElement>(RenderSVGModelObject::element()); }
@@ -132,8 +132,6 @@ private:
     bool m_needsShapeUpdate : 1;
     bool m_needsTransformUpdate : 1;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderSVGShape, isSVGShape())
 
 } // namespace WebCore
 

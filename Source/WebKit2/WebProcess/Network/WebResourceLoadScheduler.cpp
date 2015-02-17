@@ -46,7 +46,6 @@
 #include <WebCore/FrameLoader.h>
 #include <WebCore/NetscapePlugInStreamLoader.h>
 #include <WebCore/ReferrerPolicy.h>
-#include <WebCore/ResourceBuffer.h>
 #include <WebCore/ResourceLoader.h>
 #include <WebCore/SessionID.h>
 #include <WebCore/Settings.h>
@@ -93,6 +92,9 @@ static std::chrono::milliseconds maximumBufferingTime(CachedResource* resource)
     switch (resource->type()) {
     case CachedResource::CSSStyleSheet:
     case CachedResource::Script:
+#if ENABLE(SVG_FONTS)
+    case CachedResource::SVGFontResource:
+#endif
     case CachedResource::FontResource:
         return std::chrono::milliseconds::max();
     case CachedResource::ImageResource:
@@ -148,7 +150,7 @@ void WebResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, Cach
     }
 #endif
 
-    LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::scheduleLoad, url '%s' will be scheduled with the NetworkProcess with priority %i", resourceLoader->url().string().utf8().data(), resourceLoader->request().priority());
+    LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::scheduleLoad, url '%s' will be scheduled with the NetworkProcess with priority %u", resourceLoader->url().string().utf8().data(), resourceLoader->request().priority());
 
     ContentSniffingPolicy contentSniffingPolicy = resourceLoader->shouldSniffContent() ? SniffContent : DoNotSniffContent;
     StoredCredentials allowStoredCredentials = resourceLoader->shouldUseCredentialStorage() ? AllowStoredCredentials : DoNotAllowStoredCredentials;
@@ -178,7 +180,7 @@ void WebResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, Cach
 
     ASSERT((loadParameters.webPageID && loadParameters.webFrameID) || loadParameters.clientCredentialPolicy == DoNotAskClientForAnyCredentials);
 
-    if (!WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::ScheduleResourceLoad(loadParameters), 0)) {
+    if (!WebProcess::singleton().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::ScheduleResourceLoad(loadParameters), 0)) {
         // We probably failed to schedule this load with the NetworkProcess because it had crashed.
         // This load will never succeed so we will schedule it to fail asynchronously.
         scheduleInternallyFailedLoad(resourceLoader);
@@ -186,8 +188,6 @@ void WebResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, Cach
     }
     
     m_webResourceLoaders.set(identifier, WebResourceLoader::create(resourceLoader));
-    
-    notifyDidScheduleResourceRequest(resourceLoader);
 }
 
 void WebResourceLoadScheduler::scheduleInternallyFailedLoad(WebCore::ResourceLoader* resourceLoader)
@@ -226,7 +226,7 @@ void WebResourceLoadScheduler::remove(ResourceLoader* resourceLoader)
     if (!loader)
         return;
 
-    WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::RemoveLoadIdentifier(identifier), 0);
+    WebProcess::singleton().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::RemoveLoadIdentifier(identifier), 0);
 
     // It's possible that this WebResourceLoader might be just about to message back to the NetworkProcess (e.g. ContinueWillSendRequest)
     // but there's no point in doing so anymore.
@@ -236,7 +236,7 @@ void WebResourceLoadScheduler::remove(ResourceLoader* resourceLoader)
 void WebResourceLoadScheduler::setDefersLoading(ResourceLoader* resourceLoader, bool defers)
 {
     ResourceLoadIdentifier identifier = resourceLoader->identifier();
-    WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::SetDefersLoading(identifier, defers), 0);
+    WebProcess::singleton().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::SetDefersLoading(identifier, defers), 0);
 }
 
 void WebResourceLoadScheduler::crossOriginRedirectReceived(ResourceLoader*, const URL&)
@@ -254,7 +254,7 @@ void WebResourceLoadScheduler::servePendingRequests(ResourceLoadPriority minimum
     if (m_suspendPendingRequestsCount)
         return;
 
-    WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::ServePendingRequests(minimumPriority), 0);
+    WebProcess::singleton().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::ServePendingRequests(minimumPriority), 0);
 }
 
 void WebResourceLoadScheduler::suspendPendingRequests()
@@ -270,7 +270,7 @@ void WebResourceLoadScheduler::resumePendingRequests()
 
 void WebResourceLoadScheduler::setSerialLoadingEnabled(bool enabled)
 {
-    WebProcess::shared().networkConnection()->connection()->sendSync(Messages::NetworkConnectionToWebProcess::SetSerialLoadingEnabled(enabled), Messages::NetworkConnectionToWebProcess::SetSerialLoadingEnabled::Reply(), 0);
+    WebProcess::singleton().networkConnection()->connection()->sendSync(Messages::NetworkConnectionToWebProcess::SetSerialLoadingEnabled(enabled), Messages::NetworkConnectionToWebProcess::SetSerialLoadingEnabled::Reply(), 0);
 }
 
 void WebResourceLoadScheduler::networkProcessCrashed()

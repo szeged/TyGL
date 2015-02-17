@@ -67,9 +67,9 @@ inline SVGImageElement::SVGImageElement(const QualifiedName& tagName, Document& 
     registerAnimatedPropertiesForSVGImageElement();
 }
 
-PassRefPtr<SVGImageElement> SVGImageElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGImageElement> SVGImageElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGImageElement(tagName, document));
+    return adoptRef(*new SVGImageElement(tagName, document));
 }
 
 bool SVGImageElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -122,7 +122,7 @@ void SVGImageElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::widthAttr
         || attrName == SVGNames::heightAttr) {
@@ -143,12 +143,12 @@ void SVGImageElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    auto renderer = this->renderer();
+    auto* renderer = this->renderer();
     if (!renderer)
         return;
 
     if (isLengthAttribute) {
-        if (toRenderSVGImage(renderer)->updateImageViewport())
+        if (downcast<RenderSVGImage>(*renderer).updateImageViewport())
             RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
         return;
     }
@@ -163,7 +163,7 @@ void SVGImageElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderPtr<RenderElement> SVGImageElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGImageElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGImage>(*this, WTF::move(style));
 }
@@ -175,7 +175,7 @@ bool SVGImageElement::haveLoadedRequiredResources()
 
 void SVGImageElement::didAttachRenderers()
 {
-    if (RenderSVGImage* imageObj = toRenderSVGImage(renderer())) {
+    if (auto* imageObj = downcast<RenderSVGImage>(renderer())) {
         if (imageObj->imageResource().hasImage())
             return;
 

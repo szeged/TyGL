@@ -48,6 +48,7 @@ namespace WebCore {
 
 class Dictionary;
 class Document;
+class Frame;
 class MediaConstraints;
 class MediaStreamPrivate;
 class UserMediaController;
@@ -66,6 +67,9 @@ public:
     WEBCORE_EXPORT void userMediaAccessGranted();
     WEBCORE_EXPORT void userMediaAccessDenied();
 
+    bool requiresAudio() const { return m_audioConstraints; }
+    bool requiresVideo() const { return m_videoConstraints; }
+
 private:
     UserMediaRequest(ScriptExecutionContext*, UserMediaController*, PassRefPtr<MediaConstraints> audioConstraints, PassRefPtr<MediaConstraints> videoConstraints, PassRefPtr<NavigatorUserMediaSuccessCallback>, PassRefPtr<NavigatorUserMediaErrorCallback>);
 
@@ -79,11 +83,6 @@ private:
     // ContextDestructionObserver
     virtual void contextDestroyed() override final;
     
-    void callSuccessHandler(PassRefPtr<MediaStreamPrivate>);
-    void callErrorHandler(PassRefPtr<NavigatorUserMediaError>);
-    void requestPermission();
-    void createMediaStream();
-
     RefPtr<MediaConstraints> m_audioConstraints;
     RefPtr<MediaConstraints> m_videoConstraints;
 

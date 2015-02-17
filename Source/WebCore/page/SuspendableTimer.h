@@ -34,7 +34,7 @@ namespace WebCore {
 
 class SuspendableTimer : private TimerBase, public ActiveDOMObject {
 public:
-    explicit SuspendableTimer(ScriptExecutionContext*);
+    explicit SuspendableTimer(ScriptExecutionContext&);
     virtual ~SuspendableTimer();
 
     // A hook for derived classes to perform cleanup.
@@ -55,7 +55,7 @@ public:
     void cancel(); // Equivalent to TimerBase::stop(), whose name conflicts with ActiveDOMObject::stop().
 
 private:
-    virtual void fired() = 0;
+    virtual void fired() override = 0;
 
     // ActiveDOMObject
     virtual bool hasPendingActivity() const final override;
@@ -63,6 +63,7 @@ private:
     virtual bool canSuspend() const final override;
     virtual void suspend(ReasonForSuspension) final override;
     virtual void resume() final override;
+    virtual const char* activeDOMObjectName() const override { return "SuspendableTimer"; }
 
     bool m_suspended;
 

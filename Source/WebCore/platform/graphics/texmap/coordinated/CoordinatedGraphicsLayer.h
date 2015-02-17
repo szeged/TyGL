@@ -26,10 +26,10 @@
 #include "CoordinatedTile.h"
 #include "FloatPoint3D.h"
 #include "GraphicsLayer.h"
-#include "GraphicsLayerAnimation.h"
 #include "GraphicsLayerTransform.h"
 #include "Image.h"
 #include "IntSize.h"
+#include "TextureMapperAnimation.h"
 #include "TiledBackingStore.h"
 #include "TiledBackingStoreClient.h"
 #include "TransformationMatrix.h"
@@ -42,7 +42,7 @@
 
 namespace WebCore {
 class CoordinatedGraphicsLayer;
-class GraphicsLayerAnimations;
+class TextureMapperAnimations;
 class ScrollableArea;
 
 class CoordinatedGraphicsLayerClient {
@@ -61,7 +61,7 @@ class CoordinatedGraphicsLayer : public GraphicsLayer
     , public CoordinatedImageBacking::Host
     , public CoordinatedTileClient {
 public:
-    explicit CoordinatedGraphicsLayer(GraphicsLayerClient&);
+    explicit CoordinatedGraphicsLayer(Type, GraphicsLayerClient&);
     virtual ~CoordinatedGraphicsLayer();
 
     // Reimplementations from GraphicsLayer.h.
@@ -201,7 +201,7 @@ private:
     void setShouldUpdateVisibleRect();
     float effectiveContentsScale();
 
-    void animationStartedTimerFired(Timer<CoordinatedGraphicsLayer>*);
+    void animationStartedTimerFired();
 
     CoordinatedLayerID m_id;
     CoordinatedGraphicsLayerState m_layerState;
@@ -243,8 +243,8 @@ private:
     IntSize m_platformLayerSize;
     GraphicsSurfaceToken m_platformLayerToken;
 #endif
-    Timer<CoordinatedGraphicsLayer> m_animationStartedTimer;
-    GraphicsLayerAnimations m_animations;
+    Timer m_animationStartedTimer;
+    TextureMapperAnimations m_animations;
     double m_lastAnimationStartTime;
 
     ScrollableArea* m_scrollableArea;

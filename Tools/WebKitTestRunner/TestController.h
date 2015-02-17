@@ -43,13 +43,16 @@ class EventSenderProxy;
 // FIXME: Rename this TestRunner?
 class TestController {
 public:
-    static TestController& shared();
+    static TestController& singleton();
 
     static const unsigned viewWidth;
     static const unsigned viewHeight;
 
     static const unsigned w3cSVGViewWidth;
     static const unsigned w3cSVGViewHeight;
+
+    static const double shortTimeout;
+    static const double noTimeout;
 
     TestController(int argc, const char* argv[]);
     ~TestController();
@@ -68,14 +71,11 @@ public:
     bool shouldUseRemoteLayerTree() const { return m_shouldUseRemoteLayerTree; }
     
     // Runs the run loop until `done` is true or the timeout elapses.
-    enum TimeoutDuration { ShortTimeout, LongTimeout, NoTimeout, CustomTimeout };
     bool useWaitToDumpWatchdogTimer() { return m_useWaitToDumpWatchdogTimer; }
-    void runUntil(bool& done, TimeoutDuration);
+    void runUntil(bool& done, double timeoutSeconds);
     void notifyDone();
     
     void configureViewForTest(const TestInvocation&);
-
-    int getCustomTimeout();
     
     bool beforeUnloadReturnValue() const { return m_beforeUnloadReturnValue; }
     void setBeforeUnloadReturnValue(bool value) { m_beforeUnloadReturnValue = value; }
@@ -88,6 +88,10 @@ public:
     void setMockGeolocationPositionUnavailableError(WKStringRef errorMessage);
     void handleGeolocationPermissionRequest(WKGeolocationPermissionRequestRef);
 
+    // MediaStream.
+    void setUserMediaPermission(bool);
+    void handleUserMediaPermissionRequest(WKUserMediaPermissionRequestRef);
+
     // Policy delegate.
     void setCustomPolicyDelegate(bool enabled, bool permissive);
 
@@ -99,6 +103,8 @@ public:
 
     void terminateWebContentProcess();
     void reattachPageToWebProcess();
+
+    static const char* webProcessName();
 
     WorkQueueManager& workQueueManager() { return m_workQueueManager; }
 
@@ -121,6 +127,7 @@ private:
     void platformInitialize();
     void platformDestroy();
     void platformInitializeContext();
+    void platformResetPreferencesToConsistentValues();
     void platformConfigureViewForTest(const TestInvocation&);
     void platformWillRunTest(const TestInvocation&);
     void platformRunUntil(bool& done, double timeout);
@@ -129,10 +136,11 @@ private:
     void initializeTestPluginDirectory();
 
     void updateWebViewSizeForTest(const TestInvocation&);
-    void updateWindowScaleForTest(const TestInvocation&);
+    void updateWindowScaleForTest(PlatformWebView*, const TestInvocation&);
     void updateLayoutTypeForTest(const TestInvocation&);
 
     void decidePolicyForGeolocationPermissionRequestIfPossible();
+    void decidePolicyForUserMediaPermissionRequestIfPossible();
 
     // WKContextInjectedBundleClient
     static void didReceiveMessageFromInjectedBundle(WKContextRef, WKStringRef messageName, WKTypeRef messageBody, const void*);
@@ -142,18 +150,18 @@ private:
 
     void didReceiveKeyDownMessageFromInjectedBundle(WKDictionaryRef messageBodyDictionary, bool synchronous);
 
-    // WKPageLoaderClient
-    static void didCommitLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void*);
-    void didCommitLoadForFrame(WKPageRef, WKFrameRef);
+    // WKPageNavigationClient
+    static void didCommitNavigation(WKPageRef, WKNavigationRef, WKTypeRef userData, const void*);
+    void didCommitNavigation(WKPageRef, WKNavigationRef);
 
-    static void didFinishLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void*);
-    void didFinishLoadForFrame(WKPageRef, WKFrameRef);
+    static void didFinishNavigation(WKPageRef, WKNavigationRef, WKTypeRef userData, const void*);
+    void didFinishNavigation(WKPageRef, WKNavigationRef);
 
     static void processDidCrash(WKPageRef, const void* clientInfo);
     void processDidCrash();
 
-    static WKPluginLoadPolicy pluginLoadPolicy(WKPageRef, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInformation, WKStringRef* unavailabilityDescription, const void* clientInfo);
-    WKPluginLoadPolicy pluginLoadPolicy(WKPageRef, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInformation, WKStringRef* unavailabilityDescription);
+    static WKPluginLoadPolicy decidePolicyForPluginLoad(WKPageRef, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInformation, WKStringRef* unavailabilityDescription, const void* clientInfo);
+    WKPluginLoadPolicy decidePolicyForPluginLoad(WKPageRef, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInformation, WKStringRef* unavailabilityDescription);
     
 
     static void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef, const void*);
@@ -161,17 +169,16 @@ private:
 
     static void unavailablePluginButtonClicked(WKPageRef, WKPluginUnavailabilityReason, WKDictionaryRef, const void*);
 
-    static bool canAuthenticateAgainstProtectionSpaceInFrame(WKPageRef, WKFrameRef, WKProtectionSpaceRef, const void *clientInfo);
+    static bool canAuthenticateAgainstProtectionSpace(WKPageRef, WKProtectionSpaceRef, const void *clientInfo);
 
-    static void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef, const void *clientInfo);
-    void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef);
+    static void didReceiveAuthenticationChallenge(WKPageRef, WKAuthenticationChallengeRef, const void *clientInfo);
+    void didReceiveAuthenticationChallenge(WKPageRef, WKAuthenticationChallengeRef);
 
-    // WKPagePolicyClient
-    static void decidePolicyForNavigationAction(WKPageRef, WKFrameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKFrameRef, WKURLRequestRef, WKFramePolicyListenerRef, WKTypeRef, const void*);
+    static void decidePolicyForNavigationAction(WKPageRef, WKNavigationActionRef, WKFramePolicyListenerRef, WKTypeRef, const void*);
     void decidePolicyForNavigationAction(WKFramePolicyListenerRef);
 
-    static void decidePolicyForResponse(WKPageRef, WKFrameRef, WKURLResponseRef, WKURLRequestRef, bool canShowMIMEType, WKFramePolicyListenerRef, WKTypeRef, const void*);
-    void decidePolicyForResponse(WKFrameRef, WKURLResponseRef, WKFramePolicyListenerRef);
+    static void decidePolicyForNavigationResponse(WKPageRef, WKNavigationResponseRef, WKFramePolicyListenerRef, WKTypeRef, const void*);
+    void decidePolicyForNavigationResponse(WKNavigationResponseRef, WKFramePolicyListenerRef);
 
     // WKContextHistoryClient
     static void didNavigateWithNavigationData(WKContextRef, WKPageRef, WKNavigationDataRef, WKFrameRef, const void*);
@@ -219,13 +226,8 @@ private:
     State m_state;
     bool m_doneResetting;
 
-    double m_longTimeout;
-    double m_shortTimeout;
-    double m_noTimeout;
     bool m_useWaitToDumpWatchdogTimer;
     bool m_forceNoTimeout;
-
-    int m_timeout;
 
     bool m_didPrintWebProcessCrashedMessage;
     bool m_shouldExitWhenWebProcessCrashes;
@@ -236,6 +238,10 @@ private:
     Vector<WKRetainPtr<WKGeolocationPermissionRequestRef> > m_geolocationPermissionRequests;
     bool m_isGeolocationPermissionSet;
     bool m_isGeolocationPermissionAllowed;
+
+    Vector<WKRetainPtr<WKUserMediaPermissionRequestRef>> m_userMediaPermissionRequests;
+    bool m_isUserMediaPermissionSet;
+    bool m_isUserMediaPermissionAllowed;
 
     bool m_policyDelegateEnabled;
     bool m_policyDelegatePermissive;

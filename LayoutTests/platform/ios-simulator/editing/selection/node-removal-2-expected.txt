@@ -7,10 +7,10 @@ layer at (0,0) size 800x600
   RenderBlock {HTML} at (0,0) size 800x600
     RenderBody {BODY} at (8,8) size 784x584
       RenderBlock {P} at (0,0) size 784x40
-        RenderText {#text} at (0,0) size 764x39
+        RenderText {#text} at (0,0) size 763x39
           text run at (0,0) width 693: "This tests behavior when a node that serves as the start or end of a selection is removed from the document. "
-          text run at (692,0) width 72: "Ideally, we"
-          text run at (0,20) width 661: "would just adjust the selection when an endpoint is removed, for now, we just blow away the selection."
+          text run at (692,0) width 71: "Ideally, we"
+          text run at (0,20) width 660: "would just adjust the selection when an endpoint is removed, for now, we just blow away the selection."
       RenderBlock {P} at (0,56) size 784x40
         RenderText {#text} at (0,0) size 772x39
           text run at (0,0) width 487: "This test creates a selection that ends inside of a node that will be removed. "

@@ -45,6 +45,10 @@
 #include "JSGlobalObjectInspectorController.h"
 #endif
 
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+#include "JSContextRefInspectorSupport.h"
+#endif
+
 #if OS(DARWIN)
 #include <mach-o/dyld.h>
 
@@ -95,9 +99,9 @@ void JSContextGroupSetExecutionTimeLimit(JSContextGroupRef group, double limit, 
     Watchdog& watchdog = *vm.watchdog;
     if (callback) {
         void* callbackPtr = reinterpret_cast<void*>(callback);
-        watchdog.setTimeLimit(vm, limit, internalScriptTimeoutCallback, callbackPtr, callbackData);
+        watchdog.setTimeLimit(vm, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>(limit)), internalScriptTimeoutCallback, callbackPtr, callbackData);
     } else
-        watchdog.setTimeLimit(vm, limit);
+        watchdog.setTimeLimit(vm, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>(limit)));
 }
 
 void JSContextGroupClearExecutionTimeLimit(JSContextGroupRef group)
@@ -107,7 +111,7 @@ void JSContextGroupClearExecutionTimeLimit(JSContextGroupRef group)
     if (!vm.watchdog)
         vm.watchdog = std::make_unique<Watchdog>();
     Watchdog& watchdog = *vm.watchdog;
-    watchdog.setTimeLimit(vm, std::numeric_limits<double>::infinity());
+    watchdog.setTimeLimit(vm, std::chrono::microseconds::max());
 }
 
 // From the API's perspective, a global context remains alive iff it has been JSGlobalContextRetained.
@@ -134,7 +138,6 @@ JSGlobalContextRef JSGlobalContextCreateInGroup(JSContextGroupRef group, JSClass
     RefPtr<VM> vm = group ? PassRefPtr<VM>(toJS(group)) : VM::createContextGroup();
 
     JSLockHolder locker(vm.get());
-    vm->makeUsableFromMultipleThreads();
 
     if (!globalObjectClass) {
         JSGlobalObject* globalObject = JSGlobalObject::create(*vm, JSGlobalObject::createStructure(*vm, jsNull()));
@@ -409,5 +412,20 @@ void JSGlobalContextSetDebuggerRunLoop(JSGlobalContextRef ctx, CFRunLoopRef runL
     UNUSED_PARAM(ctx);
     UNUSED_PARAM(runLoop);
 #endif
+}
+#endif // USE(CF)
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+Inspector::AugmentableInspectorController* JSGlobalContextGetAugmentableInspectorController(JSGlobalContextRef ctx)
+{
+    if (!ctx) {
+        ASSERT_NOT_REACHED();
+        return nullptr;
+    }
+
+    ExecState* exec = toJS(ctx);
+    JSLockHolder lock(exec);
+
+    return &exec->vmEntryGlobalObject()->inspectorController();
 }
 #endif

@@ -12,6 +12,7 @@ function Controller(root, video, host)
     this.listeners = {};
     this.isLive = false;
     this.statusHidden = true;
+    this.hasVisualMedia = false;
 
     this.addVideoListeners();
     this.createBase();
@@ -155,7 +156,7 @@ Controller.prototype = {
 
     addVideoListeners: function()
     {
-        for (name in this.HandledVideoEvents) {
+        for (var name in this.HandledVideoEvents) {
             this.listenFor(this.video, name, this.HandledVideoEvents[name]);
         };
 
@@ -181,7 +182,7 @@ Controller.prototype = {
 
     removeVideoListeners: function()
     {
-        for (name in this.HandledVideoEvents) {
+        for (var name in this.HandledVideoEvents) {
             this.stopListeningFor(this.video, name, this.HandledVideoEvents[name]);
         };
 
@@ -337,6 +338,7 @@ Controller.prototype = {
         timeline.setAttribute('aria-label', this.UIString('Duration'));
         timeline.style.backgroundImage = '-webkit-canvas(timeline-' + this.timelineID + ')';
         timeline.type = 'range';
+        timeline.value = 0;
         this.listenFor(timeline, 'input', this.handleTimelineChange);
         this.listenFor(timeline, 'mouseover', this.handleTimelineMouseOver);
         this.listenFor(timeline, 'mouseout', this.handleTimelineMouseOut);
@@ -437,7 +439,7 @@ Controller.prototype = {
 
     disconnectControls: function(event)
     {
-        for (item in this.controls) {
+        for (var item in this.controls) {
             var control = this.controls[item];
             if (control && control.parentNode)
                 control.parentNode.removeChild(control);
@@ -554,6 +556,7 @@ Controller.prototype = {
 
     handleReadyStateChange: function(event)
     {
+        this.hasVisualMedia = this.video.videoTracks && this.video.videoTracks.length > 0;
         this.updateReadyState();
         this.updateDuration();
         this.updateCaptionButton();
@@ -571,8 +574,8 @@ Controller.prototype = {
     handleDurationChange: function(event)
     {
         this.updateDuration();
-        this.updateTime();
-        this.updateProgress();
+        this.updateTime(true);
+        this.updateProgress(true);
     },
 
     handlePlay: function(event)
@@ -836,7 +839,7 @@ Controller.prototype = {
 
     updateFullscreenButton: function()
     {
-        this.controls.fullscreenButton.classList.toggle(this.ClassNames.hidden, !this.video.webkitSupportsFullscreen);
+        this.controls.fullscreenButton.classList.toggle(this.ClassNames.hidden, (!this.video.webkitSupportsFullscreen || !this.hasVisualMedia));
     },
 
     handleFullscreenButtonClicked: function(event)
@@ -937,8 +940,11 @@ Controller.prototype = {
         return gradient;
     },
 
-    updateProgress: function()
+    updateProgress: function(forceUpdate)
     {
+        if (!forceUpdate && this.controlsAreHidden())
+            return;
+
         this.updateTimelineMetricsIfNeeded();
 
         var width = this.timelineWidth;
@@ -1034,8 +1040,11 @@ Controller.prototype = {
         this.setNeedsTimelineMetricsUpdate();
     },
 
-    updateTime: function()
+    updateTime: function(forceUpdate)
     {
+        if (!forceUpdate && this.controlsAreHidden())
+            return;
+
         var currentTime = this.video.currentTime;
         var timeRemaining = currentTime - this.video.duration;
         this.controls.currentTime.innerText = this.formatTime(currentTime);

@@ -41,6 +41,11 @@
 #import <UIKit/UIView.h>
 #endif
 
+#if ENABLE(FILTERS_LEVEL_2)
+@interface CABackdropLayer : CALayer
+@end
+#endif
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -54,6 +59,9 @@ RemoteLayerTreeHost::RemoteLayerTreeHost(RemoteLayerTreeDrawingAreaProxy& drawin
 
 RemoteLayerTreeHost::~RemoteLayerTreeHost()
 {
+    for (auto& delegate : m_animationDelegates.values())
+        [delegate.get() invalidate];
+
     clearLayers();
 }
 
@@ -168,7 +176,6 @@ void RemoteLayerTreeHost::animationDidEnd(WebCore::GraphicsLayer::PlatformLayerI
 
     if (!animationKey.isEmpty())
         m_drawingArea.acceleratedAnimationDidEnd(layerID, animationKey);
-
 }
 
 void RemoteLayerTreeHost::clearLayers()
@@ -215,10 +222,19 @@ LayerOrView *RemoteLayerTreeHost::createLayer(const RemoteLayerTreeTransaction::
     case PlatformCALayer::LayerTypeTiledBackingLayer:
     case PlatformCALayer::LayerTypePageTiledBackingLayer:
     case PlatformCALayer::LayerTypeTiledBackingTileLayer:
+    case PlatformCALayer::LayerTypeScrollingLayer:
         layer = adoptNS([[CALayer alloc] init]);
         break;
     case PlatformCALayer::LayerTypeTransformLayer:
         layer = adoptNS([[CATransformLayer alloc] init]);
+        break;
+    case PlatformCALayer::LayerTypeBackdropLayer:
+#if ENABLE(FILTERS_LEVEL_2)
+        layer = adoptNS([[CABackdropLayer alloc] init]);
+#else
+        ASSERT_NOT_REACHED();
+        layer = adoptNS([[CALayer alloc] init]);
+#endif
         break;
     case PlatformCALayer::LayerTypeCustom:
     case PlatformCALayer::LayerTypeAVPlayerLayer:
@@ -227,6 +243,9 @@ LayerOrView *RemoteLayerTreeHost::createLayer(const RemoteLayerTreeTransaction::
             layer = WKMakeRenderLayer(properties.hostingContextID);
         else
             layer = adoptNS([[CALayer alloc] init]);
+        break;
+    case PlatformCALayer::LayerTypeShapeLayer:
+        layer = adoptNS([[CAShapeLayer alloc] init]);
         break;
     default:
         ASSERT_NOT_REACHED();

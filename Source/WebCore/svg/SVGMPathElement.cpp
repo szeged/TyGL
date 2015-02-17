@@ -46,9 +46,9 @@ inline SVGMPathElement::SVGMPathElement(const QualifiedName& tagName, Document& 
     registerAnimatedPropertiesForSVGMPathElement();
 }
 
-PassRefPtr<SVGMPathElement> SVGMPathElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGMPathElement> SVGMPathElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGMPathElement(tagName, document));
+    return adoptRef(*new SVGMPathElement(tagName, document));
 }
 
 SVGMPathElement::~SVGMPathElement()
@@ -140,7 +140,7 @@ void SVGMPathElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (SVGURIReference::isKnownAttribute(attrName)) {
         buildPendingResource();

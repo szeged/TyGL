@@ -28,7 +28,6 @@
 
 #include "WriteBarrier.h"
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
 
 #define JSC_COMMON_STRINGS_EACH_NAME(macro) \
     macro(boolean) \
@@ -39,6 +38,7 @@
     macro(object) \
     macro(undefined) \
     macro(string) \
+    macro(symbol) \
     macro(true)
 
 namespace WTF {
@@ -89,13 +89,20 @@ public:
     JSString* nullObjectString() const { return m_nullObjectString; }
     JSString* undefinedObjectString() const { return m_undefinedObjectString; }
 
+    bool needsToBeVisited(HeapOperation collectionType) const
+    {
+        if (collectionType == FullCollection)
+            return true;
+        return m_needsToBeVisited;
+    }
+
 private:
     static const unsigned singleCharacterStringCount = maxSingleCharacterString + 1;
 
     JS_EXPORT_PRIVATE void createEmptyString(VM*);
     JS_EXPORT_PRIVATE void createSingleCharacterString(VM*, unsigned char);
 
-    void initialize(VM*, JSString*&, const char* value) const;
+    void initialize(VM*, JSString*&, const char* value);
 
     JSString* m_emptyString;
 #define JSC_COMMON_STRINGS_ATTRIBUTE_DECLARATION(name) JSString* m_##name;
@@ -104,7 +111,8 @@ private:
     JSString* m_nullObjectString;
     JSString* m_undefinedObjectString;
     JSString* m_singleCharacterStrings[singleCharacterStringCount];
-    OwnPtr<SmallStringsStorage> m_storage;
+    std::unique_ptr<SmallStringsStorage> m_storage;
+    bool m_needsToBeVisited;
 };
 
 } // namespace JSC

@@ -39,6 +39,7 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder.encodeEnum(drawingAreaType);
     encoder << pageGroupData;
     encoder << drawsBackground;
+    encoder << isEditable;
     encoder << drawsTransparentBackground;
     encoder << underlayColor;
     encoder << useFixedLayout;
@@ -53,11 +54,13 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << highestUsedBackForwardItemID;
     encoder << userContentControllerID;
     encoder << visitedLinkTableID;
+    encoder << websiteDataStoreID;
     encoder << canRunBeforeUnloadConfirmPanel;
     encoder << canRunModal;
     encoder << deviceScaleFactor;
     encoder << topContentInset;
     encoder << mediaVolume;
+    encoder << muted;
     encoder << mayStartMediaWhenInWindow;
     encoder << minimumLayoutSize;
     encoder << autoSizingShouldExpandToViewHeight;
@@ -93,6 +96,8 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
         return false;
     if (!decoder.decode(parameters.drawsBackground))
         return false;
+    if (!decoder.decode(parameters.isEditable))
+        return false;
     if (!decoder.decode(parameters.drawsTransparentBackground))
         return false;
     if (!decoder.decode(parameters.underlayColor))
@@ -121,6 +126,8 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
         return false;
     if (!decoder.decode(parameters.visitedLinkTableID))
         return false;
+    if (!decoder.decode(parameters.websiteDataStoreID))
+        return false;
     if (!decoder.decode(parameters.canRunBeforeUnloadConfirmPanel))
         return false;
     if (!decoder.decode(parameters.canRunModal))
@@ -130,6 +137,8 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
     if (!decoder.decode(parameters.topContentInset))
         return false;
     if (!decoder.decode(parameters.mediaVolume))
+        return false;
+    if (!decoder.decode(parameters.muted))
         return false;
     if (!decoder.decode(parameters.mayStartMediaWhenInWindow))
         return false;

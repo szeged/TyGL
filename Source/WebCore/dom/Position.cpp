@@ -533,7 +533,7 @@ static bool endsOfNodeAreVisuallyDistinctPositions(Node* node)
         return false;
     
     // There is a VisiblePosition inside an empty inline-block container.
-    return node->renderer()->isReplaced() && canHaveChildrenForEditing(node) && toRenderBox(node->renderer())->height() != 0 && !node->firstChild();
+    return node->renderer()->isReplaced() && canHaveChildrenForEditing(node) && downcast<RenderBox>(*node->renderer()).height() && !node->firstChild();
 }
 
 static Node* enclosingVisualBoundary(Node* node)
@@ -661,7 +661,7 @@ Position Position::upstream(EditingBoundaryCrossingRule rule) const
                     otherBox = otherBox->nextLeafChild();
                     if (!otherBox)
                         break;
-                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && toInlineTextBox(otherBox)->start() > textOffset))
+                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && downcast<InlineTextBox>(*otherBox).start() > textOffset))
                         continuesOnNextLine = false;
                 }
 
@@ -670,7 +670,7 @@ Position Position::upstream(EditingBoundaryCrossingRule rule) const
                     otherBox = otherBox->prevLeafChild();
                     if (!otherBox)
                         break;
-                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && toInlineTextBox(otherBox)->start() > textOffset))
+                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && downcast<InlineTextBox>(*otherBox).start() > textOffset))
                         continuesOnNextLine = false;
                 }
 
@@ -789,7 +789,7 @@ Position Position::downstream(EditingBoundaryCrossingRule rule) const
                     otherBox = otherBox->nextLeafChild();
                     if (!otherBox)
                         break;
-                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && toInlineTextBox(otherBox)->start() >= textOffset))
+                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && downcast<InlineTextBox>(*otherBox).start() >= textOffset))
                         continuesOnNextLine = false;
                 }
 
@@ -798,7 +798,7 @@ Position Position::downstream(EditingBoundaryCrossingRule rule) const
                     otherBox = otherBox->prevLeafChild();
                     if (!otherBox)
                         break;
-                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && toInlineTextBox(otherBox)->start() >= textOffset))
+                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && downcast<InlineTextBox>(*otherBox).start() >= textOffset))
                         continuesOnNextLine = false;
                 }
 
@@ -1095,13 +1095,11 @@ void Position::getInlineBoxAndOffset(EAffinity affinity, InlineBox*& inlineBox, 
     getInlineBoxAndOffset(affinity, primaryDirection(), inlineBox, caretOffset);
 }
 
-static bool isNonTextLeafChild(RenderObject* object)
+static bool isNonTextLeafChild(RenderObject& object)
 {
-    if (object->isText())
+    if (is<RenderText>(object))
         return false;
-    if (toRenderElement(object)->firstChild())
-        return false;
-    return true;
+    return !downcast<RenderElement>(object).firstChild();
 }
 
 static InlineTextBox* searchAheadForBetterMatch(RenderObject* renderer)
@@ -1113,7 +1111,7 @@ static InlineTextBox* searchAheadForBetterMatch(RenderObject* renderer)
             return nullptr;
         if (next->isBR())
             return nullptr;
-        if (isNonTextLeafChild(next))
+        if (isNonTextLeafChild(*next))
             return nullptr;
         if (is<RenderText>(*next)) {
             InlineTextBox* match = nullptr;
@@ -1158,7 +1156,7 @@ void Position::getInlineBoxAndOffset(EAffinity affinity, TextDirection primaryDi
     RenderObject* renderer = deprecatedNode()->renderer();
 
     if (renderer->isBR())
-        inlineBox = !caretOffset ? toRenderLineBreak(renderer)->inlineBoxWrapper() : nullptr;
+        inlineBox = !caretOffset ? downcast<RenderLineBreak>(*renderer).inlineBoxWrapper() : nullptr;
     else if (is<RenderText>(*renderer)) {
         auto& textRenderer = downcast<RenderText>(*renderer);
         textRenderer.ensureLineBoxes();

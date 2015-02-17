@@ -24,16 +24,17 @@
  */
 
 #import "config.h"
+#pragma GCC visibility push(default)
 #import "WebCoreSystemInterface.h"
+#pragma GCC visibility pop
+
 #import <Foundation/Foundation.h>
 
 void (*wkAdvanceDefaultButtonPulseAnimation)(NSButtonCell *);
 void (*wkCALayerEnumerateRectsBeingDrawnWithBlock)(CALayer *, CGContextRef context, void (^block)(CGRect rect));
 BOOL (*wkCGContextGetShouldSmoothFonts)(CGContextRef);
 void (*wkCGContextResetClip)(CGContextRef);
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
 bool (*wkCGContextDrawsWithCorrectShadowOffsets)(CGContextRef);
-#endif
 CGPatternRef (*wkCGPatternCreateWithImageAndTransform)(CGImageRef, CGAffineTransform, int);
 NSString* (*wkCopyNSURLResponseStatusLine)(NSURLResponse*);
 CFArrayRef (*wkCopyNSURLResponseCertificateChain)(NSURLResponse*);
@@ -45,8 +46,6 @@ void (*wkDrawBezeledTextArea)(NSRect, BOOL enabled);
 void (*wkDrawFocusRing)(CGContextRef, CGColorRef, int);
 bool (*wkDrawFocusRingAtTime)(CGContextRef, NSTimeInterval);
 bool (*wkDrawCellFocusRingWithFrameAtTime)(NSCell*, NSRect, NSView*, NSTimeInterval);
-NSFont* (*wkGetFontInLanguageForRange)(NSFont*, NSString*, NSRange);
-NSFont* (*wkGetFontInLanguageForCharacter)(NSFont*, UniChar);
 void (*wkDrawMediaSliderTrack)(CGContextRef context, CGRect rect, float timeLoaded, float currentTime,
     float duration, unsigned state);
 BOOL (*wkHitTestMediaUIPart)(int part, CGRect bounds, CGPoint point);
@@ -84,7 +83,6 @@ void (*wkSetBaseCTM)(CGContextRef, CGAffineTransform);
 void (*wkSetPatternPhaseInUserSpace)(CGContextRef, CGPoint point);
 CGAffineTransform (*wkGetUserToBaseCTM)(CGContextRef);
 bool (*wkCGContextIsPDFContext)(CGContextRef);
-void (*wkSetUpFontCache)();
 void (*wkSetNSURLConnectionDefersCallbacks)(NSURLConnection *, BOOL);
 void (*wkSetNSURLRequestShouldContentSniff)(NSMutableURLRequest *, BOOL);
 unsigned (*wkInitializeMaximumHTTPConnectionCountPerHost)(unsigned preferredConnectionCount);
@@ -104,18 +102,7 @@ void (*wkSetCFURLRequestShouldContentSniff)(CFMutableURLRequestRef, bool);
 void (*wkSetRequestStorageSession)(CFURLStorageSessionRef, CFMutableURLRequestRef);
 #endif
 
-bool (*wkGetVerticalGlyphsForCharacters)(CTFontRef, const UniChar[], CGGlyph[], size_t);
-
 void* wkGetHyphenationLocationBeforeIndex;
-
-CTLineRef (*wkCreateCTLineWithUniCharProvider)(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*);
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-bool (*wkCTFontTransformGlyphs)(CTFontRef font, CGGlyph glyphs[], CGSize advances[], CFIndex count, wkCTFontTransformOptions options);
-#endif
-
-CGSize (*wkCTRunGetInitialAdvance)(CTRunRef);
-
-CTTypesetterRef (*wkCreateCTTypesetterWithUniCharProviderAndOptions)(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*, CFDictionaryRef options);
 
 CGContextRef (*wkIOSurfaceContextCreate)(IOSurfaceRef surface, unsigned width, unsigned height, CGColorSpaceRef colorSpace);
 CGImageRef (*wkIOSurfaceContextCreateImage)(CGContextRef context);
@@ -164,19 +151,17 @@ void(*wkDestroyRenderingResources)(void);
 
 dispatch_source_t (*wkCreateVMPressureDispatchOnMainQueue)(void);
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if PLATFORM(MAC)
 dispatch_source_t (*wkCreateMemoryStatusPressureCriticalDispatchOnMainQueue)(void);
 #endif
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
 bool (*wkExecutableWasLinkedOnOrBeforeLion)(void);
-#endif
 
 void (*wkCGPathAddRoundedRect)(CGMutablePathRef path, const CGAffineTransform* matrix, CGRect rect, CGFloat cornerWidth, CGFloat cornerHeight);
 
 void (*wkCFURLRequestAllowAllPostCaching)(CFURLRequestRef);
 
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+#if !PLATFORM(IOS)
 CGFloat (*wkNSElasticDeltaForTimeDelta)(CGFloat initialPosition, CGFloat initialVelocity, CGFloat elapsedTime);
 CGFloat (*wkNSElasticDeltaForReboundDelta)(CGFloat delta);
 CGFloat (*wkNSReboundDeltaForElasticDelta)(CGFloat delta);

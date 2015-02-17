@@ -32,8 +32,6 @@
 #include "config.h"
 #include "InjectedScriptBase.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "DebuggerEvalEnabler.h"
 #include "InspectorValues.h"
 #include "JSCInlines.h"
@@ -135,17 +133,21 @@ void InjectedScriptBase::makeEvalCall(ErrorString& errorString, Deprecated::Scri
         return;
     }
 
-    RefPtr<InspectorObject> resultObject = resultPair->getObject(ASCIILiteral("result"));
-    bool wasThrownVal = false;
-    if (!resultObject || !resultPair->getBoolean(ASCIILiteral("wasThrown"), wasThrownVal)) {
+    RefPtr<InspectorObject> resultObject;
+    if (!resultPair->getObject(ASCIILiteral("result"), resultObject)) {
+        errorString = ASCIILiteral("Internal error: result is not a pair of value and wasThrown flag");
+        return;
+    }
+
+    bool wasThrownValue = false;
+    if (!resultPair->getBoolean(ASCIILiteral("wasThrown"), wasThrownValue)) {
         errorString = ASCIILiteral("Internal error: result is not a pair of value and wasThrown flag");
         return;
     }
 
     *objectResult = BindingTraits<Protocol::Runtime::RemoteObject>::runtimeCast(resultObject);
-    *wasThrown = wasThrownVal;
+    *wasThrown = wasThrownValue;
 }
 
 } // namespace Inspector
 
-#endif // ENABLE(INSPECTOR)

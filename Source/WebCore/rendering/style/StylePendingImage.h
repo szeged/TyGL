@@ -41,7 +41,7 @@ namespace WebCore {
 // style resolution, in order to avoid loading images that are not referenced by the final style.
 // They should never exist in a RenderStyle after it has been returned from the style selector.
 
-class StylePendingImage : public StyleImage {
+class StylePendingImage final : public StyleImage {
 public:
     static PassRefPtr<StylePendingImage> create(CSSValue* value) { return adoptRef(new StylePendingImage(value)); }
 
@@ -63,7 +63,7 @@ private:
     virtual FloatSize imageSize(const RenderElement*, float /*multiplier*/) const override { return FloatSize(); }
     virtual bool imageHasRelativeWidth() const override { return false; }
     virtual bool imageHasRelativeHeight() const override { return false; }
-    virtual void computeIntrinsicDimensions(const RenderElement*, Length& /* intrinsicWidth */ , Length& /* intrinsicHeight */, FloatSize& /* intrinsicRatio */) { }
+    virtual void computeIntrinsicDimensions(const RenderElement*, Length& /* intrinsicWidth */ , Length& /* intrinsicHeight */, FloatSize& /* intrinsicRatio */) override { }
     virtual bool usesImageContainerSize() const override { return false; }
     virtual void setContainerSizeForRenderer(const RenderElement*, const FloatSize&, float) override { }
     virtual void addClient(RenderElement*) override { }
@@ -86,8 +86,8 @@ private:
     CSSValue* m_value; // Not retained; it owns us.
 };
 
-STYLE_IMAGE_TYPE_CASTS(StylePendingImage, StyleImage, isPendingImage)
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_STYLE_IMAGE(StylePendingImage, isPendingImage)
 
-#endif
+#endif // StylePendingImage_h

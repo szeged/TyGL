@@ -46,9 +46,9 @@ inline SVGFETileElement::SVGFETileElement(const QualifiedName& tagName, Document
     registerAnimatedPropertiesForSVGFETileElement();
 }
 
-PassRefPtr<SVGFETileElement> SVGFETileElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFETileElement> SVGFETileElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFETileElement(tagName, document));
+    return adoptRef(*new SVGFETileElement(tagName, document));
 }
 
 bool SVGFETileElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -81,7 +81,7 @@ void SVGFETileElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::inAttr) {
         invalidate();

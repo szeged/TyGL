@@ -28,11 +28,11 @@
 #ifndef InspectorReplayAgent_h
 #define InspectorReplayAgent_h
 
-#if ENABLE(INSPECTOR) && ENABLE(WEB_REPLAY)
+#if ENABLE(WEB_REPLAY)
 
 #include "InspectorWebAgentBase.h"
-#include "InspectorWebBackendDispatchers.h"
-#include "InspectorWebFrontendDispatchers.h"
+#include <inspector/InspectorBackendDispatchers.h>
+#include <inspector/InspectorFrontendDispatchers.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
@@ -62,25 +62,25 @@ class InspectorReplayAgent final
     WTF_MAKE_NONCOPYABLE(InspectorReplayAgent);
 public:
     InspectorReplayAgent(InstrumentingAgents*, InspectorPageAgent*);
-    ~InspectorReplayAgent();
+    virtual ~InspectorReplayAgent();
 
     virtual void didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, Inspector::InspectorBackendDispatcher*) override;
     virtual void willDestroyFrontendAndBackend(Inspector::InspectorDisconnectReason) override;
 
-    // Callbacks from InspectorInstrumentation.
+    // InspectorInstrumentation callbacks.
     void frameNavigated(DocumentLoader*);
-    void frameDetached(Frame*);
+    void frameDetached(Frame&);
     void willDispatchEvent(const Event&, Frame*);
 
     // Notifications from ReplayController.
-    void sessionCreated(PassRefPtr<ReplaySession>);
+    void sessionCreated(RefPtr<ReplaySession>&&);
     // This is called internally (when adding/removing) and by ReplayController during capture.
-    void sessionModified(PassRefPtr<ReplaySession>);
-    void sessionLoaded(PassRefPtr<ReplaySession>);
+    void sessionModified(RefPtr<ReplaySession>&&);
+    void sessionLoaded(RefPtr<ReplaySession>&&);
 
-    void segmentCreated(PassRefPtr<ReplaySessionSegment>);
-    void segmentCompleted(PassRefPtr<ReplaySessionSegment>);
-    void segmentLoaded(PassRefPtr<ReplaySessionSegment>);
+    void segmentCreated(RefPtr<ReplaySessionSegment>&&);
+    void segmentCompleted(RefPtr<ReplaySessionSegment>&&);
+    void segmentLoaded(RefPtr<ReplaySessionSegment>&&);
     void segmentUnloaded();
 
     void captureStarted();
@@ -95,7 +95,7 @@ public:
     virtual void startCapturing(ErrorString&) override;
     virtual void stopCapturing(ErrorString&) override;
 
-    virtual void replayToPosition(ErrorString&, const RefPtr<Inspector::InspectorObject>&, bool shouldFastForward) override;
+    virtual void replayToPosition(ErrorString&, const RefPtr<Inspector::InspectorObject>&&, bool shouldFastForward) override;
     virtual void replayToCompletion(ErrorString&, bool shouldFastForward) override;
     virtual void pausePlayback(ErrorString&) override;
     virtual void cancelPlayback(ErrorString&) override;
@@ -110,8 +110,8 @@ public:
     virtual void getSegmentData(ErrorString&, Inspector::Protocol::Replay::SegmentIdentifier, RefPtr<Inspector::Protocol::Replay::SessionSegment>&) override;
 
 private:
-    PassRefPtr<ReplaySession> findSession(ErrorString&, SessionIdentifier);
-    PassRefPtr<ReplaySessionSegment> findSegment(ErrorString&, SegmentIdentifier);
+    RefPtr<ReplaySession> findSession(ErrorString&, SessionIdentifier);
+    RefPtr<ReplaySessionSegment> findSegment(ErrorString&, SegmentIdentifier);
     WebCore::SessionState sessionState() const;
 
     std::unique_ptr<Inspector::InspectorReplayFrontendDispatcher> m_frontendDispatcher;
@@ -124,6 +124,6 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(INSPECTOR) && ENABLE(WEB_REPLAY)
+#endif // ENABLE(WEB_REPLAY)
 
 #endif // InspectorReplayAgent_h

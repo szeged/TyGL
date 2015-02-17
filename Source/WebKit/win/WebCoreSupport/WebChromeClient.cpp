@@ -24,7 +24,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "WebChromeClient.h"
 
 #include "COMPropertyBag.h"
@@ -583,7 +582,6 @@ void WebChromeClient::print(Frame* frame)
         uiDelegate->printFrame(m_webView, kit(frame));
 }
 
-#if ENABLE(SQL_DATABASE)
 void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseIdentifier, DatabaseDetails)
 {
     COMPtr<WebSecurityOrigin> origin(AdoptCOM, WebSecurityOrigin::createInstance(frame->document()->securityOrigin()));
@@ -619,7 +617,6 @@ void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& database
         }
     }
 }
-#endif
 
 // FIXME: Move this include to the top of the file with the other includes.
 #include "ApplicationCacheStorage.h"
@@ -633,21 +630,6 @@ void WebChromeClient::reachedMaxAppCacheSize(int64_t spaceNeeded)
 void WebChromeClient::reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t)
 {
     notImplemented();
-}
-
-void WebChromeClient::populateVisitedLinks()
-{
-    COMPtr<IWebHistoryDelegate> historyDelegate;
-    m_webView->historyDelegate(&historyDelegate);
-    if (historyDelegate) {
-        historyDelegate->populateVisitedLinksForWebView(m_webView);
-        return;
-    }
-
-    WebHistory* history = WebHistory::sharedHistory();
-    if (!history)
-        return;
-    history->addVisitedLinksToPageGroup(m_webView->page()->group());
 }
 
 void WebChromeClient::runOpenPanel(Frame*, PassRefPtr<FileChooser> prpFileChooser)

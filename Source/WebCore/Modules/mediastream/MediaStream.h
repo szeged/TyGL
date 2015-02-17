@@ -49,6 +49,7 @@ class MediaStream final : public RefCounted<MediaStream>, public URLRegistrable,
 public:
     class Observer {
     public:
+        virtual ~Observer() { }
         virtual void didAddOrRemoveTrack() = 0;
     };
 
@@ -119,7 +120,7 @@ private:
     bool haveTrackWithSource(PassRefPtr<MediaStreamSource>);
 
     void scheduleDispatchEvent(PassRefPtr<Event>);
-    void scheduledEventTimerFired(Timer<MediaStream>*);
+    void scheduledEventTimerFired();
 
     void cloneMediaStreamTrackVector(Vector<RefPtr<MediaStreamTrack>>&, const Vector<RefPtr<MediaStreamTrack>>&);
 
@@ -129,7 +130,7 @@ private:
     Vector<RefPtr<MediaStreamTrack>> m_audioTracks;
     Vector<RefPtr<MediaStreamTrack>> m_videoTracks;
 
-    Timer<MediaStream> m_scheduledEventTimer;
+    Timer m_scheduledEventTimer;
     Vector<RefPtr<Event>> m_scheduledEvents;
 
     Vector<Observer*> m_observers;

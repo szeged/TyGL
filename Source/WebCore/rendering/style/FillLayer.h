@@ -27,6 +27,7 @@
 
 #include "GraphicsTypes.h"
 #include "LengthSize.h"
+#include "MaskImageOperation.h"
 #include "RenderStyleConstants.h"
 #include "StyleImage.h"
 #include <wtf/RefPtr.h>
@@ -67,7 +68,8 @@ public:
     explicit FillLayer(EFillLayerType);
     ~FillLayer();
 
-    StyleImage* image() const { return m_image.get(); }
+    StyleImage* image() const { return hasMaskImage() ? maskImage()->image() : m_image.get(); }
+    const RefPtr<MaskImageOperation>& maskImage() const { return m_maskImageOperation; }
     const Length& xPosition() const { return m_xPosition; }
     const Length& yPosition() const { return m_yPosition; }
     BackgroundEdgeOrigin backgroundXOrigin() const { return static_cast<BackgroundEdgeOrigin>(m_backgroundXOrigin); }
@@ -101,6 +103,7 @@ public:
     bool isSizeSet() const { return m_sizeType != SizeNone; }
     bool isMaskSourceTypeSet() const { return m_maskSourceTypeSet; }
 
+    void setMaskImage(PassRefPtr<MaskImageOperation> maskImage) { m_maskImageOperation = maskImage; }
     void setImage(PassRefPtr<StyleImage> image) { m_image = image; m_imageSet = true; }
     void setXPosition(Length length) { m_xPosition = WTF::move(length); m_xPosSet = true; }
     void setYPosition(Length length) { m_yPosition = WTF::move(length); m_yPosSet = true; }
@@ -118,6 +121,7 @@ public:
     void setSize(FillSize f) { m_sizeType = f.type; m_sizeLength = f.size; }
     void setMaskSourceType(EMaskSourceType m) { m_maskSourceType = m; m_maskSourceTypeSet = true; }
 
+    void clearMaskImage() { m_maskImageOperation.clear(); }
     void clearImage() { m_image.clear(); m_imageSet = false; }
     void clearXPosition() { m_xPosSet = false; m_backgroundOriginSet = false; }
     void clearYPosition() { m_yPosSet = false; m_backgroundOriginSet = false; }
@@ -143,6 +147,8 @@ public:
     bool containsImage(StyleImage&) const;
     bool imagesAreLoaded() const;
     bool hasImage() const;
+    bool hasMaskImage() const { return maskImage().get(); }
+    bool hasNonEmptyMaskImage() const;
     bool hasFixedImage() const;
     bool hasOpaqueImage(const RenderElement&) const;
     bool hasRepeatXY() const;
@@ -160,13 +166,11 @@ public:
     static EFillRepeat initialFillRepeatY(EFillLayerType) { return RepeatFill; }
     static CompositeOperator initialFillComposite(EFillLayerType) { return CompositeSourceOver; }
     static BlendMode initialFillBlendMode(EFillLayerType) { return BlendModeNormal; }
-    static EFillSizeType initialFillSizeType(EFillLayerType) { return SizeNone; }
-    static LengthSize initialFillSizeLength(EFillLayerType) { return LengthSize(); }
-    static FillSize initialFillSize(EFillLayerType type) { return FillSize(initialFillSizeType(type), initialFillSizeLength(type)); }
+    static FillSize initialFillSize(EFillLayerType) { return FillSize(); }
     static Length initialFillXPosition(EFillLayerType) { return Length(0.0f, Percent); }
     static Length initialFillYPosition(EFillLayerType) { return Length(0.0f, Percent); }
-    static StyleImage* initialFillImage(EFillLayerType) { return 0; }
-    static EMaskSourceType initialMaskSourceType(EFillLayerType) { return MaskAlpha; }
+    static StyleImage* initialFillImage(EFillLayerType) { return nullptr; }
+    static EMaskSourceType initialFillMaskSourceType(EFillLayerType) { return MaskAlpha; }
 
 private:
     friend class RenderStyle;
@@ -175,6 +179,9 @@ private:
 
     std::unique_ptr<FillLayer> m_next;
 
+    // FIXME: A FillLayer will always have at least one of these pointers null.
+    // Maybe we could group them together somehow and decrease the size of FillLayer.
+    RefPtr<MaskImageOperation> m_maskImageOperation;
     RefPtr<StyleImage> m_image;
 
     Length m_xPosition;

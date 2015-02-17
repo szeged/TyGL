@@ -27,9 +27,8 @@
  */
 
 #include "config.h"
-#include "SimpleFontData.h"
-
 #include "Font.h"
+
 #include "FontCache.h"
 #include "FloatRect.h"
 #include "FontDescription.h"
@@ -44,17 +43,17 @@ const float cSmallCapsFontSizeMultiplier = 0.7f;
 
 static bool g_shouldApplyMacAscentHack;
 
-void SimpleFontData::setShouldApplyMacAscentHack(bool b)
+void Font::setShouldApplyMacAscentHack(bool b)
 {
     g_shouldApplyMacAscentHack = b;
 }
 
-bool SimpleFontData::shouldApplyMacAscentHack()
+bool Font::shouldApplyMacAscentHack()
 {
     return g_shouldApplyMacAscentHack;
 }
 
-float SimpleFontData::ascentConsideringMacAscentHack(const WCHAR* faceName, float ascent, float descent)
+float Font::ascentConsideringMacAscentHack(const WCHAR* faceName, float ascent, float descent)
 {
     if (!shouldApplyMacAscentHack())
         return ascent;
@@ -72,7 +71,7 @@ float SimpleFontData::ascentConsideringMacAscentHack(const WCHAR* faceName, floa
     return ascent;
 }
 
-void SimpleFontData::initGDIFont()
+void Font::initGDIFont()
 {
     if (!m_platformData.size()) {
         m_fontMetrics.reset();
@@ -107,7 +106,7 @@ void SimpleFontData::initGDIFont()
     SelectObject(hdc, oldFont);
 }
 
-void SimpleFontData::platformCharWidthInit()
+void Font::platformCharWidthInit()
 {
     // GDI Fonts init charwidths in initGDIFont.
     if (!m_platformData.useGDI()) {
@@ -117,70 +116,29 @@ void SimpleFontData::platformCharWidthInit()
     }
 }
 
-void SimpleFontData::platformDestroy()
+void Font::platformDestroy()
 {
     ScriptFreeCache(&m_scriptCache);
     delete m_scriptFontProperties;
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::platformCreateScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
+PassRefPtr<Font> Font::platformCreateScaledFont(const FontDescription& fontDescription, float scaleFactor) const
 {
     float scaledSize = scaleFactor * m_platformData.size();
     if (isCustomFont()) {
         FontPlatformData scaledFont(m_platformData);
         scaledFont.setSize(scaledSize);
-        return SimpleFontData::create(scaledFont, true, false);
+        return Font::create(scaledFont, true, false);
     }
 
     LOGFONT winfont;
     GetObject(m_platformData.hfont(), sizeof(LOGFONT), &winfont);
     winfont.lfHeight = -lroundf(scaledSize * (m_platformData.useGDI() ? 1 : 32));
     auto hfont = adoptGDIObject(::CreateFontIndirect(&winfont));
-    return SimpleFontData::create(FontPlatformData(WTF::move(hfont), scaledSize, m_platformData.syntheticBold(), m_platformData.syntheticOblique(), m_platformData.useGDI()), isCustomFont(), false);
+    return Font::create(FontPlatformData(WTF::move(hfont), scaledSize, m_platformData.syntheticBold(), m_platformData.syntheticOblique(), m_platformData.useGDI()), isCustomFont(), false);
 }
 
-bool SimpleFontData::containsCharacters(const UChar* characters, int length) const
-{
-    // FIXME: Support custom fonts.
-    if (isCustomFont())
-        return false;
-
-    // FIXME: Microsoft documentation seems to imply that characters can be output using a given font and DC
-    // merely by testing code page intersection.  This seems suspect though.  Can't a font only partially
-    // cover a given code page?
-    IMLangFontLinkType* langFontLink = fontCache().getFontLinkInterface();
-    if (!langFontLink)
-        return false;
-
-    HWndDC dc(0);
-
-    DWORD acpCodePages;
-    if (FAILED(langFontLink->CodePageToCodePages(CP_ACP, &acpCodePages))) {
-        WTFLogAlways("SimpleFontData::containsCharacters: Unable to convert to CP_ACP code page.");
-        return false;
-    }
-
-    DWORD fontCodePages;
-    if (FAILED(langFontLink->GetFontCodePages(dc, m_platformData.hfont(), &fontCodePages))) {
-        WTFLogAlways("SimpleFontData::containsCharacters: Unable to find matching code page for specified font.");
-        return false;
-    }
-
-    DWORD actualCodePages = 0;
-    long numCharactersProcessed = 0;
-    long offset = 0;
-    while (offset < length) {
-        if (FAILED(langFontLink->GetStrCodePages(characters, length, acpCodePages, &actualCodePages, &numCharactersProcessed)))
-            return false;
-        if ((actualCodePages & fontCodePages) == 0)
-            return false;
-        offset += numCharactersProcessed;
-    }
-
-    return true;
-}
-
-void SimpleFontData::determinePitch()
+void Font::determinePitch()
 {
     if (isCustomFont()) {
         m_treatAsFixedPitch = false;
@@ -201,7 +159,7 @@ void SimpleFontData::determinePitch()
     RestoreDC(dc, -1);
 }
 
-FloatRect SimpleFontData::boundsForGDIGlyph(Glyph glyph) const
+FloatRect Font::boundsForGDIGlyph(Glyph glyph) const
 {
     HWndDC hdc(0);
     SetGraphicsMode(hdc, GM_ADVANCED);
@@ -217,7 +175,7 @@ FloatRect SimpleFontData::boundsForGDIGlyph(Glyph glyph) const
         gdiMetrics.gmBlackBoxX + m_syntheticBoldOffset, gdiMetrics.gmBlackBoxY); 
 }
 
-float SimpleFontData::widthForGDIGlyph(Glyph glyph) const
+float Font::widthForGDIGlyph(Glyph glyph) const
 {
     HWndDC hdc(0);
     SetGraphicsMode(hdc, GM_ADVANCED);
@@ -233,7 +191,7 @@ float SimpleFontData::widthForGDIGlyph(Glyph glyph) const
     return result;
 }
 
-SCRIPT_FONTPROPERTIES* SimpleFontData::scriptFontProperties() const
+SCRIPT_FONTPROPERTIES* Font::scriptFontProperties() const
 {
     if (!m_scriptFontProperties) {
         m_scriptFontProperties = new SCRIPT_FONTPROPERTIES;

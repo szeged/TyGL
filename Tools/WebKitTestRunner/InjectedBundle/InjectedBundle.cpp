@@ -41,7 +41,7 @@
 
 namespace WTR {
 
-InjectedBundle& InjectedBundle::shared()
+InjectedBundle& InjectedBundle::singleton()
 {
     static InjectedBundle& shared = *new InjectedBundle;
     return shared;
@@ -243,7 +243,6 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     m_textInputController = TextInputController::create();
     m_accessibilityController = AccessibilityController::create();
 
-    WKBundleRemoveAllVisitedLinks(m_bundle);
     WKBundleSetAllowUniversalAccessFromFileURLs(m_bundle, m_pageGroup, true);
     WKBundleSetJavaScriptCanAccessClipboard(m_bundle, m_pageGroup, true);
     WKBundleSetPrivateBrowsingEnabled(m_bundle, m_pageGroup, false);
@@ -254,7 +253,7 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     WKBundleSetAllowFileAccessFromFileURLs(m_bundle, m_pageGroup, true);
     WKBundleSetPluginsEnabled(m_bundle, m_pageGroup, true);
     WKBundleSetPopupBlockingEnabled(m_bundle, m_pageGroup, false);
-    WKBundleSetAlwaysAcceptCookies(m_bundle, false);
+    WKBundleSetAlwaysAcceptCookies(m_bundle, false); // FIXME: Do this from UI process, so that Networking process gets the preference, too.
     WKBundleSetSerialLoadingEnabled(m_bundle, false);
     WKBundleSetCacheModel(m_bundle, 1 /*CacheModelDocumentBrowser*/);
 
@@ -267,7 +266,8 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     m_testRunner->setAcceptsEditing(true);
     m_testRunner->setTabKeyCyclesThroughElements(true);
 
-    m_testRunner->setCustomTimeout(m_timeout);
+    if (m_timeout > 0)
+        m_testRunner->setCustomTimeout(m_timeout);
 
     page()->prepare();
 
@@ -288,6 +288,8 @@ void InjectedBundle::done()
 
     page()->stopLoading();
     setTopLoadingFrame(0);
+
+    m_testRunner->invalidateWaitToDumpWatchdogTimer();
 
     m_accessibilityController->resetToConsistentState();
 
@@ -456,6 +458,13 @@ void InjectedBundle::setMockGeolocationPositionUnavailableError(WKStringRef erro
 {
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetMockGeolocationPositionUnavailableError"));
     WKBundlePostMessage(m_bundle, messageName.get(), errorMessage);
+}
+
+void InjectedBundle::setUserMediaPermission(bool enabled)
+{
+    auto messageName = adoptWK(WKStringCreateWithUTF8CString("SetUserMediaPermission"));
+    auto messageBody = adoptWK(WKBooleanCreate(enabled));
+    WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
 }
 
 void InjectedBundle::setCustomPolicyDelegate(bool enabled, bool permissive)

@@ -45,15 +45,15 @@ END_REGISTER_ANIMATED_PROPERTIES
 inline SVGScriptElement::SVGScriptElement(const QualifiedName& tagName, Document& document, bool wasInsertedByParser, bool alreadyStarted)
     : SVGElement(tagName, document)
     , ScriptElement(*this, wasInsertedByParser, alreadyStarted)
-    , m_svgLoadEventTimer(this, &SVGElement::svgLoadEventTimerFired)
+    , m_svgLoadEventTimer(*this, &SVGElement::svgLoadEventTimerFired)
 {
     ASSERT(hasTagName(SVGNames::scriptTag));
     registerAnimatedPropertiesForSVGScriptElement();
 }
 
-PassRefPtr<SVGScriptElement> SVGScriptElement::create(const QualifiedName& tagName, Document& document, bool insertedByParser)
+Ref<SVGScriptElement> SVGScriptElement::create(const QualifiedName& tagName, Document& document, bool insertedByParser)
 {
-    return adoptRef(new SVGScriptElement(tagName, document, insertedByParser, false));
+    return adoptRef(*new SVGScriptElement(tagName, document, insertedByParser, false));
 }
 
 bool SVGScriptElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -98,7 +98,7 @@ void SVGScriptElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::typeAttr || attrName == HTMLNames::onerrorAttr)
         return;
@@ -192,9 +192,9 @@ bool SVGScriptElement::hasSourceAttribute() const
     return hasAttribute(XLinkNames::hrefAttr);
 }
 
-PassRefPtr<Element> SVGScriptElement::cloneElementWithoutAttributesAndChildren()
+RefPtr<Element> SVGScriptElement::cloneElementWithoutAttributesAndChildren(Document& targetDocument)
 {
-    return adoptRef(new SVGScriptElement(tagQName(), document(), false, alreadyStarted()));
+    return adoptRef(new SVGScriptElement(tagQName(), targetDocument, false, alreadyStarted()));
 }
 
 #ifndef NDEBUG

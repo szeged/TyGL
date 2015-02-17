@@ -27,18 +27,15 @@
 #define WebPlatformStrategies_h
 
 #include <WebCore/CookiesStrategy.h>
-#include <WebCore/DatabaseStrategy.h>
 #include <WebCore/LoaderStrategy.h>
 #include <WebCore/PasteboardStrategy.h>
 #include <WebCore/PlatformStrategies.h>
 #include <WebCore/PluginStrategy.h>
-#include <WebCore/SharedWorkerStrategy.h>
-#include <WebCore/StorageStrategy.h>
 #include <wtf/NeverDestroyed.h>
 
 namespace WebKit {
 
-class WebPlatformStrategies : public WebCore::PlatformStrategies, private WebCore::CookiesStrategy, private WebCore::DatabaseStrategy, private WebCore::LoaderStrategy, private WebCore::PasteboardStrategy, private WebCore::PluginStrategy, private WebCore::SharedWorkerStrategy, private WebCore::StorageStrategy {
+class WebPlatformStrategies : public WebCore::PlatformStrategies, private WebCore::CookiesStrategy, private WebCore::LoaderStrategy, private WebCore::PasteboardStrategy, private WebCore::PluginStrategy {
     friend class NeverDestroyed<WebPlatformStrategies>;
 public:
     static void initialize();
@@ -48,12 +45,9 @@ private:
     
     // WebCore::PlatformStrategies
     virtual WebCore::CookiesStrategy* createCookiesStrategy() override;
-    virtual WebCore::DatabaseStrategy* createDatabaseStrategy() override;
     virtual WebCore::LoaderStrategy* createLoaderStrategy() override;
     virtual WebCore::PasteboardStrategy* createPasteboardStrategy() override;
     virtual WebCore::PluginStrategy* createPluginStrategy() override;
-    virtual WebCore::SharedWorkerStrategy* createSharedWorkerStrategy() override;
-    virtual WebCore::StorageStrategy* createStorageStrategy() override;
 
     // WebCore::CookiesStrategy
     virtual String cookiesForDOM(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&) override;
@@ -62,14 +56,6 @@ private:
     virtual String cookieRequestHeaderFieldValue(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&) override;
     virtual bool getRawCookies(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&, Vector<WebCore::Cookie>&) override;
     virtual void deleteCookie(const WebCore::NetworkStorageSession&, const WebCore::URL&, const String&) override;
-
-    // WebCore::DatabaseStrategy
-#if ENABLE(SQL_DATABASE)
-    virtual WebCore::AbstractDatabaseServer* getDatabaseServer() override;
-#endif
-#if ENABLE(INDEXED_DATABASE)
-    virtual PassRefPtr<WebCore::IDBFactoryBackendInterface> createIDBFactoryBackend(const String& databaseDirectoryIdentifier) override;
-#endif
 
     // WebCore::LoaderStrategy
 #if ENABLE(NETWORK_PROCESS)
@@ -81,14 +67,6 @@ private:
     // WebCore::PluginStrategy
     virtual void refreshPlugins() override;
     virtual void getPluginInfo(const WebCore::Page*, Vector<WebCore::PluginInfo>&) override;
-
-    // WebCore::SharedWorkerStrategy
-    virtual bool isAvailable() const override;
-
-    // WebCore::StorageStrategy.
-    virtual PassRefPtr<WebCore::StorageNamespace> localStorageNamespace(WebCore::PageGroup*) override;
-    virtual PassRefPtr<WebCore::StorageNamespace> transientLocalStorageNamespace(WebCore::PageGroup*, WebCore::SecurityOrigin*) override;
-    virtual PassRefPtr<WebCore::StorageNamespace> sessionStorageNamespace(WebCore::Page*) override;
 
     // WebCore::PasteboardStrategy
 #if PLATFORM(IOS)

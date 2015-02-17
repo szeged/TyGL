@@ -52,7 +52,7 @@ class ThreadableLoader;
 class XMLHttpRequest final : public ScriptWrappable, public RefCounted<XMLHttpRequest>, public EventTargetWithInlineData, private ThreadableLoaderClient, public ActiveDOMObject {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<XMLHttpRequest> create(ScriptExecutionContext&);
+    static Ref<XMLHttpRequest> create(ScriptExecutionContext&);
     ~XMLHttpRequest();
 
     // These exact numeric values are important because JS expects them.
@@ -132,6 +132,8 @@ public:
     String responseType();
     ResponseTypeCode responseTypeCode() const { return m_responseTypeCode; }
 
+    String responseURL() const;
+
     // response attribute has custom getter.
     JSC::ArrayBuffer* responseArrayBuffer();
     JSC::ArrayBuffer* optionalResponseArrayBuffer() const { return m_responseArrayBuffer.get(); }
@@ -141,6 +143,8 @@ public:
 
     XMLHttpRequestUpload* upload();
     XMLHttpRequestUpload* optionalUpload() const { return m_upload.get(); }
+
+    const ResourceResponse& resourceResponse() const { return m_response; }
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(readystatechange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
@@ -165,6 +169,7 @@ private:
     virtual void suspend(ReasonForSuspension) override;
     virtual void resume() override;
     virtual void stop() override;
+    virtual const char* activeDOMObjectName() const override { return "XMLHttpRequest"; }
 
     virtual void refEventTarget() override { ref(); }
     virtual void derefEventTarget() override { deref(); }
@@ -194,7 +199,11 @@ private:
     void changeState(State newState);
     void callReadyStateChangeListener();
     void dropProtection();
-    void internalAbort();
+
+    // Returns false when cancelling the loader within internalAbort() triggers an event whose callback creates a new loader. 
+    // In that case, the function calling internalAbort should exit.
+    bool internalAbort();
+
     void clearResponse();
     void clearResponseBuffers();
     void clearRequest();

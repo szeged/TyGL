@@ -45,6 +45,7 @@
 #include "StyleSheetList.h"
 #include "UserContentController.h"
 #include "UserContentURLPattern.h"
+#include "UserStyleSheet.h"
 
 namespace WebCore {
 
@@ -56,12 +57,8 @@ DocumentStyleSheetCollection::DocumentStyleSheetCollection(Document& document)
     , m_injectedStyleSheetCacheValid(false)
     , m_hadActiveLoadingStylesheet(false)
     , m_pendingUpdateType(NoUpdate)
-    , m_usesSiblingRules(false)
-    , m_usesSiblingRulesOverride(false)
     , m_usesFirstLineRules(false)
     , m_usesFirstLetterRules(false)
-    , m_usesBeforeAfterRules(false)
-    , m_usesBeforeAfterRulesOverride(false)
     , m_usesRemUnits(false)
 {
 }
@@ -70,19 +67,15 @@ void DocumentStyleSheetCollection::combineCSSFeatureFlags()
 {
     // Delay resetting the flags until after next style recalc since unapplying the style may not work without these set (this is true at least with before/after).
     const StyleResolver& styleResolver = m_document.ensureStyleResolver();
-    m_usesSiblingRules = m_usesSiblingRules || styleResolver.usesSiblingRules();
     m_usesFirstLineRules = m_usesFirstLineRules || styleResolver.usesFirstLineRules();
     m_usesFirstLetterRules = m_usesFirstLetterRules || styleResolver.usesFirstLetterRules();
-    m_usesBeforeAfterRules = m_usesBeforeAfterRules || styleResolver.usesBeforeAfterRules();
 }
 
 void DocumentStyleSheetCollection::resetCSSFeatureFlags()
 {
     const StyleResolver& styleResolver = m_document.ensureStyleResolver();
-    m_usesSiblingRules = styleResolver.usesSiblingRules();
     m_usesFirstLineRules = styleResolver.usesFirstLineRules();
     m_usesFirstLetterRules = styleResolver.usesFirstLetterRules();
-    m_usesBeforeAfterRules = styleResolver.usesBeforeAfterRules();
 }
 
 CSSStyleSheet* DocumentStyleSheetCollection::pageUserSheet()
@@ -183,14 +176,14 @@ void DocumentStyleSheetCollection::invalidateInjectedStyleSheetCache()
     m_document.styleResolverChanged(DeferRecalcStyle);
 }
 
-void DocumentStyleSheetCollection::addAuthorSheet(PassRef<StyleSheetContents> authorSheet)
+void DocumentStyleSheetCollection::addAuthorSheet(Ref<StyleSheetContents>&& authorSheet)
 {
     ASSERT(!authorSheet.get().isUserStyleSheet());
     m_authorStyleSheets.append(CSSStyleSheet::create(WTF::move(authorSheet), &m_document));
     m_document.styleResolverChanged(RecalcStyleImmediately);
 }
 
-void DocumentStyleSheetCollection::addUserSheet(PassRef<StyleSheetContents> userSheet)
+void DocumentStyleSheetCollection::addUserSheet(Ref<StyleSheetContents>&& userSheet)
 {
     ASSERT(userSheet.get().isUserStyleSheet());
     m_userStyleSheets.append(CSSStyleSheet::create(WTF::move(userSheet), &m_document));
@@ -230,7 +223,7 @@ void DocumentStyleSheetCollection::addStyleSheetCandidateNode(Node& node, bool c
     // since styles outside of the body and head continue to be shunted into the head
     // (and thus can shift to end up before dynamically added DOM content that is also
     // outside the body).
-    if ((createdByParser && m_document.body()) || m_styleSheetCandidateNodes.isEmpty()) {
+    if ((createdByParser && m_document.bodyOrFrameset()) || m_styleSheetCandidateNodes.isEmpty()) {
         m_styleSheetCandidateNodes.add(&node);
         return;
     }
@@ -388,7 +381,7 @@ void DocumentStyleSheetCollection::analyzeStyleSheetChange(UpdateFlag updateFlag
     styleResolverUpdateType = hasInsertions ? Reset : Additive;
 
     // If we are already parsing the body and so may have significant amount of elements, put some effort into trying to avoid style recalcs.
-    if (!m_document.body() || m_document.hasNodesWithPlaceholderStyle())
+    if (!m_document.bodyOrFrameset() || m_document.hasNodesWithPlaceholderStyle())
         return;
     StyleInvalidationAnalysis invalidationAnalysis(addedSheets, styleResolver.mediaQueryEvaluator());
     if (invalidationAnalysis.dirtiesAllStyle())

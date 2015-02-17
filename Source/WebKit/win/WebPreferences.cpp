@@ -23,7 +23,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#include "config.h"
 #include "WebKit.h"
 #include "WebKitDLL.h"
 #include "WebPreferences.h"
@@ -34,7 +33,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <WebCore/COMPtr.h>
 #include <WebCore/FileSystem.h>
-#include <WebCore/Font.h>
+#include <WebCore/FontCascade.h>
 #include <WebCore/LocalizedStrings.h>
 #include <limits>
 #include <shlobj.h>
@@ -162,7 +161,7 @@ WebPreferences* WebPreferences::getInstanceForIdentifier(BSTR identifier)
     if (identifierString.isEmpty())
         return sharedStandardPreferences();
 
-    return webPreferencesInstances().get(identifierString).get();
+    return webPreferencesInstances().get(identifierString);
 }
 
 void WebPreferences::setInstance(WebPreferences* instance, BSTR identifier)
@@ -183,7 +182,7 @@ void WebPreferences::removeReferenceForIdentifier(BSTR identifier)
     WTF::String identifierString(identifier, SysStringLen(identifier));
     if (identifierString.isEmpty())
         return;
-    WebPreferences* webPreference = webPreferencesInstances().get(identifierString).get();
+    WebPreferences* webPreference = webPreferencesInstances().get(identifierString);
     if (webPreference && webPreference->m_refCount == 1)
         webPreferencesInstances().remove(identifierString);
 }
@@ -265,7 +264,6 @@ void WebPreferences::initializeDefaultSettings()
     CFDictionaryAddValue(defaults, CFSTR(WebKitCacheModelPreferenceKey), cacheModelRef.get());
 
     CFDictionaryAddValue(defaults, CFSTR(WebKitAuthorAndUserStylesEnabledPreferenceKey), kCFBooleanTrue);
-    CFDictionaryAddValue(defaults, CFSTR(WebKitApplicationChromeModePreferenceKey), kCFBooleanFalse);
 
     CFDictionaryAddValue(defaults, CFSTR(WebKitOfflineWebApplicationCacheEnabledPreferenceKey), kCFBooleanFalse);
 
@@ -1280,18 +1278,6 @@ HRESULT WebPreferences::setMockScrollbarsEnabled(BOOL enabled)
     return S_OK;
 }
 
-HRESULT WebPreferences::screenFontSubstitutionEnabled(BOOL* enabled)
-{
-    *enabled = boolValueForKey(WebKitScreenFontSubstitutionEnabledPreferenceKey);
-    return S_OK;
-}
-
-HRESULT WebPreferences::setScreenFontSubstitutionEnabled(BOOL enabled)
-{
-    setBoolValue(WebKitScreenFontSubstitutionEnabledPreferenceKey, enabled);
-    return S_OK;
-}
-
 HRESULT STDMETHODCALLTYPE WebPreferences::hyperlinkAuditingEnabled(
     /* [in] */ BOOL* enabled)
 {
@@ -1473,15 +1459,13 @@ HRESULT STDMETHODCALLTYPE WebPreferences::authorAndUserStylesEnabled(BOOL* enabl
     return S_OK;
 }
 
-HRESULT WebPreferences::inApplicationChromeMode(BOOL* enabled)
+HRESULT WebPreferences::inApplicationChromeMode(BOOL*)
 {
-    *enabled = boolValueForKey(WebKitApplicationChromeModePreferenceKey);
     return S_OK;
 }
-    
-HRESULT WebPreferences::setApplicationChromeMode(BOOL enabled)
+
+HRESULT WebPreferences::setApplicationChromeMode(BOOL)
 {
-    setBoolValue(WebKitApplicationChromeModePreferenceKey, enabled);
     return S_OK;
 }
 

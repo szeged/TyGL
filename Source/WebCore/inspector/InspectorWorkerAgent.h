@@ -32,7 +32,7 @@
 #define InspectorWorkerAgent_h
 
 #include "InspectorWebAgentBase.h"
-#include "InspectorWebBackendDispatchers.h"
+#include <inspector/InspectorBackendDispatchers.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 
@@ -48,11 +48,11 @@ class WorkerGlobalScopeProxy;
 
 typedef String ErrorString;
 
-class InspectorWorkerAgent : public InspectorAgentBase, public Inspector::InspectorWorkerBackendDispatcherHandler {
+class InspectorWorkerAgent final : public InspectorAgentBase, public Inspector::InspectorWorkerBackendDispatcherHandler {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit InspectorWorkerAgent(InstrumentingAgents*);
-    ~InspectorWorkerAgent();
+    virtual ~InspectorWorkerAgent();
 
     virtual void didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, Inspector::InspectorBackendDispatcher*) override;
     virtual void willDestroyFrontendAndBackend(Inspector::InspectorDisconnectReason) override;
@@ -68,7 +68,7 @@ public:
     virtual void canInspectWorkers(ErrorString&, bool*) override;
     virtual void connectToWorker(ErrorString&, int workerId) override;
     virtual void disconnectFromWorker(ErrorString&, int workerId) override;
-    virtual void sendMessageToWorker(ErrorString&, int workerId, const RefPtr<Inspector::InspectorObject>& message) override;
+    virtual void sendMessageToWorker(ErrorString&, int workerId, const RefPtr<Inspector::InspectorObject>&& message) override;
     virtual void setAutoconnectToWorkers(ErrorString&, bool value) override;
 
 private:

@@ -24,7 +24,6 @@
 #define HTMLNameCollection_h
 
 #include "HTMLCollection.h"
-
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
@@ -33,7 +32,7 @@ class Document;
 
 class HTMLNameCollection : public HTMLCollection {
 public:
-    ~HTMLNameCollection();
+    virtual ~HTMLNameCollection();
 
     Document& document() { return downcast<Document>(ownerNode()); }
 
@@ -45,7 +44,7 @@ protected:
 
 class WindowNameCollection final : public HTMLNameCollection {
 public:
-    static PassRef<WindowNameCollection> create(Document& document, CollectionType type, const AtomicString& name)
+    static Ref<WindowNameCollection> create(Document& document, CollectionType type, const AtomicString& name)
     {
         return adoptRef(*new WindowNameCollection(document, type, name));
     }
@@ -66,7 +65,7 @@ private:
 
 class DocumentNameCollection final : public HTMLNameCollection {
 public:
-    static PassRef<DocumentNameCollection> create(Document& document, CollectionType type, const AtomicString& name)
+    static Ref<DocumentNameCollection> create(Document& document, CollectionType type, const AtomicString& name)
     {
         return adoptRef(*new DocumentNameCollection(document, type, name));
     }
@@ -85,6 +84,9 @@ private:
     }
 };
 
-}
+} // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_HTMLCOLLECTION(WindowNameCollection, WindowNamedItems)
+SPECIALIZE_TYPE_TRAITS_HTMLCOLLECTION(DocumentNameCollection, DocumentNamedItems)
+
+#endif // HTMLNameCollection_h

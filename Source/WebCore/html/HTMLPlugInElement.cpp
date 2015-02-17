@@ -67,7 +67,7 @@ using namespace HTMLNames;
 HTMLPlugInElement::HTMLPlugInElement(const QualifiedName& tagName, Document& document)
     : HTMLFrameOwnerElement(tagName, document)
     , m_inBeforeLoadEventHandler(false)
-    , m_swapRendererTimer(this, &HTMLPlugInElement::swapRendererTimerFired)
+    , m_swapRendererTimer(*this, &HTMLPlugInElement::swapRendererTimerFired)
 #if ENABLE(NETSCAPE_PLUGIN_API)
     , m_NPObject(0)
 #endif
@@ -207,17 +207,17 @@ void HTMLPlugInElement::defaultEventHandler(Event* event)
     // FIXME: Mouse down and scroll events are passed down to plug-in via custom code in EventHandler; these code paths should be united.
 
     auto renderer = this->renderer();
-    if (!renderer || !renderer->isWidget())
+    if (!is<RenderWidget>(renderer))
         return;
 
-    if (renderer->isEmbeddedObject()) {
-        if (toRenderEmbeddedObject(renderer)->isPluginUnavailable()) {
-            toRenderEmbeddedObject(renderer)->handleUnavailablePluginIndicatorEvent(event);
+    if (is<RenderEmbeddedObject>(*renderer)) {
+        if (downcast<RenderEmbeddedObject>(*renderer).isPluginUnavailable()) {
+            downcast<RenderEmbeddedObject>(*renderer).handleUnavailablePluginIndicatorEvent(event);
             return;
         }
 
-        if (toRenderEmbeddedObject(renderer)->isSnapshottedPlugIn() && displayState() < Restarting) {
-            toRenderSnapshottedPlugIn(renderer)->handleEvent(event);
+        if (is<RenderSnapshottedPlugIn>(*renderer) && displayState() < Restarting) {
+            downcast<RenderSnapshottedPlugIn>(*renderer).handleEvent(event);
             HTMLFrameOwnerElement::defaultEventHandler(event);
             return;
         }
@@ -226,7 +226,7 @@ void HTMLPlugInElement::defaultEventHandler(Event* event)
             return;
     }
 
-    RefPtr<Widget> widget = toRenderWidget(renderer)->widget();
+    RefPtr<Widget> widget = downcast<RenderWidget>(*renderer).widget();
     if (!widget)
         return;
     widget->handleEvent(event);
@@ -275,9 +275,9 @@ bool HTMLPlugInElement::supportsFocus() const
     if (HTMLFrameOwnerElement::supportsFocus())
         return true;
 
-    if (useFallbackContent() || !renderer() || !renderer()->isEmbeddedObject())
+    if (useFallbackContent() || !is<RenderEmbeddedObject>(renderer()))
         return false;
-    return !toRenderEmbeddedObject(renderer())->isPluginUnavailable();
+    return !downcast<RenderEmbeddedObject>(*renderer()).isPluginUnavailable();
 }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -292,7 +292,7 @@ NPObject* HTMLPlugInElement::getNPObject()
 
 #endif /* ENABLE(NETSCAPE_PLUGIN_API) */
 
-RenderPtr<RenderElement> HTMLPlugInElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLPlugInElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     if (m_pluginReplacement && m_pluginReplacement->willCreateRenderer())
         return m_pluginReplacement->createElementRenderer(*this, WTF::move(style));
@@ -300,7 +300,7 @@ RenderPtr<RenderElement> HTMLPlugInElement::createElementRenderer(PassRef<Render
     return createRenderer<RenderEmbeddedObject>(*this, WTF::move(style));
 }
 
-void HTMLPlugInElement::swapRendererTimerFired(Timer<HTMLPlugInElement>&)
+void HTMLPlugInElement::swapRendererTimerFired()
 {
     ASSERT(displayState() == PreparingPluginReplacement || displayState() == DisplayingSnapshot);
     if (userAgentShadowRoot())

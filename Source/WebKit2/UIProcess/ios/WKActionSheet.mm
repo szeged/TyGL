@@ -28,13 +28,11 @@
 
 #if PLATFORM(IOS)
 
-#import "WKContentViewInteraction.h"
-#import <UIKit/UIAlertController_Private.h>
-#import <UIKit/UIWindow_Private.h>
+#import "UIKitSPI.h"
+#import <wtf/RetainPtr.h>
 
 @implementation WKActionSheet {
     id <WKActionSheetDelegate> _sheetDelegate;
-    WKContentView *_view;
     UIPopoverArrowDirection _arrowDirections;
     BOOL _isRotating;
     BOOL _readyToPresentAfterRotation;
@@ -43,14 +41,13 @@
     RetainPtr<id <UIPopoverPresentationControllerDelegate>> _popoverPresentationControllerDelegateWhileRotating;
 }
 
-- (id)initWithView:(WKContentView *)view
+- (id)init
 {
     self = [super init];
     if (!self)
         return nil;
 
     _arrowDirections = UIPopoverArrowDirectionAny;
-    _view = view;
 
     if (UI_USER_INTERFACE_IDIOM() != UIUserInterfaceIdiomPhone) {
         // Only iPads support popovers that rotate. UIActionSheets actually block rotation on iPhone/iPod Touch
@@ -213,7 +210,7 @@
 {
     _isRotating = NO;
     _readyToPresentAfterRotation = YES;
-    [_view _updatePositionInformation];
+    [_sheetDelegate updatePositionInformation];
     [self updateSheetPosition];
 }
 

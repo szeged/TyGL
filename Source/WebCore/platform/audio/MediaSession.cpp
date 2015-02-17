@@ -59,7 +59,7 @@ std::unique_ptr<MediaSession> MediaSession::create(MediaSessionClient& client)
 
 MediaSession::MediaSession(MediaSessionClient& client)
     : m_client(client)
-    , m_clientDataBufferingTimer(this, &MediaSession::clientDataBufferingTimerFired)
+    , m_clientDataBufferingTimer(*this, &MediaSession::clientDataBufferingTimerFired)
     , m_state(Idle)
     , m_stateToRestore(Idle)
     , m_notifyingClient(false)
@@ -76,13 +76,7 @@ MediaSession::~MediaSession()
 void MediaSession::setState(State state)
 {
     LOG(Media, "MediaSession::setState(%p) - %s", this, stateName(state));
-
-    if (m_state == state)
-        return;
-
     m_state = state;
-
-    client().mediaStateDidChange();
 }
 
 void MediaSession::beginInterruption(InterruptionType type)
@@ -111,11 +105,6 @@ void MediaSession::endInterruption(EndInterruptionFlags flags)
         LOG(Media, "MediaSession::endInterruption - resuming playback");
         client().resumePlayback();
     }
-}
-
-bool MediaSession::hasMediaCharacteristics(MediaSession::MediaCharacteristics mediaCharacteristics) const
-{
-    return client().hasMediaCharacteristics(mediaCharacteristics);
 }
 
 bool MediaSession::clientWillBeginPlayback()
@@ -191,7 +180,7 @@ void MediaSession::visibilityChanged()
         m_clientDataBufferingTimer.startOneShot(kClientDataBufferingTimerThrottleDelay);
 }
 
-void MediaSession::clientDataBufferingTimerFired(Timer<WebCore::MediaSession> &)
+void MediaSession::clientDataBufferingTimerFired()
 {
     updateClientDataBuffering();
 }
@@ -201,8 +190,22 @@ void MediaSession::updateClientDataBuffering()
     if (m_clientDataBufferingTimer.isActive())
         m_clientDataBufferingTimer.stop();
 
-    bool shouldBuffer = m_state == Playing || !m_client.elementIsHidden();
-    m_client.setShouldBufferData(shouldBuffer);
+    m_client.setShouldBufferData(MediaSessionManager::sharedManager().sessionCanLoadMedia(*this));
+}
+
+bool MediaSession::isHidden() const
+{
+    return m_client.elementIsHidden();
+}
+
+MediaSession::DisplayType MediaSession::displayType() const
+{
+    return m_client.displayType();
+}
+
+void MediaSession::wirelessRoutesAvailableDidChange() const
+{
+    m_client.wirelessRoutesAvailableDidChange();
 }
 
 String MediaSessionClient::mediaSessionTitle() const

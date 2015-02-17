@@ -28,8 +28,10 @@
 #import "SettingsController.h"
 #import "WK1BrowserWindowController.h"
 #import "WK2BrowserWindowController.h"
-#import <WebKit/WebHistory.h>
-#import <WebKit/WebKit2.h>
+#import <WebKit/WKPreferencesPrivate.h>
+#import <WebKit/WKWebViewConfigurationPrivate.h>
+#import <WebKit/WebKit.h>
+#import <WebKit/_WKWebsiteDataStore.h>
 
 enum {
     WebKit1NewWindowTag = 1,
@@ -55,6 +57,22 @@ enum {
     [[NSApp mainMenu] insertItem:[item autorelease] atIndex:[[NSApp mainMenu] indexOfItemWithTitle:@"Debug"]];
 }
 
+#if WK_API_ENABLED
+static WKWebViewConfiguration *defaultConfiguration()
+{
+    static WKWebViewConfiguration *configuration;
+
+    if (!configuration) {
+        configuration = [[WKWebViewConfiguration alloc] init];
+        configuration.preferences._fullScreenEnabled = YES;
+        configuration.preferences._developerExtrasEnabled = YES;
+    }
+
+    return configuration;
+}
+#endif
+
+
 - (IBAction)newWindow:(id)sender
 {
     BrowserWindowController *controller = nil;
@@ -70,7 +88,7 @@ enum {
         controller = [[WK1BrowserWindowController alloc] initWithWindowNibName:@"BrowserWindow"];
 #if WK_API_ENABLED
     else
-        controller = [[WK2BrowserWindowController alloc] initWithWindowNibName:@"BrowserWindow"];
+        controller = [[WK2BrowserWindowController alloc] initWithConfiguration:defaultConfiguration()];
 #endif
     if (!controller)
         return;
@@ -79,6 +97,22 @@ enum {
     [_browserWindowControllers addObject:controller];
     
     [controller loadURLString:[SettingsController shared].defaultURL];
+}
+
+- (IBAction)newPrivateWindow:(id)sender
+{
+#if WK_API_ENABLED
+    WKWebViewConfiguration *privateConfiguraton = [defaultConfiguration() copy];
+    privateConfiguraton._websiteDataStore = [_WKWebsiteDataStore nonPersistentDataStore];
+
+    BrowserWindowController *controller = [[WK2BrowserWindowController alloc] initWithConfiguration:privateConfiguraton];
+    [privateConfiguraton release];
+
+    [[controller window] makeKeyAndOrderFront:sender];
+    [_browserWindowControllers addObject:controller];
+
+    [controller loadURLString:[SettingsController shared].defaultURL];
+#endif
 }
 
 - (void)browserWindowWillClose:(NSWindow *)window
@@ -126,7 +160,7 @@ enum {
     if (browserWindowController) {
         NSOpenPanel *openPanel = [[NSOpenPanel openPanel] retain];
         [openPanel beginSheetModalForWindow:browserWindowController.window completionHandler:^(NSInteger result) {
-            if (result != NSOKButton)
+            if (result != NSFileHandlingPanelOKButton)
                 return;
 
             NSURL *url = [openPanel.URLs objectAtIndex:0];
@@ -137,7 +171,7 @@ enum {
 
     NSOpenPanel *openPanel = [NSOpenPanel openPanel];
     [openPanel beginWithCompletionHandler:^(NSInteger result) {
-        if (result != NSOKButton)
+        if (result != NSFileHandlingPanelOKButton)
             return;
 
         BrowserWindowController *newBrowserWindowController = [[WK1BrowserWindowController alloc] initWithWindowNibName:@"BrowserWindow"];

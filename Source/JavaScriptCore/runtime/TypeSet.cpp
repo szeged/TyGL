@@ -26,7 +26,7 @@
 #include "config.h"
 #include "TypeSet.h"
 
-#include "InspectorJSProtocolTypes.h"
+#include "InspectorProtocolObjects.h"
 #include "JSCJSValue.h"
 #include "JSCJSValueInlines.h"
 #include <wtf/text/CString.h>
@@ -67,17 +67,16 @@ RuntimeType TypeSet::getRuntimeTypeForValue(JSValue v)
     return ret;
 }
 
-void TypeSet::addTypeInformation(RuntimeType type, PassRefPtr<StructureShape> prpNewShape, StructureID id) 
+void TypeSet::addTypeInformation(RuntimeType type, PassRefPtr<StructureShape> prpNewShape, Structure* structure) 
 {
     RefPtr<StructureShape> newShape = prpNewShape;
     m_seenTypes = m_seenTypes | type;
 
-    if (id && newShape && type != TypeString) {
-        ASSERT(m_structureIDCache.isValidValue(id));
-        auto addResult = m_structureIDCache.add(id);
-        if (addResult.isNewEntry) {
+    if (structure && newShape && type != TypeString) {
+        if (!m_structureSet.contains(structure)) {
+            m_structureSet.add(structure);
             // Make one more pass making sure that: 
-            // - We don't have two instances of the same shape. (Same shapes may have different StructureIDs).
+            // - We don't have two instances of the same shape. (Same shapes may have different Structures).
             // - We don't have two shapes that share the same prototype chain. If these shapes share the same 
             //   prototype chain, they will be merged into one shape.
             bool found = false;
@@ -107,7 +106,8 @@ void TypeSet::addTypeInformation(RuntimeType type, PassRefPtr<StructureShape> pr
 
 void TypeSet::invalidateCache()
 {
-    m_structureIDCache.clear();
+    auto keepMarkedStructuresFilter = [] (Structure* structure) -> bool { return Heap::isMarked(structure); };
+    m_structureSet.genericFilter(keepMarkedStructuresFilter);
 }
 
 String TypeSet::dumpTypes() const
@@ -157,7 +157,7 @@ String TypeSet::dumpTypes() const
     return seen.toString();
 }
 
-bool TypeSet::doesTypeConformTo(uint32_t test) const
+bool TypeSet::doesTypeConformTo(uint8_t test) const
 {
     // This function checks if our seen types conform  to the types described by the test bitstring. (i.e we haven't seen more types than test).
     // We are <= to those types if ANDing with the bitstring doesn't zero out any of our bits.
@@ -236,18 +236,17 @@ String TypeSet::leastCommonAncestor() const
     return StructureShape::leastCommonAncestor(m_structureHistory);
 }
 
-#if ENABLE(INSPECTOR)
-PassRefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::StructureDescription>> TypeSet::allStructureRepresentations() const
+Ref<Inspector::Protocol::Array<Inspector::Protocol::Runtime::StructureDescription>> TypeSet::allStructureRepresentations() const
 {
-    RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::StructureDescription>> description = Inspector::Protocol::Array<Inspector::Protocol::Runtime::StructureDescription>::create();
+    auto description = Inspector::Protocol::Array<Inspector::Protocol::Runtime::StructureDescription>::create();
 
     for (size_t i = 0; i < m_structureHistory.size(); i++)
         description->addItem(m_structureHistory.at(i)->inspectorRepresentation());
 
-    return description.release();
+    return WTF::move(description);
 }
 
-PassRefPtr<Inspector::Protocol::Runtime::TypeSet> TypeSet::inspectorTypeSet() const
+Ref<Inspector::Protocol::Runtime::TypeSet> TypeSet::inspectorTypeSet() const
 {
     return Inspector::Protocol::Runtime::TypeSet::create()
         .setIsFunction((m_seenTypes & TypeFunction) != TypeNothing)
@@ -260,7 +259,6 @@ PassRefPtr<Inspector::Protocol::Runtime::TypeSet> TypeSet::inspectorTypeSet() co
         .setIsObject((m_seenTypes & TypeObject) != TypeNothing)
         .release();
 }
-#endif
 
 String TypeSet::toJSONString() const
 {
@@ -510,12 +508,11 @@ String StructureShape::toJSONString() const
     return json.toString();
 }
 
-#if ENABLE(INSPECTOR)
-PassRefPtr<Inspector::Protocol::Runtime::StructureDescription> StructureShape::inspectorRepresentation()
+Ref<Inspector::Protocol::Runtime::StructureDescription> StructureShape::inspectorRepresentation()
 {
-    RefPtr<Inspector::Protocol::Runtime::StructureDescription> base = Inspector::Protocol::Runtime::StructureDescription::create();
-    RefPtr<Inspector::Protocol::Runtime::StructureDescription> currentObject = base;
-    RefPtr<StructureShape> currentShape = this;
+    auto base = Inspector::Protocol::Runtime::StructureDescription::create().release();
+    Ref<Inspector::Protocol::Runtime::StructureDescription> currentObject = base.copyRef();
+    RefPtr<StructureShape> currentShape(this);
 
     while (currentShape) {
         auto fields = Inspector::Protocol::Array<String>::create();
@@ -525,23 +522,22 @@ PassRefPtr<Inspector::Protocol::Runtime::StructureDescription> StructureShape::i
         for (auto field : currentShape->m_optionalFields)
             optionalFields->addItem(field.get());
 
-        currentObject->setFields(fields);
-        currentObject->setOptionalFields(optionalFields);
+        currentObject->setFields(&fields.get());
+        currentObject->setOptionalFields(&optionalFields.get());
         currentObject->setConstructorName(currentShape->m_constructorName);
         currentObject->setIsImprecise(currentShape->m_isInDictionaryMode);
 
         if (currentShape->m_proto) {
-            RefPtr<Inspector::Protocol::Runtime::StructureDescription> nextObject = Inspector::Protocol::Runtime::StructureDescription::create();
-            currentObject->setPrototypeStructure(nextObject);
-            currentObject = nextObject;
+            auto nextObject = Inspector::Protocol::Runtime::StructureDescription::create().release();
+            currentObject->setPrototypeStructure(&nextObject.get());
+            currentObject = WTF::move(nextObject);
         }
 
         currentShape = currentShape->m_proto;
     }
 
-    return base.release();
+    return WTF::move(base);
 }
-#endif
 
 bool StructureShape::hasSamePrototypeChain(PassRefPtr<StructureShape> prpOther)
 {

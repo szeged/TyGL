@@ -29,9 +29,9 @@ namespace WebCore {
 class JSTestOverloadedConstructors : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestOverloadedConstructors* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestOverloadedConstructors> impl)
+    static JSTestOverloadedConstructors* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestOverloadedConstructors>&& impl)
     {
-        JSTestOverloadedConstructors* ptr = new (NotNull, JSC::allocateCell<JSTestOverloadedConstructors>(globalObject->vm().heap)) JSTestOverloadedConstructors(structure, globalObject, impl);
+        JSTestOverloadedConstructors* ptr = new (NotNull, JSC::allocateCell<JSTestOverloadedConstructors>(globalObject->vm().heap)) JSTestOverloadedConstructors(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -64,7 +64,7 @@ public:
 private:
     TestOverloadedConstructors* m_impl;
 protected:
-    JSTestOverloadedConstructors(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestOverloadedConstructors>);
+    JSTestOverloadedConstructors(JSC::Structure*, JSDOMGlobalObject*, Ref<TestOverloadedConstructors>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -86,12 +86,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestOverloadedConstr
     return &jsTestOverloadedConstructorsOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestOverloadedConstructors*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestOverloadedConstructors*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestOverloadedConstructors& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

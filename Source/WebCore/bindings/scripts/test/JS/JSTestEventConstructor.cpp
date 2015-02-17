@@ -97,7 +97,7 @@ EncodedJSValue JSC_HOST_CALL JSTestEventConstructorConstructor::constructJSTestE
     if (!executionContext)
         return throwVMError(exec, createReferenceError(exec, "Constructor associated execution context is unavailable"));
 
-    AtomicString eventType = exec->argument(0).toString(exec)->value(exec);
+    AtomicString eventType = exec->argument(0).toString(exec)->toAtomicString(exec);
     if (UNLIKELY(exec->hadException()))
         return JSValue::encode(jsUndefined());
 
@@ -167,9 +167,9 @@ void JSTestEventConstructorPrototype::finishCreation(VM& vm)
 
 WEBCORE_EXPORT const ClassInfo JSTestEventConstructor::s_info = { "TestEventConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestEventConstructor) };
 
-JSTestEventConstructor::JSTestEventConstructor(Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestEventConstructor> impl)
+JSTestEventConstructor::JSTestEventConstructor(Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestEventConstructor>&& impl)
     : JSDOMWrapper(structure, globalObject)
-    , m_impl(impl.leakRef())
+    , m_impl(&impl.leakRef())
 {
 }
 

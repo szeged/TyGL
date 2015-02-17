@@ -1,3 +1,1672 @@
+2015-02-02  Chris Dumez  <cdumez@apple.com>
+
+        Access MemoryCache singleton using MemoryCache::singleton()
+        https://bugs.webkit.org/show_bug.cgi?id=141104
+
+        Reviewed by Andreas Kling.
+
+        Access MemoryCache singleton using MemoryCache::singleton() static
+        member function, instead of a free function, as per the recent
+        coding style discussion on WebKit-dev.
+
+2015-01-30  Chris Dumez  <cdumez@apple.com>
+
+        Rename shared() static member functions to singleton() for singleton classes.
+        https://bugs.webkit.org/show_bug.cgi?id=141088
+
+        Reviewed by Ryosuke Niwa and Benjamin Poulain.
+
+        Rename shared() static member functions to singleton() for singleton
+        classes as per the recent coding style change.
+
+2015-01-29  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Build fix after r179368.
+
+        * Interfaces/IWebPreferencesPrivate.idl:
+        * WebPreferences.cpp:
+        (WebPreferences::screenFontSubstitutionEnabled): Deleted.
+        (WebPreferences::setScreenFontSubstitutionEnabled): Deleted.
+        * WebPreferences.h:
+        * WebView.cpp:
+        (WebView::notifyPreferencesChanged):
+
+2015-01-29  Sam Weinig  <sam@webkit.org>
+
+        Remove support for screen font substitution
+        https://bugs.webkit.org/show_bug.cgi?id=141038
+
+        Reviewed by Tim Horton.
+
+        * WebPreferenceKeysPrivate.h:
+        * WebPreferences.cpp:
+        (WebPreferences::screenFontSubstitutionEnabled):
+        (WebPreferences::setScreenFontSubstitutionEnabled):
+        Remove implementations. Have this setting set on windows didn't have any effect before,
+        so this doesn't change behavior.
+
+2015-01-29  Chris Dumez  <cdumez@apple.com>
+
+        Clean up / modernize PageCache class
+        https://bugs.webkit.org/show_bug.cgi?id=141009
+
+        Reviewed by Darin Adler.
+
+        Clean up / modernize PageCache class.
+
+        * WebView.cpp:
+        (WebView::setCacheModel):
+
+2015-01-28  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Message loop is flooded with timer messages when animating in accelerated compositing mode.
+        https://bugs.webkit.org/show_bug.cgi?id=140985
+
+        Reviewed by Brent Fulgham.
+
+        The animation timer has zero timeout, which makes it hard for other messages to slip through.
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        (AcceleratedCompositingContext::scheduleLayerFlush):
+
+2015-01-28  Chris Dumez  <cdumez@apple.com>
+
+        Fix typo in markPagesForVistedLinkStyleRecalc()
+        https://bugs.webkit.org/show_bug.cgi?id=140977
+
+        Reviewed by Darin Adler.
+
+        * WebCoreSupport/WebVisitedLinkStore.cpp:
+        (WebVisitedLinkStore::removeAllVisitedLinks):
+        (WebVisitedLinkStore::addVisitedLinkHash):
+
+2015-01-28  Chris Dumez  <cdumez@apple.com>
+
+        Rename pageCache() to PageCache::shared() and return a reference
+        https://bugs.webkit.org/show_bug.cgi?id=140983
+
+        Reviewed by Andreas Kling.
+
+        Rename pageCache() to PageCache::shared() as this is a singleton class
+        and have it return a reference instead of a pointer.
+
+        * WebCoreStatistics.cpp:
+        (WebCoreStatistics::cachedPageCount):
+        (WebCoreStatistics::cachedFrameCount):
+        * WebCoreSupport/WebVisitedLinkStore.cpp:
+        (WebVisitedLinkStore::removeAllVisitedLinks):
+        (WebVisitedLinkStore::addVisitedLinkHash):
+        * WebView.cpp:
+        (WebView::setCacheModel):
+
+2015-01-27  Chris Dumez  <cdumez@apple.com>
+
+        Use a Ref<CachedResourceLoader> in Document instead of a RefPtr
+        https://bugs.webkit.org/show_bug.cgi?id=140971
+
+        Reviewed by Andreas Kling.
+
+        Use more references instead of pointers.
+
+        * WebDataSource.cpp:
+        (WebDataSource::subresourceForURL):
+
+2015-01-26  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] ASSERTION FAILED !m_ptr under AccessibilityController::winAddNotificationListener
+        https://bugs.webkit.org/show_bug.cgi?id=87426
+        <rdar://problem/11527899>
+
+        Reviewed by Darin Adler.
+
+        Revise COMPtr to work better with our HashMap implementation. Use
+        modern loop syntax.
+
+        * WebHistory.cpp:
+        (WebHistory::visitedURL): Adjust for new COMPtr changes.
+        * WebPreferences.cpp:
+        (WebPreferences::getInstanceForIdentifier): Ditto.
+        (WebPreferences::removeReferenceForIdentifier): Ditto.
+        * WebView.cpp:
+        (WebView::setEditable): Ditto.
+
+2015-01-26  Chris Dumez  <cdumez@apple.com>
+
+        Rename Document::body() to Document::bodyOrFrameset() for clarity
+        https://bugs.webkit.org/show_bug.cgi?id=140902
+
+        Reviewed by Andreas Kling.
+
+        Rename Document::body() to Document::bodyOrFrameset() for clarity. This
+        method does not necessarily return an HTMLBodyElement, it can also
+        return a frameset as per the specification:
+        http://www.w3.org/TR/html5/dom.html#dom-tree-accessors
+
+        This method is often misused internally (the caller is only interested
+        in the <body> element). I will fix these instances in a follow-up patch,
+        this patch is only renaming mechanically.
+
+2015-01-25  peavo@outlook.com  <peavo@outlook.com>
+
+        [Win] Add WebKit message loop interface.
+        https://bugs.webkit.org/show_bug.cgi?id=140857
+
+        Reviewed by Brent Fulgham.
+
+        Added message loop interface which will run the message loop,
+        and perform required tasks (like calling CFRunLoopRunInMode)
+        on each iteration of the loop.
+
+        * ForEachCoClass.h:
+        * Interfaces/WebKit.idl:
+        * Interfaces/WebKitMessageLoop.idl: Added.
+        * WebKitClassFactory.cpp:
+        * WebKitMessageLoop.cpp: Added.
+        (WebKitMessageLoop::WebKitMessageLoop):
+        (WebKitMessageLoop::~WebKitMessageLoop):
+        (WebKitMessageLoop::createInstance):
+        (WebKitMessageLoop::QueryInterface):
+        (WebKitMessageLoop::AddRef):
+        (WebKitMessageLoop::Release):
+        (WebKitMessageLoop::run):
+        (WebKitMessageLoop::performMessageLoopTasks):
+        * WebKitMessageLoop.h: Added.
+
+2015-01-23  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Teach WebKit to provide IAccessible2 'get_language'
+        https://bugs.webkit.org/show_bug.cgi?id=140839
+
+        Reviewed by Dean Jackson.
+
+        * AccessibleBase.cpp:
+        (AccessibleBase::get_locale): Wrap the Webore::AccessibleObject::language
+        result in an IA2Locale structure to statisfy the IAccessible2 specification.
+
+2015-01-22  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed test fix after r178965.
+
+        * WebView.cpp: Supply missing implementation of 'setEditable'. It
+        currently asserts, causing all debug tests to fail.
+
+2015-01-22  peavo@outlook.com  <peavo@outlook.com>
+
+        [Win] No plugin content on some sites.
+        https://bugs.webkit.org/show_bug.cgi?id=140780
+
+        Reviewed by Anders Carlsson.
+
+        Add override modifier to bindingInstance method.
+
+        * Plugins/PluginView.h:
+
+2015-01-22  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Expose missing editing features through WebView interface
+        https://bugs.webkit.org/show_bug.cgi?id=140773
+        <rdar://problem/19565421>
+
+        Reviewed by Dean Jackson.
+
+        Connect the various WebView editing delegate methods to our
+        test infrastructure. Also prefer _bstr_t to raw BSTR types
+        to simplify life cycle management.
+
+        * DOMCoreClasses.cpp: Flesh out the DOMRange object.
+        (DOMElement::createInstance):
+        (DOMRange::QueryInterface):
+        (DOMRange::DOMRange):
+        (DOMRange::~DOMRange):
+        (DOMRange::createInstance):
+        (DOMRange::startContainer):
+        (DOMRange::startOffset):
+        (DOMRange::endContainer):
+        (DOMRange::endOffset):
+        (DOMRange::collapsed):
+        (DOMRange::commonAncestorContainer):
+        (DOMRange::setStart):
+        (DOMRange::setEnd):
+        (DOMRange::setStartBefore):
+        (DOMRange::setStartAfter):
+        (DOMRange::setEndBefore):
+        (DOMRange::setEndAfter):
+        (DOMRange::collapse):
+        (DOMRange::selectNode):
+        (DOMRange::selectNodeContents):
+        (DOMRange::compareBoundaryPoints):
+        (DOMRange::deleteContents):
+        (DOMRange::extractContents):
+        (DOMRange::cloneContents):
+        (DOMRange::insertNode):
+        (DOMRange::surroundContents):
+        (DOMRange::cloneRange):
+        (DOMRange::toString):
+        (DOMRange::detach):
+        * DOMCoreClasses.h:
+        (DOMRange::AddRef):
+        (DOMRange::Release):
+        (DOMRange::throwException):
+        (DOMRange::callWebScriptMethod):
+        (DOMRange::evaluateWebScript):
+        (DOMRange::removeWebScriptKey):
+        (DOMRange::stringRepresentation):
+        (DOMRange::webScriptValueAtIndex):
+        (DOMRange::setWebScriptValueAtIndex):
+        (DOMRange::setException):
+        * Interfaces/IWebEditingDelegate.idl:
+        * Interfaces/IWebView.idl:
+        * WebCoreSupport/WebEditorClient.cpp: Connect more methods
+        to actual editing features in WebCore.
+        (WebEditorClient::shouldBeginEditing):
+        (WebEditorClient::shouldEndEditing):
+        (WebEditorClient::didBeginEditing):
+        (WebEditorClient::respondToChangedContents):
+        (WebEditorClient::respondToChangedSelection):
+        (WebEditorClient::didEndEditing):
+        (WebEditorClient::shouldDeleteRange):
+        (WebEditorClient::shouldInsertNode):
+        (WebEditorClient::shouldInsertText):
+        (WebEditorClient::shouldChangeSelectedRange):
+        (WebEditorClient::webViewDidChangeTypingStyle):
+        (WebEditorClient::webViewDidChangeSelection):
+        (WebEditorClient::isSelectTrailingWhitespaceEnabled):
+        * WebView.cpp:
+        (WebView::setEditingDelegate): Added.
+
+2015-01-21  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] eventSender does not support scalePageBy
+        https://bugs.webkit.org/show_bug.cgi?id=140726
+        <rdar://problem/19549865>
+
+        Reviewed by Dean Jackson.
+
+        * Interfaces/IWebViewPrivate.idl: Add scaleWebView API.
+        * WebView.cpp:
+        (WebView::scaleWebView): 
+        Connect WebCore implementation to the Windows COM interface.
+        * WebView.h:
+
+2015-01-21  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove ENABLE(INSPECTOR) ifdef guards
+        https://bugs.webkit.org/show_bug.cgi?id=140668
+
+        Reviewed by Darin Adler.
+
+        * WebCoreSupport/WebInspectorClient.cpp:
+        (registerWindowClass):
+        * WebInspector.cpp:
+        (WebInspector::setTimelineProfilingEnabled):
+        * WebNodeHighlight.cpp:
+        (WebNodeHighlight::WebNodeHighlight):
+        (WebNodeHighlight::update):
+        * WebNodeHighlight.h:
+        * WebView.cpp:
+        (WebView::WebView):
+        (WebView::close):
+        (WebView::initWithFrame):
+        (WebView::inspector):
+        * WebView.h:
+
+2015-01-20  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove non-Windows cruft from WebKit/win/Plugins
+        https://bugs.webkit.org/show_bug.cgi?id=140675
+
+        Reviewed by Anders Carlsson.
+
+        * Plugins/PluginDatabase.cpp:
+        (WebCore::PluginDatabase::defaultPluginDirectories):
+        (WebCore::PluginDatabase::isPreferredPluginDirectory):
+        (WebCore::PluginDatabase::getPluginPathsInDirectories):
+        * Plugins/PluginDebug.cpp:
+        (WebCore::prettyNameForNPNVariable):
+        (WebCore::prettyNameForNPPVariable):
+        (WebCore::prettyNameForDrawingModel): Deleted.
+        (WebCore::prettyNameForEventModel): Deleted.
+        * Plugins/PluginDebug.h:
+        * Plugins/PluginPackage.cpp:
+        (WebCore::PluginPackage::compareFileVersion):
+        (WebCore::PluginPackage::determineQuirks): Deleted.
+        (WebCore::PluginPackage::determineModuleVersionFromDescription): Deleted.
+        (WebCore::PluginPackage::hash): Deleted.
+        (WebCore::PluginPackage::equal): Deleted.
+        * Plugins/PluginView.cpp:
+        (WebCore::PluginView::setFrameRect):
+        (WebCore::PluginView::handleEvent):
+        (WebCore::PluginView::stop):
+        (WebCore::PluginView::setValue):
+        (WebCore::PluginView::PluginView):
+        * Plugins/PluginView.h:
+        (WebCore::PluginView::platformPluginWidget): Deleted.
+        (WebCore::PluginView::setPlatformPluginWidget): Deleted.
+        * Plugins/PluginViewWin.cpp:
+        (windowHandleForPageClient):
+        (WebCore::PluginView::hookedBeginPaint):
+        (WebCore::PluginView::hookedEndPaint):
+        (WebCore::hook):
+        (WebCore::registerPluginView):
+        (WebCore::PluginView::paint):
+        (WebCore::PluginView::handleMouseEvent):
+        (WebCore::PluginView::setNPWindowRect):
+        (WebCore::PluginView::platformStart):
+        (WebCore::PluginView::snapshot):
+        * Plugins/npapi.cpp:
+        (NPN_InvalidateRect):
+
+2015-01-19  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Periodic failure in DumpRenderTree related to WebActionPropertyBag::Read
+        https://bugs.webkit.org/show_bug.cgi?id=139906
+
+        Reviewed by Dean Jackson.
+
+        WebKit on Windows was creating uninitialized VARIANT structures, then attempting
+        to use them. This patch fixes that.
+
+        Identified by dom/html/level2/html/HTMLIFrameElement03.html (and others)
+
+        * COMEnumVariant.h:
+        (COMEnumVariant<ContainerType>::Next):
+        * COMPropertyBag.h:
+        (HashType>::Read):
+        * DefaultPolicyDelegate.cpp:
+        (DefaultPolicyDelegate::decidePolicyForNavigationAction):
+        * WebActionPropertyBag.cpp:
+        (WebActionPropertyBag::Read):
+        * WebDatabaseManager.cpp:
+        (DatabaseDetailsPropertyBag::Read):
+        * WebElementPropertyBag.cpp:
+        (WebElementPropertyBag::Read):
+        * WebFrame.cpp:
+        (EnumChildFrames::Next):
+        * WebView.cpp:
+        (WebView::notifyDidAddIcon):
+
+2015-01-15  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove ENABLE(SQL_DATABASE) guards
+        https://bugs.webkit.org/show_bug.cgi?id=140434
+
+        Reviewed by Darin Adler.
+
+        * ForEachCoClass.h:
+        * WebCoreSupport/WebChromeClient.cpp:
+        (WebChromeClient::exceededDatabaseQuota):
+        * WebCoreSupport/WebChromeClient.h:
+        * WebDatabaseManager.cpp:
+        (WebKitInitializeWebDatabasesIfNecessary):
+        * WebDatabaseManager.h:
+        * WebSecurityOrigin.cpp:
+        (WebSecurityOrigin::usage):
+        (WebSecurityOrigin::quota):
+        (WebSecurityOrigin::setQuota):
+        * WebView.cpp:
+        (WebView::initWithFrame):
+        (WebView::notifyPreferencesChanged):
+
+2015-01-15  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix after r178510
+
+        Correct #include and declarations from Font->FontCascade
+
+        * DOMCoreClasses.cpp:
+        (DOMElement::font):
+        * FullscreenVideoController.cpp:
+        (FullscreenVideoController::draw):
+        * WebKitGraphics.cpp:
+        * WebPreferences.cpp:
+
+2015-01-14  Chris Dumez  <cdumez@apple.com>
+
+        Make 'TypeName' parameter unnecessary in CSSPropertyNames.in
+        https://bugs.webkit.org/show_bug.cgi?id=140347
+
+        Reviewed by Darin Adler.
+
+        Call FontDescription::setIsItalic() instead of setItalic() as the
+        call site passes a boolean.
+
+        * WebKitGraphics.cpp:
+        (makeFont):
+
+2015-01-11  Sam Weinig  <sam@webkit.org>
+
+        Remove support for SharedWorkers
+        https://bugs.webkit.org/show_bug.cgi?id=140344
+
+        Reviewed by Anders Carlsson.
+
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::createSharedWorkerStrategy): Deleted.
+        * WebCoreSupport/WebPlatformStrategies.h:
+
+2015-01-10  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Accelerated compositing has stopped working.
+        https://bugs.webkit.org/show_bug.cgi?id=140334
+
+        Reviewed by Brent Fulgham.
+
+        The method GraphicsLayerTextureMapper::flushCompositingStateForThisLayerOnly()
+        is not updating the backingstore anymore, we need to call the new method
+        GraphicsLayerTextureMapper::updateBackingStoreIncludingSubLayers().
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        (AcceleratedCompositingContext::flushPendingLayerChanges):
+        (AcceleratedCompositingContext::flushAndRenderLayers):
+
+2015-01-09  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of the database strategy
+        https://bugs.webkit.org/show_bug.cgi?id=140322
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::createDatabaseStrategy): Deleted.
+        * WebCoreSupport/WebPlatformStrategies.h:
+
+2015-01-06  Anders Carlsson  <andersca@apple.com>
+
+        Move the Windows only plug-in code to WebKit/win
+        https://bugs.webkit.org/show_bug.cgi?id=140133
+
+        Reviewed by Darin Adler.
+
+        * Plugins/PaintHooks.asm: Renamed from Source/WebCore/plugins/win/PaintHooks.asm.
+        * Plugins/PluginDatabase.cpp: Renamed from Source/WebCore/plugins/PluginDatabase.cpp.
+        (WebCore::persistentPluginMetadataCachePath):
+        (WebCore::PluginDatabase::PluginDatabase):
+        (WebCore::PluginDatabase::installedPlugins):
+        (WebCore::PluginDatabase::isMIMETypeRegistered):
+        (WebCore::PluginDatabase::addExtraPluginDirectory):
+        (WebCore::PluginDatabase::refresh):
+        (WebCore::PluginDatabase::plugins):
+        (WebCore::PluginDatabase::preferredPluginCompare):
+        (WebCore::PluginDatabase::pluginForMIMEType):
+        (WebCore::PluginDatabase::MIMETypeForExtension):
+        (WebCore::PluginDatabase::findPlugin):
+        (WebCore::PluginDatabase::setPreferredPluginForMIMEType):
+        (WebCore::PluginDatabase::fileExistsAndIsNotDisabled):
+        (WebCore::PluginDatabase::getDeletedPlugins):
+        (WebCore::PluginDatabase::add):
+        (WebCore::PluginDatabase::remove):
+        (WebCore::PluginDatabase::clear):
+        (WebCore::PluginDatabase::removeDisabledPluginFile):
+        (WebCore::PluginDatabase::addDisabledPluginFile):
+        (WebCore::PluginDatabase::defaultPluginDirectories):
+        (WebCore::PluginDatabase::isPreferredPluginDirectory):
+        (WebCore::PluginDatabase::getPluginPathsInDirectories):
+        (WebCore::fillBufferWithContentsOfFile):
+        (WebCore::readUTF8String):
+        (WebCore::readTime):
+        (WebCore::PluginDatabase::loadPersistentMetadataCache):
+        (WebCore::writeUTF8String):
+        (WebCore::writeTime):
+        (WebCore::PluginDatabase::updatePersistentMetadataCache):
+        (WebCore::PluginDatabase::isPersistentMetadataCacheEnabled):
+        (WebCore::PluginDatabase::setPersistentMetadataCacheEnabled):
+        (WebCore::PluginDatabase::persistentMetadataCachePath):
+        (WebCore::PluginDatabase::setPersistentMetadataCachePath):
+        * Plugins/PluginDatabase.h: Renamed from Source/WebCore/plugins/PluginDatabase.h.
+        (WebCore::PluginDatabase::setPluginDirectories):
+        (WebCore::PluginDatabase::pluginDirectories):
+        * Plugins/PluginDatabaseWin.cpp: Renamed from Source/WebCore/plugins/win/PluginDatabaseWin.cpp.
+        (WebCore::addPluginPathsFromRegistry):
+        (WebCore::PluginDatabase::getPluginPathsInDirectories):
+        (WebCore::parseVersionString):
+        (WebCore::compareVersions):
+        (WebCore::addMozillaPluginDirectories):
+        (WebCore::addWindowsMediaPlayerPluginDirectory):
+        (WebCore::addAdobeAcrobatPluginDirectory):
+        (WebCore::addJavaPluginDirectory):
+        (WebCore::safariPluginsDirectory):
+        (WebCore::addMacromediaPluginDirectories):
+        (WebCore::PluginDatabase::defaultPluginDirectories):
+        (WebCore::PluginDatabase::isPreferredPluginDirectory):
+        * Plugins/PluginDebug.cpp: Renamed from Source/WebCore/plugins/PluginDebug.cpp.
+        (WebCore::prettyNameForNPError):
+        (WebCore::prettyNameForDrawingModel):
+        (WebCore::prettyNameForEventModel):
+        (WebCore::prettyNameForNPNVariable):
+        (WebCore::prettyNameForNPPVariable):
+        (WebCore::prettyNameForNPNURLVariable):
+        * Plugins/PluginDebug.h: Renamed from Source/WebCore/plugins/PluginDebug.h.
+        * Plugins/PluginMessageThrottlerWin.cpp: Renamed from Source/WebCore/plugins/win/PluginMessageThrottlerWin.cpp.
+        (WebCore::PluginMessageThrottlerWin::PluginMessageThrottlerWin):
+        (WebCore::PluginMessageThrottlerWin::~PluginMessageThrottlerWin):
+        (WebCore::PluginMessageThrottlerWin::appendMessage):
+        (WebCore::PluginMessageThrottlerWin::processQueuedMessage):
+        (WebCore::PluginMessageThrottlerWin::messageThrottleTimerFired):
+        (WebCore::PluginMessageThrottlerWin::allocateMessage):
+        (WebCore::PluginMessageThrottlerWin::isInlineMessage):
+        (WebCore::PluginMessageThrottlerWin::freeMessage):
+        * Plugins/PluginMessageThrottlerWin.h: Renamed from Source/WebCore/plugins/win/PluginMessageThrottlerWin.h.
+        * Plugins/PluginPackage.cpp: Renamed from Source/WebCore/plugins/PluginPackage.cpp.
+        (WebCore::PluginPackage::~PluginPackage):
+        (WebCore::PluginPackage::freeLibrarySoon):
+        (WebCore::PluginPackage::freeLibraryTimerFired):
+        (WebCore::PluginPackage::compare):
+        (WebCore::PluginPackage::PluginPackage):
+        (WebCore::PluginPackage::unload):
+        (WebCore::PluginPackage::unloadWithoutShutdown):
+        (WebCore::PluginPackage::setEnabled):
+        (WebCore::PluginPackage::createPackage):
+        (WebCore::PluginPackage::createPackageFromCache):
+        (WebCore::PluginPackage::determineQuirks):
+        (WebCore::PluginPackage::determineModuleVersionFromDescription):
+        (WebCore::getListFromVariantArgs):
+        (WebCore::makeSource):
+        (WebCore::NPN_Evaluate):
+        (WebCore::NPN_Invoke):
+        (WebCore::PluginPackage::initializeBrowserFuncs):
+        (WebCore::PluginPackage::hash):
+        (WebCore::PluginPackage::equal):
+        (WebCore::PluginPackage::compareFileVersion):
+        (WebCore::PluginPackage::ensurePluginLoaded):
+        * Plugins/PluginPackage.h: Renamed from Source/WebCore/plugins/PluginPackage.h.
+        (WebCore::PluginPackage::name):
+        (WebCore::PluginPackage::description):
+        (WebCore::PluginPackage::path):
+        (WebCore::PluginPackage::fileName):
+        (WebCore::PluginPackage::parentDirectory):
+        (WebCore::PluginPackage::module):
+        (WebCore::PluginPackage::lastModified):
+        (WebCore::PluginPackage::mimeToDescriptions):
+        (WebCore::PluginPackage::mimeToExtensions):
+        (WebCore::PluginPackage::isEnabled):
+        (WebCore::PluginPackage::pluginFuncs):
+        (WebCore::PluginPackage::quirks):
+        (WebCore::PluginPackage::version):
+        (WebCore::PluginPackage::fullMIMEDescription):
+        (WebCore::PluginPackageHash::hash):
+        (WebCore::PluginPackageHash::equal):
+        * Plugins/PluginPackageWin.cpp: Renamed from Source/WebCore/plugins/win/PluginPackageWin.cpp.
+        (WebCore::getVersionInfo):
+        (WebCore::PluginPackage::isPluginBlacklisted):
+        (WebCore::PluginPackage::determineQuirks):
+        (WebCore::PluginPackage::fetchInfo):
+        (WebCore::PluginPackage::load):
+        (WebCore::PluginPackage::hash):
+        (WebCore::PluginPackage::equal):
+        (WebCore::PluginPackage::NPVersion):
+        * Plugins/PluginQuirkSet.h: Renamed from Source/WebCore/plugins/PluginQuirkSet.h.
+        (WebCore::PluginQuirkSet::PluginQuirkSet):
+        (WebCore::PluginQuirkSet::add):
+        (WebCore::PluginQuirkSet::contains):
+        * Plugins/PluginStream.cpp: Renamed from Source/WebCore/plugins/PluginStream.cpp.
+        (WebCore::streams):
+        (WebCore::PluginStream::PluginStream):
+        (WebCore::PluginStream::~PluginStream):
+        (WebCore::PluginStream::start):
+        (WebCore::PluginStream::stop):
+        (WebCore::lastModifiedDate):
+        (WebCore::PluginStream::startStream):
+        (WebCore::PluginStream::ownerForStream):
+        (WebCore::PluginStream::cancelAndDestroyStream):
+        (WebCore::PluginStream::destroyStream):
+        (WebCore::PluginStream::delayDeliveryTimerFired):
+        (WebCore::PluginStream::deliverData):
+        (WebCore::PluginStream::sendJavaScriptStream):
+        (WebCore::PluginStream::didReceiveResponse):
+        (WebCore::PluginStream::didReceiveData):
+        (WebCore::PluginStream::didFail):
+        (WebCore::PluginStream::didFinishLoading):
+        (WebCore::PluginStream::wantsAllStreams):
+        * Plugins/PluginStream.h: Renamed from Source/WebCore/plugins/PluginStream.h.
+        (WebCore::PluginStreamClient::~PluginStreamClient):
+        (WebCore::PluginStreamClient::streamDidFinishLoading):
+        (WebCore::PluginStream::create):
+        (WebCore::PluginStream::setLoadManually):
+        * Plugins/PluginView.cpp: Renamed from Source/WebCore/plugins/PluginView.cpp.
+        (WebCore::instanceMap):
+        (WebCore::scriptStringIfJavaScriptURL):
+        (WebCore::PluginView::popPopupsStateTimerFired):
+        (WebCore::PluginView::windowClipRect):
+        (WebCore::PluginView::setFrameRect):
+        (WebCore::PluginView::frameRectsChanged):
+        (WebCore::PluginView::clipRectChanged):
+        (WebCore::PluginView::handleEvent):
+        (WebCore::PluginView::init):
+        (WebCore::PluginView::startOrAddToUnstartedList):
+        (WebCore::PluginView::start):
+        (WebCore::PluginView::mediaCanStart):
+        (WebCore::PluginView::~PluginView):
+        (WebCore::PluginView::stop):
+        (WebCore::PluginView::setCurrentPluginView):
+        (WebCore::PluginView::currentPluginView):
+        (WebCore::createUTF8String):
+        (WebCore::PluginView::performRequest):
+        (WebCore::PluginView::requestTimerFired):
+        (WebCore::PluginView::scheduleRequest):
+        (WebCore::PluginView::load):
+        (WebCore::makeURL):
+        (WebCore::PluginView::getURLNotify):
+        (WebCore::PluginView::getURL):
+        (WebCore::PluginView::postURLNotify):
+        (WebCore::PluginView::postURL):
+        (WebCore::PluginView::newStream):
+        (WebCore::PluginView::write):
+        (WebCore::PluginView::destroyStream):
+        (WebCore::PluginView::status):
+        (WebCore::PluginView::setValue):
+        (WebCore::PluginView::invalidateTimerFired):
+        (WebCore::PluginView::pushPopupsEnabledState):
+        (WebCore::PluginView::popPopupsEnabledState):
+        (WebCore::PluginView::arePopupsAllowed):
+        (WebCore::PluginView::setJavaScriptPaused):
+        (WebCore::PluginView::npObject):
+        (WebCore::PluginView::bindingInstance):
+        (WebCore::PluginView::disconnectStream):
+        (WebCore::PluginView::setParameters):
+        (WebCore::PluginView::PluginView):
+        (WebCore::PluginView::focusPluginElement):
+        (WebCore::PluginView::didReceiveResponse):
+        (WebCore::PluginView::didReceiveData):
+        (WebCore::PluginView::didFinishLoading):
+        (WebCore::PluginView::didFail):
+        (WebCore::PluginView::setCallingPlugin):
+        (WebCore::PluginView::isCallingPlugin):
+        (WebCore::PluginView::create):
+        (WebCore::PluginView::freeStringArray):
+        (WebCore::startsWithBlankLine):
+        (WebCore::locationAfterFirstBlankLine):
+        (WebCore::findEOL):
+        (WebCore::capitalizeRFC822HeaderFieldName):
+        (WebCore::parseRFC822HeaderFields):
+        (WebCore::PluginView::handlePost):
+        (WebCore::PluginView::invalidateWindowlessPluginRect):
+        (WebCore::PluginView::paintMissingPluginIcon):
+        (WebCore::PluginView::userAgent):
+        (WebCore::PluginView::userAgentStatic):
+        (WebCore::PluginView::lifeSupportTimerFired):
+        (WebCore::PluginView::keepAlive):
+        (WebCore::PluginView::getValueStatic):
+        (WebCore::PluginView::getValue):
+        (WebCore::getFrame):
+        (WebCore::PluginView::getValueForURL):
+        (WebCore::PluginView::setValueForURL):
+        (WebCore::PluginView::getAuthenticationInfo):
+        (WebCore::PluginView::privateBrowsingStateChanged):
+        * Plugins/PluginView.h: Renamed from Source/WebCore/plugins/PluginView.h.
+        (WebCore::PluginRequest::PluginRequest):
+        (WebCore::PluginRequest::frameLoadRequest):
+        (WebCore::PluginRequest::notifyData):
+        (WebCore::PluginRequest::sendNotification):
+        (WebCore::PluginRequest::shouldAllowPopups):
+        (WebCore::PluginManualLoader::~PluginManualLoader):
+        (WebCore::PluginView::plugin):
+        (WebCore::PluginView::instance):
+        (WebCore::PluginView::status):
+        (WebCore::PluginView::streamDidFinishLoading):
+        (WebCore::PluginView::parentFrame):
+        (WebCore::PluginView::pluginsPage):
+        (WebCore::PluginView::mimeType):
+        (WebCore::PluginView::url):
+        (WebCore::PluginView::pluginWndProc):
+        (WebCore::PluginView::platformPluginWidget):
+        (WebCore::PluginView::setPlatformPluginWidget):
+        (WebCore::toPluginView):
+        * Plugins/PluginViewWin.cpp: Renamed from Source/WebCore/plugins/win/PluginViewWin.cpp.
+        (windowHandleForPageClient):
+        (WebCore::PluginView::hookedBeginPaint):
+        (WebCore::PluginView::hookedEndPaint):
+        (WebCore::hook):
+        (WebCore::setUpOffscreenPaintingHooks):
+        (WebCore::registerPluginView):
+        (WebCore::PluginView::PluginViewWndProc):
+        (WebCore::isWindowsMessageUserGesture):
+        (WebCore::contentsToNativeWindow):
+        (WebCore::PluginView::wndProc):
+        (WebCore::PluginView::updatePluginWidget):
+        (WebCore::PluginView::setFocus):
+        (WebCore::PluginView::show):
+        (WebCore::PluginView::hide):
+        (WebCore::PluginView::dispatchNPEvent):
+        (WebCore::PluginView::paintIntoTransformedContext):
+        (WebCore::PluginView::paintWindowedPluginIntoContext):
+        (WebCore::PluginView::paint):
+        (WebCore::PluginView::handleKeyboardEvent):
+        (WebCore::PluginView::handleMouseEvent):
+        (WebCore::PluginView::setParent):
+        (WebCore::PluginView::setParentVisible):
+        (WebCore::PluginView::setNPWindowRect):
+        (WebCore::PluginView::handlePostReadFile):
+        (WebCore::PluginView::platformGetValueStatic):
+        (WebCore::PluginView::platformGetValue):
+        (WebCore::PluginView::invalidateRect):
+        (WebCore::PluginView::invalidateRegion):
+        (WebCore::PluginView::forceRedraw):
+        (WebCore::PluginView::platformStart):
+        (WebCore::PluginView::platformDestroy):
+        (WebCore::PluginView::snapshot):
+        * Plugins/npapi.cpp: Renamed from Source/WebCore/plugins/npapi.cpp.
+        (pluginViewForInstance):
+        (NPN_MemAlloc):
+        (NPN_MemFree):
+        (NPN_MemFlush):
+        (NPN_ReloadPlugins):
+        (NPN_RequestRead):
+        (NPN_GetURLNotify):
+        (NPN_GetURL):
+        (NPN_PostURLNotify):
+        (NPN_PostURL):
+        (NPN_NewStream):
+        (NPN_Write):
+        (NPN_DestroyStream):
+        (NPN_UserAgent):
+        (NPN_Status):
+        (NPN_InvalidateRect):
+        (NPN_InvalidateRegion):
+        (NPN_ForceRedraw):
+        (NPN_GetValue):
+        (NPN_SetValue):
+        (NPN_GetJavaEnv):
+        (NPN_GetJavaPeer):
+        (NPN_PushPopupsEnabledState):
+        (NPN_PopPopupsEnabledState):
+        (NPN_PluginThreadAsyncCall):
+        (NPN_GetValueForURL):
+        (NPN_SetValueForURL):
+        (NPN_GetAuthenticationInfo):
+        (NPN_PopUpContextMenu):
+
+2015-01-08  Dean Jackson  <dino@apple.com>
+
+        Text not drawn or white-on-white for "Close Page"/"Go Back" button on safe browsing warning page
+        https://bugs.webkit.org/show_bug.cgi?id=140232
+        <rdar://problem/19371010>
+
+        Reviewed by Anders Carlsson.
+
+        Remove the applicationChromeMode setting, but leave stubs in to make
+        sure existing binaries don't break.
+
+        * WebPreferences.cpp:
+        (WebPreferences::initializeDefaultSettings):
+        (WebPreferences::inApplicationChromeMode):
+        (WebPreferences::setApplicationChromeMode):
+        * WebView.cpp:
+        (WebView::notifyPreferencesChanged):
+
+2015-01-07  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] WindowCloseTimer is an ActiveDOMObject and must call suspendIfNeeded
+        https://bugs.webkit.org/show_bug.cgi?id=140184
+        <rdar://problem/19399740>
+
+        Reviewed by Jer Noble.
+
+        This bug was found in fast/loader/stateobjects/popstate-fires-with-page-cache.html
+
+        * WebView.cpp:
+        (WindowCloseTimer::create): Modify to ensure a call to suspendIfNeeded is made
+        during the creation process.
+
+2015-01-07  Zan Dobersek  <zdobersek@igalia.com>
+
+        [TexMap] m_layer member in GraphicsLayerTextureMapper is always non-null
+        https://bugs.webkit.org/show_bug.cgi?id=140135
+
+        Reviewed by Darin Adler.
+
+        GraphicsLayerTextureMapper::layer() now returns a reference,
+        so the call sites are updated.
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        (AcceleratedCompositingContext::initialize):
+        (AcceleratedCompositingContext::startedAnimation):
+        (AcceleratedCompositingContext::compositeLayersToContext):
+
+2015-01-06  Anders Carlsson  <andersca@apple.com>
+
+        Add a WebKit1 database provider
+        https://bugs.webkit.org/show_bug.cgi?id=140126
+
+        Reviewed by Sam Weinig.
+
+        Set the database provider.
+
+        * WebView.cpp:
+        (WebView::initWithFrame):
+
+2015-01-06  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r177963.
+        https://bugs.webkit.org/show_bug.cgi?id=140136
+
+        Caused lots of crashes (Requested by smfr on #webkit).
+
+        Reverted changeset:
+
+        "Add a WebKit1 database provider"
+        https://bugs.webkit.org/show_bug.cgi?id=140126
+        http://trac.webkit.org/changeset/177963
+
+2015-01-06  Anders Carlsson  <andersca@apple.com>
+
+        Add a WebKit1 database provider
+        https://bugs.webkit.org/show_bug.cgi?id=140126
+
+        Reviewed by Sam Weinig.
+
+        Set the database provider.
+
+        * WebView.cpp:
+        (WebView::initWithFrame):
+
+2014-12-29  Anders Carlsson  <andersca@apple.com>
+
+        Another attempt at fixing the build.
+
+        * WebKitDLL.cpp:
+        (shutDownWebKit):
+
+2014-12-29  Anders Carlsson  <andersca@apple.com>
+
+        Try to fix the Windows build.
+
+        * WebKitDLL.cpp:
+        (shutDownWebKit):
+
+2014-12-19  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Crash after failing to create GL context in accelerated compositing mode.
+        https://bugs.webkit.org/show_bug.cgi?id=139830
+
+        Reviewed by Alex Christensen.
+
+        There is missing a null pointer check.
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        (AcceleratedCompositingContext::initialize):
+
+2014-12-19  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Add accessor for serializing HTTP loads.
+        https://bugs.webkit.org/show_bug.cgi?id=139817
+
+        Reviewed by Mark Lam.
+
+        * Interfaces/IWebViewPrivate.idl: Add new method.
+        * WebView.cpp:
+        (WebView::setLoadResourcesSerially): Provide implementation.
+        * WebView.h:
+
+2014-12-18  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Compile error in code for creating GL context.
+        https://bugs.webkit.org/show_bug.cgi?id=139782
+
+        Reviewed by Alex Christensen.
+
+        The GLContext::createContextForWindow method has changed return type to std::unique_ptr.
+
+        * WebCoreSupport/AcceleratedCompositingContext.h:
+
+2014-12-18  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Update DumpRenderTree to more closely match Mac version
+        https://bugs.webkit.org/show_bug.cgi?id=139799
+
+        Reviewed by Tim Horton.
+
+        * Interfaces/IWebSecurityOrigin.idl: Add initializer from URL.
+        * Interfaces/WebKit.idl: Add CLSID so we can instantiate a
+        WebSecurityOrigin from COM.
+        * WebApplicationCache.h: Decorate class declaration with CLSID
+        to support COM introspection.
+        * WebSecurityOrigin.cpp: Get rid of meaningless STDMETHODCALLTYPE
+        declarations inside implementation.
+        (WebSecurityOrigin::QueryInterface):
+        (WebSecurityOrigin::AddRef):
+        (WebSecurityOrigin::Release):
+        (WebSecurityOrigin::protocol):
+        (WebSecurityOrigin::host):
+        (WebSecurityOrigin::port):
+        (WebSecurityOrigin::usage):
+        (WebSecurityOrigin::quota):
+        (WebSecurityOrigin::setQuota):
+        (WebSecurityOrigin::initWithURL): Added.
+        * WebSecurityOrigin.h:
+
+2014-12-18  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Correct Windows tests after Bug 139149.
+        https://bugs.webkit.org/show_bug.cgi?id=139781
+
+        Reviewed by Anders Carlsson.
+
+        * Interfaces/IWebApplicationCache.idl: Added.
+        * Interfaces/WebKit.idl: Add new IDL file.
+        * WebActionPropertyBag.cpp:
+        (WebActionPropertyBag::Read): Remove old debugging message.
+        * WebApplicationCache.cpp: Added.
+        (WebApplicationCache::WebApplicationCache):
+        (WebApplicationCache::~WebApplicationCache):
+        (WebApplicationCache::createInstance):
+        (WebApplicationCache::QueryInterface):
+        (WebApplicationCache::AddRef):
+        (WebApplicationCache::Release):
+        (WebApplicationCache::maximumSize):
+        (WebApplicationCache::setMaximumSize):
+        (WebApplicationCache::defaultOriginQuota):
+        (WebApplicationCache::setDefaultOriginQuota):
+        (WebApplicationCache::diskUsageForOrigin):
+        (WebApplicationCache::deleteAllApplicationCaches):
+        (WebApplicationCache::deleteCacheForOrigin):
+        (WebApplicationCache::originsWithCache):
+        * WebApplicationCache.h: Added.
+        * WebKitClassFactory.cpp: Add new interface header.
+
+2014-12-17  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of FrameLoader::defaultObjectContentType
+        https://bugs.webkit.org/show_bug.cgi?id=139758
+
+        Reviewed by Geoffrey Garen.
+
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebFrameLoaderClient::objectContentType):
+
+2014-12-16  Andreas Kling  <akling@apple.com>
+
+        Use Ref for SecurityOrigin.
+        <https://webkit.org/b/139710>
+
+        Reviewed by Anders Carlsson.
+
+        * WebDatabaseManager.cpp:
+        (WebDatabaseManager::setQuota):
+        * WebView.cpp:
+        (WebView::addOriginAccessWhitelistEntry):
+        (WebView::removeOriginAccessWhitelistEntry):
+
+2014-12-11  Alexey Proskuryakov  <ap@apple.com>
+
+        REGRESSION (Async Text Input): Text input method state is not reset when reloading a page
+        https://bugs.webkit.org/show_bug.cgi?id=139504
+        rdar://problem/19034674
+
+        Reviewed by Enrica Casucci.
+
+        Stub out new client calls, this patch doesn't attempt to make any changes on Windows.
+
+        * WebCoreSupport/WebEditorClient.cpp:
+        (WebEditorClient::discardedComposition):
+        * WebCoreSupport/WebEditorClient.h:
+
+2014-12-10  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of the storage strategy
+        https://bugs.webkit.org/show_bug.cgi?id=139519
+
+        Reviewed by Antti Koivisto.
+
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::createStorageStrategy): Deleted.
+        * WebCoreSupport/WebPlatformStrategies.h:
+
+2014-12-08  Anders Carlsson  <andersca@apple.com>
+
+        Use the new storage namespace provider in WebKit1
+        https://bugs.webkit.org/show_bug.cgi?id=139425
+
+        Reviewed by Tim Horton.
+
+        * WebView.cpp:
+        (localStorageDatabasePath):
+        Helper from getting the local storage database path given a WebPreferences instance.
+
+        (WebView::initWithFrame):
+        Create a storage namespace provider.
+
+2014-12-09  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r177037.
+        https://bugs.webkit.org/show_bug.cgi?id=139464
+
+        broke ~50 API tests (Requested by thorton on #webkit).
+
+        Reverted changeset:
+
+        "Use the new storage namespace provider in WebKit1"
+        https://bugs.webkit.org/show_bug.cgi?id=139425
+        http://trac.webkit.org/changeset/177037
+
+2014-12-08  Anders Carlsson  <andersca@apple.com>
+
+        Use the new storage namespace provider in WebKit1
+        https://bugs.webkit.org/show_bug.cgi?id=139425
+
+        Reviewed by Tim Horton.
+
+        * WebView.cpp:
+        (localStorageDatabasePath):
+        Helper from getting the local storage database path given a WebPreferences instance.
+
+        (WebView::initWithFrame):
+        Create a storage namespace provider.
+
+2014-12-05  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of config.h includes and include config.h in the prefix header instead
+        https://bugs.webkit.org/show_bug.cgi?id=139323
+
+        Reviewed by Brent Fulgham.
+
+        This is making it easier to share code between WebKit1 for Mac and WebKit1 for Windows.
+
+        * AccessibleBase.cpp:
+        * AccessibleDocument.cpp:
+        * AccessibleImage.cpp:
+        * AccessibleTextImpl.cpp:
+        * CFDictionaryPropertyBag.cpp:
+        * DOMCSSClasses.cpp:
+        * DOMCoreClasses.cpp:
+        * DOMEventsClasses.cpp:
+        * DOMHTMLClasses.cpp:
+        * DefaultDownloadDelegate.cpp:
+        * DefaultPolicyDelegate.cpp:
+        * ForEachCoClass.cpp:
+        * FullscreenVideoController.cpp:
+        * MarshallingHelpers.cpp:
+        * MemoryStream.cpp:
+        * WebActionPropertyBag.cpp:
+        * WebArchive.cpp:
+        * WebBackForwardList.cpp:
+        * WebCache.cpp:
+        * WebCoreStatistics.cpp:
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        * WebCoreSupport/EmbeddedWidget.cpp:
+        * WebCoreSupport/WebChromeClient.cpp:
+        * WebCoreSupport/WebContextMenuClient.cpp:
+        * WebCoreSupport/WebDesktopNotificationsDelegate.cpp:
+        * WebCoreSupport/WebDragClient.cpp:
+        * WebCoreSupport/WebEditorClient.cpp:
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        * WebCoreSupport/WebFrameNetworkingContext.cpp:
+        * WebCoreSupport/WebGeolocationClient.cpp:
+        * WebCoreSupport/WebInspectorClient.cpp:
+        * WebCoreSupport/WebInspectorDelegate.cpp:
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        * WebCoreSupport/WebVisitedLinkStore.cpp:
+        * WebDataSource.cpp:
+        * WebDatabaseManager.cpp:
+        * WebDocumentLoader.cpp:
+        * WebDownload.cpp:
+        * WebDownloadCFNet.cpp:
+        * WebDownloadCurl.cpp:
+        * WebDropSource.cpp:
+        * WebElementPropertyBag.cpp:
+        * WebError.cpp:
+        * WebFrame.cpp:
+        * WebFramePolicyListener.cpp:
+        * WebGeolocationPolicyListener.cpp:
+        * WebGeolocationPosition.cpp:
+        * WebHTMLRepresentation.cpp:
+        * WebHistory.cpp:
+        * WebHistoryItem.cpp:
+        * WebIconDatabase.cpp:
+        * WebInspector.cpp:
+        * WebJavaScriptCollector.cpp:
+        * WebKitCOMAPI.cpp:
+        * WebKitClassFactory.cpp:
+        * WebKitDLL.cpp:
+        * WebKitGraphics.cpp:
+        * WebKitLogging.cpp:
+        * WebKitPrefix.h:
+        * WebKitStatistics.cpp:
+        * WebKitSystemBits.cpp:
+        * WebLocalizableStrings.cpp:
+        * WebMutableURLRequest.cpp:
+        * WebNavigationData.cpp:
+        * WebNodeHighlight.cpp:
+        * WebNotification.cpp:
+        * WebNotificationCenter.cpp:
+        * WebPreferences.cpp:
+        * WebResource.cpp:
+        * WebScriptObject.cpp:
+        * WebScriptWorld.cpp:
+        * WebSecurityOrigin.cpp:
+        * WebSerializedJSValue.cpp:
+        * WebTextRenderer.cpp:
+        * WebURLAuthenticationChallenge.cpp:
+        * WebURLAuthenticationChallengeSender.cpp:
+        * WebURLAuthenticationChallengeSenderCFNet.cpp:
+        * WebURLAuthenticationChallengeSenderCurl.cpp:
+        * WebURLCredential.cpp:
+        * WebURLProtectionSpace.cpp:
+        * WebURLResponse.cpp:
+        * WebUserContentURLPattern.cpp:
+        * WebView.cpp:
+        * WebWorkersPrivate.cpp:
+
+2014-12-05  Anders Carlsson  <andersca@apple.com>
+
+        Follow-up build fix.
+
+        * WebCoreSupport/WebVisitedLinkStore.cpp:
+        (WebVisitedLinkStore::shared):
+
+2014-12-04  Anders Carlsson  <andersca@apple.com>
+
+        Don't use NeverDestroyed with a RefCounted object.
+
+        * WebCoreSupport/WebVisitedLinkStore.cpp:
+        (WebVisitedLinkStore::shared):
+
+2014-12-03  peavo@outlook.com  <peavo@outlook.com>
+
+        [TexMap] Redundant method in GraphicsLayerTextureMapper.
+        https://bugs.webkit.org/show_bug.cgi?id=138005
+
+        Reviewed by Alex Christensen.
+
+        The TextureMapperLayer method descendantsOrSelfHaveRunningAnimations() can be used
+        instead of the GraphicsLayerTextureMapper method startedAnimation().
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        (AcceleratedCompositingContext::startedAnimation):
+
+2014-12-02  Anders Carlsson  <andersca@apple.com>
+
+        Remove more Windows cruft
+        https://bugs.webkit.org/show_bug.cgi?id=139189
+
+        Reviewed by Andreas Kling.
+
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebFrameLoaderClient::createNetworkingContext):
+        * WebCoreSupport/WebFrameNetworkingContext.h:
+        (WebFrameNetworkingContext::create):
+        (WebFrameNetworkingContext::WebFrameNetworkingContext):
+        (WebFrameNetworkingContext::userAgent): Deleted.
+
+2014-12-02  Anders Carlsson  <andersca@apple.com>
+
+        Remove visited link handling from PageGroup
+        https://bugs.webkit.org/show_bug.cgi?id=139185
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/WebChromeClient.cpp:
+        (WebChromeClient::populateVisitedLinks): Deleted.
+        * WebCoreSupport/WebChromeClient.h:
+
+2014-12-01  Anders Carlsson  <andersca@apple.com>
+
+        Remove IWebCookieManager on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=139144
+
+        Reviewed by Sam Weinig.
+
+        Remove WebCookieManager.
+
+        * ForEachCoClass.h:
+        * Interfaces/IWebCookieManager.idl: Removed.
+        * Interfaces/WebKit.idl:
+        * WebCookieManager.cpp: Removed.
+        * WebCookieManager.h: Removed.
+        * WebCookieManagerCFNet.cpp: Removed.
+        * WebCookieManagerCurl.cpp: Removed.
+        * WebKitClassFactory.cpp:
+
+2014-11-29  Anders Carlsson  <andersca@apple.com>
+
+        Switch over to using WebVisitedLinkStore on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=139103
+
+        Reviewed by Antti Koivisto.
+
+        * WebCoreSupport/WebChromeClient.cpp:
+        (WebChromeClient::populateVisitedLinks):
+        * WebHistory.cpp:
+        (WebHistory::setOptionalSharedHistory):
+        (WebHistory::removeAllItems):
+        (WebHistory::setVisitedLinkTrackingEnabled):
+        (WebHistory::removeAllVisitedLinks):
+        (WebHistory::removeItemForURLString):
+        (WebHistory::addVisitedLinksToVisitedLinkStore):
+        (WebHistory::addVisitedLinksToPageGroup): Deleted.
+        * WebHistory.h:
+        * WebView.cpp:
+        (WebView::initWithFrame):
+
+2014-11-29  Anders Carlsson  <andersca@apple.com>
+
+        Another build fix.
+
+        * WebHistory.cpp:
+        (WebHistory::addVisitedLinksToVisitedLinkStore):
+
+2014-11-29  Anders Carlsson  <andersca@apple.com>
+
+        Another build fix.
+
+        * WebHistory.cpp:
+        (WebHistory::addVisitedLinksToVisitedLinkStore):
+        (WebHistory::removeAllVisitedLinks): Deleted.
+        (WebHistory::setHistoryItemLimit): Deleted.
+
+2014-11-29  Anders Carlsson  <andersca@apple.com>
+
+        Try to fix build.
+
+        * WebHistory.h:
+
+2014-11-29  Anders Carlsson  <andersca@apple.com>
+
+        Stub out more of WebVisitedLinkStore on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=139098
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/WebVisitedLinkStore.cpp:
+        (WebVisitedLinkStore::WebVisitedLinkStore):
+        Initialize m_visitedLinksPopulated to false.
+
+        (WebVisitedLinkStore::setShouldTrackVisitedLinks):
+        Update s_shouldTrackVisitedLinks and remove all visited links if needed.
+
+        (WebVisitedLinkStore::removeAllVisitedLinks):
+        Remove all hashes from our shared link store.
+
+        (WebVisitedLinkStore::addVisitedLink):
+        Compute the visited link hash and add it to the store.
+
+        (WebVisitedLinkStore::isLinkVisited):
+        Populate visited links and then look up the hash in our hash map.
+
+        (WebVisitedLinkStore::populateVisitedLinksIfNeeded):
+        Call out to the history delegate or populate visited links from shared history.
+
+        (WebVisitedLinkStore::addVisitedLinkHash):
+        Add the hash if we're tracking hashes.
+
+        (WebVisitedLinkStore::removeVisitedLinkHashes):
+        Clear the map.
+
+        * WebCoreSupport/WebVisitedLinkStore.h:
+        Add members.
+
+        * WebHistory.cpp:
+        (WebHistory::addVisitedLinksToVisitedLinkStore):
+        New function that adds visited links from the history to a given store.
+
+        * WebHistory.h:
+        Add new member.
+
+        * WebView.cpp:
+        (WebView::addVisitedLinks):
+        Add links to the visited link store as well.
+
+2014-11-27  Anders Carlsson  <andersca@apple.com>
+
+        Add a stubbed out WebVisitedLinkStore class on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=139078
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/WebVisitedLinkStore.cpp: Added.
+        (WebVisitedLinkStore::shared):
+        (WebVisitedLinkStore::WebVisitedLinkStore):
+        (WebVisitedLinkStore::~WebVisitedLinkStore):
+        (WebVisitedLinkStore::isLinkVisited):
+        (WebVisitedLinkStore::addVisitedLink):
+        * WebCoreSupport/WebVisitedLinkStore.h: Added.
+
+2014-11-24  Anders Carlsson  <andersca@apple.com>
+
+        Stub out user content WebView member functions on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=139033
+
+        Reviewed by Sam Weinig.
+
+        These functions aren't used by any clients and hinder getting rid of PageGroup.
+        If it turns out they're still needed we can copy the user content controller code from Mac Legacy WebKit.
+
+        * WebView.cpp:
+        (WebView::addUserScriptToGroup):
+        (WebView::addUserStyleSheetToGroup):
+        (WebView::removeUserScriptFromGroup):
+        (WebView::removeUserStyleSheetFromGroup):
+        (WebView::removeUserScriptsFromGroup):
+        (WebView::removeUserStyleSheetsFromGroup):
+        (WebView::removeAllUserContentFromGroup):
+        (toStringVector): Deleted.
+
+2014-11-21  Jer Noble  <jer.noble@apple.com>
+
+        Support multiple signatures of diagnostic logging.
+        https://bugs.webkit.org/show_bug.cgi?id=138690
+
+        Reviewed by Anders Carlsson.
+
+        Page::PageClients has been renamed PageConfiguration.
+
+        * WebView.cpp:
+        (WebView::initWithFrame):
+
+2014-11-21  Anders Carlsson  <andersca@apple.com>
+
+        Another Windows build fix.
+
+        * FullscreenVideoController.cpp:
+        (FullscreenVideoController::FullscreenVideoController):
+
+2014-11-21  Anders Carlsson  <andersca@apple.com>
+
+        Remove the Timer parameters from timer callbacks
+        https://bugs.webkit.org/show_bug.cgi?id=138974
+
+        Reviewed by Antti Koivisto.
+
+        * FullscreenVideoController.cpp:
+        (FullscreenVideoController::timerFired):
+        * FullscreenVideoController.h:
+
+2014-11-21  Anders Carlsson  <andersca@apple.com>
+
+        Make memoryCache() return a reference
+        https://bugs.webkit.org/show_bug.cgi?id=138939
+
+        Reviewed by Antti Koivisto.
+
+        * WebCache.cpp:
+        (WebCache::statistics):
+        (WebCache::empty):
+        (WebCache::setDisabled):
+        (WebCache::disabled):
+        * WebView.cpp:
+        (WebView::setCacheModel):
+
+2014-11-16  Zan Dobersek  <zdobersek@igalia.com>
+
+        [TexMap] Add typecasting support for GraphicsLayerTextureMapper
+        https://bugs.webkit.org/show_bug.cgi?id=138741
+
+        Reviewed by Martin Robinson.
+
+        Switch to using downcast<GraphicsLayerTextureMapper>() and replace
+        uses of toTextureMapperLayer() with downcasting and calling
+        the GraphicsLayerTextureMapper::layer() method.
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        (AcceleratedCompositingContext::initialize):
+        (AcceleratedCompositingContext::startedAnimation):
+        (AcceleratedCompositingContext::compositeLayersToContext):
+
+2014-11-12  Chris Dumez  <cdumez@apple.com>
+
+        Have DOMTimer deal with more ScriptExecutionContext references
+        https://bugs.webkit.org/show_bug.cgi?id=138679
+
+        Reviewed by Andreas Kling.
+
+        Update WindowCloseTimer to deal with ScriptExecutionContext references
+        instead of pointers as it subclasses SuspendableTimer and its
+        constructor takes a ScriptExecutionContext& in argument.
+
+        * WebView.cpp:
+        (WindowCloseTimer::create):
+        (WindowCloseTimer::WindowCloseTimer):
+
+2014-11-05  Jer Noble  <jer.noble@apple.com>
+
+        De-templatize Timer
+        https://bugs.webkit.org/show_bug.cgi?id=138450
+
+        Reviewed by Anders Carlsson.
+
+        * FullscreenVideoController.cpp:
+        (FullscreenVideoController::timerFired):
+        * FullscreenVideoController.h:
+
+2014-11-04  Darin Adler  <darin@apple.com>
+
+        Eliminate ResourceBuffer and use SharedBuffer directly instead
+        https://bugs.webkit.org/show_bug.cgi?id=138174
+
+        Reviewed by Antti Koivisto.
+
+        * WebDataSource.cpp:
+        (WebDataSource::data): Use SharedBuffer directly.
+        (WebDataSource::subresourceForURL): Ditto.
+
+2014-11-03  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r175406, r175413, and r175423.
+        https://bugs.webkit.org/show_bug.cgi?id=138327
+
+        Multipart tests are still broken (Requested by ap on #webkit).
+
+        Reverted changesets:
+
+        "Eliminate ResourceBuffer and use SharedBuffer directly
+        instead"
+        https://bugs.webkit.org/show_bug.cgi?id=138174
+        http://trac.webkit.org/changeset/175406
+
+        "Unreviewed, iOS build fix since 175406."
+        http://trac.webkit.org/changeset/175413
+
+        "Fix assertion in CachedResource::addDataBuffer"
+        http://trac.webkit.org/changeset/175423
+
+2014-11-03  Sungmann Cho  <sungmann.cho@navercorp.com>
+
+        AX: Fix some minor typos related to the word "accessibility".
+        https://bugs.webkit.org/show_bug.cgi?id=138299
+
+        Reviewed by Chris Fleizach.
+
+        No new tests, no behavior change.
+
+        * AccessibleBase.h:
+
+2014-10-31  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Use std::unique_ptr for TypeCountSet
+        https://bugs.webkit.org/show_bug.cgi?id=138242
+
+        Reviewed by Andreas Kling.
+
+        * WebCoreStatistics.cpp:
+        (WebCoreStatistics::javaScriptProtectedObjectTypeCounts): Use std::unique_ptr<> instead of OwnPtr.
+        (WebCoreStatistics::javaScriptObjectTypeCounts): ditto.
+
+2014-10-30  Darin Adler  <darin@apple.com>
+
+        Eliminate ResourceBuffer and use SharedBuffer directly instead
+        https://bugs.webkit.org/show_bug.cgi?id=138174
+
+        Reviewed by Antti Koivisto.
+
+        * WebDataSource.cpp:
+        (WebDataSource::data): Use SharedBuffer directly.
+        (WebDataSource::subresourceForURL): Ditto.
+
+2014-10-20  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Crash in ATI display driver in accelerated compositing mode.
+        https://bugs.webkit.org/show_bug.cgi?id=137879
+
+        Reviewed by Darin Adler.
+
+        Speculative fix; don't enable antialiasing when drawing textures.
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        (AcceleratedCompositingContext::initialize):
+
+2014-10-20  Chris Dumez  <cdumez@apple.com>
+
+        Use is<>() / downcast<>() for Accessibility objects
+        https://bugs.webkit.org/show_bug.cgi?id=137286
+
+        Reviewed by Darin Adler.
+
+        Use is<>() / downcast<>() for Accessibility objects.
+
+        * AccessibleBase.cpp:
+        (AccessibleBase::accSelect):
+        * AccessibleImage.cpp:
+        (AccessibleImage::name):
+
+2014-10-18  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Repaint issues with accelerated compositing.
+        https://bugs.webkit.org/show_bug.cgi?id=137850
+
+        Reviewed by Brent Fulgham.
+
+        There is sometimes missing content in accelerated compositing mode.
+        This is caused by not invalidating the non composited layer,
+        and not rendering when a flush did not complete.
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp:
+        (AcceleratedCompositingContext::flushAndRenderLayers): Also render when flush did not complete.
+        (AcceleratedCompositingContext::setNeedsDisplayInRect): Deleted.
+        * WebCoreSupport/AcceleratedCompositingContext.h: Ditto.
+        * WebView.cpp:
+        (WebView::addToDirtyRegion): Invalidate non composited layer.
+        (WebView::flushPendingGraphicsLayerChanges): Flush layers.
+
+2014-10-17  Chris Dumez  <cdumez@apple.com>
+
+        Use is<>() / downcast<>() for RenderBox
+        https://bugs.webkit.org/show_bug.cgi?id=137804
+
+        Reviewed by Andreas Kling.
+
+        Use is<>() / downcast<>() for RenderBox and clean up the surrounding
+        code.
+
+        * WebView.cpp:
+        (WebView::gestureNotify):
+
+2014-10-17  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Accelerated compositing is not implemented.
+        https://bugs.webkit.org/show_bug.cgi?id=137345
+
+        Reviewed by Brent Fulgham.
+
+        This patch is based on GTK, and the texture mapper graphics layer type.
+
+        * WebCoreSupport/AcceleratedCompositingContext.cpp: Added.
+        (WebKit::AcceleratedCompositingContext::AcceleratedCompositingContext):
+        (WebKit::getWebViewSize):
+        (WebKit::AcceleratedCompositingContext::initialize):
+        (WebKit::AcceleratedCompositingContext::~AcceleratedCompositingContext):
+        (WebKit::AcceleratedCompositingContext::stopAnyPendingLayerFlush):
+        (WebKit::AcceleratedCompositingContext::enabled):
+        (WebKit::AcceleratedCompositingContext::prepareForRendering):
+        (WebKit::AcceleratedCompositingContext::startedAnimation):
+        (WebKit::AcceleratedCompositingContext::compositeLayersToContext):
+        (WebKit::AcceleratedCompositingContext::setRootCompositingLayer):
+        (WebKit::AcceleratedCompositingContext::setNonCompositedContentsNeedDisplay):
+        (WebKit::AcceleratedCompositingContext::setNeedsDisplayInRect):
+        (WebKit::AcceleratedCompositingContext::resizeRootLayer):
+        (WebKit::AcceleratedCompositingContext::scrollNonCompositedContents):
+        (WebKit::AcceleratedCompositingContext::scheduleLayerFlush):
+        (WebKit::AcceleratedCompositingContext::flushPendingLayerChanges):
+        (WebKit::AcceleratedCompositingContext::flushPendingLayerChangesSoon):
+        (WebKit::AcceleratedCompositingContext::flushAndRenderLayers):
+        (WebKit::AcceleratedCompositingContext::layerFlushTimerFired):
+        (WebKit::AcceleratedCompositingContext::notifyAnimationStarted):
+        (WebKit::AcceleratedCompositingContext::notifyFlushRequired):
+        (WebKit::AcceleratedCompositingContext::paintContents):
+        * WebCoreSupport/AcceleratedCompositingContext.h: Added.
+        (WebKit::AcceleratedCompositingContext::LayerFlushTimer::LayerFlushTimer):
+        (WebKit::AcceleratedCompositingContext::LayerFlushTimer::fired):
+        * WebView.cpp:
+        (WebView::WebView):
+        (WebView::addToDirtyRegion):
+        (WebView::scrollBackingStore):
+        (WebView::sizeChanged):
+        (WebView::paint):
+        (WebView::setRootChildLayer):
+        (WebView::flushPendingGraphicsLayerChangesSoon):
+        (WebView::setAcceleratedCompositing):
+        * WebView.h:
+
+2014-10-16  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r174754.
+        https://bugs.webkit.org/show_bug.cgi?id=137789
+
+        Speculative fix for Windows test was ineffective. (Requested
+        by rfong on #webkit).
+
+        Reverted changeset:
+
+        "[Windows] Add some more logging to debug Windows test
+        issues."
+        http://trac.webkit.org/changeset/174754
+
+2014-10-15  Roger Fong  <roger_fong@apple.com>
+
+        [Windows] Add some more logging to debug Windows test issues.
+
+        * WebActionPropertyBag.cpp:
+        (WebActionPropertyBag::Read):
+
+2014-10-14  Roger Fong  <roger_fong@apple.com>
+
+        [Windows] Add some logging to debug random crashing when running layout tests on Windows.
+
+        * WebActionPropertyBag.cpp:
+        (WebActionPropertyBag::Read):
+
+2014-10-13  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Implement a page load profiling tool
+        https://bugs.webkit.org/show_bug.cgi?id=137673
+
+        Reviewed by Dean Jackson.
+
+        Add a new predicate (isMainFrame) to the IWebFrame interface so
+        that we can make decisions about a frames position in the page
+        load hierarchy in client programs.
+
+        * Interfaces/IWebFrame.idl: Added new isMainFrame
+        predicate to interface definition.
+        * WebFrame.cpp:
+        (WebFrame::isMainFrame): Added.
+        * WebFrame.h:
+
+2014-10-13  Chris Dumez  <cdumez@apple.com>
+
+        Use is<>() / downcast<>() for PlatformCALayer subclasses
+        https://bugs.webkit.org/show_bug.cgi?id=137661
+
+        Reviewed by Simon Fraser.
+
+        Use is<>() / downcast<>() for PlatformCALayer subclasses and clean up 
+        the surrounding code.
+
+        * FullscreenVideoController.cpp:
+        (FullscreenVideoController::enterFullscreen):
+
+2014-10-10  Chris Dumez  <cdumez@apple.com>
+
+        Use is<>() / downcast<>() for RenderElement
+        https://bugs.webkit.org/show_bug.cgi?id=137622
+
+        Reviewed by Benjamin Poulain.
+
+        Use is<>() / downcast<>() for RenderElement and clean up the
+        surrounding code.
+
+        * WebFrame.cpp:
+        (WebFrame::pauseAnimation):
+        (WebFrame::pauseTransition):
+
 2014-10-09  Chris Dumez  <cdumez@apple.com>
 
         Use is<>() / downcast<>() for Widget subclasses

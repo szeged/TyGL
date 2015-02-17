@@ -37,6 +37,7 @@
 #import "RemoteScrollingCoordinatorTransaction.h"
 #import "WebPage.h"
 #import "WebProcess.h"
+#import <WebCore/DebugPageOverlays.h>
 #import <WebCore/Frame.h>
 #import <WebCore/FrameView.h>
 #import <WebCore/MainFrame.h>
@@ -57,7 +58,7 @@ RemoteLayerTreeDrawingArea::RemoteLayerTreeDrawingArea(WebPage& webPage, const W
     , m_rootLayer(GraphicsLayer::create(graphicsLayerFactory(), *this))
     , m_exposedRect(FloatRect::infiniteRect())
     , m_scrolledExposedRect(FloatRect::infiniteRect())
-    , m_layerFlushTimer(this, &RemoteLayerTreeDrawingArea::layerFlushTimerFired)
+    , m_layerFlushTimer(*this, &RemoteLayerTreeDrawingArea::layerFlushTimerFired)
     , m_isFlushingSuspended(false)
     , m_hasDeferredFlush(false)
     , m_isThrottlingLayerFlushes(false)
@@ -169,6 +170,9 @@ void RemoteLayerTreeDrawingArea::updatePreferences(const WebPreferencesStore&)
     settings.setFixedPositionCreatesStackingContext(true);
 
     m_rootLayer->setShowDebugBorder(settings.showDebugBorders());
+
+    if (MainFrame* mainFrame = m_webPage.mainFrame())
+        DebugPageOverlays::settingsChanged(*mainFrame);
 }
 
 #if PLATFORM(IOS)
@@ -309,7 +313,7 @@ bool RemoteLayerTreeDrawingArea::adjustLayerFlushThrottling(WebCore::LayerFlushT
     return true;
 }
 
-void RemoteLayerTreeDrawingArea::layerFlushTimerFired(WebCore::Timer<RemoteLayerTreeDrawingArea>*)
+void RemoteLayerTreeDrawingArea::layerFlushTimerFired()
 {
     flushLayers();
 }
@@ -351,7 +355,7 @@ void RemoteLayerTreeDrawingArea::flushLayers()
     RemoteLayerTreeTransaction layerTransaction;
     layerTransaction.setTransactionID(takeNextTransactionID());
     layerTransaction.setCallbackIDs(WTF::move(m_pendingCallbackIDs));
-    m_remoteLayerTreeContext->buildTransaction(layerTransaction, *toGraphicsLayerCARemote(m_rootLayer.get())->platformCALayer());
+    m_remoteLayerTreeContext->buildTransaction(layerTransaction, *downcast<GraphicsLayerCARemote>(*m_rootLayer).platformCALayer());
     backingStoreCollection.willCommitLayerTree(layerTransaction);
     m_webPage.willCommitLayerTree(layerTransaction);
 
@@ -389,14 +393,14 @@ void RemoteLayerTreeDrawingArea::flushLayers()
     if (hadAnyChangedBackingStore)
         backingStoreCollection.scheduleVolatilityTimer();
 
-    RefPtr<BackingStoreFlusher> backingStoreFlusher = BackingStoreFlusher::create(WebProcess::shared().parentProcessConnection(), WTF::move(commitEncoder), WTF::move(contextsToFlush));
+    RefPtr<BackingStoreFlusher> backingStoreFlusher = BackingStoreFlusher::create(WebProcess::singleton().parentProcessConnection(), WTF::move(commitEncoder), WTF::move(contextsToFlush));
     m_pendingBackingStoreFlusher = backingStoreFlusher;
 
     uint64_t pageID = m_webPage.pageID();
     dispatch_async(m_commitQueue, [backingStoreFlusher, pageID] {
         backingStoreFlusher->flush();
 
-        if (WebPage *webPage = WebProcess::shared().webPage(pageID)) {
+        if (WebPage *webPage = WebProcess::singleton().webPage(pageID)) {
             std::chrono::milliseconds timestamp = std::chrono::milliseconds(static_cast<std::chrono::milliseconds::rep>(monotonicallyIncreasingTime() * 1000));
             dispatch_async(dispatch_get_main_queue(), ^{
                 webPage->didFlushLayerTreeAtTime(timestamp);
@@ -463,7 +467,7 @@ void RemoteLayerTreeDrawingArea::BackingStoreFlusher::flush()
     m_connection->sendMessage(WTF::move(m_commitEncoder));
 }
 
-void RemoteLayerTreeDrawingArea::viewStateDidChange(ViewState::Flags, bool wantsDidUpdateViewState)
+void RemoteLayerTreeDrawingArea::viewStateDidChange(ViewState::Flags, bool wantsDidUpdateViewState, const Vector<uint64_t>&)
 {
     // FIXME: Should we suspend painting while not visible, like TiledCoreAnimationDrawingArea? Probably.
 

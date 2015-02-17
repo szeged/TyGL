@@ -49,8 +49,8 @@ namespace WebCore {
 
 LinkLoader::LinkLoader(LinkLoaderClient* client)
     : m_client(client)
-    , m_linkLoadTimer(this, &LinkLoader::linkLoadTimerFired)
-    , m_linkLoadingErrorTimer(this, &LinkLoader::linkLoadingErrorTimerFired)
+    , m_linkLoadTimer(*this, &LinkLoader::linkLoadTimerFired)
+    , m_linkLoadingErrorTimer(*this, &LinkLoader::linkLoadingErrorTimerFired)
 {
 }
 
@@ -60,15 +60,13 @@ LinkLoader::~LinkLoader()
         m_cachedLinkResource->removeClient(this);
 }
 
-void LinkLoader::linkLoadTimerFired(Timer<LinkLoader>& timer)
+void LinkLoader::linkLoadTimerFired()
 {
-    ASSERT_UNUSED(timer, &timer == &m_linkLoadTimer);
     m_client->linkLoaded();
 }
 
-void LinkLoader::linkLoadingErrorTimerFired(Timer<LinkLoader>& timer)
+void LinkLoader::linkLoadingErrorTimerFired()
 {
-    ASSERT_UNUSED(timer, &timer == &m_linkLoadingErrorTimer);
     m_client->linkLoadingErrored();
 }
 
@@ -107,7 +105,7 @@ bool LinkLoader::loadLink(const LinkRelAttribute& relAttribute, const String& ty
     if ((relAttribute.m_isLinkPrefetch || relAttribute.m_isLinkSubresource) && href.isValid() && document->frame()) {
         if (!m_client->shouldLoadLink())
             return false;
-        ResourceLoadPriority priority = ResourceLoadPriorityUnresolved;
+        Optional<ResourceLoadPriority> priority;
         CachedResource::Type type = CachedResource::LinkPrefetch;
         // We only make one request to the cachedresourcelodaer if multiple rel types are
         // specified, 
@@ -119,9 +117,9 @@ bool LinkLoader::loadLink(const LinkRelAttribute& relAttribute, const String& ty
         
         if (m_cachedLinkResource) {
             m_cachedLinkResource->removeClient(this);
-            m_cachedLinkResource = 0;
+            m_cachedLinkResource = nullptr;
         }
-        m_cachedLinkResource = document->cachedResourceLoader()->requestLinkResource(type, linkRequest);
+        m_cachedLinkResource = document->cachedResourceLoader().requestLinkResource(type, linkRequest);
         if (m_cachedLinkResource)
             m_cachedLinkResource->addClient(this);
     }

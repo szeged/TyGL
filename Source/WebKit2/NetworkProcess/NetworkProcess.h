@@ -53,7 +53,7 @@ class NetworkProcess : public ChildProcess, private DownloadManager::Client {
     friend class NeverDestroyed<NetworkProcess>;
     friend class NeverDestroyed<DownloadManager>;
 public:
-    static NetworkProcess& shared();
+    static NetworkProcess& singleton();
 
     template <typename T>
     T* supplement()
@@ -95,10 +95,12 @@ private:
     virtual bool shouldTerminate() override;
 
     // IPC::Connection::Client
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
-    virtual void didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
-    virtual void didClose(IPC::Connection*) override;
-    virtual void didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    virtual void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
+    virtual void didClose(IPC::Connection&) override;
+    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::Network; }
+    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::UI; }
 
     // DownloadManager::Client
     virtual void didCreateDownload() override;
@@ -107,12 +109,19 @@ private:
     virtual AuthenticationManager& downloadsAuthenticationManager() override;
 
     // Message Handlers
-    void didReceiveNetworkProcessMessage(IPC::Connection*, IPC::MessageDecoder&);
+    void didReceiveNetworkProcessMessage(IPC::Connection&, IPC::MessageDecoder&);
     void initializeNetworkProcess(const NetworkProcessCreationParameters&);
     void createNetworkConnectionToWebProcess();
     void ensurePrivateBrowsingSession(WebCore::SessionID);
     void destroyPrivateBrowsingSession(WebCore::SessionID);
+
+    void deleteWebsiteData(WebCore::SessionID, uint64_t websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID);
+
+    // FIXME: This should take a session ID so we can identify which disk cache to delete.
+    void clearDiskCache(std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
+
     void downloadRequest(uint64_t downloadID, const WebCore::ResourceRequest&);
+    void resumeDownload(uint64_t downloadID, const IPC::DataReference& resumeData, const String& path, const SandboxExtension::Handle&);
     void cancelDownload(uint64_t downloadID);
     void setCacheModel(uint32_t);
     void allowSpecificHTTPSCertificateForHost(const WebCore::CertificateInfo&, const String& host);
@@ -136,6 +145,7 @@ private:
     String m_diskCacheDirectory;
     bool m_hasSetCacheModel;
     CacheModel m_cacheModel;
+    bool m_diskCacheIsDisabledForTesting;
     bool m_canHandleHTTPSServerTrustEvaluation;
 
     typedef HashMap<const char*, std::unique_ptr<NetworkProcessSupplement>, PtrHash<const char*>> NetworkProcessSupplementMap;

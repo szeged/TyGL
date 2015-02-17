@@ -49,9 +49,9 @@ AccessibilityImageMapLink::~AccessibilityImageMapLink()
 {
 }    
 
-PassRefPtr<AccessibilityImageMapLink> AccessibilityImageMapLink::create()
+Ref<AccessibilityImageMapLink> AccessibilityImageMapLink::create()
 {
-    return adoptRef(new AccessibilityImageMapLink());
+    return adoptRef(*new AccessibilityImageMapLink());
 }
 
 AccessibilityObject* AccessibilityImageMapLink::parentObject() const
@@ -140,8 +140,8 @@ RenderElement* AccessibilityImageMapLink::imageMapLinkRenderer() const
         return nullptr;
 
     RenderElement* renderer = nullptr;
-    if (m_parent && m_parent->isAccessibilityRenderObject())
-        renderer = toRenderElement(toAccessibilityRenderObject(m_parent)->renderer());
+    if (is<AccessibilityRenderObject>(m_parent))
+        renderer = downcast<RenderElement>(downcast<AccessibilityRenderObject>(*m_parent).renderer());
     else
         renderer = m_mapElement->renderer();
     

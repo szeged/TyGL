@@ -84,8 +84,8 @@ inline SVGSVGElement::SVGSVGElement(const QualifiedName& tagName, Document& docu
     : SVGGraphicsElement(tagName, document)
     , m_x(LengthModeWidth)
     , m_y(LengthModeHeight)
-    , m_width(LengthModeWidth, "100%")
-    , m_height(LengthModeHeight, "100%") 
+    , m_width(LengthModeWidth, ASCIILiteral("100%"))
+    , m_height(LengthModeHeight, ASCIILiteral("100%"))
     , m_useCurrentView(false)
     , m_zoomAndPan(SVGZoomAndPanMagnify)
     , m_timeContainer(SMILTimeContainer::create(this))
@@ -95,9 +95,9 @@ inline SVGSVGElement::SVGSVGElement(const QualifiedName& tagName, Document& docu
     document.registerForPageCacheSuspensionCallbacks(this);
 }
 
-PassRefPtr<SVGSVGElement> SVGSVGElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGSVGElement> SVGSVGElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGSVGElement(tagName, document));
+    return adoptRef(*new SVGSVGElement(tagName, document));
 }
 
 SVGSVGElement::~SVGSVGElement()
@@ -257,11 +257,23 @@ void SVGSVGElement::parseAttribute(const QualifiedName& name, const AtomicString
         setXBaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::yAttr)
         setYBaseValue(SVGLength::construct(LengthModeHeight, value, parseError));
-    else if (name == SVGNames::widthAttr)
-        setWidthBaseValue(SVGLength::construct(LengthModeWidth, value, parseError, ForbidNegativeLengths));
-    else if (name == SVGNames::heightAttr)
-        setHeightBaseValue(SVGLength::construct(LengthModeHeight, value, parseError, ForbidNegativeLengths));
-    else if (SVGLangSpace::parseAttribute(name, value)
+    else if (name == SVGNames::widthAttr) {
+        SVGLength length = SVGLength::construct(LengthModeWidth, value, parseError, ForbidNegativeLengths);
+        if (parseError != NoError || value.isEmpty()) {
+            // FIXME: This is definitely the correct behavior for a missing/removed attribute.
+            // Not sure it's correct for the empty string or for something that can't be parsed.
+            length = SVGLength(LengthModeWidth, ASCIILiteral("100%"));
+        }
+        setWidthBaseValue(length);
+    } else if (name == SVGNames::heightAttr) {
+        SVGLength length = SVGLength::construct(LengthModeHeight, value, parseError, ForbidNegativeLengths);
+        if (parseError != NoError || value.isEmpty()) {
+            // FIXME: This is definitely the correct behavior for a removed attribute.
+            // Not sure it's correct for the empty string or for something that can't be parsed.
+            length = SVGLength(LengthModeHeight, ASCIILiteral("100%"));
+        }
+        setHeightBaseValue(length);
+    } else if (SVGLangSpace::parseAttribute(name, value)
                || SVGExternalResourcesRequired::parseAttribute(name, value)
                || SVGFitToViewBox::parseAttribute(this, name, value)
                || SVGZoomAndPan::parseAttribute(this, name, value)) {
@@ -288,7 +300,7 @@ void SVGSVGElement::svgAttributeChanged(const QualifiedName& attrName)
             object->setNeedsTransformUpdate();
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (updateRelativeLengthsOrViewBox
         || SVGLangSpace::isKnownAttribute(attrName)
@@ -423,7 +435,7 @@ AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMSc
         SVGLengthContext lengthContext(this);
         transform.translate(x().value(lengthContext), y().value(lengthContext));
     } else if (mode == SVGLocatable::ScreenScope) {
-        if (RenderObject* renderer = this->renderer()) {
+        if (RenderElement* renderer = this->renderer()) {
             FloatPoint location;
             float zoomFactor = 1;
 
@@ -431,8 +443,8 @@ AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMSc
             // to map an element from SVG viewport coordinates to CSS box coordinates.
             // RenderSVGRoot's localToAbsolute method expects CSS box coordinates.
             // We also need to adjust for the zoom level factored into CSS coordinates (bug #96361).
-            if (renderer->isSVGRoot()) {
-                location = toRenderSVGRoot(renderer)->localToBorderBoxTransform().mapPoint(location);
+            if (is<RenderSVGRoot>(*renderer)) {
+                location = downcast<RenderSVGRoot>(*renderer).localToBorderBoxTransform().mapPoint(location);
                 zoomFactor = 1 / renderer->style().effectiveZoom();
             }
 
@@ -470,7 +482,7 @@ bool SVGSVGElement::rendererIsNeeded(const RenderStyle& style)
     return StyledElement::rendererIsNeeded(style);
 }
 
-RenderPtr<RenderElement> SVGSVGElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGSVGElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     if (isOutermostSVGSVGElement())
         return createRenderer<RenderSVGRoot>(*this, WTF::move(style));
@@ -546,9 +558,9 @@ FloatRect SVGSVGElement::currentViewBoxRect() const
     FloatRect useViewBox = viewBox();
     if (!useViewBox.isEmpty())
         return useViewBox;
-    if (!renderer() || !renderer()->isSVGRoot())
+    if (!is<RenderSVGRoot>(renderer()))
         return FloatRect();
-    if (!toRenderSVGRoot(renderer())->isEmbeddedThroughSVGImage())
+    if (!downcast<RenderSVGRoot>(*renderer()).isEmbeddedThroughSVGImage())
         return FloatRect();
 
     Length intrinsicWidth = this->intrinsicWidth();
@@ -572,12 +584,12 @@ FloatSize SVGSVGElement::currentViewportSize() const
     if (!renderer())
         return FloatSize();
 
-    if (renderer()->isSVGRoot()) {
-        LayoutRect contentBoxRect = toRenderSVGRoot(renderer())->contentBoxRect();
+    if (is<RenderSVGRoot>(*renderer())) {
+        LayoutRect contentBoxRect = downcast<RenderSVGRoot>(*renderer()).contentBoxRect();
         return FloatSize(contentBoxRect.width() / renderer()->style().effectiveZoom(), contentBoxRect.height() / renderer()->style().effectiveZoom());
     }
 
-    FloatRect viewportRect = toRenderSVGViewportContainer(renderer())->viewport();
+    FloatRect viewportRect = downcast<RenderSVGViewportContainer>(*renderer()).viewport();
     return FloatSize(viewportRect.width(), viewportRect.height());
 }
 

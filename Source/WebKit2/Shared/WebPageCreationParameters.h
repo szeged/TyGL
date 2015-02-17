@@ -66,6 +66,7 @@ struct WebPageCreationParameters {
 
     bool drawsBackground;
     bool drawsTransparentBackground;
+    bool isEditable;
 
     WebCore::Color underlayColor;
 
@@ -87,6 +88,7 @@ struct WebPageCreationParameters {
 
     uint64_t userContentControllerID;
     uint64_t visitedLinkTableID;
+    uint64_t websiteDataStoreID;
     bool canRunBeforeUnloadConfirmPanel;
     bool canRunModal;
 
@@ -95,6 +97,7 @@ struct WebPageCreationParameters {
     float topContentInset;
     
     float mediaVolume;
+    bool muted;
     bool mayStartMediaWhenInWindow;
 
     WebCore::IntSize minimumLayoutSize;

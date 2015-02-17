@@ -45,7 +45,7 @@ class SpellChecker;
 
 class SpellCheckRequest : public TextCheckingRequest {
 public:
-    static PassRefPtr<SpellCheckRequest> create(TextCheckingTypeMask, TextCheckingProcessType, PassRefPtr<Range> checkingRange, PassRefPtr<Range> paragraphRange);
+    static RefPtr<SpellCheckRequest> create(TextCheckingTypeMask, TextCheckingProcessType, PassRefPtr<Range> checkingRange, PassRefPtr<Range> paragraphRange);
     virtual ~SpellCheckRequest();
 
     PassRefPtr<Range> checkingRange() const { return m_checkingRange; }
@@ -98,7 +98,7 @@ private:
 
     bool canCheckAsynchronously(Range*) const;
     TextCheckerClient* client() const;
-    void timerFiredToProcessQueuedRequest(Timer<SpellChecker>*);
+    void timerFiredToProcessQueuedRequest();
     void invokeRequest(PassRefPtr<SpellCheckRequest>);
     void enqueueRequest(PassRefPtr<SpellCheckRequest>);
     void didCheckSucceed(int sequence, const Vector<TextCheckingResult>&);
@@ -109,7 +109,7 @@ private:
     int m_lastRequestSequence;
     int m_lastProcessedSequence;
 
-    Timer<SpellChecker> m_timerToProcessQueuedRequest;
+    Timer m_timerToProcessQueuedRequest;
 
     RefPtr<SpellCheckRequest> m_processingRequest;
     RequestQueue m_requestQueue;

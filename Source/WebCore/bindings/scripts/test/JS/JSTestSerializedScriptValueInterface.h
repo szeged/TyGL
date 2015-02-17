@@ -31,9 +31,9 @@ namespace WebCore {
 class JSTestSerializedScriptValueInterface : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestSerializedScriptValueInterface* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestSerializedScriptValueInterface> impl)
+    static JSTestSerializedScriptValueInterface* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestSerializedScriptValueInterface>&& impl)
     {
-        JSTestSerializedScriptValueInterface* ptr = new (NotNull, JSC::allocateCell<JSTestSerializedScriptValueInterface>(globalObject->vm().heap)) JSTestSerializedScriptValueInterface(structure, globalObject, impl);
+        JSTestSerializedScriptValueInterface* ptr = new (NotNull, JSC::allocateCell<JSTestSerializedScriptValueInterface>(globalObject->vm().heap)) JSTestSerializedScriptValueInterface(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -70,7 +70,7 @@ public:
 private:
     TestSerializedScriptValueInterface* m_impl;
 protected:
-    JSTestSerializedScriptValueInterface(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestSerializedScriptValueInterface>);
+    JSTestSerializedScriptValueInterface(JSC::Structure*, JSDOMGlobalObject*, Ref<TestSerializedScriptValueInterface>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -92,12 +92,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestSerializedScript
     return &jsTestSerializedScriptValueInterfaceOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestSerializedScriptValueInterface*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestSerializedScriptValueInterface*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestSerializedScriptValueInterface& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

@@ -139,6 +139,14 @@ HRESULT FrameLoadDelegate::didReceiveServerRedirectForProvisionalLoadForFrame(IW
     return S_OK;
 }
 
+HRESULT FrameLoadDelegate::didChangeLocationWithinPageForFrame(IWebView* , IWebFrame* frame)
+{
+    if (!done && gTestRunner->dumpFrameLoadCallbacks())
+        printf("%s - didChangeLocationWithinPageForFrame\n", descriptionSuitableForTestResult(frame).c_str());
+
+    return S_OK;
+}
+
 HRESULT FrameLoadDelegate::didFailProvisionalLoadWithError(IWebView* /*webView*/, IWebError* error, IWebFrame* frame)
 {
     if (!done && gTestRunner->dumpFrameLoadCallbacks())
@@ -189,7 +197,7 @@ void FrameLoadDelegate::processWork()
         return;
 
     // if we finish all the commands, we're ready to dump state
-    if (WorkQueue::shared()->processWork() && !::gTestRunner->waitToDump())
+    if (WorkQueue::singleton().processWork() && !::gTestRunner->waitToDump())
         dump();
 }
 
@@ -225,13 +233,14 @@ void FrameLoadDelegate::locationChangeDone(IWebError*, IWebFrame* frame)
     if (frame != topLoadingFrame)
         return;
 
-    topLoadingFrame = 0;
-    WorkQueue::shared()->setFrozen(true);
+    topLoadingFrame = nullptr;
+    auto& workQueue = WorkQueue::singleton();
+    workQueue.setFrozen(true);
 
     if (::gTestRunner->waitToDump())
         return;
 
-    if (WorkQueue::shared()->count()) {
+    if (workQueue.count()) {
         if (!processWorkTimerID)
             processWorkTimerID = ::SetTimer(0, 0, 0, processWorkTimer);
         delegatesWithDelayedWork().append(this);
@@ -280,6 +289,16 @@ HRESULT FrameLoadDelegate::didCancelClientRedirectForFrame(IWebView* /*webView*/
 HRESULT FrameLoadDelegate::willCloseFrame(IWebView* /*webView*/, IWebFrame* /*frame*/)
 {
     return E_NOTIMPL;
+}
+
+HRESULT FrameLoadDelegate::windowScriptObjectAvailable(IWebView*, JSContextRef, JSObjectRef)
+{
+    if (!done && gTestRunner->dumpFrameLoadCallbacks())
+        printf("?? - windowScriptObjectAvailable\n");
+
+    ASSERT_NOT_REACHED();
+
+    return S_OK;
 }
 
 HRESULT FrameLoadDelegate::didClearWindowObject(IWebView*, JSContextRef, JSObjectRef, IWebFrame*)

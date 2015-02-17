@@ -12,6 +12,7 @@ function Controller(root, video, host)
     this.listeners = {};
     this.isLive = false;
     this.statusHidden = true;
+    this.hasVisualMedia = false;
 
     this.addVideoListeners();
     this.createBase();
@@ -26,7 +27,7 @@ function Controller(root, video, host)
     this.updateThumbnail();
     this.updateCaptionButton();
     this.updateCaptionContainer();
-    this.updateFullscreenButton();
+    this.updateFullscreenButtons();
     this.updateVolume();
     this.updateHasAudio();
     this.updateHasVideo();
@@ -152,7 +153,7 @@ Controller.prototype = {
 
     addVideoListeners: function()
     {
-        for (name in this.HandledVideoEvents) {
+        for (var name in this.HandledVideoEvents) {
             this.listenFor(this.video, name, this.HandledVideoEvents[name]);
         };
 
@@ -178,7 +179,7 @@ Controller.prototype = {
 
     removeVideoListeners: function()
     {
-        for (name in this.HandledVideoEvents) {
+        for (var name in this.HandledVideoEvents) {
             this.stopListeningFor(this.video, name, this.HandledVideoEvents[name]);
         };
 
@@ -249,6 +250,9 @@ Controller.prototype = {
 
     shouldHaveControls: function()
     {
+        if (!this.isAudio() && !this.host.mediaPlaybackAllowsInline)
+            return true;
+
         return this.video.controls || this.isFullScreen();
     },
 
@@ -282,9 +286,6 @@ Controller.prototype = {
 
     createControls: function()
     {
-        var panelCompositedParent = this.controls.panelCompositedParent = document.createElement('div');
-        panelCompositedParent.setAttribute('pseudo', '-webkit-media-controls-panel-composited-parent');
-
         var panel = this.controls.panel = document.createElement('div');
         panel.setAttribute('pseudo', '-webkit-media-controls-panel');
         panel.setAttribute('aria-label', (this.isAudio() ? this.UIString('Audio Playback') : this.UIString('Video Playback')));
@@ -333,7 +334,9 @@ Controller.prototype = {
         timeline.setAttribute('pseudo', '-webkit-media-controls-timeline');
         timeline.setAttribute('aria-label', this.UIString('Duration'));
         timeline.type = 'range';
-        this.listenFor(timeline, 'input', this.handleTimelineChange);
+        timeline.value = 0;
+        this.listenFor(timeline, 'input', this.handleTimelineInput);
+        this.listenFor(timeline, 'change', this.handleTimelineChange);
         this.listenFor(timeline, 'mouseover', this.handleTimelineMouseOver);
         this.listenFor(timeline, 'mouseout', this.handleTimelineMouseOut);
         this.listenFor(timeline, 'mousemove', this.handleTimelineMouseMove);
@@ -384,7 +387,7 @@ Controller.prototype = {
         volume.min = 0;
         volume.max = 1;
         volume.step = .01;
-        this.listenFor(volume, 'change', this.handleVolumeSliderChange);
+        this.listenFor(volume, 'input', this.handleVolumeSliderInput);
 
         var captionButton = this.controls.captionButton = document.createElement('button');
         captionButton.setAttribute('pseudo', '-webkit-media-controls-toggle-closed-captions-button');
@@ -396,6 +399,11 @@ Controller.prototype = {
         fullscreenButton.setAttribute('pseudo', '-webkit-media-controls-fullscreen-button');
         fullscreenButton.setAttribute('aria-label', this.UIString('Display Full Screen'));
         this.listenFor(fullscreenButton, 'click', this.handleFullscreenButtonClicked);
+
+        var optimizedFullscreenButton = this.controls.optimizedFullscreenButton = document.createElement('button');
+        optimizedFullscreenButton.setAttribute('pseudo', '-webkit-media-controls-optimized-fullscreen-button');
+        optimizedFullscreenButton.setAttribute('aria-label', this.UIString('Display Optimized Full Screen'));
+        this.listenFor(optimizedFullscreenButton, 'click', this.handleOptimizedFullscreenButtonClicked);
     },
 
     setControlsType: function(type)
@@ -433,7 +441,7 @@ Controller.prototype = {
 
     disconnectControls: function(event)
     {
-        for (item in this.controls) {
+        for (var item in this.controls) {
             var control = this.controls[item];
             if (control && control.parentNode)
                 control.parentNode.removeChild(control);
@@ -550,11 +558,12 @@ Controller.prototype = {
 
     handleReadyStateChange: function(event)
     {
+        this.hasVisualMedia = this.video.videoTracks && this.video.videoTracks.length > 0;
         this.updateReadyState();
         this.updateDuration();
         this.updateCaptionButton();
         this.updateCaptionContainer();
-        this.updateFullscreenButton();
+        this.updateFullscreenButtons();
         this.updateProgress();
     },
 
@@ -567,8 +576,8 @@ Controller.prototype = {
     handleDurationChange: function(event)
     {
         this.updateDuration();
-        this.updateTime();
-        this.updateProgress();
+        this.updateTime(true);
+        this.updateProgress(true);
     },
 
     handlePlay: function(event)
@@ -739,9 +748,14 @@ Controller.prototype = {
         return true;
     },
 
-    handleTimelineChange: function(event)
+    handleTimelineInput: function(event)
     {
         this.video.fastSeek(this.controls.timeline.value);
+    },
+
+    handleTimelineChange: function(event)
+    {
+        this.video.currentTime = this.controls.timeline.value;
     },
 
     handleTimelineDown: function(event)
@@ -803,9 +817,6 @@ Controller.prototype = {
     handleTimelineMouseUp: function(event)
     {
         this.scrubbing = false;
-
-        // Do a precise seek when we lift the mouse:
-        this.video.currentTime = this.controls.timeline.value;
     },
 
     handleMuteButtonClicked: function(event)
@@ -835,7 +846,7 @@ Controller.prototype = {
         this.video.volume = 1;
     },
 
-    handleVolumeSliderChange: function(event)
+    handleVolumeSliderInput: function(event)
     {
         if (this.video.muted) {
             this.video.muted = false;
@@ -853,9 +864,11 @@ Controller.prototype = {
         return true;
     },
 
-    updateFullscreenButton: function()
+    updateFullscreenButtons: function()
     {
-        this.controls.fullscreenButton.classList.toggle(this.ClassNames.hidden, !this.video.webkitSupportsFullscreen);
+        var shouldBeHidden = !this.video.webkitSupportsFullscreen || !this.hasVisualMedia;
+        this.controls.fullscreenButton.classList.toggle(this.ClassNames.hidden, shouldBeHidden);
+        this.controls.optimizedFullscreenButton.classList.toggle(this.ClassNames.hidden, shouldBeHidden);
     },
 
     handleFullscreenButtonClicked: function(event)
@@ -956,8 +969,11 @@ Controller.prototype = {
         return gradient;
     },
 
-    updateProgress: function()
+    updateProgress: function(forceUpdate)
     {
+        if (!forceUpdate && this.controlsAreHidden())
+            return;
+
         this.updateTimelineMetricsIfNeeded();
 
         var background = 'url(\'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" preserveAspectRatio="none"><linearGradient id="gradient" x2="0" y2="100%" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="rgb(2, 2, 2)"/><stop offset="1" stop-color="rgb(23, 23, 23)"/></linearGradient><g style="fill:url(#gradient)">'
@@ -1020,10 +1036,13 @@ Controller.prototype = {
 
     showControls: function()
     {
+        this.setNeedsTimelineMetricsUpdate();
+
+        this.updateTime();
+        this.updateProgress(true);
+
         this.controls.panel.classList.add(this.ClassNames.show);
         this.controls.panel.classList.remove(this.ClassNames.hidden);
-
-        this.setNeedsTimelineMetricsUpdate();
     },
 
     hideControls: function()
@@ -1033,7 +1052,7 @@ Controller.prototype = {
 
     controlsAreHidden: function()
     {
-        return !this.controls.panel.classList.contains(this.ClassNames.show) || this.controls.panel.classList.contains(this.ClassNames.hidden);
+        return !this.isAudio() && this.controls.panel.classList.contains(this.ClassNames.hidden);
     },
 
     removeControls: function()
@@ -1045,13 +1064,15 @@ Controller.prototype = {
 
     addControls: function()
     {
-        this.base.appendChild(this.controls.panelCompositedParent);
-        this.controls.panelCompositedParent.appendChild(this.controls.panel);
+        this.base.appendChild(this.controls.panel);
         this.setNeedsTimelineMetricsUpdate();
     },
 
-    updateTime: function()
+    updateTime: function(forceUpdate)
     {
+        if (!forceUpdate && this.controlsAreHidden())
+            return;
+
         var currentTime = this.video.currentTime;
         var timeRemaining = currentTime - this.video.duration;
         this.controls.currentTime.innerText = this.formatTime(currentTime);

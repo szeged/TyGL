@@ -55,13 +55,13 @@ public:
     virtual void removeFromSuperlayer() override;
     virtual void setSublayers(const PlatformCALayerList&) override;
     virtual void removeAllSublayers() override;
-    virtual void appendSublayer(PlatformCALayer*) override;
-    virtual void insertSublayer(PlatformCALayer*, size_t index) override;
-    virtual void replaceSublayer(PlatformCALayer* reference, PlatformCALayer*) override;
+    virtual void appendSublayer(PlatformCALayer&) override;
+    virtual void insertSublayer(PlatformCALayer&, size_t index) override;
+    virtual void replaceSublayer(PlatformCALayer& reference, PlatformCALayer&) override;
     virtual const PlatformCALayerList* customSublayers() const override { return m_customSublayers.get(); }
-    virtual void adoptSublayers(PlatformCALayer* source) override;
+    virtual void adoptSublayers(PlatformCALayer& source) override;
 
-    virtual void addAnimationForKey(const String& key, PlatformCAAnimation*) override;
+    virtual void addAnimationForKey(const String& key, PlatformCAAnimation&) override;
     virtual void removeAnimationForKey(const String& key) override;
     virtual PassRefPtr<PlatformCAAnimation> animationForKey(const String& key) override;
     virtual void animationStarted(const String& key, CFTimeInterval beginTime) override;
@@ -119,7 +119,7 @@ public:
     virtual void setOpacity(float) override;
     virtual void setFilters(const FilterOperations&) override;
     WEBCORE_EXPORT static bool filtersCanBeComposited(const FilterOperations&);
-    virtual void copyFiltersFrom(const PlatformCALayer*) override;
+    virtual void copyFiltersFrom(const PlatformCALayer&) override;
 
 #if ENABLE(CSS_COMPOSITING)
     virtual void setBlendMode(BlendMode) override;
@@ -134,13 +134,16 @@ public:
     virtual float contentsScale() const override;
     virtual void setContentsScale(float) override;
 
+    virtual float cornerRadius() const override;
+    virtual void setCornerRadius(float) override;
+
     virtual void setEdgeAntialiasingMask(unsigned) override;
+
+    virtual FloatRoundedRect shapeRoundedRect() const override;
+    virtual void setShapeRoundedRect(const FloatRoundedRect&) override;
 
     virtual GraphicsLayer::CustomAppearance customAppearance() const override { return m_customAppearance; }
     virtual void updateCustomAppearance(GraphicsLayer::CustomAppearance) override;
-
-    virtual GraphicsLayer::CustomBehavior customBehavior() const override { return m_customBehavior; }
-    virtual void updateCustomBehavior(GraphicsLayer::CustomBehavior) override;
 
     virtual TiledBacking* tiledBacking() override;
 
@@ -163,11 +166,11 @@ private:
     RetainPtr<NSObject> m_delegate;
     std::unique_ptr<PlatformCALayerList> m_customSublayers;
     GraphicsLayer::CustomAppearance m_customAppearance;
-    GraphicsLayer::CustomBehavior m_customBehavior;
+    std::unique_ptr<FloatRoundedRect> m_shapeRoundedRect;
 };
 
-PLATFORM_CALAYER_TYPE_CASTS(PlatformCALayerMac, isPlatformCALayerMac())
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_PLATFORM_CALAYER(WebCore::PlatformCALayerMac, isPlatformCALayerMac())
 
 #endif // PlatformCALayerMac_h

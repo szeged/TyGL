@@ -57,9 +57,9 @@ inline SVGFETurbulenceElement::SVGFETurbulenceElement(const QualifiedName& tagNa
     registerAnimatedPropertiesForSVGFETurbulenceElement();
 }
 
-PassRefPtr<SVGFETurbulenceElement> SVGFETurbulenceElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFETurbulenceElement> SVGFETurbulenceElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFETurbulenceElement(tagName, document));
+    return adoptRef(*new SVGFETurbulenceElement(tagName, document));
 }
 
 const AtomicString& SVGFETurbulenceElement::baseFrequencyXIdentifier()
@@ -155,7 +155,7 @@ void SVGFETurbulenceElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::baseFrequencyAttr
         || attrName == SVGNames::numOctavesAttr

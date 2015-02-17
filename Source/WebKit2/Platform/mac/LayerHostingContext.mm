@@ -26,34 +26,20 @@
 #import "config.h"
 #import "LayerHostingContext.h"
 
+#import <WebCore/MachSendRight.h>
+#import <WebCore/QuartzCoreSPI.h>
 #import <WebKitSystemInterface.h>
 
-#if __has_include(<QuartzCore/CAContext.h>)
-#import <QuartzCore/CAContext.h>
-#else
-@interface CAContext : NSObject
-@end
-
-@interface CAContext (Details)
-- (void)invalidate;
-@property (readonly) uint32_t contextId;
-@property (strong) CALayer *layer;
-@property CGColorSpaceRef colorSpace;
-- (void)setFencePort:(mach_port_t)port;
-+ (CAContext *)remoteContextWithOptions:(NSDictionary *)dict;
-@end
-#endif
-
-extern NSString * const kCAContextIgnoresHitTest;
+using namespace WebCore;
 
 namespace WebKit {
 
-std::unique_ptr<LayerHostingContext> LayerHostingContext::createForPort(mach_port_t serverPort)
+std::unique_ptr<LayerHostingContext> LayerHostingContext::createForPort(const MachSendRight& serverPort)
 {
     auto layerHostingContext = std::make_unique<LayerHostingContext>();
 
     layerHostingContext->m_layerHostingMode = LayerHostingMode::InProcess;
-    layerHostingContext->m_context = (CAContext *)WKCAContextMakeRemoteWithServerPort(serverPort);
+    layerHostingContext->m_context = (CAContext *)WKCAContextMakeRemoteWithServerPort(serverPort.sendRight());
 
     return layerHostingContext;
 }

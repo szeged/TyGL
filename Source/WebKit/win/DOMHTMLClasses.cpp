@@ -23,7 +23,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#include "config.h"
 #include "WebKitDLL.h"
 #include "DOMHTMLClasses.h"
 #include "WebFrame.h"
@@ -263,7 +262,7 @@ HRESULT STDMETHODCALLTYPE DOMHTMLDocument::body(
 
     HTMLDocument& htmlDoc = downcast<HTMLDocument>(*m_document);
     COMPtr<IDOMElement> domElement;
-    domElement.adoptRef(DOMHTMLElement::createInstance(htmlDoc.body()));
+    domElement.adoptRef(DOMHTMLElement::createInstance(htmlDoc.bodyOrFrameset()));
     if (domElement)
         return domElement->QueryInterface(IID_IDOMHTMLElement, (void**) bodyElement);
     return E_FAIL;

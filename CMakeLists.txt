@@ -10,7 +10,6 @@ set(WEBCORE_DIR "${CMAKE_SOURCE_DIR}/Source/WebCore")
 set(WEBKIT_DIR "${CMAKE_SOURCE_DIR}/Source/WebKit")
 set(WEBKIT2_DIR "${CMAKE_SOURCE_DIR}/Source/WebKit2")
 set(THIRDPARTY_DIR "${CMAKE_SOURCE_DIR}/Source/ThirdParty")
-set(PLATFORM_DIR "${CMAKE_SOURCE_DIR}/Source/Platform")
 
 set(TOOLS_DIR "${CMAKE_SOURCE_DIR}/Tools")
 
@@ -32,9 +31,6 @@ endif ()
 if (NOT DEFINED ENABLE_TOOLS AND EXISTS ${TOOLS_DIR})
     set(ENABLE_TOOLS ON)
 endif ()
-
-# Do not create transitive library dependencies by default
-set(CMAKE_LINK_INTERFACE_LIBRARIES "")
 
 include(WebKitMacros)
 include(WebKitFS)
@@ -68,7 +64,7 @@ find_package(Gperf 3.0.1 REQUIRED)
 # TODO Enforce version requirement for perl
 find_package(Perl 5.10.0 REQUIRED)
 
-find_package(PythonInterp 2.6.0 REQUIRED)
+find_package(PythonInterp 2.7.0 REQUIRED)
 find_package(Ruby 1.8.7)
 
 # -----------------------------------------------------------------------------
@@ -131,11 +127,7 @@ if (SHARED_CORE)
     set(JavaScriptCore_LIBRARY_TYPE SHARED)
     set(WebCore_LIBRARY_TYPE SHARED)
 else ()
-    if (${PORT} STREQUAL GTK)
-        set(JavaScriptCore_LIBRARY_TYPE SHARED)
-    else ()
-        set(JavaScriptCore_LIBRARY_TYPE STATIC)
-    endif ()
+    set(JavaScriptCore_LIBRARY_TYPE SHARED)
     set(WebCore_LIBRARY_TYPE STATIC)
 endif ()
 

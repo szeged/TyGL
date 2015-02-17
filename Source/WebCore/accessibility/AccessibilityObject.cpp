@@ -35,11 +35,13 @@
 #include "AccessibilityTable.h"
 #include "DOMTokenList.h"
 #include "Editor.h"
+#include "EventHandler.h"
 #include "FloatRect.h"
 #include "FocusController.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameSelection.h"
+#include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "HitTestResult.h"
@@ -231,11 +233,11 @@ bool AccessibilityObject::isAccessibilityObjectSearchMatchAtIndex(AccessibilityO
         
     case TableSameLevelSearchKey:
         return criteria->startObject
-            && axObject->isAccessibilityTable()
-            && axObject->tableLevel() == criteria->startObject->tableLevel();
+            && is<AccessibilityTable>(*axObject) && downcast<AccessibilityTable>(*axObject).isExposableThroughAccessibility()
+            && downcast<AccessibilityTable>(*axObject).tableLevel() == criteria->startObject->tableLevel();
         
     case TableSearchKey:
-        return axObject->isAccessibilityTable();
+        return is<AccessibilityTable>(*axObject) && downcast<AccessibilityTable>(*axObject).isExposableThroughAccessibility();
         
     case TextFieldSearchKey:
         return axObject->isTextControl();
@@ -367,7 +369,7 @@ String AccessibilityObject::computedLabel()
 
 bool AccessibilityObject::isBlockquote() const
 {
-    return node() && node()->hasTagName(blockquoteTag);
+    return roleValue() == BlockquoteRole;
 }
 
 bool AccessibilityObject::isTextControl() const
@@ -465,10 +467,10 @@ AccessibilityObject* AccessibilityObject::firstAccessibleObjectFromNode(const No
     
     AccessibilityObject* accessibleObject = cache->getOrCreate(node->renderer());
     while (accessibleObject && accessibleObject->accessibilityIsIgnored()) {
-        node = NodeTraversal::next(node);
+        node = NodeTraversal::next(*node);
 
         while (node && !node->renderer())
-            node = NodeTraversal::nextSkippingChildren(node);
+            node = NodeTraversal::nextSkippingChildren(*node);
 
         if (!node)
             return nullptr;
@@ -502,7 +504,7 @@ static void appendChildrenToArray(AccessibilityObject* object, bool isForward, A
 {
     // A table's children includes elements whose own children are also the table's children (due to the way the Mac exposes tables).
     // The rows from the table should be queried, since those are direct descendants of the table, and they contain content.
-    const auto& searchChildren = object->isAccessibilityTable() ? toAccessibilityTable(object)->rows() : object->children();
+    const auto& searchChildren = is<AccessibilityTable>(*object) && downcast<AccessibilityTable>(*object).isExposableThroughAccessibility() ? downcast<AccessibilityTable>(*object).rows() : object->children();
 
     size_t childrenSize = searchChildren.size();
 
@@ -845,7 +847,8 @@ bool AccessibilityObject::press()
     // Hit test at this location to determine if there is a sub-node element that should act
     // as the target of the action.
     Element* hitTestElement = nullptr;
-    if (Document* document = this->document()) {
+    Document* document = this->document();
+    if (document) {
         HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AccessibilityHitTest);
         HitTestResult hitTestResult(clickPoint());
         document->renderView()->hitTest(request, hitTestResult);
@@ -853,6 +856,8 @@ bool AccessibilityObject::press()
             Node* innerNode = hitTestResult.innerNode()->deprecatedShadowAncestorNode();
             if (is<Element>(*innerNode))
                 hitTestElement = downcast<Element>(innerNode);
+            else if (innerNode)
+                hitTestElement = innerNode->parentElement();
         }
     }
     
@@ -866,9 +871,26 @@ bool AccessibilityObject::press()
     if (hitTestElement && hitTestElement->isDescendantOf(pressElement))
         pressElement = hitTestElement;
     
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
-    pressElement->accessKeyAction(true);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture, document);
+    
+    bool dispatchedTouchEvent = dispatchTouchEvent();
+    if (!dispatchedTouchEvent)
+        pressElement->accessKeyAction(true);
+    
     return true;
+}
+    
+bool AccessibilityObject::dispatchTouchEvent()
+{
+    bool handled = false;
+#if ENABLE(IOS_TOUCH_EVENTS)
+    MainFrame* frame = mainFrame();
+    if (!frame)
+        return false;
+
+    frame->eventHandler().dispatchSimulatedTouchEvent(clickPoint());
+#endif
+    return handled;
 }
 
 Frame* AccessibilityObject::frame() const
@@ -1159,8 +1181,8 @@ static RenderListItem* renderListItemContainerForNode(Node* node)
 {
     for (; node; node = node->parentNode()) {
         RenderBoxModelObject* renderer = node->renderBoxModelObject();
-        if (renderer && renderer->isListItem())
-            return toRenderListItem(renderer);
+        if (is<RenderListItem>(renderer))
+            return downcast<RenderListItem>(renderer);
     }
     return nullptr;
 }
@@ -1535,8 +1557,8 @@ void AccessibilityObject::updateBackingStore()
 ScrollView* AccessibilityObject::scrollViewAncestor() const
 {
     for (const AccessibilityObject* scrollParent = this; scrollParent; scrollParent = scrollParent->parentObject()) {
-        if (scrollParent->isAccessibilityScrollView())
-            return toAccessibilityScrollView(scrollParent)->scrollView();
+        if (is<AccessibilityScrollView>(*scrollParent))
+            return downcast<AccessibilityScrollView>(*scrollParent).scrollView();
     }
     
     return nullptr;
@@ -1963,12 +1985,47 @@ bool AccessibilityObject::hasHighlighting() const
     return false;
 }
 
+static bool nodeHasPresentationRole(Node* node)
+{
+    return nodeHasRole(node, "presentation") || nodeHasRole(node, "none");
+}
+    
+bool AccessibilityObject::supportsPressAction() const
+{
+    if (isButton())
+        return true;
+    
+    Element* actionElement = this->actionElement();
+    if (!actionElement)
+        return false;
+    
+    // [Bug: 133613] Heuristic: If the action element is presentational, we shouldn't expose press as a supported action.
+    return !nodeHasPresentationRole(actionElement);
+}
+
+bool AccessibilityObject::supportsDatetimeAttribute() const
+{
+    return hasTagName(insTag) || hasTagName(delTag) || hasTagName(timeTag);
+}
+
 Element* AccessibilityObject::element() const
 {
     Node* node = this->node();
     if (is<Element>(node))
         return downcast<Element>(node);
     return nullptr;
+}
+    
+bool AccessibilityObject::isValueAutofilled() const
+{
+    if (!isNativeTextControl())
+        return false;
+    
+    Node* node = this->node();
+    if (!node || !is<HTMLInputElement>(*node))
+        return false;
+    
+    return downcast<HTMLInputElement>(*node).isAutofilled();
 }
 
 const AtomicString& AccessibilityObject::placeholderValue() const

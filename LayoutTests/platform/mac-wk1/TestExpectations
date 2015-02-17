@@ -13,7 +13,24 @@
 # Asserts in WebKit1-debug due to a preexisting issue with overflow rect computation
 webkit.org/b/118269 compositing/geometry/fixed-position-flipped-writing-mode.html
 
-webkit.org/b/124318 fullscreen/anonymous-block-merge-crash.html [ Pass Failure ]
+# Before Yosemite, the test did not actually test compositing vs. non-compositing on WebKit1, so it passed accidentally.
+webkit.org/b/132421 [ Yosemite+ ] fast/multicol/fixed-stack.html [ ImageOnlyFailure ]
+
+webkit.org/b/104104 fast/overflow/scrollbar-click-retains-focus.html [ Failure ]
+
+webkit.org/b/82981 http/tests/misc/favicon-loads-with-icon-loading-override.html [ Failure ]
+
+webkit.org/b/90724 compositing/iframes/iframe-size-from-zero.html [ Failure ]
+
+webkit.org/b/138697 fast/events/overflow-scroll-fake-mouse-move.html [ Pass Failure ]
+
+webkit.org/b/82747 fast/events/scroll-div-with-prevent-default-in-subframe.html [ Failure ]
+
+webkit.org/b/112533 media/auto-play-in-sandbox-with-allow-scripts.html [ Pass Timeout ]
+
+webkit.org/b/139778 fullscreen/exit-full-screen-iframe.html [ Skip ]
+
+webkit.org/b/139862 editing/spelling/grammar-edit-word.html [ Skip ]
 
 ### END OF (1) Failures with bug reports
 ########################################
@@ -34,7 +51,6 @@ crypto/subtle/rsa-indexeddb-non-exportable.html
 
 # Fails with WebKit1 only.
 editing/secure-input/reset-state-on-navigation.html [ Failure ]
-css3/blending/background-blend-mode-gif-color-2.html [ ImageOnlyFailure Pass ]
 
 # Plug-in blocking callback doesn't exist in WebKit1.
 plugins/unavailable-plugin-indicator-obscurity.html
@@ -48,11 +64,16 @@ fast/events/ghostly-mousemoves-in-subframe.html [ Skip ]
 # Disable snapshotting tests on WK1 only
 plugins/snapshotting
 
+# Animated image throttling behaves differently on WK1.
+fast/images/animated-gif-body-outside-viewport.html [ Skip ]
+fast/images/animated-gif-window-resizing.html [ Skip ]
+fast/images/animated-gif-zooming.html [ Skip ]
+
 # Mavericks and prior do not support contentInset
-[ MountainLion Mavericks ] platform/mac/fast/events/content-inset-hit-testing.html [ Skip ]
-[ MountainLion Mavericks ] platform/mac/fast/events/content-inset-hit-testing-in-frame.html [ Skip ]
-[ MountainLion Mavericks ] platform/mac/fast/scrolling/scroll-select-bottom-test.html [ Skip ]
-[ MountainLion Mavericks ] platform/mac-wk1/fast/backgrounds/top-content-inset-fixed-attachment.html [ Skip ]
+[ Mavericks ] platform/mac/fast/events/content-inset-hit-testing.html [ Skip ]
+[ Mavericks ] platform/mac/fast/events/content-inset-hit-testing-in-frame.html [ Skip ]
+[ Mavericks ] platform/mac/fast/scrolling/scroll-select-bottom-test.html [ Skip ]
+[ Mavericks ] platform/mac-wk1/fast/backgrounds/top-content-inset-fixed-attachment.html [ Skip ]
 
 # WK1 uses the native scrollview for scrolling by page.
 scrollbars/scrolling-backward-by-page-accounting-bottom-fixed-elements-on-keyboard-spacebar.html
@@ -63,6 +84,13 @@ scrollbars/scrolling-by-page-accounting-top-fixed-elements-with-negative-top-on-
 scrollbars/scrolling-by-page-ignoring-hidden-fixed-elements-on-keyboard-spacebar.html
 scrollbars/scrolling-by-page-ignoring-transparent-fixed-elements-on-keyboard-spacebar.html
 scrollbars/scrolling-by-page-on-keyboard-spacebar.html
+
+compositing/rtl/rtl-fixed-overflow-scrolled.html [ Failure ]
+
+compositing/iframes/overlapped-nested-iframes.html [ Pass Failure ]
+
+# Disk cache is WK2 only
+http/tests/cache/disk-cache-validation.html
 
 ### END OF (2) Failures without bug reports
 ########################################

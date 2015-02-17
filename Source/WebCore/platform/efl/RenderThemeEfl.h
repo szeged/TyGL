@@ -107,9 +107,6 @@ public:
 
     void adjustSizeConstraints(RenderStyle&, FormType) const;
 
-    // System fonts.
-    virtual void systemFont(CSSValueID, FontDescription&) const override;
-
     virtual void adjustCheckboxStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintCheckbox(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
@@ -192,6 +189,9 @@ private:
         return m_edje || (!m_themePath.isEmpty() && const_cast<RenderThemeEfl*>(this)->loadTheme());
     }
 
+    // System fonts.
+    virtual void updateCachedSystemFontDescription(CSSValueID, FontDescription&) const override;
+
     ALWAYS_INLINE Ecore_Evas* canvas() const { return m_canvas.get(); }
     ALWAYS_INLINE Evas_Object* edje() const { return m_edje.get(); }
 
@@ -226,7 +226,7 @@ private:
     void applyPartDescription(Evas_Object*, struct ThemePartDesc*);
 
     struct ThemePartCacheEntry {
-        static PassOwnPtr<RenderThemeEfl::ThemePartCacheEntry> create(const String& themePath, FormType, const IntSize&);
+        static std::unique_ptr<RenderThemeEfl::ThemePartCacheEntry> create(const String& themePath, FormType, const IntSize&);
         void reuse(const String& themePath, FormType, const IntSize&);
 
         ALWAYS_INLINE Ecore_Evas* canvas() { return m_canvas.get(); }
@@ -252,7 +252,7 @@ private:
     // List of ThemePartCacheEntry* sorted so that the most recently
     // used entries come first. We use a list for efficient moving
     // of items within the container.
-    Eina_List* m_partCache;
+    Vector<std::unique_ptr<ThemePartCacheEntry>> m_partCache;
 
     ThemePartCacheEntry* getThemePartFromCache(FormType, const IntSize&);
     void clearThemePartCache();

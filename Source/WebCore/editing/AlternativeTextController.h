@@ -62,9 +62,9 @@ struct AlternativeTextInfo {
 
 class DictationMarkerDetails : public DocumentMarkerDetails {
 public:
-    static PassRefPtr<DictationMarkerDetails> create(const String& originalText, uint64_t dictationContext)
+    static Ref<DictationMarkerDetails> create(const String& originalText, uint64_t dictationContext)
     {
-        return adoptRef(new DictationMarkerDetails(originalText, dictationContext));
+        return adoptRef(*new DictationMarkerDetails(originalText, dictationContext));
     }
     const String& originalText() const { return m_originalText; }
     uint64_t dictationContext() const { return m_dictationContext; }
@@ -138,7 +138,7 @@ private:
 #if USE(AUTOCORRECTION_PANEL)
     String dismissSoon(ReasonForDismissingAlternativeText);
     void applyAlternativeTextToRange(const Range*, const String& alternative, AlternativeTextType, const Vector<DocumentMarker::MarkerType>&);
-    void timerFired(Timer<AlternativeTextController>&);
+    void timerFired();
     void recordAutocorrectionResponseReversed(const String& replacedString, const String& replacementString);
     void recordSpellcheckerResponseForModifiedCorrection(Range* rangeOfCorrection, const String& corrected, const String& correction);
     String markerDescriptionForAppliedAlternativeText(AlternativeTextType, DocumentMarker::MarkerType);
@@ -153,7 +153,7 @@ private:
     FloatRect rootViewRectForRange(const Range*) const;
     void markPrecedingWhitespaceForDeletedAutocorrectionAfterCommand(EditCommand*);
 
-    Timer<AlternativeTextController> m_timer;
+    Timer m_timer;
     AlternativeTextInfo m_alternativeTextInfo;
     bool m_isDismissedByEditing;
 

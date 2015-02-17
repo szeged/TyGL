@@ -44,10 +44,6 @@
 #include <runtime/Error.h>
 #include <runtime/JSLock.h>
 
-#if ENABLE(SHARED_WORKERS)
-#include "JSSharedWorkerGlobalScope.h"
-#endif
-
 using namespace JSC;
 
 namespace WebCore {
@@ -85,24 +81,13 @@ void WorkerScriptController::initScript()
         Strong<JSDedicatedWorkerGlobalScopePrototype> dedicatedContextPrototype(*m_vm, JSDedicatedWorkerGlobalScopePrototype::create(*m_vm, 0, dedicatedContextPrototypeStructure));
         Structure* structure = JSDedicatedWorkerGlobalScope::createStructure(*m_vm, 0, dedicatedContextPrototype.get());
 
-        m_workerGlobalScopeWrapper.set(*m_vm, JSDedicatedWorkerGlobalScope::create(*m_vm, structure, static_cast<DedicatedWorkerGlobalScope*>(m_workerGlobalScope)));
+        m_workerGlobalScopeWrapper.set(*m_vm, JSDedicatedWorkerGlobalScope::create(*m_vm, structure, static_cast<DedicatedWorkerGlobalScope&>(*m_workerGlobalScope)));
         workerGlobalScopePrototypeStructure->setGlobalObject(*m_vm, m_workerGlobalScopeWrapper.get());
         dedicatedContextPrototypeStructure->setGlobalObject(*m_vm, m_workerGlobalScopeWrapper.get());
         ASSERT(structure->globalObject() == m_workerGlobalScopeWrapper);
         ASSERT(m_workerGlobalScopeWrapper->structure()->globalObject() == m_workerGlobalScopeWrapper);
         workerGlobalScopePrototype->structure()->setGlobalObject(*m_vm, m_workerGlobalScopeWrapper.get());
         dedicatedContextPrototype->structure()->setGlobalObject(*m_vm, m_workerGlobalScopeWrapper.get());
-#if ENABLE(SHARED_WORKERS)
-    } else {
-        ASSERT(m_workerGlobalScope->isSharedWorkerGlobalScope());
-        Structure* sharedContextPrototypeStructure = JSSharedWorkerGlobalScopePrototype::createStructure(*m_vm, 0, workerGlobalScopePrototype.get());
-        Strong<JSSharedWorkerGlobalScopePrototype> sharedContextPrototype(*m_vm, JSSharedWorkerGlobalScopePrototype::create(*m_vm, 0, sharedContextPrototypeStructure));
-        Structure* structure = JSSharedWorkerGlobalScope::createStructure(*m_vm, 0, sharedContextPrototype.get());
-
-        m_workerGlobalScopeWrapper.set(*m_vm, JSSharedWorkerGlobalScope::create(*m_vm, structure, static_cast<SharedWorkerGlobalScope*>(m_workerGlobalScope)));
-        workerGlobalScopePrototype->structure()->setGlobalObject(*m_vm, m_workerGlobalScopeWrapper.get());
-        sharedContextPrototype->structure()->setGlobalObject(*m_vm, m_workerGlobalScopeWrapper.get());
-#endif
     }
     ASSERT(m_workerGlobalScopeWrapper->globalObject() == m_workerGlobalScopeWrapper);
     ASSERT(asObject(m_workerGlobalScopeWrapper->prototype())->globalObject() == m_workerGlobalScopeWrapper);

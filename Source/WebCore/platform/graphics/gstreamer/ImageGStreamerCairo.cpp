@@ -34,8 +34,9 @@
 using namespace std;
 using namespace WebCore;
 
-ImageGStreamer::ImageGStreamer(GstBuffer* buffer, GstCaps* caps)
+ImageGStreamer::ImageGStreamer(GstSample* sample)
 {
+    GstCaps* caps = gst_sample_get_caps(sample);
     GstVideoInfo videoInfo;
     gst_video_info_init(&videoInfo);
     if (!gst_video_info_from_caps(&videoInfo, caps))
@@ -45,6 +46,8 @@ ImageGStreamer::ImageGStreamer(GstBuffer* buffer, GstCaps* caps)
     ASSERT(GST_VIDEO_INFO_N_PLANES(&videoInfo) == 1);
 
 #if USE(CAIRO)
+    GstBuffer* buffer = gst_sample_get_buffer(sample);
+
     if (!gst_video_frame_map(&m_videoFrame, &videoInfo, buffer, GST_MAP_READ))
         return;
 
@@ -64,10 +67,10 @@ ImageGStreamer::ImageGStreamer(GstBuffer* buffer, GstCaps* caps)
     RefPtr<cairo_surface_t> surface = adoptRef(cairo_image_surface_create_for_data(bufferData, cairoFormat, width, height, stride));
     ASSERT(cairo_surface_status(surface.get()) == CAIRO_STATUS_SUCCESS);
     m_image = BitmapImage::create(surface.release());
-#endif // CAIRO
 
     if (GstVideoCropMeta* cropMeta = gst_buffer_get_video_crop_meta(buffer))
         setCropRect(FloatRect(cropMeta->x, cropMeta->y, cropMeta->width, cropMeta->height));
+#endif // CAIRO
 }
 
 ImageGStreamer::~ImageGStreamer()

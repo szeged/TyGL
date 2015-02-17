@@ -102,10 +102,12 @@ enum AccessibilityRole {
     ApplicationStatusRole,
     ApplicationTimerRole,
     AudioRole,
+    BlockquoteRole,
     BrowserRole,
     BusyIndicatorRole,
     ButtonRole,
     CanvasRole,
+    CaptionRole,
     CellRole, 
     CheckBoxRole,
     ColorWellRole,
@@ -135,6 +137,7 @@ enum AccessibilityRole {
     HelpTagRole,
     HorizontalRuleRole,
     IgnoredRole,
+    InlineRole,
     ImageRole,
     ImageMapRole,
     ImageMapLinkRole,
@@ -253,11 +256,13 @@ struct AccessibilityTextUnderElementMode {
     
     ChildrenInclusion childrenInclusion;
     bool includeFocusableContent;
+    Node* ignoredChildNode;
     
-    AccessibilityTextUnderElementMode(ChildrenInclusion c = TextUnderElementModeSkipIgnoredChildren, bool i = false)
-    : childrenInclusion(c)
-    , includeFocusableContent(i)
-    { }
+    AccessibilityTextUnderElementMode(ChildrenInclusion c = TextUnderElementModeSkipIgnoredChildren, bool i = false, Node* ignored = nullptr)
+        : childrenInclusion(c)
+        , includeFocusableContent(i)
+        , ignoredChildNode(ignored)
+        { }
 };
     
 enum AccessibilityOrientation {
@@ -417,6 +422,9 @@ struct AccessibilitySelectTextCriteria {
     { }
 };
 
+enum AccessibilityMathScriptObjectType { Subscript, Superscript };
+enum AccessibilityMathMultiscriptObjectType { PreSubscript, PreSuperscript, PostSubscript, PostSuperscript };
+
 class AccessibilityObject : public RefCounted<AccessibilityObject> {
 protected:
     AccessibilityObject();
@@ -444,12 +452,12 @@ public:
     virtual bool isAccessibilitySVGRoot() const { return false; }
 
     bool accessibilityObjectContainsText(String *) const;
-    
-    virtual bool isAnchor() const { return false; }
+
     virtual bool isAttachment() const { return false; }
     virtual bool isHeading() const { return false; }
     virtual bool isLink() const { return false; }
     virtual bool isImage() const { return false; }
+    virtual bool isImageMap() const { return roleValue() == ImageMapRole; }
     virtual bool isNativeImage() const { return false; }
     virtual bool isImageButton() const { return false; }
     virtual bool isPasswordField() const { return false; }
@@ -475,7 +483,6 @@ public:
     virtual bool isControl() const { return false; }
     virtual bool isList() const { return false; }
     virtual bool isTable() const { return false; }
-    virtual bool isAccessibilityTable() const { return false; }
     virtual bool isDataTable() const { return false; }
     virtual bool isTableRow() const { return false; }
     virtual bool isTableColumn() const { return false; }
@@ -548,6 +555,8 @@ public:
     virtual bool hasUnderline() const { return false; }
     bool hasHighlighting() const;
 
+    bool supportsDatetimeAttribute() const;
+
     virtual bool canSetFocusAttribute() const { return false; }
     virtual bool canSetTextRangeAttributes() const { return false; }
     virtual bool canSetValueAttribute() const { return false; }
@@ -556,7 +565,7 @@ public:
     virtual bool canSetSelectedChildrenAttribute() const { return false; }
     virtual bool canSetExpandedAttribute() const { return false; }
     
-    Element* element() const;
+    virtual Element* element() const;
     virtual Node* node() const { return nullptr; }
     virtual RenderObject* renderer() const { return nullptr; }
     virtual bool accessibilityIsIgnored() const;
@@ -679,7 +688,6 @@ public:
     // Only if isColorWell()
     virtual void colorValue(int& r, int& g, int& b) const { r = 0; g = 0; b = 0; }
 
-    void setRoleValue(AccessibilityRole role) { m_role = role; }
     virtual AccessibilityRole roleValue() const { return m_role; }
 
     virtual AXObjectCache* axObjectCache() const;
@@ -688,6 +696,7 @@ public:
     static AccessibilityObject* anchorElementForNode(Node*);
     static AccessibilityObject* headingElementForNode(Node*);
     virtual Element* anchorElement() const { return nullptr; }
+    bool supportsPressAction() const;
     virtual Element* actionElement() const { return nullptr; }
     virtual LayoutRect boundingBoxRect() const { return LayoutRect(); }
     IntRect pixelSnappedBoundingBoxRect() const { return snappedIntRect(boundingBoxRect()); }
@@ -755,6 +764,7 @@ public:
 #else
     virtual void detachFromParent() { }
 #endif
+    virtual bool isDetachedFromParent() { return false; }
 
     virtual void selectedChildren(AccessibilityChildrenVector&) { }
     virtual void visibleChildren(AccessibilityChildrenVector&) { }
@@ -834,7 +844,8 @@ public:
     virtual AccessibilityRole roleValueForMSAA() const { return roleValue(); }
 
     virtual String passwordFieldValue() const { return String(); }
-
+    bool isValueAutofilled() const;
+    
     // Used by an ARIA tree to get all its rows.
     void ariaTreeRows(AccessibilityChildrenVector&);
     // Used by an ARIA tree item to get all of its direct rows that it can disclose.
@@ -891,6 +902,9 @@ public:
     virtual bool isMathTableRow() const { return false; }
     virtual bool isMathTableCell() const { return false; }
     virtual bool isMathMultiscript() const { return false; }
+    virtual bool isMathToken() const { return false; }
+    virtual bool isMathScriptObject(AccessibilityMathScriptObjectType) const { return false; }
+    virtual bool isMathMultiscriptObject(AccessibilityMathMultiscriptObjectType) const { return false; }
 
     // Root components.
     virtual AccessibilityObject* mathRadicandObject() { return nullptr; }
@@ -980,7 +994,8 @@ protected:
     static bool objectMatchesSearchCriteriaWithResultLimit(AccessibilityObject*, AccessibilitySearchCriteria*, AccessibilityChildrenVector&);
     virtual AccessibilityRole buttonRoleType() const;
     bool isOnscreen() const;
-    
+    bool dispatchTouchEvent();
+
 #if (PLATFORM(GTK) || PLATFORM(EFL)) && HAVE(ACCESSIBILITY)
     bool allowsTextRanges() const;
     unsigned getLengthForTextRange() const;
@@ -1005,9 +1020,11 @@ inline int AccessibilityObject::lineForPosition(const VisiblePosition&) const { 
 inline void AccessibilityObject::updateBackingStore() { }
 #endif
 
-#define ACCESSIBILITY_OBJECT_TYPE_CASTS(ToValueTypeName, predicate) \
-    TYPE_CASTS_BASE(ToValueTypeName, AccessibilityObject, object, object->predicate, object.predicate)
-
 } // namespace WebCore
+
+#define SPECIALIZE_TYPE_TRAITS_ACCESSIBILITY(ToValueTypeName, predicate) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ToValueTypeName) \
+    static bool isType(const WebCore::AccessibilityObject& object) { return object.predicate; } \
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // AccessibilityObject_h

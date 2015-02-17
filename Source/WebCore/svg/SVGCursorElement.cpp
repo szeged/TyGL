@@ -53,9 +53,9 @@ inline SVGCursorElement::SVGCursorElement(const QualifiedName& tagName, Document
     registerAnimatedPropertiesForSVGCursorElement();
 }
 
-PassRefPtr<SVGCursorElement> SVGCursorElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGCursorElement> SVGCursorElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGCursorElement(tagName, document));
+    return adoptRef(*new SVGCursorElement(tagName, document));
 }
 
 SVGCursorElement::~SVGCursorElement()
@@ -121,7 +121,7 @@ void SVGCursorElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     // Any change of a cursor specific attribute triggers this recalc.
     HashSet<SVGElement*>::const_iterator it = m_clients.begin();

@@ -93,21 +93,26 @@ protected:
     void dispatchBreakpointActionSound(JSC::ExecState*, int breakpointActionIdentifier);
     void dispatchBreakpointActionProbe(JSC::ExecState*, const ScriptBreakpointAction&, const Deprecated::ScriptValue& sample);
 
-    bool m_doneProcessingDebuggerEvents;
+    bool m_doneProcessingDebuggerEvents {true};
 
 private:
     typedef HashMap<JSC::BreakpointID, BreakpointActions> BreakpointIDToActionsMap;
 
     virtual void sourceParsed(JSC::ExecState*, JSC::SourceProvider*, int errorLine, const String& errorMsg) override final;
     virtual bool needPauseHandling(JSC::JSGlobalObject*) override final { return true; }
-    virtual void handleBreakpointHit(const JSC::Breakpoint&) override final;
+    virtual void handleBreakpointHit(JSC::JSGlobalObject*, const JSC::Breakpoint&) override final;
     virtual void handleExceptionInBreakpointCondition(JSC::ExecState*, JSC::JSValue exception) const override final;
-    virtual void handlePause(JSC::Debugger::ReasonForPause, JSC::JSGlobalObject*) override final;
+    virtual void handlePause(JSC::JSGlobalObject*, JSC::Debugger::ReasonForPause) override final;
     virtual void notifyDoneProcessingDebuggerEvents() override final;
 
-    unsigned m_hitCount;
-    bool m_callingListeners;
+    Deprecated::ScriptValue exceptionOrCaughtValue(JSC::ExecState*);
+
+    bool m_callingListeners {false};
+
     BreakpointIDToActionsMap m_breakpointIDToActions;
+
+    unsigned m_nextProbeSampleId {1};
+    unsigned m_currentProbeBatchId {0};
 };
 
 } // namespace Inspector

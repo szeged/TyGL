@@ -82,8 +82,7 @@ uint32_t frameIndexFromFrame(const Frame* targetFrame)
     ASSERT(targetFrame);
 
     uint32_t currentIndex = 0;
-    const Frame* mainFrame = &targetFrame->tree().top();
-    for (const Frame* frame = mainFrame; frame; ++currentIndex, frame = frame->tree().traverseNext(mainFrame)) {
+    for (const Frame* frame = &targetFrame->tree().top(); frame; ++currentIndex, frame = frame->tree().traverseNext()) {
         if (frame == targetFrame)
             return currentIndex;
     }
@@ -103,10 +102,9 @@ Frame* frameFromFrameIndex(Page* page, uint32_t frameIndex)
     ASSERT(page);
     ASSERT(frameIndex >= 0);
 
-    MainFrame* mainFrame = &page->mainFrame();
-    Frame* frame = mainFrame;
+    Frame* frame = &page->mainFrame();
     uint32_t currentIndex = 0;
-    for (; currentIndex < frameIndex && frame; ++currentIndex, frame = frame->tree().traverseNext(mainFrame)) { }
+    for (; currentIndex < frameIndex && frame; ++currentIndex, frame = frame->tree().traverseNext()) { }
 
     return frame;
 }
@@ -168,8 +166,8 @@ EncodedValue EncodingTraits<NondeterministicInputBase>::encodeValue(const Nondet
     ENCODE_TYPE_WITH_KEY(encodedValue, String, type, input.type());
 
 #define ENCODE_IF_TYPE_TAG_MATCHES(name) \
-    if (input.type() == InputTraits<name>::type()) { \
-        InputTraits<name>::encode(encodedValue, static_cast<const name&>(input)); \
+    if (is<name>(input)) { \
+        InputTraits<name>::encode(encodedValue, downcast<name>(input)); \
         return encodedValue; \
     } \
 
@@ -178,8 +176,8 @@ EncodedValue EncodingTraits<NondeterministicInputBase>::encodeValue(const Nondet
 #undef ENCODE_IF_TYPE_TAG_MATCHES
 
     // The macro won't work here because of the class template argument.
-    if (input.type() == InputTraits<MemoizedDOMResultBase>::type()) {
-        InputTraits<MemoizedDOMResultBase>::encode(encodedValue, static_cast<const MemoizedDOMResultBase&>(input));
+    if (is<MemoizedDOMResultBase>(input)) {
+        InputTraits<MemoizedDOMResultBase>::encode(encodedValue, downcast<MemoizedDOMResultBase>(input));
         return encodedValue;
     }
 

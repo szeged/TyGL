@@ -35,11 +35,6 @@
 #include "Location.h"
 #include "ScheduledAction.h"
 #include "Settings.h"
-#include "SharedWorkerRepository.h"
-
-#if ENABLE(SHARED_WORKERS)
-#include "JSSharedWorker.h"
-#endif
 
 #if ENABLE(IOS_TOUCH_EVENTS)
 #include "JSTouchConstructorIOS.h"
@@ -149,25 +144,17 @@ bool JSDOMWindow::getOwnPropertySlot(JSObject* object, ExecState* exec, Property
     // Also, it's important to get the implementation straight out of the DOMWindow prototype regardless of
     // what prototype is actually set on this object.
     if (propertyName == exec->propertyNames().blur) {
-        if (!allowsAccess) {
-            slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionBlur, 0>);
-            return true;
-        }
+        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionBlur, 0>);
+        return true;
     } else if (propertyName == exec->propertyNames().close) {
-        if (!allowsAccess) {
-            slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionClose, 0>);
-            return true;
-        }
+        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionClose, 0>);
+        return true;
     } else if (propertyName == exec->propertyNames().focus) {
-        if (!allowsAccess) {
-            slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionFocus, 0>);
-            return true;
-        }
+        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionFocus, 0>);
+        return true;
     } else if (propertyName == exec->propertyNames().postMessage) {
-        if (!allowsAccess) {
-            slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionPostMessage, 2>);
-            return true;
-        }
+        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionPostMessage, 2>);
+        return true;
     } else if (propertyName == exec->propertyNames().showModalDialog) {
         if (!DOMWindow::canShowModalDialog(thisObject->impl().frame())) {
             slot.setUndefined();
@@ -665,7 +652,7 @@ JSValue JSDOMWindow::addEventListener(ExecState* exec)
     if (!listener.isObject())
         return jsUndefined();
 
-    impl().addEventListener(exec->argument(0).toString(exec)->value(exec), JSEventListener::create(asObject(listener), this, false, globalObject()->world()), exec->argument(2).toBoolean(exec));
+    impl().addEventListener(exec->argument(0).toString(exec)->toAtomicString(exec), JSEventListener::create(asObject(listener), this, false, globalObject()->world()), exec->argument(2).toBoolean(exec));
     return jsUndefined();
 }
 
@@ -679,7 +666,7 @@ JSValue JSDOMWindow::removeEventListener(ExecState* exec)
     if (!listener.isObject())
         return jsUndefined();
 
-    impl().removeEventListener(exec->argument(0).toString(exec)->value(exec), JSEventListener::create(asObject(listener), this, false, globalObject()->world()).get(), exec->argument(2).toBoolean(exec));
+    impl().removeEventListener(exec->argument(0).toString(exec)->toAtomicString(exec), JSEventListener::create(asObject(listener), this, false, globalObject()->world()).ptr(), exec->argument(2).toBoolean(exec));
     return jsUndefined();
 }
 

@@ -4,7 +4,7 @@
              (C) 1998, 1999 Torben Weis (weis@kde.org)
              (C) 1999 Lars Knoll (knoll@kde.org)
              (C) 1999 Antti Koivisto (koivisto@kde.org)
-   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+   Copyright (C) 2004-2009, 2014 Apple Inc. All rights reserved.
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Library General Public
@@ -27,6 +27,7 @@
 
 #include "AdjustViewSizeOrNot.h"
 #include "Color.h"
+#include "ContainerNode.h"
 #include "LayoutMilestones.h"
 #include "LayoutRect.h"
 #include "Pagination.h"
@@ -35,12 +36,14 @@
 #include "ScrollView.h"
 #include <memory>
 #include <wtf/Forward.h>
+#include <wtf/HashSet.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class AXObjectCache;
+class DOMTimer;
 class Element;
 class FloatSize;
 class Frame;
@@ -67,8 +70,8 @@ public:
     friend class RenderView;
     friend class Internals;
 
-    WEBCORE_EXPORT static PassRefPtr<FrameView> create(Frame&);
-    static PassRefPtr<FrameView> create(Frame&, const IntSize& initialSize);
+    WEBCORE_EXPORT static Ref<FrameView> create(Frame&);
+    static Ref<FrameView> create(Frame&, const IntSize& initialSize);
 
     virtual ~FrameView();
 
@@ -104,7 +107,7 @@ public:
 
     void layout(bool allowSubtree = true);
     WEBCORE_EXPORT bool didFirstLayout() const;
-    void layoutTimerFired(Timer<FrameView>&);
+    void layoutTimerFired();
     void scheduleRelayout();
     void scheduleRelayoutOfSubtree(RenderElement&);
     void unscheduleRelayout();
@@ -221,7 +224,7 @@ public:
     WEBCORE_EXPORT void setViewportSizeForCSSViewportUnits(IntSize);
     IntSize viewportSizeForCSSViewportUnits() const;
     
-    virtual IntRect windowClipRect(bool clipToContents = true) const override;
+    virtual IntRect windowClipRect() const override;
     WEBCORE_EXPORT IntRect windowClipRectForFrameOwner(const HTMLFrameOwnerElement*, bool clipToLayerContents) const;
 
     virtual IntRect windowResizerRect() const override;
@@ -232,15 +235,15 @@ public:
     virtual void setFixedVisibleContentRect(const IntRect&) override;
 #endif
     WEBCORE_EXPORT virtual void setScrollPosition(const IntPoint&) override;
-    WEBCORE_EXPORT void scrollPositionChangedViaPlatformWidget(const IntPoint& oldPosition, const IntPoint& newPosition);
     virtual void updateLayerPositionsAfterScrolling() override;
     virtual void updateCompositingLayersAfterScrolling() override;
     virtual bool requestScrollPositionUpdate(const IntPoint&) override;
     virtual bool isRubberBandInProgress() const override;
     WEBCORE_EXPORT virtual IntPoint minimumScrollPosition() const override;
     WEBCORE_EXPORT virtual IntPoint maximumScrollPosition() const override;
-    void delayedScrollEventTimerFired(Timer<FrameView>&);
+    void delayedScrollEventTimerFired();
 
+    void viewportContentsChanged();
     void resumeVisibleImageAnimationsIncludingSubframes();
 
     // This is different than visibleContentRect() in that it ignores negative (or overly positive)
@@ -301,7 +304,10 @@ public:
 
     void restoreScrollbar();
 
-    void postLayoutTimerFired(Timer<FrameView>&);
+    void postLayoutTimerFired();
+
+    void registerThrottledDOMTimer(DOMTimer*);
+    void unregisterThrottledDOMTimer(DOMTimer*);
 
     WEBCORE_EXPORT bool wasScrolledByUser() const;
     WEBCORE_EXPORT void setWasScrolledByUser(bool);
@@ -383,7 +389,7 @@ public:
 
     bool scrollToFragment(const URL&);
     bool scrollToAnchor(const String&);
-    void maintainScrollPositionAtAnchor(Node*);
+    void maintainScrollPositionAtAnchor(ContainerNode*);
     WEBCORE_EXPORT void scrollElementToRect(Element*, const IntRect&);
 
     // Methods to convert points and rects between the coordinate space of the renderer, and this view.
@@ -535,6 +541,7 @@ private:
         InLayout,
         InViewSizeAdjust,
         InPostLayout,
+        InPostLayerPositionsUpdatedAfterLayout,
     };
     LayoutPhase layoutPhase() const { return m_layoutPhase; }
 
@@ -551,6 +558,10 @@ private:
 
     bool shouldUpdateCompositingLayersAfterScrolling() const;
 
+    virtual bool shouldDeferScrollUpdateAfterContentSizeChange() override;
+
+    virtual void scrollPositionChangedViaPlatformWidgetImpl(const IntPoint& oldPosition, const IntPoint& newPosition) override;
+
     void applyOverflowToViewport(RenderElement*, ScrollbarMode& hMode, ScrollbarMode& vMode);
     void applyPaginationToViewport();
 
@@ -561,6 +572,7 @@ private:
     void forceLayoutParentViewIfNeeded();
     void performPostLayoutTasks();
     void autoSizeIfEnabled();
+    void updateThrottledDOMTimersState();
 
     void updateLayerFlushThrottling();
     WEBCORE_EXPORT void adjustTiledBackingCoverage();
@@ -607,9 +619,9 @@ private:
     virtual void notifyPageThatContentAreaWillPaint() const override;
 
     void enableSpeculativeTilingIfNeeded();
-    void speculativeTilingEnableTimerFired(Timer<FrameView>&);
+    void speculativeTilingEnableTimerFired();
 
-    void updateEmbeddedObjectsTimerFired(Timer<FrameView>*);
+    void updateEmbeddedObjectsTimerFired();
     bool updateEmbeddedObjects();
     void updateEmbeddedObject(RenderEmbeddedObject&);
     void scrollToAnchor();
@@ -653,7 +665,7 @@ private:
     bool m_isOverlapped;
     bool m_contentIsOpaque;
 
-    Timer<FrameView> m_layoutTimer;
+    Timer m_layoutTimer;
     bool m_delayedLayout;
     RenderElement* m_layoutRoot;
 
@@ -662,8 +674,8 @@ private:
     bool m_inSynchronousPostLayout;
     int m_layoutCount;
     unsigned m_nestedLayoutCount;
-    Timer<FrameView> m_postLayoutTasksTimer;
-    Timer<FrameView> m_updateEmbeddedObjectsTimer;
+    Timer m_postLayoutTasksTimer;
+    Timer m_updateEmbeddedObjectsTimer;
     bool m_firstLayoutCallbackPending;
 
     bool m_firstLayout;
@@ -685,7 +697,7 @@ private:
     bool m_wasScrolledByUser;
     bool m_inProgrammaticScroll;
     bool m_safeToPropagateScrollToParent;
-    Timer<FrameView> m_delayedScrollEventTimer;
+    Timer m_delayedScrollEventTimer;
 
     double m_lastPaintTime;
 
@@ -708,13 +720,13 @@ private:
     bool m_isVisuallyNonEmpty;
     bool m_firstVisuallyNonEmptyLayoutCallbackPending;
 
-    RefPtr<Node> m_maintainScrollPositionAnchor;
+    RefPtr<ContainerNode> m_maintainScrollPositionAnchor;
 
     // Renderer to hold our custom scroll corner.
     RenderPtr<RenderScrollbarPart> m_scrollCorner;
 
     bool m_speculativeTilingEnabled;
-    Timer<FrameView> m_speculativeTilingEnableTimer;
+    Timer m_speculativeTilingEnableTimer;
 
 #if PLATFORM(IOS)
     bool m_useCustomFixedPositionLayoutRect;
@@ -748,6 +760,8 @@ private:
 
     std::unique_ptr<ScrollableAreaSet> m_scrollableAreas;
     std::unique_ptr<ViewportConstrainedObjectSet> m_viewportConstrainedObjects;
+
+    HashSet<DOMTimer*> m_throttledTimers;
 
     int m_headerHeight;
     int m_footerHeight;

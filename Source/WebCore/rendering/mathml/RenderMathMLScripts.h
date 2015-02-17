@@ -35,7 +35,7 @@ namespace WebCore {
     
 class RenderMathMLScripts;
 
-class RenderMathMLScriptsWrapper : public RenderMathMLBlock {
+class RenderMathMLScriptsWrapper final : public RenderMathMLBlock {
 
 friend class RenderMathMLScripts;
 
@@ -43,10 +43,10 @@ public:
     enum WrapperType { Base, SubSupPair };
 
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0) override;
-    virtual RenderObject* removeChild(RenderObject&) override;
+    virtual void removeChild(RenderObject&) override;
 
 private:
-    RenderMathMLScriptsWrapper(Document& document, PassRef<RenderStyle> style, WrapperType kind)
+    RenderMathMLScriptsWrapper(Document& document, Ref<RenderStyle>&& style, WrapperType kind)
         : RenderMathMLBlock(document, WTF::move(style))
         , m_kind(kind)
     {
@@ -55,7 +55,7 @@ private:
     static RenderMathMLScriptsWrapper* createAnonymousWrapper(RenderMathMLScripts* renderObject, WrapperType);
 
     void addChildInternal(bool normalInsertion, RenderObject* child, RenderObject* beforeChild = 0);
-    RenderObject* removeChildInternal(bool normalRemoval, RenderObject& child);
+    void removeChildInternal(bool normalRemoval, RenderObject& child);
 
     virtual const char* renderName() const override { return m_kind == Base ? "Base Wrapper" : "SubSupPair Wrapper"; }
     virtual bool isRenderMathMLScriptsWrapper() const override final { return true; }
@@ -66,26 +66,26 @@ private:
 };
 
 // Render a base with scripts.
-class RenderMathMLScripts : public RenderMathMLBlock {
+class RenderMathMLScripts final : public RenderMathMLBlock {
 
 friend class RenderMathMLScriptsWrapper;
 
 public:
-    RenderMathMLScripts(Element&, PassRef<RenderStyle>);
+    RenderMathMLScripts(Element&, Ref<RenderStyle>&&);
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0) override;
-    virtual RenderObject* removeChild(RenderObject&) override;
+    virtual void removeChild(RenderObject&) override;
     
-    virtual RenderMathMLOperator* unembellishedOperator();
+    virtual RenderMathMLOperator* unembellishedOperator() override;
     virtual int firstLineBaseline() const override;
 
 protected:
-    virtual void layout();
+    virtual void layout() override;
     
 private:
     void addChildInternal(bool normalInsertion, RenderObject* child, RenderObject* beforeChild = 0);
-    RenderObject* removeChildInternal(bool normalRemoval, RenderObject& child);
+    void removeChildInternal(bool normalRemoval, RenderObject& child);
 
-    virtual bool isRenderMathMLScripts() const override final { return true; }
+    virtual bool isRenderMathMLScripts() const override { return true; }
     virtual const char* renderName() const override { return "RenderMathMLScripts"; }
 
     void fixAnonymousStyleForSubSupPair(RenderObject* subSupPair, bool isPostScript);

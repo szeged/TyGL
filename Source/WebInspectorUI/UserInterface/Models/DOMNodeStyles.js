@@ -248,7 +248,7 @@ WebInspector.DOMNodeStyles.prototype = {
         CSSAgent.getComputedStyleForNode.invoke({nodeId: this._node.id}, fetchedComputedStyle.bind(this));
     },
 
-    addRule: function(selector)
+    addEmptyRule: function()
     {
         function addedRule(error, rulePayload)
         {
@@ -260,7 +260,7 @@ WebInspector.DOMNodeStyles.prototype = {
             this.refresh();
         }
 
-        selector = selector || this._node.appropriateSelectorFor(true);
+        selector = this._node.appropriateSelectorFor(true);
 
         CSSAgent.addRule.invoke({contextNodeId: this._node.id, selector: selector}, addedRule.bind(this));
     },
@@ -405,8 +405,10 @@ WebInspector.DOMNodeStyles.prototype = {
             return;
         }
 
-        function fetchedStyleSheetContent(styleSheet, content)
+        function fetchedStyleSheetContent(parameters)
         {
+            var content = parameters.content;
+
             console.assert(style.styleSheetTextRange);
             if (!style.styleSheetTextRange)
                 return;
@@ -446,85 +448,10 @@ WebInspector.DOMNodeStyles.prototype = {
         this._needsRefresh = true;
         this._ignoreNextContentDidChangeForStyleSheet = style.ownerStyleSheet;
 
-        style.ownerStyleSheet.requestContent(fetchedStyleSheetContent.bind(this));
-    },
-
-    changeProperty: function(property, name, value, priority)
-    {
-        var text = name ? name + ": " + value + (priority ? " !" + priority : "") + ";" : "";
-        this.changePropertyText(property, text);
-    },
-
-    changePropertyText: function(property, text)
-    {
-        text = text || "";
-
-        var index = property.index;
-        var newProperty = isNaN(index);
-        var overwrite = true;
-
-        // If this is a new property, then give it an index at the end of the current properties.
-        // Also don't overwrite, which will cause the property to be added at that index.
-        if (newProperty) {
-            index = property.ownerStyle.properties.length;
-            overwrite = false;
-        }
-
-        if (text && text.charAt(text.length - 1) !== ";")
-            text += ";";
-
-        this._needsRefresh = true;
-        this._ignoreNextContentDidChangeForStyleSheet = property.ownerStyle.ownerStyleSheet;
-
-        CSSAgent.setPropertyText(property.ownerStyle.id, index, text, overwrite, this._handlePropertyChange.bind(this, property));
-    },
-
-    changePropertyEnabledState: function(property, enabled)
-    {
-        enabled = !!enabled;
-
-        // Can't change a pending property with a NaN index.
-        if (isNaN(property.index))
-            return;
-
-        this._ignoreNextContentDidChangeForStyleSheet = property.ownerStyle.ownerStyleSheet;
-
-        CSSAgent.toggleProperty(property.ownerStyle.id, property.index, !enabled, this._handlePropertyChange.bind(this, property));
-    },
-
-    addProperty: function(property)
-    {
-        // Can't add a property unless it has a NaN index.
-        if (!isNaN(property.index))
-            return;
-
-        // Adding is done by setting the text.
-        this.changePropertyText(property, property.text);
-    },
-
-    removeProperty: function(property)
-    {
-        // Can't remove a pending property with a NaN index.
-        if (isNaN(property.index))
-            return;
-
-        // Removing is done by setting text to an empty string.
-        this.changePropertyText(property, "");
+        style.ownerStyleSheet.requestContent().then(fetchedStyleSheetContent.bind(this));
     },
 
     // Private
-
-    _handlePropertyChange: function(property, error, stylePayload)
-    {
-        if (error)
-            return;
-
-        DOMAgent.markUndoableState();
-
-        // Do a refresh instead of handling stylePayload so computed style is updated and we get valid
-        // styleSheetTextRange values for all the rules after this change.
-        this.refresh();
-    },
 
     _createSourceCodeLocation: function(sourceURL, sourceLine, sourceColumn)
     {
@@ -594,6 +521,7 @@ WebInspector.DOMNodeStyles.prototype = {
             enabled = false;
             break;
         case "style":
+            // FIXME: Is this still needed? This includes UserAgent styles and HTML attribute styles.
             anonymous = true;
             break;
         }
@@ -648,6 +576,9 @@ WebInspector.DOMNodeStyles.prototype = {
 
         var id = payload.styleId;
         var mapKey = id ? id.styleSheetId + ":" + id.ordinal : null;
+
+        if (type == WebInspector.CSSStyleDeclaration.Type.Attribute)
+            mapKey = node.id + ":attribute";
 
         var styleDeclaration = rule ? rule.style : null;
         var styleDeclarations = [];
@@ -745,6 +676,29 @@ WebInspector.DOMNodeStyles.prototype = {
         return styleDeclaration;
     },
 
+    _parseSelectorListPayload: function(selectorList)
+    {
+        // COMPATIBILITY (iOS 6): The payload did not have 'selectorList'.
+        if (!selectorList)
+            return [];
+
+        var selectors = selectorList.selectors;
+        if (!selectors.length)
+            return [];
+
+        // COMPATIBILITY (iOS 8): The selectorList payload was an array of selector text strings.
+        // Now they are CSSSelector objects with multiple properties.
+        if (typeof selectors[0] === "string") {
+            return selectors.map(function(selectorText) {
+                return new WebInspector.CSSSelector(selectorText);
+            });
+        }
+
+        return selectors.map(function(selectorPayload) {
+            return new WebInspector.CSSSelector(selectorPayload.text, selectorPayload.specificity, selectorPayload.dynamic);
+        });
+    },
+
     _parseRulePayload: function(payload, matchedSelectorIndices, node, inherited, ruleOccurrences)
     {
         if (!payload)
@@ -766,10 +720,10 @@ WebInspector.DOMNodeStyles.prototype = {
                 occurrence = ++ruleOccurrences[mapKey];
             else
                 ruleOccurrences[mapKey] = occurrence;
-        }
 
-        // Append the occurrence number to the map key for lookup in the rules map.
-        mapKey += ":" + occurrence;
+            // Append the occurrence number to the map key for lookup in the rules map.
+            mapKey += ":" + occurrence;
+        }
 
         var rule = null;
 
@@ -791,7 +745,7 @@ WebInspector.DOMNodeStyles.prototype = {
         // COMPATIBILITY (iOS 6): The payload had 'selectorText' as a property,
         // now it has 'selectorList' with a 'text' property. Support both here.
         var selectorText = payload.selectorList ? payload.selectorList.text : payload.selectorText;
-        var selectors = payload.selectorList ? payload.selectorList.selectors : [];
+        var selectors = this._parseSelectorListPayload(payload.selectorList);
 
         // COMPATIBILITY (iOS 6): The payload did not have 'selectorList'.
         // Fallback to using 'sourceLine' without column information.
@@ -955,7 +909,7 @@ WebInspector.DOMNodeStyles.prototype = {
 
             for (var j = 0; j < properties.length; ++j) {
                 var property = properties[j];
-                if (!property.enabled || property.anonymous || !property.valid) {
+                if (!property.enabled || !property.valid) {
                     property.overridden = false;
                     continue;
                 }

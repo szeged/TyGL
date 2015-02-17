@@ -92,6 +92,31 @@ WebInspector.RulesStyleDetailsPanel.prototype = {
             });
         }
 
+        function uniqueOrderedStyles(orderedStyles)
+        {
+            var uniqueStyles = [];
+
+            for (var style of orderedStyles) {
+                var rule = style.ownerRule;
+                if (!rule) {
+                    uniqueStyles.push(style);
+                    continue;
+                }
+
+                var found = false;
+                for (var existingStyle of uniqueStyles) {
+                    if (rule.isEqualTo(existingStyle.ownerRule)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    uniqueStyles.push(style);
+            }
+
+            return uniqueStyles;
+        }
+
         function appendStyleSection(style)
         {
             var section = style.__rulesSection;
@@ -138,10 +163,9 @@ WebInspector.RulesStyleDetailsPanel.prototype = {
         var pseudoElements = this.nodeStyles.pseudoElements;
         for (var pseudoIdentifier in pseudoElements) {
             var pseudoElement = pseudoElements[pseudoIdentifier];
-            for (var i = 0; i < pseudoElement.orderedStyles.length; ++i) {
-                var style = pseudoElement.orderedStyles[i];
+            var orderedStyles = uniqueOrderedStyles(pseudoElement.orderedStyles);
+            for (var style of orderedStyles)
                 appendStyleSection.call(this, style);
-            }
 
             if (previousSection)
                 previousSection.lastInGroup = true;
@@ -149,7 +173,7 @@ WebInspector.RulesStyleDetailsPanel.prototype = {
 
         var addedNewRuleButton = false;
 
-        var orderedStyles = this.nodeStyles.orderedStyles;
+        var orderedStyles = uniqueOrderedStyles(this.nodeStyles.orderedStyles);
         for (var i = 0; i < orderedStyles.length; ++i) {
             var style = orderedStyles[i];
 
@@ -216,18 +240,8 @@ WebInspector.RulesStyleDetailsPanel.prototype = {
         for (var i = 0; i < this._sections.length; ++i)
             this._sections[i].updateLayout();
 
-        if (previousFocusedSection) {
+        if (previousFocusedSection)
             previousFocusedSection.focus();
-
-            function scrollToFocusedSection()
-            {
-                previousFocusedSection.element.scrollIntoViewIfNeeded(true);
-            }
-
-            // Do the scroll on a timeout since StyleDetailsPanel restores scroll position
-            // after the refresh, and we might not need to scroll after the restore.
-            setTimeout(scrollToFocusedSection, 0);
-        }
     },
 
     // Protected
@@ -266,7 +280,7 @@ WebInspector.RulesStyleDetailsPanel.prototype = {
     _newRuleClicked: function(event)
     {
         this._focusNextNewInspectorRule = true;
-        this.nodeStyles.addRule();
+        this.nodeStyles.addEmptyRule();
     }
 };
 

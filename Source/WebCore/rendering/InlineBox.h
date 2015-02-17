@@ -22,7 +22,9 @@
 #define InlineBox_h
 
 #include "RenderBoxModelObject.h"
+#include "RenderText.h"
 #include "TextDirection.h"
+#include <wtf/TypeCasts.h>
 
 namespace WebCore {
 
@@ -252,9 +254,9 @@ public:
     // Use with caution! The type is not checked!
     RenderBoxModelObject* boxModelObject() const
     { 
-        if (!m_renderer.isText())
-            return &toRenderBoxModelObject(m_renderer);
-        return 0;
+        if (!is<RenderText>(m_renderer))
+            return &downcast<RenderBoxModelObject>(m_renderer);
+        return nullptr;
     }
 
     FloatPoint locationIncludingFlipping();
@@ -275,6 +277,12 @@ public:
         m_expansion = newExpansion;
         m_logicalWidth += m_expansion;
     }
+    void setExpansionWithoutGrowing(float newExpansion)
+    {
+        ASSERT(!m_expansion);
+        m_expansion = newExpansion;
+    }
+    float expansion() const { return m_expansion; }
 
 private:
     InlineBox* m_next; // The next element on the same line as us.
@@ -406,7 +414,6 @@ protected:
     void setHasHyphen(bool hasHyphen) { m_bitfields.setHasEllipsisBoxOrHyphen(hasHyphen); }    
     bool canHaveLeadingExpansion() const { return m_bitfields.hasSelectedChildrenOrCanHaveLeadingExpansion(); }
     void setCanHaveLeadingExpansion(bool canHaveLeadingExpansion) { m_bitfields.setHasSelectedChildrenOrCanHaveLeadingExpansion(canHaveLeadingExpansion); }
-    float expansion() const { return m_expansion; }
     
     // For InlineFlowBox and InlineTextBox
     bool extracted() const { return m_bitfields.extracted(); }
@@ -419,9 +426,6 @@ private:
     bool m_hasBadParent;
 #endif
 };
-
-#define INLINE_BOX_OBJECT_TYPE_CASTS(ToValueTypeName, predicate) \
-    TYPE_CASTS_BASE(ToValueTypeName, InlineBox, object, object->predicate, object.predicate)
 
 #if ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
 
@@ -436,6 +440,11 @@ inline void InlineBox::assertNotDeleted() const
 #endif
 
 } // namespace WebCore
+
+#define SPECIALIZE_TYPE_TRAITS_INLINE_BOX(ToValueTypeName, predicate) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ToValueTypeName) \
+    static bool isType(const WebCore::InlineBox& box) { return box.predicate; } \
+SPECIALIZE_TYPE_TRAITS_END()
 
 #ifndef NDEBUG
 // Outside the WebCore namespace for ease of invocation from gdb.

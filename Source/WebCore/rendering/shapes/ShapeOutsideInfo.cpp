@@ -141,7 +141,9 @@ static LayoutRect getShapeImageMarginRect(const RenderBox& renderBox, const Layo
 {
     LayoutPoint marginBoxOrigin(-renderBox.marginLogicalLeft() - renderBox.borderAndPaddingLogicalLeft(), -renderBox.marginBefore() - renderBox.borderBefore() - renderBox.paddingBefore());
     LayoutSize marginBoxSizeDelta(renderBox.marginLogicalWidth() + renderBox.borderAndPaddingLogicalWidth(), renderBox.marginLogicalHeight() + renderBox.borderAndPaddingLogicalHeight());
-    return LayoutRect(marginBoxOrigin, referenceBoxLogicalSize + marginBoxSizeDelta);
+    LayoutSize marginRectSize(referenceBoxLogicalSize + marginBoxSizeDelta);
+    marginRectSize.clampNegativeToZero();
+    return LayoutRect(marginBoxOrigin, marginRectSize);
 }
 
 std::unique_ptr<Shape> ShapeOutsideInfo::createShapeForImage(StyleImage* styleImage, float shapeImageThreshold, WritingMode writingMode, float margin) const
@@ -150,8 +152,8 @@ std::unique_ptr<Shape> ShapeOutsideInfo::createShapeForImage(StyleImage* styleIm
     styleImage->setContainerSizeForRenderer(&m_renderer, imageSize, m_renderer.style().effectiveZoom());
 
     const LayoutRect& marginRect = getShapeImageMarginRect(m_renderer, m_referenceBoxLogicalSize);
-    const LayoutRect& imageRect = m_renderer.isRenderImage()
-        ? toRenderImage(&m_renderer)->replacedContentRect(m_renderer.intrinsicSize())
+    const LayoutRect& imageRect = is<RenderImage>(m_renderer)
+        ? downcast<RenderImage>(m_renderer).replacedContentRect(m_renderer.intrinsicSize())
         : LayoutRect(LayoutPoint(), imageSize);
 
     ASSERT(!styleImage->isPendingImage());
@@ -177,7 +179,7 @@ const Shape& ShapeOutsideInfo::computedShape() const
     switch (shapeValue.type()) {
     case ShapeValue::Type::Shape:
         ASSERT(shapeValue.shape());
-        m_shape = Shape::createShape(shapeValue.shape(), m_referenceBoxLogicalSize, writingMode, margin);
+        m_shape = Shape::createShape(*shapeValue.shape(), m_referenceBoxLogicalSize, writingMode, margin);
         break;
     case ShapeValue::Type::Image:
         ASSERT(shapeValue.isImageValid());

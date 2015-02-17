@@ -23,6 +23,7 @@
 #include "ewk_view_private.h"
 
 #include "EwkView.h"
+#include "WebInspectorProxy.h"
 #include "ewk_back_forward_list_private.h"
 #include "ewk_context_private.h"
 #include "ewk_main_private.h"
@@ -42,8 +43,8 @@
 #include <WebKit/WKViewEfl.h>
 #include <wtf/text/CString.h>
 
-#if ENABLE(INSPECTOR)
-#include "WebInspectorProxy.h"
+#if HAVE(ACCESSIBILITY)
+#include "WebAccessibility.h"
 #endif
 
 using namespace WebKit;
@@ -79,7 +80,7 @@ Eina_Bool ewk_view_smart_class_set(Ewk_View_Smart_Class* api)
 
 Evas_Object* EWKViewCreate(WKContextRef context, WKPageGroupRef pageGroup, Evas* canvas, Evas_Smart* smart)
 {
-    if (!EwkMain::shared().isInitialized()) {
+    if (!EwkMain::singleton().isInitialized()) {
         EINA_LOG_CRIT("EWebKit has not been initialized. You must call ewk_init() before creating view.");
         return nullptr;
     }
@@ -206,6 +207,8 @@ Eina_Bool ewk_view_scale_set(Evas_Object* ewkView, double scaleFactor, int x, in
     EWK_VIEW_IMPL_GET_OR_RETURN(ewkView, impl, false);
 
     WKPageSetScaleFactor(impl->wkPage(), scaleFactor, WKPointMake(x, y));
+    impl->updateScaleToPageViewportController(scaleFactor, x, y);
+
     return true;
 }
 
@@ -501,7 +504,6 @@ Eina_Bool ewk_view_touch_events_enabled_get(const Evas_Object* ewkView)
 
 Eina_Bool ewk_view_inspector_show(Evas_Object* ewkView)
 {
-#if ENABLE(INSPECTOR)
     EWK_VIEW_IMPL_GET_OR_RETURN(ewkView, impl, false);
 
     WKInspectorRef wkInspector = WKPageGetInspector(impl->wkPage());
@@ -509,15 +511,10 @@ Eina_Bool ewk_view_inspector_show(Evas_Object* ewkView)
         WKInspectorShow(wkInspector);
 
     return true;
-#else
-    UNUSED_PARAM(ewkView);
-    return false;
-#endif
 }
 
 Eina_Bool ewk_view_inspector_close(Evas_Object* ewkView)
 {
-#if ENABLE(INSPECTOR)
     EWK_VIEW_IMPL_GET_OR_RETURN(ewkView, impl, false);
 
     WKInspectorRef wkInspector = WKPageGetInspector(impl->wkPage());
@@ -525,10 +522,6 @@ Eina_Bool ewk_view_inspector_close(Evas_Object* ewkView)
         WKInspectorClose(wkInspector);
 
     return true;
-#else
-    UNUSED_PARAM(ewkView);
-    return false;
-#endif
 }
 
 inline WKPaginationMode toWKPaginationMode(Ewk_Pagination_Mode mode)
@@ -783,4 +776,48 @@ Eina_Bool ewk_view_contents_size_get(const Evas_Object* ewkView, Evas_Coord* wid
         *height = contentsSize.height;
 
     return true;
+}
+
+Eina_Bool ewk_view_accessibility_action_activate_get(const Evas_Object* ewkView)
+{
+#if HAVE(ACCESSIBILITY) && defined(HAVE_ECORE_X)
+    EWK_VIEW_IMPL_GET_OR_RETURN(ewkView, impl, false);
+    return impl->webAccessibility()->activateAction();
+#else
+    UNUSED_PARAM(ewkView);
+    return false;
+#endif
+}
+
+Eina_Bool ewk_view_accessibility_action_next_get(const Evas_Object* ewkView)
+{
+#if HAVE(ACCESSIBILITY) && defined(HAVE_ECORE_X)
+    EWK_VIEW_IMPL_GET_OR_RETURN(ewkView, impl, false);
+    return impl->webAccessibility()->nextAction();
+#else
+    UNUSED_PARAM(ewkView);
+    return false;
+#endif
+}
+
+Eina_Bool ewk_view_accessibility_action_prev_get(const Evas_Object* ewkView)
+{
+#if HAVE(ACCESSIBILITY) && defined(HAVE_ECORE_X)
+    EWK_VIEW_IMPL_GET_OR_RETURN(ewkView, impl, false);
+    return impl->webAccessibility()->prevAction();
+#else
+    UNUSED_PARAM(ewkView);
+    return false;
+#endif
+}
+
+Eina_Bool ewk_view_accessibility_action_read_by_point_get(const Evas_Object* ewkView)
+{
+#if HAVE(ACCESSIBILITY) && defined(HAVE_ECORE_X)
+    EWK_VIEW_IMPL_GET_OR_RETURN(ewkView, impl, false);
+    return impl->webAccessibility()->readAction();
+#else
+    UNUSED_PARAM(ewkView);
+    return false;
+#endif
 }

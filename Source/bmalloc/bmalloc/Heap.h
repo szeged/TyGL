@@ -27,6 +27,7 @@
 #define Heap_h
 
 #include "BumpRange.h"
+#include "Environment.h"
 #include "LineMetadata.h"
 #include "MediumChunk.h"
 #include "MediumLine.h"
@@ -49,6 +50,8 @@ class EndTag;
 class Heap {
 public:
     Heap(std::lock_guard<StaticMutex>&);
+    
+    Environment& environment() { return m_environment; }
 
     void refillSmallBumpRangeCache(std::lock_guard<StaticMutex>&, size_t sizeClass, BumpRangeCache&);
     void derefSmallLine(std::lock_guard<StaticMutex>&, SmallLine*);
@@ -57,10 +60,13 @@ public:
     void derefMediumLine(std::lock_guard<StaticMutex>&, MediumLine*);
 
     void* allocateLarge(std::lock_guard<StaticMutex>&, size_t);
+    void* allocateLarge(std::lock_guard<StaticMutex>&, size_t alignment, size_t, size_t unalignedSize);
     void deallocateLarge(std::lock_guard<StaticMutex>&, void*);
 
     void* allocateXLarge(std::lock_guard<StaticMutex>&, size_t);
-    void deallocateXLarge(std::lock_guard<StaticMutex>&, void*);
+    void* allocateXLarge(std::lock_guard<StaticMutex>&, size_t alignment, size_t);
+    Range findXLarge(std::lock_guard<StaticMutex>&, void*);
+    void deallocateXLarge(std::unique_lock<StaticMutex>&, void*);
 
     void scavenge(std::unique_lock<StaticMutex>&, std::chrono::milliseconds sleepDuration);
 
@@ -75,7 +81,8 @@ private:
     void deallocateSmallLine(std::lock_guard<StaticMutex>&, SmallLine*);
     void deallocateMediumLine(std::lock_guard<StaticMutex>&, MediumLine*);
 
-    void* allocateLarge(Range, size_t);
+    void* allocateLarge(std::lock_guard<StaticMutex>&, const Range&, size_t);
+    void allocateLarge(std::lock_guard<StaticMutex>&, const Range&, size_t, Range& leftover);
     Range allocateLargeChunk();
 
     void splitLarge(BeginTag*, size_t, EndTag*&, Range&);
@@ -98,8 +105,11 @@ private:
     Vector<MediumPage*> m_mediumPages;
 
     SegregatedFreeList m_largeRanges;
+    Vector<Range> m_xLargeRanges;
 
     bool m_isAllocatingPages;
+
+    Environment m_environment;
 
     VMHeap m_vmHeap;
     AsyncTask<Heap, decltype(&Heap::concurrentScavenge)> m_scavenger;

@@ -24,8 +24,10 @@
 #include "WebKitFileChooserRequestPrivate.h"
 #include "WebKitGeolocationPermissionRequestPrivate.h"
 #include "WebKitNavigationActionPrivate.h"
+#include "WebKitNotificationPermissionRequestPrivate.h"
 #include "WebKitPrivate.h"
 #include "WebKitURIRequestPrivate.h"
+#include "WebKitUserMediaPermissionRequestPrivate.h"
 #include "WebKitWebViewBasePrivate.h"
 #include "WebKitWebViewPrivate.h"
 #include "WebKitWindowPropertiesPrivate.h"
@@ -151,10 +153,24 @@ private:
         return true;
     }
 
-    virtual bool decidePolicyForGeolocationPermissionRequest(WebPageProxy*, WebFrameProxy*, WebSecurityOrigin*, GeolocationPermissionRequestProxy* permissionRequest) override
+    virtual bool decidePolicyForGeolocationPermissionRequest(WebPageProxy*, WebFrameProxy*, API::SecurityOrigin*, GeolocationPermissionRequestProxy* permissionRequest) override
     {
         GRefPtr<WebKitGeolocationPermissionRequest> geolocationPermissionRequest = adoptGRef(webkitGeolocationPermissionRequestCreate(permissionRequest));
         webkitWebViewMakePermissionRequest(m_webView, WEBKIT_PERMISSION_REQUEST(geolocationPermissionRequest.get()));
+        return true;
+    }
+
+    virtual bool decidePolicyForUserMediaPermissionRequest(WebPageProxy&, WebFrameProxy&, API::SecurityOrigin& securityOrigin, UserMediaPermissionRequestProxy& permissionRequest) override
+    {
+        GRefPtr<WebKitUserMediaPermissionRequest> userMediaPermissionRequest = adoptGRef(webkitUserMediaPermissionRequestCreate(permissionRequest, securityOrigin));
+        webkitWebViewMakePermissionRequest(m_webView, WEBKIT_PERMISSION_REQUEST(userMediaPermissionRequest.get()));
+        return true;
+    }
+
+    virtual bool decidePolicyForNotificationPermissionRequest(WebPageProxy*, API::SecurityOrigin*, NotificationPermissionRequest* permissionRequest) override
+    {
+        GRefPtr<WebKitNotificationPermissionRequest> notificationPermissionRequest = adoptGRef(webkitNotificationPermissionRequestCreate(permissionRequest));
+        webkitWebViewMakePermissionRequest(m_webView, WEBKIT_PERMISSION_REQUEST(notificationPermissionRequest.get()));
         return true;
     }
 
@@ -168,6 +184,11 @@ private:
     virtual void runModal(WebPageProxy*) override
     {
         webkitWebViewRunAsModal(m_webView);
+    }
+
+    virtual void isPlayingAudioDidChange(WebPageProxy&) override
+    {
+        webkitWebViewIsPlayingAudioChanged(m_webView);
     }
 
     WebKitWebView* m_webView;

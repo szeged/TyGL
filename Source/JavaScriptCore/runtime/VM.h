@@ -29,8 +29,10 @@
 #ifndef VM_h
 #define VM_h
 
+#include "ControlFlowProfiler.h"
 #include "DateInstanceCache.h"
 #include "ExecutableAllocator.h"
+#include "FunctionHasExecutedCache.h"
 #include "Heap.h"
 #include "Intrinsic.h"
 #include "JITThunks.h"
@@ -46,7 +48,6 @@
 #include "Strong.h"
 #include "ThunkGenerators.h"
 #include "TypedArrayController.h"
-#include "TypeLocation.h"
 #include "VMEntryRecord.h"
 #include "Watchdog.h"
 #include "Watchpoint.h"
@@ -72,7 +73,6 @@ namespace JSC {
 
 class ArityCheckFailReturnThunks;
 class BuiltinExecutables;
-class CallEdgeLog;
 class CodeBlock;
 class CodeCache;
 class CommonIdentifiers;
@@ -88,7 +88,6 @@ class Keywords;
 class LLIntOffsetsExtractor;
 class LegacyProfiler;
 class NativeExecutable;
-class ParserArena;
 class RegExpCache;
 class ScriptExecutable;
 class SourceProvider;
@@ -133,6 +132,7 @@ struct LocalTimeOffsetCache {
         : start(0.0)
         , end(-1.0)
         , increment(0.0)
+        , timeType(WTF::UTCTime)
     {
     }
 
@@ -142,12 +142,14 @@ struct LocalTimeOffsetCache {
         start = 0.0;
         end = -1.0;
         increment = 0.0;
+        timeType = WTF::UTCTime;
     }
 
     LocalTimeOffset offset;
     double start;
     double end;
     double increment;
+    WTF::TimeType timeType;
 };
 
 class ConservativeRoots;
@@ -215,8 +217,6 @@ public:
     static PassRefPtr<VM> createContextGroup(HeapType = SmallHeap);
     JS_EXPORT_PRIVATE ~VM();
 
-    void makeUsableFromMultipleThreads() { heap.machineThreads().makeUsableFromMultipleThreads(); }
-
 private:
     RefPtr<JSLock> m_apiLock;
 
@@ -232,11 +232,8 @@ public:
     Heap heap;
 
 #if ENABLE(DFG_JIT)
-    OwnPtr<DFG::LongLivedState> dfgState;
+    std::unique_ptr<DFG::LongLivedState> dfgState;
 #endif // ENABLE(DFG_JIT)
-
-    std::unique_ptr<CallEdgeLog> callEdgeLog;
-    CallEdgeLog& ensureCallEdgeLog();
 
     VMType vmType;
     ClientData* clientData;
@@ -261,6 +258,7 @@ public:
     Strong<Structure> programExecutableStructure;
     Strong<Structure> functionExecutableStructure;
     Strong<Structure> regExpStructure;
+    Strong<Structure> symbolStructure;
     Strong<Structure> symbolTableStructure;
     Strong<Structure> structureChainStructure;
     Strong<Structure> sparseArrayValueMapStructure;
@@ -323,13 +321,12 @@ public:
 
     PrototypeMap prototypeMap;
 
-    OwnPtr<ParserArena> parserArena;
     typedef HashMap<RefPtr<SourceProvider>, RefPtr<SourceProviderCache>> SourceProviderCacheMap;
     SourceProviderCacheMap sourceProviderCacheMap;
-    OwnPtr<Keywords> keywords;
+    std::unique_ptr<Keywords> keywords;
     Interpreter* interpreter;
 #if ENABLE(JIT)
-    OwnPtr<JITThunks> jitStubs;
+    std::unique_ptr<JITThunks> jitStubs;
     MacroAssemblerCodeRef getCTIStub(ThunkGenerator generator)
     {
         return jitStubs->ctiStub(this, generator);
@@ -456,7 +453,7 @@ public:
     String cachedDateString;
     double cachedDateStringValue;
 
-    OwnPtr<Profiler::Database> m_perBytecodeProfiler;
+    std::unique_ptr<Profiler::Database> m_perBytecodeProfiler;
     RefPtr<TypedArrayController> m_typedArrayController;
     RegExpCache* m_regExpCache;
     BumpPointerAllocator m_regExpAllocator;
@@ -515,10 +512,13 @@ public:
     bool disableTypeProfiler();
     TypeProfilerLog* typeProfilerLog() { return m_typeProfilerLog.get(); }
     TypeProfiler* typeProfiler() { return m_typeProfiler.get(); }
-    TypeLocation* nextTypeLocation();
     JS_EXPORT_PRIVATE void dumpTypeProfilerData();
-    void invalidateTypeSetCache();
-    GlobalVariableID getNextUniqueVariableID() { return m_nextUniqueVariableID++; }
+
+    FunctionHasExecutedCache* functionHasExecutedCache() { return &m_functionHasExecutedCache; }
+
+    ControlFlowProfiler* controlFlowProfiler() { return m_controlFlowProfiler.get(); }
+    bool enableControlFlowProfiler();
+    bool disableControlFlowProfiler();
 
 private:
     friend class LLIntOffsetsExtractor;
@@ -563,16 +563,17 @@ private:
     void* m_lastStackTop;
     JSValue m_exception;
     bool m_inDefineOwnProperty;
-    OwnPtr<CodeCache> m_codeCache;
+    std::unique_ptr<CodeCache> m_codeCache;
     LegacyProfiler* m_enabledProfiler;
-    OwnPtr<BuiltinExecutables> m_builtinExecutables;
+    std::unique_ptr<BuiltinExecutables> m_builtinExecutables;
     RefCountedArray<StackFrame> m_exceptionStack;
     HashMap<String, RefPtr<WatchpointSet>> m_impurePropertyWatchpointSets;
     std::unique_ptr<TypeProfiler> m_typeProfiler;
     std::unique_ptr<TypeProfilerLog> m_typeProfilerLog;
-    GlobalVariableID m_nextUniqueVariableID;
     unsigned m_typeProfilerEnabledCount;
-    std::unique_ptr<Bag<TypeLocation>> m_typeLocationInfo;
+    FunctionHasExecutedCache m_functionHasExecutedCache;
+    std::unique_ptr<ControlFlowProfiler> m_controlFlowProfiler;
+    unsigned m_controlFlowProfilerEnabledCount;
 };
 
 #if ENABLE(GC_VALIDATION)

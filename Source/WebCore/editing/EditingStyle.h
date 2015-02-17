@@ -70,29 +70,29 @@ public:
     enum ShouldExtractMatchingStyle { ExtractMatchingStyle, DoNotExtractMatchingStyle };
     static float NoFontDelta;
 
-    static PassRefPtr<EditingStyle> create()
+    static Ref<EditingStyle> create()
     {
-        return adoptRef(new EditingStyle());
+        return adoptRef(*new EditingStyle);
     }
 
-    static PassRefPtr<EditingStyle> create(Node* node, PropertiesToInclude propertiesToInclude = OnlyEditingInheritableProperties)
+    static Ref<EditingStyle> create(Node* node, PropertiesToInclude propertiesToInclude = OnlyEditingInheritableProperties)
     {
-        return adoptRef(new EditingStyle(node, propertiesToInclude));
+        return adoptRef(*new EditingStyle(node, propertiesToInclude));
     }
 
-    static PassRefPtr<EditingStyle> create(const Position& position, PropertiesToInclude propertiesToInclude = OnlyEditingInheritableProperties)
+    static Ref<EditingStyle> create(const Position& position, PropertiesToInclude propertiesToInclude = OnlyEditingInheritableProperties)
     {
-        return adoptRef(new EditingStyle(position, propertiesToInclude));
+        return adoptRef(*new EditingStyle(position, propertiesToInclude));
     }
 
-    static PassRefPtr<EditingStyle> create(const StyleProperties* style)
+    static Ref<EditingStyle> create(const StyleProperties* style)
     {
-        return adoptRef(new EditingStyle(style));
+        return adoptRef(*new EditingStyle(style));
     }
 
-    static PassRefPtr<EditingStyle> create(CSSPropertyID propertyID, const String& value)
+    static Ref<EditingStyle> create(CSSPropertyID propertyID, const String& value)
     {
-        return adoptRef(new EditingStyle(propertyID, value));
+        return adoptRef(*new EditingStyle(propertyID, value));
     }
 
     WEBCORE_EXPORT ~EditingStyle();
@@ -157,7 +157,7 @@ private:
     void removeTextFillAndStrokeColorsIfNeeded(RenderStyle*);
     void setProperty(CSSPropertyID, const String& value, bool important = false);
     void extractFontSizeDelta();
-    template<typename T> TriState triStateOfStyle(T* styleToCompare, ShouldIgnoreTextOnlyProperties) const;
+    template<typename T> TriState triStateOfStyle(T& styleToCompare, ShouldIgnoreTextOnlyProperties) const;
     bool conflictsWithInlineStyleOfElement(StyledElement*, EditingStyle* extractedStyle, Vector<CSSPropertyID>* conflictingProperties) const;
     void mergeInlineAndImplicitStyleOfElement(StyledElement*, CSSPropertyOverrideMode, PropertiesToInclude);
     void mergeStyle(const StyleProperties*, CSSPropertyOverrideMode);
@@ -216,7 +216,7 @@ public:
         return !(*this == other);
     }
 private:
-    void extractTextStyles(Document*, MutableStyleProperties*, bool shouldUseFixedFontDefaultSize);
+    void extractTextStyles(Document*, MutableStyleProperties&, bool shouldUseFixedFontDefaultSize);
 
     String m_cssStyle;
     bool m_applyBold;

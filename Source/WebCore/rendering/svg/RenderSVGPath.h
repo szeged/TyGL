@@ -32,12 +32,12 @@ namespace WebCore {
 
 class RenderSVGPath final : public RenderSVGShape {
 public:
-    RenderSVGPath(SVGGraphicsElement&, PassRef<RenderStyle>);
+    RenderSVGPath(SVGGraphicsElement&, Ref<RenderStyle>&&);
     virtual ~RenderSVGPath();
 
 private:
     virtual bool isSVGPath() const override { return true; }
-    virtual const char* renderName() const { return "RenderSVGPath"; }
+    virtual const char* renderName() const override { return "RenderSVGPath"; }
 
     virtual void updateShapeFromElement() override;
     FloatRect calculateUpdatedStrokeBoundingBox() const;
@@ -54,8 +54,6 @@ private:
 
     Vector<FloatPoint> m_zeroLengthLinecapLocations;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderSVGPath, isSVGPath())
 
 } // namespace WebCore
 

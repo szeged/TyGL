@@ -741,7 +741,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         
     case ArithSin: {
         JSValue child = forNode(node->child1()).value();
-        if (child && child.isNumber()) {
+        if (false && child && child.isNumber()) {
             setConstant(node, jsDoubleNumber(sin(child.asNumber())));
             break;
         }
@@ -751,7 +751,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     
     case ArithCos: {
         JSValue child = forNode(node->child1()).value();
-        if (child && child.isNumber()) {
+        if (false && child && child.isNumber()) {
             setConstant(node, jsDoubleNumber(cos(child.asNumber())));
             break;
         }
@@ -1384,8 +1384,9 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case GetGetter: {
         JSValue base = forNode(node->child1()).m_value;
         if (base) {
-            if (JSObject* getter = jsCast<GetterSetter*>(base)->getterConcurrently()) {
-                setConstant(node, *m_graph.freeze(getter));
+            GetterSetter* getterSetter = jsCast<GetterSetter*>(base);
+            if (!getterSetter->isGetterNull()) {
+                setConstant(node, *m_graph.freeze(getterSetter->getterConcurrently()));
                 break;
             }
         }
@@ -1397,8 +1398,9 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case GetSetter: {
         JSValue base = forNode(node->child1()).m_value;
         if (base) {
-            if (JSObject* setter = jsCast<GetterSetter*>(base)->setterConcurrently()) {
-                setConstant(node, *m_graph.freeze(setter));
+            GetterSetter* getterSetter = jsCast<GetterSetter*>(base);
+            if (!getterSetter->isSetterNull()) {
+                setConstant(node, *m_graph.freeze(getterSetter->setterConcurrently()));
                 break;
             }
         }
@@ -1408,7 +1410,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     }
         
     case GetScope: // FIXME: We could get rid of these if we know that the JSFunction is a constant. https://bugs.webkit.org/show_bug.cgi?id=106202
-    case GetMyScope:
         forNode(node).setType(SpecObjectOther);
         break;
 
@@ -1967,14 +1968,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         forNode(node).makeHeapTop();
         break;
 
-    case ProfiledCall:
-    case ProfiledConstruct:
-        if (forNode(m_graph.varArgChild(node, 0)).m_value)
-            m_state.setFoundConstants(true);
-        clobberWorld(node->origin.semantic, clobberLimit);
-        forNode(node).makeHeapTop();
-        break;
-
     case ForceOSRExit:
     case CheckBadCell:
         m_state.setIsValid(false);
@@ -1992,6 +1985,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case ProfileWillCall:
     case ProfileDidCall:
     case ProfileType:
+    case ProfileControlFlow:
     case Phantom:
     case HardPhantom:
     case CountExecution:

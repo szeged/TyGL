@@ -52,9 +52,9 @@ inline SVGFEMorphologyElement::SVGFEMorphologyElement(const QualifiedName& tagNa
     registerAnimatedPropertiesForSVGFEMorphologyElement();
 }
 
-PassRefPtr<SVGFEMorphologyElement> SVGFEMorphologyElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEMorphologyElement> SVGFEMorphologyElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEMorphologyElement(tagName, document));
+    return adoptRef(*new SVGFEMorphologyElement(tagName, document));
 }
 
 const AtomicString& SVGFEMorphologyElement::radiusXIdentifier()
@@ -141,7 +141,7 @@ void SVGFEMorphologyElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::operatorAttr || attrName == SVGNames::radiusAttr) {
         primitiveAttributeChanged(attrName);

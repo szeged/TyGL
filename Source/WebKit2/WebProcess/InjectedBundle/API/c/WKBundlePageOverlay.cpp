@@ -27,6 +27,7 @@
 #include "WKBundlePageOverlay.h"
 
 #include "APIClient.h"
+#include "InjectedBundleRangeHandle.h"
 #include "WKAPICast.h"
 #include "WKArray.h"
 #include "WKBundleAPICast.h"
@@ -34,6 +35,7 @@
 #include "WKRetainPtr.h"
 #include "WKSharedAPICast.h"
 #include "WKStringPrivate.h"
+#include "WebPage.h"
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/PageOverlay.h>
 #include <WebCore/PlatformMouseEvent.h>
@@ -42,7 +44,7 @@
 namespace API {
 
 template<> struct ClientTraits<WKBundlePageOverlayClientBase> {
-    typedef std::tuple<WKBundlePageOverlayClientV0> Versions;
+    typedef std::tuple<WKBundlePageOverlayClientV0, WKBundlePageOverlayClientV1> Versions;
 };
 
 template<> struct ClientTraits<WKBundlePageOverlayAccessibilityClientBase> {
@@ -131,7 +133,47 @@ private:
             return false;
         }
     }
-    
+
+#if PLATFORM(MAC)
+    virtual DDActionContext *actionContextForResultAtPoint(WebPageOverlay& pageOverlay, WebCore::FloatPoint location, RefPtr<WebCore::Range>& rangeHandle) override
+    {
+        if (!m_client.actionContextForResultAtPoint)
+            return nil;
+
+        WKBundleRangeHandleRef apiRange = nullptr;
+        DDActionContext *actionContext = (DDActionContext *)m_client.actionContextForResultAtPoint(toAPI(&pageOverlay), WKPointMake(location.x(), location.y()), &apiRange, m_client.base.clientInfo);
+
+        if (apiRange)
+            rangeHandle = toImpl(apiRange)->coreRange();
+
+        return actionContext;
+    }
+
+    virtual void dataDetectorsDidPresentUI(WebPageOverlay& pageOverlay) override
+    {
+        if (!m_client.dataDetectorsDidPresentUI)
+            return;
+
+        m_client.dataDetectorsDidPresentUI(toAPI(&pageOverlay), m_client.base.clientInfo);
+    }
+
+    virtual void dataDetectorsDidChangeUI(WebPageOverlay& pageOverlay) override
+    {
+        if (!m_client.dataDetectorsDidChangeUI)
+            return;
+
+        m_client.dataDetectorsDidChangeUI(toAPI(&pageOverlay), m_client.base.clientInfo);
+    }
+
+    virtual void dataDetectorsDidHideUI(WebPageOverlay& pageOverlay) override
+    {
+        if (!m_client.dataDetectorsDidHideUI)
+            return;
+
+        m_client.dataDetectorsDidHideUI(toAPI(&pageOverlay), m_client.base.clientInfo);
+    }
+#endif // PLATFORM(MAC)
+
     virtual bool copyAccessibilityAttributeStringValueForPoint(WebPageOverlay& pageOverlay, String attribute, WebCore::FloatPoint parameter, String& value) override
     {
         if (!m_accessibilityClient.client().copyAccessibilityAttributeValue)
@@ -181,19 +223,12 @@ WKTypeID WKBundlePageOverlayGetTypeID()
 
 WKBundlePageOverlayRef WKBundlePageOverlayCreate(WKBundlePageOverlayClientBase* wkClient)
 {
-    if (wkClient && wkClient->version)
-        return nullptr;
-
     auto clientImpl = std::make_unique<PageOverlayClientImpl>(wkClient);
-
-    // FIXME: Looks like this leaks the clientImpl.
-    return toAPI(WebPageOverlay::create(*clientImpl.release()).leakRef());
+    return toAPI(WebPageOverlay::create(WTF::move(clientImpl)).leakRef());
 }
 
 void WKBundlePageOverlaySetAccessibilityClient(WKBundlePageOverlayRef bundlePageOverlayRef, WKBundlePageOverlayAccessibilityClientBase* client)
 {
-    if (client && client->version)
-        return;
     static_cast<PageOverlayClientImpl&>(toImpl(bundlePageOverlayRef)->client()).setAccessibilityClient(client);
 }
 

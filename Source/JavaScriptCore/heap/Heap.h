@@ -57,6 +57,7 @@ class GCAwareJITStubRoutine;
 class GlobalCodeBlock;
 class Heap;
 class HeapRootVisitor;
+class HeapVerifier;
 class IncrementalSweeper;
 class JITStubRoutine;
 class JSCell;
@@ -114,6 +115,7 @@ public:
     Heap(VM*, HeapType);
     ~Heap();
     JS_EXPORT_PRIVATE void lastChanceToFinalize();
+    void releaseDelayedReleasedObjects();
 
     VM* vm() const { return m_vm; }
     MarkedSpace& objectSpace() { return m_objectSpace; }
@@ -128,14 +130,16 @@ public:
     JS_EXPORT_PRIVATE void setGarbageCollectionTimerEnabled(bool);
 
     JS_EXPORT_PRIVATE IncrementalSweeper* sweeper();
-    JS_EXPORT_PRIVATE void setIncrementalSweeper(PassOwnPtr<IncrementalSweeper>);
+    JS_EXPORT_PRIVATE void setIncrementalSweeper(std::unique_ptr<IncrementalSweeper>);
 
     // true if collection is in progress
     bool isCollecting();
     HeapOperation operationInProgress() { return m_operationInProgress; }
     // true if an allocation or collection is in progress
     bool isBusy();
-    
+    MarkedSpace::Subspace& subspaceForObjectWithoutDestructor() { return m_objectSpace.subspaceForObjectsWithoutDestructor(); }
+    MarkedSpace::Subspace& subspaceForObjectNormalDestructor() { return m_objectSpace.subspaceForObjectsWithNormalDestructor(); }
+    MarkedSpace::Subspace& subspaceForObjectsWithImmortalStructure() { return m_objectSpace.subspaceForObjectsWithImmortalStructure(); }
     MarkedAllocator& allocatorForObjectWithoutDestructor(size_t bytes) { return m_objectSpace.allocatorFor(bytes); }
     MarkedAllocator& allocatorForObjectWithNormalDestructor(size_t bytes) { return m_objectSpace.normalDestructorAllocatorFor(bytes); }
     MarkedAllocator& allocatorForObjectWithImmortalStructureDestructor(size_t bytes) { return m_objectSpace.immortalStructureDestructorAllocatorFor(bytes); }
@@ -169,8 +173,8 @@ public:
     JS_EXPORT_PRIVATE size_t globalObjectCount();
     JS_EXPORT_PRIVATE size_t protectedObjectCount();
     JS_EXPORT_PRIVATE size_t protectedGlobalObjectCount();
-    JS_EXPORT_PRIVATE PassOwnPtr<TypeCountSet> protectedObjectTypeCounts();
-    JS_EXPORT_PRIVATE PassOwnPtr<TypeCountSet> objectTypeCounts();
+    JS_EXPORT_PRIVATE std::unique_ptr<TypeCountSet> protectedObjectTypeCounts();
+    JS_EXPORT_PRIVATE std::unique_ptr<TypeCountSet> objectTypeCounts();
     void showStatistics();
 
     void pushTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>*);
@@ -228,10 +232,10 @@ private:
     friend class CopiedBlock;
     friend class DeferGC;
     friend class DeferGCForAWhile;
-    friend class DelayedReleaseScope;
     friend class GCAwareJITStubRoutine;
     friend class GCLogging;
     friend class HandleSet;
+    friend class HeapVerifier;
     friend class JITStubRoutine;
     friend class LLIntOffsetsExtractor;
     friend class MarkedSpace;
@@ -271,7 +275,7 @@ private:
     void stopAllocation();
 
     void markRoots(double gcStartTime);
-    void gatherStackRoots(ConservativeRoots&, void** dummy);
+    void gatherStackRoots(ConservativeRoots&, void** dummy, MachineThreads::RegisterState& registers);
     void gatherJSStackRoots(ConservativeRoots&);
     void gatherScratchBufferRoots(ConservativeRoots&);
     void clearLivenessData();
@@ -349,7 +353,7 @@ private:
 
     ProtectCountSet m_protectedValues;
     Vector<Vector<ValueStringPair, 0, UnsafeVectorOverflow>*> m_tempSortingVectors;
-    OwnPtr<HashSet<MarkedArgumentBuffer*>> m_markListSet;
+    std::unique_ptr<HashSet<MarkedArgumentBuffer*>> m_markListSet;
 
     MachineThreads m_machineThreads;
     
@@ -372,15 +376,21 @@ private:
     double m_lastEdenGCLength;
     double m_lastCodeDiscardTime;
 
-    DoublyLinkedList<ExecutableBase> m_compiledCode;
+    Vector<ExecutableBase*> m_compiledCode;
     
     RefPtr<GCActivityCallback> m_fullActivityCallback;
     RefPtr<GCActivityCallback> m_edenActivityCallback;
-    OwnPtr<IncrementalSweeper> m_sweeper;
+    std::unique_ptr<IncrementalSweeper> m_sweeper;
     Vector<MarkedBlock*> m_blockSnapshot;
     
     unsigned m_deferralDepth;
     Vector<DFG::Worklist*> m_suspendedCompilerWorklists;
+
+    std::unique_ptr<HeapVerifier> m_verifier;
+#if USE(CF)
+    Vector<RetainPtr<CFTypeRef>> m_delayedReleaseObjects;
+    unsigned m_delayedReleaseRecursionCount;
+#endif
 };
 
 } // namespace JSC

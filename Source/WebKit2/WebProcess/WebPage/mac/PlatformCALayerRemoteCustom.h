@@ -52,7 +52,7 @@ private:
 
     virtual PassRefPtr<WebCore::PlatformCALayer> clone(WebCore::PlatformCALayerClient* owner) const override;
 
-    virtual bool isPlatformCALayerRemoteCustom() const { return true; }
+    virtual bool isPlatformCALayerRemoteCustom() const override { return true; }
 
     virtual CFTypeRef contents() const override;
     virtual void setContents(CFTypeRef) override;
@@ -62,8 +62,8 @@ private:
     bool m_providesContents;
 };
 
-PLATFORM_CALAYER_TYPE_CASTS(PlatformCALayerRemoteCustom, isPlatformCALayerRemote())
-
 } // namespace WebKit
+
+SPECIALIZE_TYPE_TRAITS_PLATFORM_CALAYER(WebKit::PlatformCALayerRemoteCustom, isPlatformCALayerRemote())
 
 #endif // PlatformCALayerRemoteCustom_h

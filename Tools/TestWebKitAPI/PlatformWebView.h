@@ -30,6 +30,10 @@
 #include <CoreGraphics/CGGeometry.h>
 #endif
 
+#if PLATFORM(MAC)
+#include <objc/objc.h>
+#endif
+
 #ifdef __APPLE__
 #ifdef __OBJC__
 @class WKView;
@@ -52,7 +56,12 @@ namespace TestWebKitAPI {
 
 class PlatformWebView {
 public:
-    PlatformWebView(WKContextRef, WKPageGroupRef = 0);
+    explicit PlatformWebView(WKPageConfigurationRef);
+    explicit PlatformWebView(WKContextRef, WKPageGroupRef = 0);
+    explicit PlatformWebView(WKPageRef relatedPage);
+#if PLATFORM(MAC)
+    explicit PlatformWebView(WKContextRef, WKPageGroupRef, Class wkViewSubclass);
+#endif
     ~PlatformWebView();
 
     WKPageRef page() const;
@@ -66,6 +75,10 @@ public:
     void simulateMouseMove(unsigned x, unsigned y);
 
 private:
+#if PLATFORM(MAC)
+    void initialize(WKPageConfigurationRef, Class wkViewSubclass);
+#endif
+
     PlatformWKView m_view;
     PlatformWindow m_window;
 };

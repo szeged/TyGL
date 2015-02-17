@@ -29,6 +29,7 @@
 #import "ChildProcess.h"
 #import "WebKit2Initialize.h"
 #import <wtf/OSObjectPtr.h>
+#import <wtf/spi/darwin/XPCSPI.h>
 
 #if HAVE(VOUCHERS)
 #if __has_include(<os/voucher_private.h>)
@@ -97,7 +98,7 @@ void XPCServiceInitializer(OSObjectPtr<xpc_connection_t> connection, xpc_object_
     voucher_replace_default_voucher();
 #endif
 
-    XPCServiceType::shared().initialize(parameters);
+    XPCServiceType::singleton().initialize(parameters);
 }
 
 } // namespace WebKit

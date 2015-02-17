@@ -37,6 +37,7 @@ namespace JSC {
 
 enum ArgumentsMode {
     NormalArgumentsCreationMode,
+    ClonedArgumentsCreationMode,
     FakeArgumentValuesCreationMode
 };
 
@@ -46,16 +47,16 @@ class Arguments : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
 
-    static Arguments* create(VM& vm, CallFrame* callFrame, ArgumentsMode mode = NormalArgumentsCreationMode)
+    static Arguments* create(VM& vm, CallFrame* callFrame, JSLexicalEnvironment* lexicalEnvironment, ArgumentsMode mode = NormalArgumentsCreationMode)
     {
-        Arguments* arguments = new (NotNull, allocateCell<Arguments>(vm.heap)) Arguments(callFrame);
-        arguments->finishCreation(callFrame, mode);
+        Arguments* arguments = new (NotNull, allocateCell<Arguments>(vm.heap, offsetOfInlineRegisterArray() + registerArraySizeInBytes(callFrame))) Arguments(callFrame);
+        arguments->finishCreation(callFrame, lexicalEnvironment, mode);
         return arguments;
     }
         
     static Arguments* create(VM& vm, CallFrame* callFrame, InlineCallFrame* inlineCallFrame, ArgumentsMode mode = NormalArgumentsCreationMode)
     {
-        Arguments* arguments = new (NotNull, allocateCell<Arguments>(vm.heap)) Arguments(callFrame);
+        Arguments* arguments = new (NotNull, allocateCell<Arguments>(vm.heap, offsetOfInlineRegisterArray() + registerArraySizeInBytes(inlineCallFrame))) Arguments(callFrame);
         arguments->finishCreation(callFrame, inlineCallFrame, mode);
         return arguments;
     }
@@ -86,7 +87,9 @@ public:
     void copyToArguments(ExecState*, CallFrame*, uint32_t copyLength, int32_t firstArgumentOffset);
     void tearOff(CallFrame*);
     void tearOff(CallFrame*, InlineCallFrame*);
-    bool isTornOff() const { return m_registerArray.get(); }
+    void tearOffForCloning(CallFrame*);
+    void tearOffForCloning(CallFrame*, InlineCallFrame*);
+    bool isTornOff() const { return m_registers == (&registerArray() - CallFrame::offsetFor(1) - 1); }
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype) 
     { 
@@ -98,20 +101,14 @@ public:
     static ptrdiff_t offsetOfOverrodeLength() { return OBJECT_OFFSETOF(Arguments, m_overrodeLength); }
     static ptrdiff_t offsetOfIsStrictMode() { return OBJECT_OFFSETOF(Arguments, m_isStrictMode); }
     static ptrdiff_t offsetOfRegisters() { return OBJECT_OFFSETOF(Arguments, m_registers); }
-    static ptrdiff_t offsetOfRegisterArray() { return OBJECT_OFFSETOF(Arguments, m_registerArray); }
+    static ptrdiff_t offsetOfInlineRegisterArray() { return WTF::roundUpToMultipleOf<8>(sizeof(Arguments)); }
     static ptrdiff_t offsetOfSlowArgumentData() { return OBJECT_OFFSETOF(Arguments, m_slowArgumentData); }
     static ptrdiff_t offsetOfCallee() { return OBJECT_OFFSETOF(Arguments, m_callee); }
-
-    static size_t allocationSize(size_t inlineCapacity)
-    {
-        ASSERT_UNUSED(inlineCapacity, !inlineCapacity);
-        return sizeof(Arguments);
-    }
     
 protected:
     static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames | JSObject::StructureFlags;
 
-    void finishCreation(CallFrame*, ArgumentsMode);
+    void finishCreation(CallFrame*, JSLexicalEnvironment*, ArgumentsMode);
     void finishCreation(CallFrame*, InlineCallFrame*, ArgumentsMode);
 
 private:
@@ -126,8 +123,8 @@ private:
     void createStrictModeCallerIfNecessary(ExecState*);
     void createStrictModeCalleeIfNecessary(ExecState*);
 
-    size_t registerArraySizeInBytes() const { return sizeof(WriteBarrier<Unknown>) * m_numArguments; }
-    void allocateRegisterArray(VM&);
+    static size_t registerArraySizeInBytes(CallFrame* callFrame) { return sizeof(WriteBarrier<Unknown>) * callFrame->argumentCount(); }
+    static size_t registerArraySizeInBytes(InlineCallFrame* inlineCallFrame) { return sizeof(WriteBarrier<Unknown>) * (inlineCallFrame->arguments.size() - 1); }
     bool isArgument(size_t);
     bool trySetArgument(VM&, size_t argument, JSValue);
     JSValue tryGetArgument(size_t argument);
@@ -151,7 +148,8 @@ private:
     bool m_isStrictMode;
 
     WriteBarrierBase<Unknown>* m_registers;
-    CopyWriteBarrier<WriteBarrier<Unknown>> m_registerArray;
+    WriteBarrier<Unknown>& registerArray() { return *reinterpret_cast<WriteBarrier<Unknown>*>(reinterpret_cast<char*>(this) + offsetOfInlineRegisterArray()); }
+    const WriteBarrier<Unknown>& registerArray() const { return *reinterpret_cast<const WriteBarrier<Unknown>*>(reinterpret_cast<const char*>(this) + offsetOfInlineRegisterArray()); }
 
 public:
     struct SlowArgumentData {
@@ -276,7 +274,7 @@ inline WriteBarrierBase<Unknown>& Arguments::argument(size_t argument)
     return m_lexicalEnvironment->registerAt(index - m_slowArgumentData->bytecodeToMachineCaptureOffset());
 }
 
-inline void Arguments::finishCreation(CallFrame* callFrame, ArgumentsMode mode)
+inline void Arguments::finishCreation(CallFrame* callFrame, JSLexicalEnvironment* lexicalEnvironment, ArgumentsMode mode)
 {
     Base::finishCreation(callFrame->vm());
     ASSERT(inherits(info()));
@@ -305,8 +303,8 @@ inline void Arguments::finishCreation(CallFrame* callFrame, ArgumentsMode mode)
                 codeBlock->framePointerOffsetToGetActivationRegisters());
         }
         if (codeBlock->needsActivation()) {
-            RELEASE_ASSERT(callFrame->lexicalEnvironment());
-            m_lexicalEnvironment.set(callFrame->vm(), this, callFrame->lexicalEnvironment());
+            RELEASE_ASSERT(lexicalEnvironment && lexicalEnvironment == callFrame->lexicalEnvironment());
+            m_lexicalEnvironment.set(callFrame->vm(), this, lexicalEnvironment);
         }
         // The bytecode generator omits op_tear_off_lexical_environment in cases of no
         // declared parameters, so we need to tear off immediately.
@@ -314,7 +312,14 @@ inline void Arguments::finishCreation(CallFrame* callFrame, ArgumentsMode mode)
             tearOff(callFrame);
         break;
     }
-        
+
+    case ClonedArgumentsCreationMode: {
+        m_numArguments = callFrame->argumentCount();
+        m_registers = reinterpret_cast<WriteBarrierBase<Unknown>*>(callFrame->registers());
+        tearOffForCloning(callFrame);
+        break;
+    }
+
     case FakeArgumentValuesCreationMode: {
         m_numArguments = 0;
         m_registers = nullptr;
@@ -352,6 +357,20 @@ inline void Arguments::finishCreation(CallFrame* callFrame, InlineCallFrame* inl
         // declared parameters, so we need to tear off immediately.
         if (m_isStrictMode || !callee->jsExecutable()->parameterCount())
             tearOff(callFrame, inlineCallFrame);
+        break;
+    }
+        
+    case ClonedArgumentsCreationMode: {
+        m_numArguments = inlineCallFrame->arguments.size() - 1;
+        if (m_numArguments) {
+            int offsetForArgumentOne = inlineCallFrame->arguments[1].virtualRegister().offset();
+            m_registers = reinterpret_cast<WriteBarrierBase<Unknown>*>(callFrame->registers()) + offsetForArgumentOne - virtualRegisterForArgument(1).offset();
+        } else
+            m_registers = 0;
+        
+        ASSERT(!jsCast<FunctionExecutable*>(inlineCallFrame->executable.get())->symbolTable(inlineCallFrame->specializationKind())->slowArguments());
+        
+        tearOffForCloning(callFrame, inlineCallFrame);
         break;
     }
         

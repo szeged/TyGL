@@ -33,7 +33,6 @@
 #include "CharsetData.h"
 #include "ThreadGlobalData.h"
 #include <wtf/Assertions.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/Threading.h>
 #include <wtf/text/CString.h>
@@ -66,9 +65,9 @@ void TextCodecMac::registerEncodingNames(EncodingNameRegistrar registrar)
     }
 }
 
-static PassOwnPtr<TextCodec> newTextCodecMac(const TextEncoding&, const void* additionalData)
+static std::unique_ptr<TextCodec> newTextCodecMac(const TextEncoding&, const void* additionalData)
 {
-    return adoptPtr(new TextCodecMac(*static_cast<const TECTextEncodingID*>(additionalData)));
+    return std::make_unique<TextCodecMac>(*static_cast<const TECTextEncodingID*>(additionalData));
 }
 
 void TextCodecMac::registerCodecs(TextCodecRegistrar registrar)

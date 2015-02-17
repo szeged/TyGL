@@ -207,7 +207,7 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
     Graph dfg(vm, *this, longLivedState);
     
     if (!parse(dfg)) {
-        finalizer = adoptPtr(new FailedFinalizer(*this));
+        finalizer = std::make_unique<FailedFinalizer>(*this);
         return FailPath;
     }
     
@@ -229,7 +229,7 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
     if (mode == FTLForOSREntryMode) {
         bool result = performOSREntrypointCreation(dfg);
         if (!result) {
-            finalizer = adoptPtr(new FailedFinalizer(*this));
+            finalizer = std::make_unique<FailedFinalizer>(*this);
             return FailPath;
         }
         performCPSRethreading(dfg);
@@ -257,8 +257,9 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
         
     performStrengthReduction(dfg);
     performLocalCSE(dfg);
+    performCPSRethreading(dfg); // Canonicalize PhantomLocal to Phantom
     performArgumentsSimplification(dfg);
-    performCPSRethreading(dfg);
+    performCPSRethreading(dfg); // This should do nothing, if arguments simplification did nothing.
     performCFA(dfg);
     performConstantFolding(dfg);
     bool changed = false;
@@ -313,7 +314,7 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
     case FTLForOSREntryMode: {
 #if ENABLE(FTL_JIT)
         if (FTL::canCompile(dfg) == FTL::CannotCompile) {
-            finalizer = adoptPtr(new FailedFinalizer(*this));
+            finalizer = std::make_unique<FailedFinalizer>(*this);
             return FailPath;
         }
         
@@ -375,7 +376,7 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
             return CancelPath;
         
         if (!haveLLVM) {
-            finalizer = adoptPtr(new FailedFinalizer(*this));
+            finalizer = std::make_unique<FailedFinalizer>(*this);
             return FailPath;
         }
             
@@ -524,7 +525,7 @@ void Plan::cancel()
     profiledDFGCodeBlock = nullptr;
     mustHandleValues.clear();
     compilation = nullptr;
-    finalizer.clear();
+    finalizer = nullptr;
     inlineCallFrames = nullptr;
     watchpoints = DesiredWatchpoints();
     identifiers = DesiredIdentifiers();

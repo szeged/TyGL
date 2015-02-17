@@ -66,9 +66,6 @@ public:
 
     virtual void platformColorsDidChange() override;
 
-    // System fonts.
-    virtual void systemFont(CSSValueID, FontDescription&) const override;
-
     virtual int minimumMenuListSize(RenderStyle&) const override;
 
     virtual void adjustSliderThumbSize(RenderStyle&, Element*) const override;
@@ -111,6 +108,9 @@ public:
 protected:
     RenderThemeMac();
     virtual ~RenderThemeMac();
+
+    // System fonts.
+    virtual void updateCachedSystemFontDescription(CSSValueID, FontDescription&) const override;
 
 #if ENABLE(VIDEO)
     // Media controls
@@ -169,7 +169,7 @@ protected:
     virtual bool paintSnapshottedPluginOverlay(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
 private:
-    virtual String fileListNameForWidth(const FileList*, const Font&, int width, bool multipleFilesAllowed) const override;
+    virtual String fileListNameForWidth(const FileList*, const FontCascade&, int width, bool multipleFilesAllowed) const override;
 
     FloatRect convertToPaintingRect(const RenderObject& inputRenderer, const RenderObject& partRenderer, const FloatRect& inputRect, const IntRect&) const;
 

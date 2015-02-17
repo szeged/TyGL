@@ -58,6 +58,10 @@
 #define ENABLE_ASYNC_SCROLLING 1
 #endif
 
+#if !defined(ENABLE_CONTENT_EXTENSIONS)
+#define ENABLE_CONTENT_EXTENSIONS 1
+#endif
+
 #if !defined(ENABLE_CONTEXT_MENUS)
 #define ENABLE_CONTEXT_MENUS 0
 #endif
@@ -80,6 +84,10 @@
 
 #if !defined(ENABLE_ICONDATABASE)
 #define ENABLE_ICONDATABASE 0
+#endif
+
+#if !defined(ENABLE_INSPECTOR_ALTERNATE_DISPATCHERS)
+#define ENABLE_INSPECTOR_ALTERNATE_DISPATCHERS 1
 #endif
 
 #if !defined(ENABLE_LETTERPRESS)
@@ -163,6 +171,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 /* --------- Apple MAC port (not IOS) --------- */
 #if PLATFORM(MAC)
 
+#if !defined(ENABLE_CONTENT_EXTENSIONS)
+#define ENABLE_CONTENT_EXTENSIONS 1
+#endif
+
 #if !defined(ENABLE_CSS_IMAGE_SET)
 #define ENABLE_CSS_IMAGE_SET 1
 #endif
@@ -171,17 +183,11 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_DASHBOARD_SUPPORT 1
 #endif
 
-#if !defined(ENABLE_DELETION_UI)
-#define ENABLE_DELETION_UI 1
-#endif
-
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
 #if !defined(ENABLE_ENCRYPTED_MEDIA)
 #define ENABLE_ENCRYPTED_MEDIA 1
 #endif
 #if !defined(ENABLE_ENCRYPTED_MEDIA_V2)
 #define ENABLE_ENCRYPTED_MEDIA_V2 1
-#endif
 #endif
 
 #if !defined(ENABLE_FULLSCREEN_API)
@@ -191,6 +197,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 #if !defined(ENABLE_REMOTE_INSPECTOR)
 #define ENABLE_REMOTE_INSPECTOR 1
+#endif
+
+#if !defined(ENABLE_INSPECTOR_ALTERNATE_DISPATCHERS)
+#define ENABLE_INSPECTOR_ALTERNATE_DISPATCHERS 1
 #endif
 #endif
 
@@ -276,22 +286,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 /* --------- EFL port (Unix) --------- */
 #if PLATFORM(EFL)
-
-#if !defined(ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH)
-#define ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH 1
-#endif
-
 #endif /* PLATFORM(EFL) */
 
 /* --------- Gtk port (Unix, Windows, Mac) --------- */
 #if PLATFORM(GTK)
-
-#if OS(UNIX)
-#if !defined(ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH)
-#define ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH 1
-#endif
-#endif
-
 #endif /* PLATFORM(GTK) */
 
 /* ENABLE macro defaults for WebCore */
@@ -323,6 +321,14 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_CHANNEL_MESSAGING)
 #define ENABLE_CHANNEL_MESSAGING 1
+#endif
+
+#if !defined(ENABLE_ES6_CLASS_SYNTAX)
+#define ENABLE_ES6_CLASS_SYNTAX 0
+#endif
+
+#if !defined(ENABLE_CONTENT_EXTENSIONS)
+#define ENABLE_CONTENT_EXTENSIONS 0
 #endif
 
 #if !defined(ENABLE_CONTEXT_MENUS)
@@ -381,10 +387,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_DATA_TRANSFER_ITEMS 0
 #endif
 
-#if !defined(ENABLE_DELETION_UI)
-#define ENABLE_DELETION_UI 0
-#endif
-
 #if !defined(ENABLE_DETAILS_ELEMENT)
 #define ENABLE_DETAILS_ELEMENT 1
 #endif
@@ -407,6 +409,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_ENCRYPTED_MEDIA_V2)
 #define ENABLE_ENCRYPTED_MEDIA_V2 0
+#endif
+
+#if !defined(ENABLE_FILTERS_LEVEL_2)
+#define ENABLE_FILTERS_LEVEL_2 0
 #endif
 
 #if !defined(ENABLE_FONT_LOAD_EVENTS)
@@ -493,6 +499,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_INSPECTOR)
 #define ENABLE_INSPECTOR 1
+#endif
+
+#if !defined(ENABLE_INSPECTOR_ALTERNATE_DISPATCHERS)
+#define ENABLE_INSPECTOR_ALTERNATE_DISPATCHERS 0
 #endif
 
 #if !defined(ENABLE_JAVASCRIPT_I18N_API)
@@ -593,10 +603,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #endif
 #endif
 
-#if !defined(ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH)
-#define ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH 0
-#endif
-
 #if !defined(ENABLE_POINTER_LOCK)
 #define ENABLE_POINTER_LOCK 0
 #endif
@@ -633,10 +639,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_SATURATED_LAYOUT_ARITHMETIC 1
 #endif
 
-#if !defined(ENABLE_SHARED_WORKERS)
-#define ENABLE_SHARED_WORKERS 0
-#endif
-
 #if !defined(ENABLE_SMOOTH_SCROLLING)
 #define ENABLE_SMOOTH_SCROLLING 0
 #endif
@@ -649,8 +651,8 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_SPELLCHECK 0
 #endif
 
-#if !defined(ENABLE_SQL_DATABASE)
-#define ENABLE_SQL_DATABASE 1
+#if !defined(ENABLE_STREAMS_API)
+#define ENABLE_STREAMS_API 1
 #endif
 
 #if !defined(ENABLE_SVG_FONTS)
@@ -759,8 +761,8 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #error "ENABLE(MEDIA_CONTROLS_SCRIPT) requires ENABLE(VIDEO)"
 #endif
 
-#if ENABLE(REMOTE_INSPECTOR) && !ENABLE(INSPECTOR)
-#error "ENABLE(REMOTE_INSPECTOR) requires ENABLE(INSPECTOR)"
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS) && !ENABLE(REMOTE_INSPECTOR)
+#error "ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS) requires ENABLE(REMOTE_INSPECTOR)"
 #endif
 
 #if ENABLE(IOS_TOUCH_EVENTS) && !ENABLE(TOUCH_EVENTS)

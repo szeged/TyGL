@@ -60,7 +60,6 @@ public:
         bool callerIsVMEntryFrame() const { return m_callerIsVMEntryFrame; }
         CallFrame* callerFrame() const { return m_callerFrame; }
         JSObject* callee() const { return m_callee; }
-        JSScope* scope() const { return m_scope; }
         CodeBlock* codeBlock() const { return m_codeBlock; }
         unsigned bytecodeOffset() const { return m_bytecodeOffset; }
 #if ENABLE(DFG_JIT)
@@ -101,7 +100,6 @@ public:
         VMEntryFrame* m_CallerVMEntryFrame;
         CallFrame* m_callerFrame;
         JSObject* m_callee;
-        JSScope* m_scope;
         CodeBlock* m_codeBlock;
         unsigned m_bytecodeOffset;
         bool m_callerIsVMEntryFrame;
@@ -148,6 +146,32 @@ private:
 #endif
 
     Frame m_frame;
+};
+
+class CallerFunctor {
+public:
+    CallerFunctor()
+        : m_hasSkippedFirstFrame(false)
+        , m_callerFrame(0)
+    {
+    }
+
+    CallFrame* callerFrame() const { return m_callerFrame; }
+
+    StackVisitor::Status operator()(StackVisitor& visitor)
+    {
+        if (!m_hasSkippedFirstFrame) {
+            m_hasSkippedFirstFrame = true;
+            return StackVisitor::Continue;
+        }
+
+        m_callerFrame = visitor->callFrame();
+        return StackVisitor::Done;
+    }
+    
+private:
+    bool m_hasSkippedFirstFrame;
+    CallFrame* m_callerFrame;
 };
 
 } // namespace JSC

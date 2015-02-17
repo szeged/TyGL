@@ -50,22 +50,23 @@ inline HTMLEmbedElement::HTMLEmbedElement(const QualifiedName& tagName, Document
     ASSERT(hasTagName(embedTag));
 }
 
-PassRefPtr<HTMLEmbedElement> HTMLEmbedElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
+Ref<HTMLEmbedElement> HTMLEmbedElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
 {
-    return adoptRef(new HTMLEmbedElement(tagName, document, createdByParser));
+    return adoptRef(*new HTMLEmbedElement(tagName, document, createdByParser));
 }
 
-static inline RenderWidget* findWidgetRenderer(const Node* n) 
+static inline RenderWidget* findWidgetRenderer(const Node* node)
 {
-    if (!n->renderer())
-        do
-            n = n->parentNode();
-        while (n && !n->hasTagName(objectTag));
+    if (!node->renderer()) {
+        do {
+            node = node->parentNode();
+        } while (node && !is<HTMLObjectElement>(*node));
+    }
 
-    if (n && n->renderer() && n->renderer()->isWidget())
-        return toRenderWidget(n->renderer());
+    if (node && is<RenderWidget>(node->renderer()))
+        return downcast<RenderWidget>(node->renderer());
 
-    return 0;
+    return nullptr;
 }
 
 RenderWidget* HTMLEmbedElement::renderWidgetLoadingPlugin() const

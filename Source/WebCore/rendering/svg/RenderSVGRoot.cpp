@@ -50,7 +50,7 @@
 
 namespace WebCore {
 
-RenderSVGRoot::RenderSVGRoot(SVGSVGElement& element, PassRef<RenderStyle> style)
+RenderSVGRoot::RenderSVGRoot(SVGSVGElement& element, Ref<RenderStyle>&& style)
     : RenderReplaced(element, WTF::move(style))
     , m_objectBoundingBoxValid(false)
     , m_isLayoutSizeChanged(false)
@@ -310,10 +310,10 @@ void RenderSVGRoot::addChild(RenderObject* child, RenderObject* beforeChild)
     SVGResourcesCache::clientWasAddedToTree(*child);
 }
 
-RenderObject* RenderSVGRoot::removeChild(RenderObject& child)
+void RenderSVGRoot::removeChild(RenderObject& child)
 {
     SVGResourcesCache::clientWillBeRemovedFromTree(child);
-    return RenderReplaced::removeChild(child);
+    RenderReplaced::removeChild(child);
 }
 
 // RenderBox methods will expect coordinates w/o any transforms in coordinates
@@ -441,12 +441,12 @@ bool RenderSVGRoot::hasRelativeDimensions() const
 
 void RenderSVGRoot::addResourceForClientInvalidation(RenderSVGResourceContainer* resource)
 {
-    RenderObject* svgRoot = resource->parent();
-    while (svgRoot && !svgRoot->isSVGRoot())
+    RenderElement* svgRoot = resource->parent();
+    while (svgRoot && !is<RenderSVGRoot>(*svgRoot))
         svgRoot = svgRoot->parent();
     if (!svgRoot)
         return;
-    toRenderSVGRoot(svgRoot)->m_resourcesNeedingToInvalidateClients.add(resource);
+    downcast<RenderSVGRoot>(*svgRoot).m_resourcesNeedingToInvalidateClients.add(resource);
 }
 
 }

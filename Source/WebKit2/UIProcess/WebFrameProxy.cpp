@@ -27,11 +27,11 @@
 #include "WebFrameProxy.h"
 
 #include "WebCertificateInfo.h"
-#include "WebContext.h"
 #include "WebFormSubmissionListenerProxy.h"
 #include "WebFramePolicyListenerProxy.h"
 #include "WebPageMessages.h"
 #include "WebPageProxy.h"
+#include "WebProcessPool.h"
 #include <WebCore/DOMImplementation.h>
 #include <WebCore/Image.h>
 #include <WebCore/MIMETypeRegistry.h>
@@ -47,12 +47,12 @@ WebFrameProxy::WebFrameProxy(WebPageProxy* page, uint64_t frameID)
     , m_isFrameSet(false)
     , m_frameID(frameID)
 {
-    WebContext::statistics().wkFrameCount++;
+    WebProcessPool::statistics().wkFrameCount++;
 }
 
 WebFrameProxy::~WebFrameProxy()
 {
-    WebContext::statistics().wkFrameCount--;
+    WebProcessPool::statistics().wkFrameCount--;
 }
 
 void WebFrameProxy::disconnect()
@@ -172,30 +172,30 @@ void WebFrameProxy::didChangeTitle(const String& title)
     m_title = title;
 }
 
-void WebFrameProxy::receivedPolicyDecision(WebCore::PolicyAction action, uint64_t listenerID, uint64_t navigationID)
+void WebFrameProxy::receivedPolicyDecision(WebCore::PolicyAction action, uint64_t listenerID, API::Navigation* navigation)
 {
     if (!m_page)
         return;
 
     ASSERT(m_activeListener);
     ASSERT(m_activeListener->listenerID() == listenerID);
-    m_page->receivedPolicyDecision(action, this, listenerID, navigationID);
+    m_page->receivedPolicyDecision(action, this, listenerID, navigation);
 }
 
-WebFramePolicyListenerProxy* WebFrameProxy::setUpPolicyListenerProxy(uint64_t listenerID)
+WebFramePolicyListenerProxy& WebFrameProxy::setUpPolicyListenerProxy(uint64_t listenerID)
 {
     if (m_activeListener)
         m_activeListener->invalidate();
     m_activeListener = WebFramePolicyListenerProxy::create(this, listenerID);
-    return static_cast<WebFramePolicyListenerProxy*>(m_activeListener.get());
+    return *static_cast<WebFramePolicyListenerProxy*>(m_activeListener.get());
 }
 
-WebFormSubmissionListenerProxy* WebFrameProxy::setUpFormSubmissionListenerProxy(uint64_t listenerID)
+WebFormSubmissionListenerProxy& WebFrameProxy::setUpFormSubmissionListenerProxy(uint64_t listenerID)
 {
     if (m_activeListener)
         m_activeListener->invalidate();
     m_activeListener = WebFormSubmissionListenerProxy::create(this, listenerID);
-    return static_cast<WebFormSubmissionListenerProxy*>(m_activeListener.get());
+    return *static_cast<WebFormSubmissionListenerProxy*>(m_activeListener.get());
 }
 
 void WebFrameProxy::getWebArchive(std::function<void (API::Data*, CallbackBase::Error)> callbackFunction)

@@ -17,7 +17,10 @@ class ManifestGenerator {
         $repositories_table = $this->db->fetch_table('repositories');
 
         $repositories_with_commit = $this->db->query_and_fetch_all(
-            'SELECT DISTINCT(commit_repository) FROM commits WHERE commit_reported IS TRUE') or array();
+            'SELECT DISTINCT(commit_repository) FROM commits WHERE commit_reported IS TRUE');
+        if (!$repositories_with_commit)
+            $repositories_with_commit = array();
+
         foreach ($repositories_with_commit as &$row)
             $row = $row['commit_repository'];
 
@@ -29,6 +32,7 @@ class ManifestGenerator {
             'repositories' => $this->repositories($repositories_table, $repositories_with_commit),
             'builders' => $this->builders(),
             'bugTrackers' => $this->bug_trackers($repositories_table),
+            'defaultDashboard' => config('defaultDashboard'),
         );
         return $this->manifest;
     }
@@ -96,7 +100,8 @@ class ManifestGenerator {
         if (!$repositories_table)
             return $repositories;
         foreach ($repositories_table as $row) {
-            $repositories[$row['repository_name']] = array(
+            $repositories[$row['repository_id']] = array(
+                'name' => $row['repository_name'],
                 'url' => $row['repository_url'],
                 'blameUrl' => $row['repository_blame_url'],
                 'hasReportedCommits' => in_array($row['repository_id'], $repositories_with_commit));
@@ -117,18 +122,12 @@ class ManifestGenerator {
     }
 
     private function bug_trackers($repositories_table) {
-        $repository_id_to_name = array();
-        if ($repositories_table) {
-            foreach ($repositories_table as $row)
-                $repository_id_to_name[$row['repository_id']] = $row['repository_name'];
-        }
-
         $tracker_id_to_repositories = array();
         $tracker_repositories_table = $this->db->fetch_table('tracker_repositories');
         if ($tracker_repositories_table) {
             foreach ($tracker_repositories_table as $row) {
                 array_push(array_ensure_item_has_array($tracker_id_to_repositories, $row['tracrepo_tracker']),
-                    $repository_id_to_name[$row['tracrepo_repository']]);
+                    $row['tracrepo_repository']);
             }
         }
 
@@ -136,7 +135,10 @@ class ManifestGenerator {
         $bug_trackers_table = $this->db->fetch_table('bug_trackers');
         if ($bug_trackers_table) {
             foreach ($bug_trackers_table as $row) {
-                $bug_trackers[$row['tracker_name']] = array('newBugUrl' => $row['tracker_new_bug_url'],
+                $bug_trackers[$row['tracker_id']] = array(
+                    'name' => $row['tracker_name'],
+                    'bugUrl' => $row['tracker_bug_url'],
+                    'newBugUrl' => $row['tracker_new_bug_url'],
                     'repositories' => $tracker_id_to_repositories[$row['tracker_id']]);
             }
         }

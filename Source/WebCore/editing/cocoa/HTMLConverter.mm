@@ -37,7 +37,7 @@
 #import "DocumentLoader.h"
 #import "Element.h"
 #import "ElementTraversal.h"
-#import "Font.h"
+#import "FontCascade.h"
 #import "Frame.h"
 #import "FrameLoader.h"
 #import "HTMLElement.h"
@@ -333,7 +333,7 @@ typedef NSUInteger NSTextTabType;
 - (void)setHyphenationFactor:(float)aFactor;
 @end
 
-@interface NSShadow
+@interface NSShadow : NSObject
 - (void)setShadowOffset:(CGSize)size;
 - (void)setShadowBlurRadius:(CGFloat)radius;
 - (void)setShadowColor:(UIColor *)color;
@@ -563,7 +563,7 @@ HTMLConverter::~HTMLConverter()
 
 NSAttributedString *HTMLConverter::convert()
 {
-    Node* commonAncestorContainer = _caches->cacheAncestorsOfStartToBeConverted(m_range.get());
+    Node* commonAncestorContainer = _caches->cacheAncestorsOfStartToBeConverted(m_range);
     ASSERT(commonAncestorContainer);
 
     m_dataSource = commonAncestorContainer->document().frame()->loader().documentLoader();
@@ -1001,7 +1001,7 @@ static inline NSShadow *_shadowForShadowStyle(NSString *shadowStyle)
                 if (!spaceRange.length)
                     spaceRange = NSMakeRange(0, 0);
                 shadowBlurRadius = [[shadowStyle substringWithRange:NSMakeRange(NSMaxRange(spaceRange), thirdRange.location - NSMaxRange(spaceRange))] floatValue];
-                shadow = [[[PlatformNSShadow alloc] init] autorelease];
+                shadow = [[(NSShadow *)[PlatformNSShadow alloc] init] autorelease];
                 [shadow setShadowColor:shadowColor];
                 [shadow setShadowOffset:shadowOffset];
                 [shadow setShadowBlurRadius:shadowBlurRadius];
@@ -1114,7 +1114,7 @@ static PlatformFont *_font(Element& element)
     auto renderer = element.renderer();
     if (!renderer)
         return nil;
-    return renderer->style().font().primaryFont()->getNSFont();
+    return renderer->style().fontCascade().primaryFont().getNSFont();
 }
 #else
 static PlatformFont *_font(Element& element)
@@ -1122,7 +1122,7 @@ static PlatformFont *_font(Element& element)
     auto renderer = element.renderer();
     if (!renderer)
         return nil;
-    return (PlatformFont *)renderer->style().font().primaryFont()->getCTFont();
+    return (PlatformFont *)renderer->style().fontCascade().primaryFont().getCTFont();
 }
 #endif
 
@@ -1722,13 +1722,7 @@ static inline NSDate *_dateForString(NSString *string)
         return nil;
     [dateComponents setSecond:component];
     
-#if (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 80000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
-    NSString *calendarIdentifier = NSCalendarIdentifierGregorian;
-#else
-    NSString *calendarIdentifier = NSGregorianCalendar;
-#endif
-
-    return [[[[NSCalendar alloc] initWithCalendarIdentifier:calendarIdentifier] autorelease] dateFromComponents:dateComponents.get()];
+    return [[[[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian] autorelease] dateFromComponents:dateComponents.get()];
 }
 
 static NSInteger _colCompare(id block1, id block2, void *)
@@ -1805,7 +1799,7 @@ void HTMLConverter::_processHeadElement(Element& element)
 {
     // FIXME: Should gather data from other sources e.g. Word, but for that we would need to be able to get comments from DOM
     
-    for (HTMLMetaElement* child = Traversal<HTMLMetaElement>::firstChild(&element); child; child = Traversal<HTMLMetaElement>::nextSibling(child)) {
+    for (HTMLMetaElement* child = Traversal<HTMLMetaElement>::firstChild(element); child; child = Traversal<HTMLMetaElement>::nextSibling(*child)) {
         NSString *name = child->name();
         NSString *content = child->content();
         if (name && content)
@@ -1830,7 +1824,7 @@ BOOL HTMLConverter::_enterElement(Element& element, BOOL embedded)
 
 void HTMLConverter::_addTableForElement(Element *tableElement)
 {
-    RetainPtr<NSTextTable> table = adoptNS([[PlatformNSTextTable alloc] init]);
+    RetainPtr<NSTextTable> table = adoptNS([(NSTextTable *)[PlatformNSTextTable alloc] init]);
     CGFloat cellSpacingVal = 1;
     CGFloat cellPaddingVal = 1;
     [table setNumberOfColumns:1];
@@ -2531,9 +2525,9 @@ static NSFileWrapper *fileWrapperForElement(Element* element)
             wrapper = fileWrapperForURL(loader, URL);
     }
     if (!wrapper) {
-        RenderImage* renderer = toRenderImage(element->renderer());
-        if (renderer->cachedImage() && !renderer->cachedImage()->errorOccurred()) {
-            wrapper = [[NSFileWrapper alloc] initRegularFileWithContents:(NSData *)(renderer->cachedImage()->imageForRenderer(renderer)->getTIFFRepresentation())];
+        auto& renderer = downcast<RenderImage>(*element->renderer());
+        if (renderer.cachedImage() && !renderer.cachedImage()->errorOccurred()) {
+            wrapper = [[NSFileWrapper alloc] initRegularFileWithContents:(NSData *)(renderer.cachedImage()->imageForRenderer(&renderer)->getTIFFRepresentation())];
             [wrapper setPreferredFilename:@"image.tiff"];
             [wrapper autorelease];
         }
@@ -2555,7 +2549,7 @@ NSAttributedString *attributedStringFromRange(Range& range)
     
 #if !PLATFORM(IOS)
 // This function uses TextIterator, which makes offsets in its result compatible with HTML editing.
-NSAttributedString *editingAttributedStringFromRange(Range& range)
+NSAttributedString *editingAttributedStringFromRange(Range& range, IncludeImagesInAttributedString includeOrSkipImages)
 {
     NSFontManager *fontManager = [NSFontManager sharedFontManager];
     NSMutableAttributedString *string = [[NSMutableAttributedString alloc] init];
@@ -2568,14 +2562,16 @@ NSAttributedString *editingAttributedStringFromRange(Range& range)
         Node* endContainer = currentTextRange->endContainer();
         int startOffset = currentTextRange->startOffset();
         int endOffset = currentTextRange->endOffset();
-        
-        if (startContainer == endContainer && (startOffset == endOffset - 1)) {
-            Node* node = startContainer->traverseToChildAt(startOffset);
-            if (is<HTMLImageElement>(node)) {
-                NSFileWrapper* fileWrapper = fileWrapperForElement(downcast<HTMLImageElement>(node));
-                NSTextAttachment* attachment = [[NSTextAttachment alloc] initWithFileWrapper:fileWrapper];
-                [string appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
-                [attachment release];
+
+        if (includeOrSkipImages == IncludeImagesInAttributedString::Yes) {
+            if (startContainer == endContainer && (startOffset == endOffset - 1)) {
+                Node* node = startContainer->traverseToChildAt(startOffset);
+                if (is<HTMLImageElement>(node)) {
+                    NSFileWrapper* fileWrapper = fileWrapperForElement(downcast<HTMLImageElement>(node));
+                    NSTextAttachment* attachment = [[NSTextAttachment alloc] initWithFileWrapper:fileWrapper];
+                    [string appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
+                    [attachment release];
+                }
             }
         }
 
@@ -2592,10 +2588,10 @@ NSAttributedString *editingAttributedStringFromRange(Range& range)
             [attrs.get() setObject:[NSNumber numberWithInteger:NSUnderlineStyleSingle] forKey:NSUnderlineStyleAttributeName];
         if (style.textDecorationsInEffect() & TextDecorationLineThrough)
             [attrs.get() setObject:[NSNumber numberWithInteger:NSUnderlineStyleSingle] forKey:NSStrikethroughStyleAttributeName];
-        if (NSFont *font = style.font().primaryFont()->getNSFont())
+        if (NSFont *font = style.fontCascade().primaryFont().getNSFont())
             [attrs.get() setObject:font forKey:NSFontAttributeName];
         else
-            [attrs.get() setObject:[fontManager convertFont:WebDefaultFont() toSize:style.font().primaryFont()->platformData().size()] forKey:NSFontAttributeName];
+            [attrs.get() setObject:[fontManager convertFont:WebDefaultFont() toSize:style.fontCascade().primaryFont().platformData().size()] forKey:NSFontAttributeName];
         if (style.visitedDependentColor(CSSPropertyColor).alpha())
             [attrs.get() setObject:nsColor(style.visitedDependentColor(CSSPropertyColor)) forKey:NSForegroundColorAttributeName];
         else

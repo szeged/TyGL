@@ -36,6 +36,10 @@
 #include <Ecore_X.h>
 #endif
 
+#if ENABLE(BATTERY_STATUS)
+#include <Eldbus.h>
+#endif
+
 namespace WebKit {
 
 enum class EFLModuleInitFailure {
@@ -46,7 +50,10 @@ enum class EFLModuleInitFailure {
     EcoreImf,
     Efreet,
     EcoreX,
-    Edje
+    Edje,
+#if ENABLE(BATTERY_STATUS)
+    Eldbus
+#endif
 };
 
 EwkMain::EwkMain()
@@ -55,7 +62,7 @@ EwkMain::EwkMain()
 {
 }
 
-EwkMain& EwkMain::shared()
+EwkMain& EwkMain::singleton()
 {
     static EwkMain instance;
     return instance;
@@ -128,6 +135,13 @@ int EwkMain::initialize()
         return 0;
     }
 
+#if ENABLE(BATTERY_STATUS)
+    if (!eldbus_init()) {
+        CRITICAL("Could not init eldbus.");
+        shutdownInitializedEFLModules(EFLModuleInitFailure::Eldbus);
+        return 0;
+    }
+#endif
     if (!ecore_main_loop_glib_integrate()) {
         WARN("Ecore was not compiled with GLib support, some plugins will not "
             "work (ie: Adobe Flash)");
@@ -141,6 +155,9 @@ int EwkMain::finalize()
     if (--m_initCount)
         return m_initCount;
 
+#if ENABLE(BATTERY_STATUS)
+    eldbus_shutdown();
+#endif
     edje_shutdown();
 #ifdef HAVE_ECORE_X
     ecore_x_shutdown();
@@ -160,6 +177,10 @@ int EwkMain::finalize()
 void EwkMain::shutdownInitializedEFLModules(EFLModuleInitFailure module)
 {
     switch (module) {
+#if ENABLE(BATTERY_STATUS)
+    case EFLModuleInitFailure::Eldbus:
+        eldbus_shutdown();
+#endif
     case EFLModuleInitFailure::Edje:
 #ifdef HAVE_ECORE_X
         ecore_x_shutdown();
@@ -188,10 +209,10 @@ using namespace WebKit;
 
 int ewk_init()
 {
-    return EwkMain::shared().initialize();
+    return EwkMain::singleton().initialize();
 }
 
 int ewk_shutdown()
 {
-    return EwkMain::shared().finalize();
+    return EwkMain::singleton().finalize();
 }

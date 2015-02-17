@@ -73,4 +73,13 @@ extern CFStringRef (*wkGetOSNameForUserAgent)(void);
 extern CFStringRef (*wkGetPlatformNameForNavigator)(void);
 extern CFStringRef (*wkGetVendorNameForNavigator)(void);
 
+extern bool (*wkIsOptimizedFullscreenSupported)(void);
+
+typedef enum {
+    wkMediaUIPartOptimizedFullscreenButton = 0,
+    wkMediaUIPartOptimizedFullscreenPlaceholder
+} wkMediaUIPart;
+extern CFStringRef (*wkGetMediaUIImageData)(int wkMediaUIPart);
+
+
 #endif // WebCoreSystemInterfaceIOS_h

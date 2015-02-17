@@ -38,10 +38,8 @@ class RenderMultiColumnSpannerPlaceholder;
 
 class RenderMultiColumnFlowThread final : public RenderFlowThread {
 public:
-    RenderMultiColumnFlowThread(Document&, PassRef<RenderStyle>);
+    RenderMultiColumnFlowThread(Document&, Ref<RenderStyle>&&);
     ~RenderMultiColumnFlowThread();
-
-    virtual bool isRenderMultiColumnFlowThread() const override { return true; }
 
     virtual void removeFlowChildInfo(RenderObject*) override;
 
@@ -55,7 +53,7 @@ public:
 
     RenderMultiColumnSpannerPlaceholder* findColumnSpannerPlaceholder(RenderBox* spanner) const { return m_spannerMap.get(spanner); }
 
-    virtual void layout() override final;
+    virtual void layout() override;
 
     // Find the set inside which the specified renderer would be rendered.
     RenderMultiColumnSet* findSetRendering(RenderObject*) const;
@@ -109,12 +107,13 @@ public:
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) override;
     
     virtual void mapAbsoluteToLocalPoint(MapCoordinatesFlags, TransformState&) const override;
-    virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&, bool* offsetDependsOnPoint = nullptr) const override;
+    virtual LayoutSize offsetFromContainer(RenderElement&, const LayoutPoint&, bool* offsetDependsOnPoint = nullptr) const override;
     
     // FIXME: Eventually as column and region flow threads start nesting, this will end up changing.
     virtual bool shouldCheckColumnBreaks() const override;
 
 private:
+    virtual bool isRenderMultiColumnFlowThread() const override { return true; }
     virtual const char* renderName() const override;
     virtual void addRegionToThread(RenderRegion*) override;
     virtual void willBeRemovedFromTree() override;
@@ -157,8 +156,6 @@ private:
     
     static bool gShiftingSpanner;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderMultiColumnFlowThread, isRenderMultiColumnFlowThread())
 
 } // namespace WebCore
 

@@ -29,6 +29,12 @@
 #include <wtf/MathExtras.h>
 #include <wtf/gobject/GUniquePtr.h>
 
+#if ENABLE(VIDEO_TRACK) && USE(GSTREAMER_MPEGTS)
+#define GST_USE_UNSTABLE_API
+#include <gst/mpegts/mpegts.h>
+#undef GST_USE_UNSTABLE_API
+#endif
+
 namespace WebCore {
 
 const char* webkitGstMapInfoQuarkString = "webkit-gst-map-info";
@@ -123,15 +129,27 @@ void unmapGstBuffer(GstBuffer* buffer)
 
 bool initializeGStreamer()
 {
-#if GST_CHECK_VERSION(0, 10, 31)
     if (gst_is_initialized())
         return true;
+
+#if ENABLE(SECCOMP_FILTERS)
+    // The gst-plugin-scanner helper binary will receive SIGSYS and dump core
+    // when it attempts to open a file. Disable it so that plugin scanning
+    // occurs in-process. The disadvantage is that a plugin that crashes while
+    // loading will now crash the web process.
+    gst_registry_fork_set_enabled(FALSE);
 #endif
 
     GUniqueOutPtr<GError> error;
     // FIXME: We should probably pass the arguments from the command line.
     bool gstInitialized = gst_init_check(0, 0, &error.outPtr());
     ASSERT_WITH_MESSAGE(gstInitialized, "GStreamer initialization failed: %s", error ? error->message : "unknown error occurred");
+
+#if ENABLE(VIDEO_TRACK) && USE(GSTREAMER_MPEGTS)
+    if (gstInitialized)
+        gst_mpegts_initialize();
+#endif
+
     return gstInitialized;
 }
 

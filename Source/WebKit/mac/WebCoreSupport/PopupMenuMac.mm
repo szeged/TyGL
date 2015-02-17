@@ -28,11 +28,11 @@
 #import <WebCore/Chrome.h>
 #import <WebCore/ChromeClient.h>
 #import <WebCore/EventHandler.h>
+#import <WebCore/Font.h>
 #import <WebCore/Frame.h>
 #import <WebCore/FrameView.h>
 #import <WebCore/Page.h>
 #import <WebCore/PopupMenuClient.h>
-#import <WebCore/SimpleFontData.h>
 #import <WebCore/WebCoreSystemInterface.h>
 
 using namespace WebCore;
@@ -61,9 +61,6 @@ void PopupMenuMac::populate()
         [m_popup setUsesItemFromMenu:NO];
         [m_popup setAutoenablesItems:NO];
     }
-
-    BOOL messagesEnabled = [[m_popup menu] menuChangedMessagesEnabled];
-    [[m_popup menu] setMenuChangedMessagesEnabled:NO];
     
     // For pullDown menus the first item is hidden.
     if (!m_client->shouldPopOver())
@@ -83,10 +80,10 @@ void PopupMenuMac::populate()
 
         PopupMenuStyle style = m_client->itemStyle(i);
         RetainPtr<NSMutableDictionary> attributes = adoptNS([[NSMutableDictionary alloc] init]);
-        if (style.font() != Font()) {
-            NSFont *font = style.font().primaryFont()->getNSFont();
+        if (style.font() != FontCascade()) {
+            NSFont *font = style.font().primaryFont().getNSFont();
             if (!font) {
-                CGFloat size = style.font().primaryFont()->platformData().size();
+                CGFloat size = style.font().primaryFont().platformData().size();
                 font = style.font().weight() < FontWeightBold ? [NSFont systemFontOfSize:size] : [NSFont boldSystemFontOfSize:size];
             }
             [attributes setObject:font forKey:NSFontAttributeName];
@@ -126,8 +123,6 @@ void PopupMenuMac::populate()
         }
 #pragma clang diagnostic pop
     }
-
-    [[m_popup menu] setMenuChangedMessagesEnabled:messagesEnabled];
 }
 
 void PopupMenuMac::show(const IntRect& r, FrameView* v, int index)
@@ -153,7 +148,7 @@ void PopupMenuMac::show(const IntRect& r, FrameView* v, int index)
     NSMenu* menu = [m_popup menu];
     
     NSPoint location;
-    NSFont* font = m_client->menuStyle().font().primaryFont()->getNSFont();
+    NSFont* font = m_client->menuStyle().font().primaryFont().getNSFont();
 
     // These values were borrowed from AppKit to match their placement of the menu.
     const int popOverHorizontalAdjust = -10;

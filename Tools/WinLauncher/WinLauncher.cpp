@@ -51,10 +51,11 @@ static const int maxHistorySize = 10;
 
 typedef _com_ptr_t<_com_IIID<IWebMutableURLRequest, &__uuidof(IWebMutableURLRequest)>> IWebMutableURLRequestPtr;
 
-WinLauncher::WinLauncher(HWND mainWnd, HWND urlBarWnd, bool useLayeredWebView)
+WinLauncher::WinLauncher(HWND mainWnd, HWND urlBarWnd, bool useLayeredWebView, bool pageLoadTesting)
     : m_hMainWnd(mainWnd)
     , m_hURLBarWnd(urlBarWnd)
     , m_useLayeredWebView(useLayeredWebView)
+    , m_pageLoadTestClient(std::make_unique<PageLoadTestClient>(this, pageLoadTesting))
 {
 }
 
@@ -122,6 +123,11 @@ HRESULT WinLauncher::setFrameLoadDelegate(IWebFrameLoadDelegate* frameLoadDelega
     return m_webView->setFrameLoadDelegate(frameLoadDelegate);
 }
 
+HRESULT WinLauncher::setFrameLoadDelegatePrivate(IWebFrameLoadDelegatePrivate* frameLoadDelegatePrivate)
+{
+    return m_webViewPrivate->setFrameLoadDelegatePrivate(frameLoadDelegatePrivate);
+}
+
 HRESULT WinLauncher::setUIDelegate(IWebUIDelegate* uiDelegate)
 {
     m_uiDelegate = uiDelegate;
@@ -132,6 +138,13 @@ HRESULT WinLauncher::setAccessibilityDelegate(IAccessibilityDelegate* accessibil
 {
     m_accessibilityDelegate = accessibilityDelegate;
     return m_webView->setAccessibilityDelegate(accessibilityDelegate);
+}
+
+
+HRESULT WinLauncher::setResourceLoadDelegate(IWebResourceLoadDelegate* resourceLoadDelegate)
+{
+    m_resourceLoadDelegate = resourceLoadDelegate;
+    return m_webView->setResourceLoadDelegate(resourceLoadDelegate);
 }
 
 IWebFramePtr WinLauncher::mainFrame()
@@ -263,7 +276,7 @@ void WinLauncher::showLastVisitedSites(IWebView& webView)
         allItemsOffset = totalListCount - maxHistorySize;
 
     int currentHistoryItem = 0;
-    for (int i = 0; i < totalListCount; ++i) {
+    for (int i = 0; i < m_historyItems.size() && (allItemsOffset + currentHistoryItem) < m_historyItems.size(); ++i) {
         updateMenuItemForHistoryItem(menu, *(m_historyItems[allItemsOffset + currentHistoryItem]), currentHistoryItem);
         ++currentHistoryItem;
     }
@@ -348,6 +361,9 @@ HRESULT WinLauncher::loadURL(const BSTR& passedURL)
     if (FAILED(hr))
         return hr;
 
+    if (!passedURL)
+        return frame->loadHTMLString(_bstr_t(defaultHTML).GetBSTR(), 0);
+
     IWebMutableURLRequestPtr request;
     hr = WebKitCreateInstance(CLSID_WebMutableURLRequest, 0, IID_IWebMutableURLRequest, (void**)&request);
     if (FAILED(hr))
@@ -365,4 +381,95 @@ HRESULT WinLauncher::loadURL(const BSTR& passedURL)
     hr = frame->loadRequest(request);
 
     return hr;
+}
+
+void WinLauncher::exitProgram()
+{
+    ::PostMessage(m_hMainWnd, static_cast<UINT>(WM_COMMAND), MAKELPARAM(IDM_EXIT, 0), 0);
+}
+
+void WinLauncher::setUserAgent(UINT menuID)
+{
+    if (!webView())
+        return;
+
+    _bstr_t customUserAgent;
+    switch (menuID) {
+    case IDM_UA_DEFAULT:
+        // Set to null user agent
+        break;
+    case IDM_UA_SAFARI_8_0:
+        customUserAgent = L"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10) AppleWebKit/600.1.25 (KHTML, like Gecko) Version/8.0 Safari/600.1.25";
+        break;
+    case IDM_UA_SAFARI_IOS_8_IPHONE:
+        customUserAgent = L"Mozilla/5.0 (iPhone; CPU OS 8_1 like Mac OS X) AppleWebKit/601.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12B403 Safari/600.1.4";
+        break;
+    case IDM_UA_SAFARI_IOS_8_IPAD:
+        customUserAgent = L"Mozilla/5.0 (iPad; CPU OS 8_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12B403 Safari/600.1.4";
+        break;
+    case IDM_UA_IE_11:
+        customUserAgent = L"Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko";
+        break;
+    case IDM_UA_CHROME_MAC:
+        customUserAgent = L"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.65 Safari/537.31";
+        break;
+    case IDM_UA_CHROME_WIN:
+        customUserAgent = L"Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.64 Safari/537.31";
+        break;
+    case IDM_UA_FIREFOX_MAC:
+        customUserAgent = L"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:20.0) Gecko/20100101 Firefox/20.0";
+        break;
+    case IDM_UA_FIREFOX_WIN:
+        customUserAgent = L"Mozilla/5.0 (Windows NT 6.2; WOW64; rv:20.0) Gecko/20100101 Firefox/20.0";
+        break;
+    case IDM_UA_OTHER:
+    default:
+        ASSERT(0); // We should never hit this case
+        return;
+    }
+
+    setUserAgent(customUserAgent);
+}
+
+void WinLauncher::setUserAgent(_bstr_t& customUserAgent)
+{
+    webView()->setCustomUserAgent(customUserAgent.GetBSTR());
+}
+
+_bstr_t WinLauncher::userAgent()
+{
+    _bstr_t userAgent;
+    if (FAILED(webView()->customUserAgent(&userAgent.GetBSTR())))
+        return _bstr_t(L"- Unknown -: Call failed.");
+
+    return userAgent;
+}
+
+typedef _com_ptr_t<_com_IIID<IWebIBActions, &__uuidof(IWebIBActions)>> IWebIBActionsPtr;
+
+void WinLauncher::resetZoom()
+{
+    IWebIBActionsPtr webActions;
+    if (FAILED(m_webView->QueryInterface(IID_IWebIBActions, reinterpret_cast<void**>(&webActions.GetInterfacePtr()))))
+        return;
+
+    webActions->resetPageZoom(nullptr);
+}
+
+void WinLauncher::zoomIn()
+{
+    IWebIBActionsPtr webActions;
+    if (FAILED(m_webView->QueryInterface(IID_IWebIBActions, reinterpret_cast<void**>(&webActions.GetInterfacePtr()))))
+        return;
+
+    webActions->zoomPageIn(nullptr);
+}
+
+void WinLauncher::zoomOut()
+{
+    IWebIBActionsPtr webActions;
+    if (FAILED(m_webView->QueryInterface(IID_IWebIBActions, reinterpret_cast<void**>(&webActions.GetInterfacePtr()))))
+        return;
+
+    webActions->zoomPageOut(nullptr);
 }

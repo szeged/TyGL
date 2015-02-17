@@ -106,14 +106,11 @@ private:
     virtual void toggleAutomaticSpellingCorrection() override;
 #endif
 
-#if ENABLE(DELETION_UI)
-    virtual bool shouldShowDeleteInterface(WebCore::HTMLElement*) override;
-#endif
-
     virtual TextCheckerClient* textChecker() override { return this; }
 
     virtual void respondToChangedContents() override;
     virtual void respondToChangedSelection(WebCore::Frame*) override;
+    virtual void discardedComposition(WebCore::Frame*) override;
 
     virtual void registerUndoStep(PassRefPtr<WebCore::UndoStep>) override;
     virtual void registerRedoStep(PassRefPtr<WebCore::UndoStep>) override;

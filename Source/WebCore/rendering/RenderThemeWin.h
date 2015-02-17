@@ -47,12 +47,12 @@ struct ThemeData {
     unsigned m_classicState;
 };
 
-class RenderThemeWin : public RenderTheme {
+class RenderThemeWin final: public RenderTheme {
 public:
     static PassRefPtr<RenderTheme> create();
 
-    virtual String extraDefaultStyleSheet();
-    virtual String extraQuirksStyleSheet();
+    virtual String extraDefaultStyleSheet() override;
+    virtual String extraQuirksStyleSheet() override;
 
     // A method asking if the theme's controls actually care about redrawing when hovered.
     virtual bool supportsHover(const RenderStyle&) const override;
@@ -62,8 +62,6 @@ public:
     virtual Color platformActiveSelectionForegroundColor() const override;
     virtual Color platformInactiveSelectionForegroundColor() const override;
 
-    // System fonts.
-    virtual void systemFont(CSSValueID, FontDescription&) const override;
     virtual Color systemColor(CSSValueID) const override;
 
     virtual bool paintCheckbox(const RenderObject& o, const PaintInfo& i, const IntRect& r) override
@@ -147,6 +145,9 @@ private:
 
     RenderThemeWin();
     virtual ~RenderThemeWin();
+
+    // System fonts.
+    virtual void updateCachedSystemFontDescription(CSSValueID, FontDescription&) const override;
 
     void addIntrinsicMargins(RenderStyle&) const;
     void close();

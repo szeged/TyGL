@@ -29,16 +29,13 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "InspectorWorkerAgent.h"
 
 #include "InspectorForwarding.h"
-#include "InspectorWebFrontendDispatchers.h"
 #include "InstrumentingAgents.h"
 #include "URL.h"
 #include "WorkerGlobalScopeProxy.h"
+#include <inspector/InspectorFrontendDispatchers.h>
 #include <inspector/InspectorValues.h>
 #include <wtf/RefPtr.h>
 
@@ -174,7 +171,7 @@ void InspectorWorkerAgent::disconnectFromWorker(ErrorString& error, int workerId
         error = ASCIILiteral("Worker is gone");
 }
 
-void InspectorWorkerAgent::sendMessageToWorker(ErrorString& error, int workerId, const RefPtr<InspectorObject>& message)
+void InspectorWorkerAgent::sendMessageToWorker(ErrorString& error, int workerId, const RefPtr<InspectorObject>&& message)
 {
     WorkerFrontendChannel* channel = m_idToChannel.get(workerId);
     if (channel)
@@ -240,5 +237,3 @@ void InspectorWorkerAgent::createWorkerFrontendChannel(WorkerGlobalScopeProxy* w
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

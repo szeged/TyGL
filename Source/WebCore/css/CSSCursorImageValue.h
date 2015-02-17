@@ -33,7 +33,7 @@ class SVGElement;
 
 class CSSCursorImageValue : public CSSValue {
 public:
-    static PassRef<CSSCursorImageValue> create(PassRef<CSSValue> imageValue, bool hasHotSpot, const IntPoint& hotSpot)
+    static Ref<CSSCursorImageValue> create(Ref<CSSValue>&& imageValue, bool hasHotSpot, const IntPoint& hotSpot)
     {
         return adoptRef(*new CSSCursorImageValue(WTF::move(imageValue), hasHotSpot, hotSpot));
     }
@@ -52,7 +52,7 @@ public:
     String customCSSText() const;
 
     bool updateIfSVGCursorIsUsed(Element*);
-    StyleImage* cachedImage(CachedResourceLoader*);
+    StyleImage* cachedImage(CachedResourceLoader&);
     StyleImage* cachedOrPendingImage(Document&);
 
     void removeReferencedElement(SVGElement*);
@@ -60,7 +60,7 @@ public:
     bool equals(const CSSCursorImageValue&) const;
 
 private:
-    CSSCursorImageValue(PassRef<CSSValue> imageValue, bool hasHotSpot, const IntPoint& hotSpot);
+    CSSCursorImageValue(Ref<CSSValue>&& imageValue, bool hasHotSpot, const IntPoint& hotSpot);
 
     void detachPendingImage();
 

@@ -29,9 +29,9 @@
 #if ENABLE(DFG_JIT)
 
 #include "Arguments.h"
+#include "BinarySwitch.h"
 #include "DFGAbstractInterpreterInlines.h"
 #include "DFGArrayifySlowPathGenerator.h"
-#include "DFGBinarySwitch.h"
 #include "DFGCallArrayAllocatorSlowPathGenerator.h"
 #include "DFGMayExit.h"
 #include "DFGSaneStringGetByValSlowPathGenerator.h"
@@ -102,16 +102,19 @@ void SpeculativeJIT::emitAllocateJSArray(GPRReg resultGPR, Structure* structure,
     // I want a slow path that also loads out the storage pointer, and that's
     // what this custom CallArrayAllocatorSlowPathGenerator gives me. It's a lot
     // of work for a very small piece of functionality. :-/
-    addSlowPathGenerator(adoptPtr(
-        new CallArrayAllocatorSlowPathGenerator(
+    addSlowPathGenerator(std::make_unique<CallArrayAllocatorSlowPathGenerator>(
             slowCases, this, operationNewArrayWithSize, resultGPR, storageGPR,
-            structure, numElements)));
+            structure, numElements));
 }
 
 void SpeculativeJIT::emitAllocateArguments(GPRReg resultGPR, GPRReg scratchGPR1, GPRReg scratchGPR2, MacroAssembler::JumpList& slowPath)
 {
     Structure* structure = m_jit.graph().globalObjectFor(m_currentNode->origin.semantic)->argumentsStructure();
-    emitAllocateDestructibleObject<Arguments>(resultGPR, structure, scratchGPR1, scratchGPR2, slowPath);
+
+    m_jit.load32(JITCompiler::payloadFor(JSStack::ArgumentCount), scratchGPR1);
+    m_jit.mul32(TrustedImm32(sizeof(JSValue)), scratchGPR1, scratchGPR1);
+    m_jit.add32(TrustedImm32(Arguments::offsetOfInlineRegisterArray()), scratchGPR1);
+    emitAllocateVariableSizedJSObject<Arguments>(resultGPR, structure, scratchGPR1, scratchGPR1, scratchGPR2, slowPath);
 
     m_jit.storePtr(TrustedImmPtr(0), MacroAssembler::Address(resultGPR, Arguments::offsetOfActivation()));
 
@@ -124,11 +127,11 @@ void SpeculativeJIT::emitAllocateArguments(GPRReg resultGPR, GPRReg scratchGPR1,
         m_jit.store8(TrustedImm32(1), MacroAssembler::Address(resultGPR, Arguments::offsetOfIsStrictMode()));
 
     m_jit.storePtr(GPRInfo::callFrameRegister, MacroAssembler::Address(resultGPR, Arguments::offsetOfRegisters()));
-    m_jit.storePtr(TrustedImmPtr(0), MacroAssembler::Address(resultGPR, Arguments::offsetOfRegisterArray()));
     m_jit.storePtr(TrustedImmPtr(0), MacroAssembler::Address(resultGPR, Arguments::offsetOfSlowArgumentData()));
 
     m_jit.loadPtr(JITCompiler::addressFor(JSStack::Callee), scratchGPR1);
     m_jit.storePtr(scratchGPR1, MacroAssembler::Address(resultGPR, Arguments::offsetOfCallee()));
+
 }
 
 void SpeculativeJIT::speculationCheck(ExitKind kind, JSValueSource jsValueSource, Node* node, MacroAssembler::Jump jumpToFail)
@@ -253,9 +256,9 @@ RegisterSet SpeculativeJIT::usedRegisters()
     return result;
 }
 
-void SpeculativeJIT::addSlowPathGenerator(PassOwnPtr<SlowPathGenerator> slowPathGenerator)
+void SpeculativeJIT::addSlowPathGenerator(std::unique_ptr<SlowPathGenerator> slowPathGenerator)
 {
-    m_slowPathGenerators.append(slowPathGenerator);
+    m_slowPathGenerators.append(WTF::move(slowPathGenerator));
 }
 
 void SpeculativeJIT::runSlowPathGenerators()
@@ -777,8 +780,8 @@ void SpeculativeJIT::arrayify(Node* node, GPRReg baseReg, GPRReg propertyReg)
         slowPath.append(jumpSlowForUnwantedArrayMode(tempGPR, node->arrayMode()));
     }
     
-    addSlowPathGenerator(adoptPtr(new ArrayifySlowPathGenerator(
-        slowPath, this, node, baseReg, propertyReg, tempGPR, structureGPR)));
+    addSlowPathGenerator(std::make_unique<ArrayifySlowPathGenerator>(
+        slowPath, this, node, baseReg, propertyReg, tempGPR, structureGPR));
     
     noResult(m_currentNode);
 }
@@ -875,7 +878,7 @@ void SpeculativeJIT::compileIn(Node* node)
             MacroAssembler::PatchableJump jump = m_jit.patchableJump();
             MacroAssembler::Label done = m_jit.label();
             
-            OwnPtr<SlowPathGenerator> slowPath = slowPathCall(
+            auto slowPath = slowPathCall(
                 jump.m_jump, this, operationInOptimize,
                 JSValueRegs::payloadOnly(resultGPR), stubInfo, baseGPR,
                 string->tryGetValueImpl());
@@ -885,17 +888,17 @@ void SpeculativeJIT::compileIn(Node* node)
             stubInfo->patch.valueGPR = static_cast<int8_t>(resultGPR);
             stubInfo->patch.usedRegisters = usedRegisters();
             stubInfo->patch.spillMode = NeedToSpill;
-            
+
             m_jit.addIn(InRecord(jump, done, slowPath.get(), stubInfo));
-            addSlowPathGenerator(slowPath.release());
-                
+            addSlowPathGenerator(WTF::move(slowPath));
+
             base.use();
-            
+
             blessedBooleanResult(resultGPR, node, UseChildrenCalledExplicitly);
             return;
         }
     }
-        
+
     JSValueOperand key(this, node->child1());
     JSValueRegs regs = key.jsValueRegs();
         
@@ -1775,12 +1778,12 @@ void SpeculativeJIT::compileGetByValOnString(Node* node)
         JSGlobalObject* globalObject = m_jit.globalObjectFor(node->origin.semantic);
         if (globalObject->stringPrototypeChainIsSane()) {
 #if USE(JSVALUE64)
-            addSlowPathGenerator(adoptPtr(new SaneStringGetByValSlowPathGenerator(
-                outOfBounds, this, JSValueRegs(scratchReg), baseReg, propertyReg)));
+            addSlowPathGenerator(std::make_unique<SaneStringGetByValSlowPathGenerator>(
+                outOfBounds, this, JSValueRegs(scratchReg), baseReg, propertyReg));
 #else
-            addSlowPathGenerator(adoptPtr(new SaneStringGetByValSlowPathGenerator(
+            addSlowPathGenerator(std::make_unique<SaneStringGetByValSlowPathGenerator>(
                 outOfBounds, this, JSValueRegs(resultTagReg, scratchReg),
-                baseReg, propertyReg)));
+                baseReg, propertyReg));
 #endif
         } else {
 #if USE(JSVALUE64)
@@ -4156,9 +4159,11 @@ void SpeculativeJIT::compileNewFunctionNoCheck(Node* node)
 {
     GPRFlushedCallResult result(this);
     GPRReg resultGPR = result.gpr();
+    SpeculateCellOperand scope(this, node->child1());
+    GPRReg scopeGPR = scope.gpr();
     flushRegisters();
     callOperation(
-        operationNewFunctionNoCheck, resultGPR, m_jit.codeBlock()->functionDecl(node->functionDeclIndex()));
+        operationNewFunctionNoCheck, resultGPR, scopeGPR, m_jit.codeBlock()->functionDecl(node->functionDeclIndex()));
     cellResult(resultGPR, node);
 }
 
@@ -4166,10 +4171,12 @@ void SpeculativeJIT::compileNewFunctionExpression(Node* node)
 {
     GPRFlushedCallResult result(this);
     GPRReg resultGPR = result.gpr();
+    SpeculateCellOperand scope(this, node->child1());
+    GPRReg scopeGPR = scope.gpr();
     flushRegisters();
     callOperation(
         operationNewFunctionNoCheck,
-        resultGPR,
+        resultGPR, scopeGPR, 
         m_jit.codeBlock()->functionExpr(node->functionExprIndex()));
     cellResult(resultGPR, node);
 }
@@ -5468,16 +5475,16 @@ void SpeculativeJIT::writeBarrier(GPRReg ownerGPR, JSCell* value, GPRReg scratch
     if (Heap::isMarked(value))
         return;
 
-    JITCompiler::Jump ownerNotMarkedOrAlreadyRemembered = m_jit.checkMarkByte(ownerGPR);
+    JITCompiler::Jump ownerIsRememberedOrInEden = m_jit.jumpIfIsRememberedOrInEden(ownerGPR);
     storeToWriteBarrierBuffer(ownerGPR, scratch1, scratch2);
-    ownerNotMarkedOrAlreadyRemembered.link(&m_jit);
+    ownerIsRememberedOrInEden.link(&m_jit);
 }
 
 void SpeculativeJIT::writeBarrier(GPRReg ownerGPR, GPRReg scratch1, GPRReg scratch2)
 {
-    JITCompiler::Jump ownerNotMarkedOrAlreadyRemembered = m_jit.checkMarkByte(ownerGPR);
+    JITCompiler::Jump ownerIsRememberedOrInEden = m_jit.jumpIfIsRememberedOrInEden(ownerGPR);
     storeToWriteBarrierBuffer(ownerGPR, scratch1, scratch2);
-    ownerNotMarkedOrAlreadyRemembered.link(&m_jit);
+    ownerIsRememberedOrInEden.link(&m_jit);
 }
 #else
 void SpeculativeJIT::compileStoreBarrier(Node* node)

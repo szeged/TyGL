@@ -245,7 +245,7 @@ bool ScriptElement::requestScript(const String& sourceUrl)
     Ref<Document> originalDocument(m_element.document());
     if (!m_element.dispatchBeforeLoadEvent(sourceUrl))
         return false;
-    if (!m_element.inDocument() || &m_element.document() != &originalDocument.get())
+    if (!m_element.inDocument() || &m_element.document() != originalDocument.ptr())
         return false;
 
     ASSERT(!m_cachedScript);
@@ -261,7 +261,7 @@ bool ScriptElement::requestScript(const String& sourceUrl)
         request.setCharset(scriptCharset());
         request.setInitiator(&element());
 
-        m_cachedScript = m_element.document().cachedResourceLoader()->requestScript(request);
+        m_cachedScript = m_element.document().cachedResourceLoader().requestScript(request);
         m_isExternalScript = true;
     }
 
@@ -292,8 +292,8 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
 
     Ref<Document> document(m_element.document());
     if (Frame* frame = document->frame()) {
-        IgnoreDestructiveWriteCountIncrementer ignoreDesctructiveWriteCountIncrementer(m_isExternalScript ? &document.get() : 0);
-        CurrentScriptIncrementer currentScriptIncrementer(&document.get(), &m_element);
+        IgnoreDestructiveWriteCountIncrementer ignoreDesctructiveWriteCountIncrementer(m_isExternalScript ? document.ptr() : nullptr);
+        CurrentScriptIncrementer currentScriptIncrementer(document, &m_element);
 
         // Create a script from the script element node, using the script
         // block's source and the script block's type.
@@ -377,7 +377,7 @@ bool ScriptElement::isScriptForEventSupported() const
 
 String ScriptElement::scriptContent() const
 {
-    return TextNodeTraversal::contentsAsString(&m_element);
+    return TextNodeTraversal::contentsAsString(m_element);
 }
 
 ScriptElement* toScriptElementIfPossible(Element* element)

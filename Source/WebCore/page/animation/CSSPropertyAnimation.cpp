@@ -42,6 +42,7 @@
 #include "ClipPathOperation.h"
 #include "FloatConversion.h"
 #include "IdentityTransformOperation.h"
+#include "MaskImageOperation.h"
 #include "Matrix3DTransformOperation.h"
 #include "MatrixTransformOperation.h"
 #include "RenderBox.h"
@@ -114,11 +115,11 @@ static inline std::unique_ptr<ShadowData> blendFunc(const AnimationBase* anim, c
         blend(from->color(), to->color(), progress));
 }
 
-static inline TransformOperations blendFunc(const AnimationBase* anim, const TransformOperations& from, const TransformOperations& to, double progress)
+static inline TransformOperations blendFunc(const AnimationBase* animation, const TransformOperations& from, const TransformOperations& to, double progress)
 {
-    if (anim->isTransformFunctionListValid())
+    if (animation->isTransformFunctionListValid())
         return to.blendByMatchingOperations(from, progress);
-    return to.blendByUsingMatrixInterpolation(from, progress, anim->renderer()->isBox() ? toRenderBox(anim->renderer())->borderBoxRect().size() : LayoutSize());
+    return to.blendByUsingMatrixInterpolation(from, progress, is<RenderBox>(*animation->renderer()) ? downcast<RenderBox>(*animation->renderer()).borderBoxRect().size() : LayoutSize());
 }
 
 static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, ClipPathOperation* from, ClipPathOperation* to, double progress)
@@ -130,13 +131,13 @@ static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, Clip
     if (from->type() != ClipPathOperation::Shape || to->type() != ClipPathOperation::Shape)
         return to;
 
-    const BasicShape* fromShape = static_cast<ShapeClipPathOperation*>(from)->basicShape();
-    const BasicShape* toShape = static_cast<ShapeClipPathOperation*>(to)->basicShape();
+    const BasicShape& fromShape = downcast<ShapeClipPathOperation>(*from).basicShape();
+    const BasicShape& toShape = downcast<ShapeClipPathOperation>(*to).basicShape();
 
-    if (!fromShape->canBlend(toShape))
+    if (!fromShape.canBlend(toShape))
         return to;
 
-    return ShapeClipPathOperation::create(toShape->blend(fromShape, progress));
+    return ShapeClipPathOperation::create(toShape.blend(fromShape, progress));
 }
 
 #if ENABLE(CSS_SHAPES)
@@ -151,21 +152,21 @@ static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase*, ShapeValue*
     if (from->cssBox() != to->cssBox())
         return to;
 
-    const BasicShape* fromShape = from->shape();
-    const BasicShape* toShape = to->shape();
+    const BasicShape& fromShape = *from->shape();
+    const BasicShape& toShape = *to->shape();
 
-    if (!fromShape->canBlend(toShape))
+    if (!fromShape.canBlend(toShape))
         return to;
 
-    return ShapeValue::createShapeValue(toShape->blend(fromShape, progress), to->cssBox());
+    return ShapeValue::createShapeValue(toShape.blend(fromShape, progress), to->cssBox());
 }
 #endif
 
-static inline PassRefPtr<FilterOperation> blendFunc(const AnimationBase* anim, FilterOperation* fromOp, FilterOperation* toOp, double progress, bool blendToPassthrough = false)
+static inline PassRefPtr<FilterOperation> blendFunc(const AnimationBase* animation, FilterOperation* fromOp, FilterOperation* toOp, double progress, bool blendToPassthrough = false)
 {
     ASSERT(toOp);
     if (toOp->blendingNeedsRendererSize()) {
-        LayoutSize size = anim->renderer()->isBox() ? toRenderBox(anim->renderer())->borderBoxRect().size() : LayoutSize();
+        LayoutSize size = is<RenderBox>(*animation->renderer()) ? downcast<RenderBox>(*animation->renderer()).borderBoxRect().size() : LayoutSize();
         return toOp->blend(fromOp, progress, size, blendToPassthrough);
     }
     return toOp->blend(fromOp, progress, blendToPassthrough);
@@ -293,9 +294,9 @@ static inline PassRefPtr<StyleImage> blendFunc(const AnimationBase* anim, StyleI
         return to;
 
     // Animation between two generated images. Cross fade for all other cases.
-    if (from->isGeneratedImage() && to->isGeneratedImage()) {
-        CSSImageGeneratorValue& fromGenerated = toStyleGeneratedImage(from)->imageValue();
-        CSSImageGeneratorValue& toGenerated = toStyleGeneratedImage(to)->imageValue();
+    if (is<StyleGeneratedImage>(*from) && is<StyleGeneratedImage>(*to)) {
+        CSSImageGeneratorValue& fromGenerated = downcast<StyleGeneratedImage>(*from).imageValue();
+        CSSImageGeneratorValue& toGenerated = downcast<StyleGeneratedImage>(*to).imageValue();
 
         if (is<CSSFilterImageValue>(fromGenerated) && is<CSSFilterImageValue>(toGenerated)) {
             // Animation of generated images just possible if input images are equal.
@@ -315,19 +316,19 @@ static inline PassRefPtr<StyleImage> blendFunc(const AnimationBase* anim, StyleI
 
         // FIXME: Add support for animation between two *gradient() functions.
         // https://bugs.webkit.org/show_bug.cgi?id=119956
-    } else if (from->isGeneratedImage() && to->isCachedImage()) {
-        CSSImageGeneratorValue& fromGenerated = toStyleGeneratedImage(from)->imageValue();
+    } else if (is<StyleGeneratedImage>(*from) && is<StyleCachedImage>(*to)) {
+        CSSImageGeneratorValue& fromGenerated = downcast<StyleGeneratedImage>(*from).imageValue();
         if (is<CSSFilterImageValue>(fromGenerated)) {
             CSSFilterImageValue& fromFilter = downcast<CSSFilterImageValue>(fromGenerated);
-            if (fromFilter.cachedImage() && toStyleCachedImage(to)->cachedImage() == fromFilter.cachedImage())
+            if (fromFilter.cachedImage() && downcast<StyleCachedImage>(*to).cachedImage() == fromFilter.cachedImage())
                 return blendFilter(anim, fromFilter.cachedImage(), fromFilter.filterOperations(), FilterOperations(), progress);
         }
         // FIXME: Add interpolation between cross-fade and image source.
-    } else if (from->isCachedImage() && to->isGeneratedImage()) {
-        CSSImageGeneratorValue& toGenerated = toStyleGeneratedImage(to)->imageValue();
+    } else if (is<StyleCachedImage>(*from) && is<StyleGeneratedImage>(*to)) {
+        CSSImageGeneratorValue& toGenerated = downcast<StyleGeneratedImage>(*to).imageValue();
         if (is<CSSFilterImageValue>(toGenerated)) {
             CSSFilterImageValue& toFilter = downcast<CSSFilterImageValue>(toGenerated);
-            if (toFilter.cachedImage() && toStyleCachedImage(from)->cachedImage() == toFilter.cachedImage())     
+            if (toFilter.cachedImage() && downcast<StyleCachedImage>(*from).cachedImage() == toFilter.cachedImage())
                 return blendFilter(anim, toFilter.cachedImage(), FilterOperations(), toFilter.filterOperations(), progress);
         }
         // FIXME: Add interpolation between image source and cross-fade.
@@ -335,8 +336,21 @@ static inline PassRefPtr<StyleImage> blendFunc(const AnimationBase* anim, StyleI
 
     // FIXME: Add support cross fade between cached and generated images.
     // https://bugs.webkit.org/show_bug.cgi?id=78293
-    if (from->isCachedImage() && to->isCachedImage())
-        return crossfadeBlend(anim, toStyleCachedImage(from), toStyleCachedImage(to), progress);
+    if (is<StyleCachedImage>(*from) && is<StyleCachedImage>(*to))
+        return crossfadeBlend(anim, downcast<StyleCachedImage>(from), downcast<StyleCachedImage>(to), progress);
+
+    return to;
+}
+
+static inline PassRefPtr<MaskImageOperation> blendFunc(const AnimationBase* anim, const RefPtr<MaskImageOperation> from, const RefPtr<MaskImageOperation> to, double progress)
+{
+    if (!from.get() || !to.get())
+        return to;
+
+    // Only animates between masks using images (PNG, entire SVG, generated image).
+    // It does not animate between <mask> elements (file.svg#identifier).
+    if (from->image() && to->image())
+        return MaskImageOperation::create(blendFunc(anim, from->image(), to->image(), progress));
 
     return to;
 }
@@ -497,6 +511,30 @@ public:
         StyleImage* imageA = (a->*m_getter)();
         StyleImage* imageB = (b->*m_getter)();
         return StyleImage::imagesEquivalent(imageA, imageB);
+    }
+};
+
+class MaskImagePropertyWrapper : public PropertyWrapper<const RefPtr<MaskImageOperation>> {
+public:
+    MaskImagePropertyWrapper()
+        : PropertyWrapper<const RefPtr<MaskImageOperation>>(CSSPropertyWebkitMaskImage, &RenderStyle::maskImage, &RenderStyle::setMaskImage)
+    {
+    }
+    
+    virtual bool equals(const RenderStyle* a, const RenderStyle* b) const
+    {
+        // If the style pointers are the same, don't bother doing the test.
+        // If either is null, return false. If both are null, return true.
+        if (a == b)
+            return true;
+        if (!a || !b)
+            return false;
+        
+        const RefPtr<MaskImageOperation> maskImageA = (a->*m_getter)();
+        const RefPtr<MaskImageOperation> maskImageB = (b->*m_getter)();
+        StyleImage* styleImageA = (maskImageA ? maskImageA->image() : nullptr);
+        StyleImage* styleImageB = (maskImageB ? maskImageB->image() : nullptr);
+        return StyleImage::imagesEquivalent(styleImageA, styleImageB);
     }
 };
 
@@ -882,7 +920,7 @@ public:
 class FillLayersPropertyWrapper : public AnimationPropertyWrapperBase {
 public:
     typedef const FillLayer* (RenderStyle::*LayersGetter)() const;
-    typedef FillLayer* (RenderStyle::*LayersAccessor)();
+    typedef FillLayer& (RenderStyle::*LayersAccessor)();
 
     FillLayersPropertyWrapper(CSSPropertyID prop, LayersGetter getter, LayersAccessor accessor)
         : AnimationPropertyWrapperBase(prop)
@@ -931,7 +969,7 @@ public:
     {
         const FillLayer* aLayer = (a->*m_layersGetter)();
         const FillLayer* bLayer = (b->*m_layersGetter)();
-        FillLayer* dstLayer = (dst->*m_layersAccessor)();
+        FillLayer* dstLayer = &(dst->*m_layersAccessor)();
 
         while (aLayer && bLayer && dstLayer) {
             m_fillLayerPropertyWrapper->blend(anim, dstLayer, aLayer, bLayer, progress);
@@ -1150,9 +1188,9 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
 
         new PropertyWrapperVisitedAffectedColor(CSSPropertyBackgroundColor, &RenderStyle::backgroundColor, &RenderStyle::setBackgroundColor, &RenderStyle::visitedLinkBackgroundColor, &RenderStyle::setVisitedLinkBackgroundColor),
 
-        new FillLayersPropertyWrapper(CSSPropertyBackgroundImage, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers),
+        new FillLayersPropertyWrapper(CSSPropertyBackgroundImage, &RenderStyle::backgroundLayers, &RenderStyle::ensureBackgroundLayers),
         new StyleImagePropertyWrapper(CSSPropertyListStyleImage, &RenderStyle::listStyleImage, &RenderStyle::setListStyleImage),
-        new StyleImagePropertyWrapper(CSSPropertyWebkitMaskImage, &RenderStyle::maskImage, &RenderStyle::setMaskImage),
+        new MaskImagePropertyWrapper(),
 
         new StyleImagePropertyWrapper(CSSPropertyBorderImageSource, &RenderStyle::borderImageSource, &RenderStyle::setBorderImageSource),
         new LengthPropertyWrapper<LengthBox>(CSSPropertyBorderImageSlice, &RenderStyle::borderImageSlices, &RenderStyle::setBorderImageSlices),
@@ -1162,14 +1200,14 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
         new StyleImagePropertyWrapper(CSSPropertyWebkitMaskBoxImageSource, &RenderStyle::maskBoxImageSource, &RenderStyle::setMaskBoxImageSource),
         new PropertyWrapper<const NinePieceImage&>(CSSPropertyWebkitMaskBoxImage, &RenderStyle::maskBoxImage, &RenderStyle::setMaskBoxImage),
 
-        new FillLayersPropertyWrapper(CSSPropertyBackgroundPositionX, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers),
-        new FillLayersPropertyWrapper(CSSPropertyBackgroundPositionY, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers),
-        new FillLayersPropertyWrapper(CSSPropertyBackgroundSize, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers),
-        new FillLayersPropertyWrapper(CSSPropertyWebkitBackgroundSize, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers),
+        new FillLayersPropertyWrapper(CSSPropertyBackgroundPositionX, &RenderStyle::backgroundLayers, &RenderStyle::ensureBackgroundLayers),
+        new FillLayersPropertyWrapper(CSSPropertyBackgroundPositionY, &RenderStyle::backgroundLayers, &RenderStyle::ensureBackgroundLayers),
+        new FillLayersPropertyWrapper(CSSPropertyBackgroundSize, &RenderStyle::backgroundLayers, &RenderStyle::ensureBackgroundLayers),
+        new FillLayersPropertyWrapper(CSSPropertyWebkitBackgroundSize, &RenderStyle::backgroundLayers, &RenderStyle::ensureBackgroundLayers),
 
-        new FillLayersPropertyWrapper(CSSPropertyWebkitMaskPositionX, &RenderStyle::maskLayers, &RenderStyle::accessMaskLayers),
-        new FillLayersPropertyWrapper(CSSPropertyWebkitMaskPositionY, &RenderStyle::maskLayers, &RenderStyle::accessMaskLayers),
-        new FillLayersPropertyWrapper(CSSPropertyWebkitMaskSize, &RenderStyle::maskLayers, &RenderStyle::accessMaskLayers),
+        new FillLayersPropertyWrapper(CSSPropertyWebkitMaskPositionX, &RenderStyle::maskLayers, &RenderStyle::ensureMaskLayers),
+        new FillLayersPropertyWrapper(CSSPropertyWebkitMaskPositionY, &RenderStyle::maskLayers, &RenderStyle::ensureMaskLayers),
+        new FillLayersPropertyWrapper(CSSPropertyWebkitMaskSize, &RenderStyle::maskLayers, &RenderStyle::ensureMaskLayers),
 
         new PropertyWrapper<float>(CSSPropertyFontSize,
             // Must pass a specified size to setFontSize if Text Autosizing is enabled, but a computed size
@@ -1181,10 +1219,10 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
             &RenderStyle::computedFontSize,
 #endif
             &RenderStyle::setFontSize),
-        new PropertyWrapper<unsigned short>(CSSPropertyWebkitColumnRuleWidth, &RenderStyle::columnRuleWidth, &RenderStyle::setColumnRuleWidth),
-        new PropertyWrapper<float>(CSSPropertyWebkitColumnGap, &RenderStyle::columnGap, &RenderStyle::setColumnGap),
-        new PropertyWrapper<unsigned short>(CSSPropertyWebkitColumnCount, &RenderStyle::columnCount, &RenderStyle::setColumnCount),
-        new PropertyWrapper<float>(CSSPropertyWebkitColumnWidth, &RenderStyle::columnWidth, &RenderStyle::setColumnWidth),
+        new PropertyWrapper<unsigned short>(CSSPropertyColumnRuleWidth, &RenderStyle::columnRuleWidth, &RenderStyle::setColumnRuleWidth),
+        new PropertyWrapper<float>(CSSPropertyColumnGap, &RenderStyle::columnGap, &RenderStyle::setColumnGap),
+        new PropertyWrapper<unsigned short>(CSSPropertyColumnCount, &RenderStyle::columnCount, &RenderStyle::setColumnCount),
+        new PropertyWrapper<float>(CSSPropertyColumnWidth, &RenderStyle::columnWidth, &RenderStyle::setColumnWidth),
         new PropertyWrapper<short>(CSSPropertyWebkitBorderHorizontalSpacing, &RenderStyle::horizontalBorderSpacing, &RenderStyle::setHorizontalBorderSpacing),
         new PropertyWrapper<short>(CSSPropertyWebkitBorderVerticalSpacing, &RenderStyle::verticalBorderSpacing, &RenderStyle::setVerticalBorderSpacing),
         new PropertyWrapper<int>(CSSPropertyZIndex, &RenderStyle::zIndex, &RenderStyle::setZIndex),
@@ -1223,7 +1261,7 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
         new PropertyWrapper<float>(CSSPropertyWebkitShapeImageThreshold, &RenderStyle::shapeImageThreshold, &RenderStyle::setShapeImageThreshold),
 #endif
 
-        new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitColumnRuleColor, MaybeInvalidColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor, &RenderStyle::visitedLinkColumnRuleColor, &RenderStyle::setVisitedLinkColumnRuleColor),
+        new PropertyWrapperVisitedAffectedColor(CSSPropertyColumnRuleColor, MaybeInvalidColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor, &RenderStyle::visitedLinkColumnRuleColor, &RenderStyle::setVisitedLinkColumnRuleColor),
         new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitTextStrokeColor, MaybeInvalidColor, &RenderStyle::textStrokeColor, &RenderStyle::setTextStrokeColor, &RenderStyle::visitedLinkTextStrokeColor, &RenderStyle::setVisitedLinkTextStrokeColor),
         new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitTextFillColor, MaybeInvalidColor, &RenderStyle::textFillColor, &RenderStyle::setTextFillColor, &RenderStyle::visitedLinkTextFillColor, &RenderStyle::setVisitedLinkTextFillColor),
         new PropertyWrapperVisitedAffectedColor(CSSPropertyBorderLeftColor, MaybeInvalidColor, &RenderStyle::borderLeftColor, &RenderStyle::setBorderLeftColor, &RenderStyle::visitedLinkBorderLeftColor, &RenderStyle::setVisitedLinkBorderLeftColor),
@@ -1285,7 +1323,7 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
         CSSPropertyOutline,
         CSSPropertyPadding,
         CSSPropertyWebkitTextStroke,
-        CSSPropertyWebkitColumnRule,
+        CSSPropertyColumnRule,
         CSSPropertyWebkitBorderRadius,
         CSSPropertyWebkitTransformOrigin
     };
@@ -1297,7 +1335,7 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
     //
     // Compound properties that have components that should be animatable:
     //
-    //  CSSPropertyWebkitColumns
+    //  CSSPropertyColumns
     //  CSSPropertyWebkitBoxReflect
 
     // Make sure unused slots have a value

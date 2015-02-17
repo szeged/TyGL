@@ -36,8 +36,11 @@ WebInspector.SourceCodeTextEditor = function(sourceCode)
 
     WebInspector.TextEditor.call(this, null, null, this);
 
-    this._typeTokenAnnotator = null;
     this._typeTokenScrollHandler = null;
+    this._typeTokenAnnotator = null;
+    this._basicBlockAnnotator = null;
+    
+    this._isProbablyMinified = false;
 
     // FIXME: Currently this just jumps between resources and related source map resources. It doesn't "jump to symbol" yet.
     this._updateTokenTrackingControllerState();
@@ -70,7 +73,7 @@ WebInspector.SourceCodeTextEditor = function(sourceCode)
     else
         this._sourceCode.addEventListener(WebInspector.SourceCode.Event.SourceMapAdded, this._sourceCodeSourceMapAdded, this);
 
-    sourceCode.requestContent(this._contentAvailable.bind(this));
+    sourceCode.requestContent().then(this._contentAvailable.bind(this));
 
     // FIXME: Cmd+L shorcut doesn't actually work.
     new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Command, "L", this.showGoToLineDialog.bind(this), this.element);
@@ -109,8 +112,17 @@ WebInspector.SourceCodeTextEditor.prototype = {
     {
         WebInspector.TextEditor.prototype.shown.call(this);
 
-        if (this._typeTokenAnnotator)
-            this._typeTokenAnnotator.resume();
+        if (WebInspector.showJavaScriptTypeInformationSetting.value) {
+            if (this._typeTokenAnnotator)
+                this._typeTokenAnnotator.resume();
+            if (this._basicBlockAnnotator)
+                this._basicBlockAnnotator.resume();
+            if (!this._typeTokenScrollHandler && (this._typeTokenAnnotator || this._basicBlockAnnotator))
+                this._enableScrollEventsForTypeTokenAnnotator();
+        } else {
+            if (this._typeTokenAnnotator || this._basicBlockAnnotator)
+                this._setTypeTokenAnnotatorEnabledState(false);
+        }
     },
 
     hidden: function()
@@ -125,6 +137,8 @@ WebInspector.SourceCodeTextEditor.prototype = {
 
         if (this._typeTokenAnnotator)
             this._typeTokenAnnotator.pause();
+        if (this._basicBlockAnnotator)
+            this._basicBlockAnnotator.pause();
     },
 
     close: function()
@@ -206,6 +220,9 @@ WebInspector.SourceCodeTextEditor.prototype = {
             this.dispatchEventToListeners(WebInspector.TextEditor.Event.NumberOfSearchResultsDidChange);
         }
 
+        if (this.hasEdits())
+            return false;
+
         if (this._sourceCode instanceof WebInspector.SourceMapResource)
             return false;
 
@@ -252,6 +269,12 @@ WebInspector.SourceCodeTextEditor.prototype = {
 
         for (var range of newRanges)
             this._updateEditableMarkers(range);
+
+        if (this._typeTokenAnnotator || this._basicBlockAnnotator) {
+            this._setTypeTokenAnnotatorEnabledState(false);
+            this._typeTokenAnnotator = null;
+            this._basicBlockAnnotator = null;
+        }
     },
 
     toggleTypeAnnotations: function()
@@ -259,20 +282,12 @@ WebInspector.SourceCodeTextEditor.prototype = {
         if (!this._typeTokenAnnotator)
             return false;
 
-        var isActivated = this._typeTokenAnnotator.toggleTypeAnnotations();
-        if (isActivated) {
-            RuntimeAgent.enableTypeProfiler();
-            this._enableScrollEventsForTypeTokenAnnotator();
-        } else {
-            // We disable type profiling when exiting the inspector, so no need to call it here. If we were
-            // to call it here, we would have JavaScriptCore compile out all the necessary type profiling information,
-            // so if a user were to quickly press then unpress the button, we wouldn't be able to re-show type information.
-            this._disableScrollEventsForTypeTokenAnnotator();
-        }
-        WebInspector.showJavaScriptTypeInformationSetting.value = isActivated;
+        var newActivatedState = !this._typeTokenAnnotator.isActive();
+        if (newActivatedState && this._isProbablyMinified && !this.formatted)
+            this.formatted = true;
 
-        this._updateTokenTrackingControllerState();
-        return isActivated;
+        this._setTypeTokenAnnotatorEnabledState(newActivatedState);
+        return newActivatedState;
     },
 
     showPopoverForTypes: function(types, bounds, title)
@@ -297,10 +312,24 @@ WebInspector.SourceCodeTextEditor.prototype = {
 
     prettyPrint: function(pretty)
     {
+        // The annotators must be cleared before pretty printing takes place and resumed 
+        // after so that they clear their annotations in a known state and insert new annotations 
+        // in the new state.
+        var shouldResumeTypeTokenAnnotator = this._typeTokenAnnotator && this._typeTokenAnnotator.isActive();
+        var shouldResumeBasicBlockAnnotator = this._basicBlockAnnotator && this._basicBlockAnnotator.isActive();
+        if (shouldResumeTypeTokenAnnotator || shouldResumeBasicBlockAnnotator)
+            this._setTypeTokenAnnotatorEnabledState(false);
+
         WebInspector.TextEditor.prototype.prettyPrint.call(this, pretty);
 
-        if (this._typeTokenAnnotator && this._typeTokenAnnotator.isActive)
-            this._typeTokenAnnotator.reset();
+        if (pretty || !this._isProbablyMinified) {
+            if (shouldResumeTypeTokenAnnotator || shouldResumeBasicBlockAnnotator)
+                this._setTypeTokenAnnotatorEnabledState(true);
+        } else {
+            console.assert(!pretty && this._isProbablyMinified);
+            if (this._typeTokenAnnotator || this._basicBlockAnnotator)
+                this._setTypeTokenAnnotatorEnabledState(false);
+        }
     },
 
     // Private
@@ -384,13 +413,16 @@ WebInspector.SourceCodeTextEditor.prototype = {
             while (true) {
                 var nextNewlineIndex = content.indexOf("\n", lastNewlineIndex);
                 if (nextNewlineIndex === -1) {
-                    if (content.length - lastNewlineIndex > WebInspector.SourceCodeTextEditor.AutoFormatMinimumLineLength)
+                    if (content.length - lastNewlineIndex > WebInspector.SourceCodeTextEditor.AutoFormatMinimumLineLength) {
                         this.autoFormat = true;
+                        this._isProbablyMinified = true;
+                    }
                     break;
                 }
 
                 if (nextNewlineIndex - lastNewlineIndex > WebInspector.SourceCodeTextEditor.AutoFormatMinimumLineLength) {
                     this.autoFormat = true;
+                    this._isProbablyMinified = true;
                     break;
                 }
 
@@ -429,12 +461,26 @@ WebInspector.SourceCodeTextEditor.prototype = {
         this.string = content;
 
         this._makeTypeTokenAnnotator();
+        this._makeBasicBlockAnnotator();
+
+        if (WebInspector.showJavaScriptTypeInformationSetting.value) {
+            if (this._basicBlockAnnotator || this._typeTokenAnnotator)
+                this._setTypeTokenAnnotatorEnabledState(true);
+        }
 
         this._contentDidPopulate();
     },
 
-    _contentAvailable: function(sourceCode, content, base64Encoded)
+    _contentAvailable: function(parameters)
     {
+        // Return if resource is not available.
+        if (parameters.error)
+            return;
+
+        var sourceCode = parameters.sourceCode;
+        var content = parameters.content;
+        var base64Encoded = parameters.base64Encoded;
+
         console.assert(sourceCode === this._sourceCode);
         console.assert(!base64Encoded);
 
@@ -636,7 +682,7 @@ WebInspector.SourceCodeTextEditor.prototype = {
 
         this._inlineScriptContentPopulated = pendingRequestCount;
 
-        function scriptContentAvailable(error, content)
+        function scriptContentAvailable(parameters)
         {
             // Return early if we are still waiting for content from other scripts.
             if (--pendingRequestCount)
@@ -686,7 +732,7 @@ WebInspector.SourceCodeTextEditor.prototype = {
 
         var boundScriptContentAvailable = scriptContentAvailable.bind(this);
         for (var i = 0; i < scripts.length; ++i)
-            scripts[i].requestContent(boundScriptContentAvailable);
+            scripts[i].requestContent().then(boundScriptContentAvailable);
     },
 
     _populateWithScriptContent: function()
@@ -704,8 +750,9 @@ WebInspector.SourceCodeTextEditor.prototype = {
         console.assert(scripts[0].range.startLine === 0);
         console.assert(scripts[0].range.startColumn === 0);
 
-        function scriptContentAvailable(error, content)
+        function scriptContentAvailable(parameters)
         {
+            var content = parameters.content;
             delete this._requestingScriptContent;
 
             // Abort if the full content populated while waiting for this async callback.
@@ -720,7 +767,7 @@ WebInspector.SourceCodeTextEditor.prototype = {
 
         this._requestingScriptContent = true;
 
-        scripts[0].requestContent(scriptContentAvailable.bind(this));
+        scripts[0].requestContent().then(scriptContentAvailable.bind(this));
     },
 
     _matchesSourceCodeLocation: function(sourceCodeLocation)
@@ -1039,16 +1086,20 @@ WebInspector.SourceCodeTextEditor.prototype = {
     _debuggerDidPause: function(event)
     {
         this._updateTokenTrackingControllerState();
-        if (this._typeTokenAnnotator && this._typeTokenAnnotator.isActive)
+        if (this._typeTokenAnnotator && this._typeTokenAnnotator.isActive())
             this._typeTokenAnnotator.refresh();
+        if (this._basicBlockAnnotator && this._basicBlockAnnotator.isActive())
+            this._basicBlockAnnotator.refresh();
     },
 
     _debuggerDidResume: function(event)
     {
         this._updateTokenTrackingControllerState();
         this._dismissPopover();
-        if (this._typeTokenAnnotator && this._typeTokenAnnotator.isActive)
+        if (this._typeTokenAnnotator && this._typeTokenAnnotator.isActive())
             this._typeTokenAnnotator.refresh();
+        if (this._basicBlockAnnotator && this._basicBlockAnnotator.isActive())
+            this._basicBlockAnnotator.refresh();
     },
 
     _sourceCodeSourceMapAdded: function(event)
@@ -1064,7 +1115,7 @@ WebInspector.SourceCodeTextEditor.prototype = {
         var mode = WebInspector.CodeMirrorTokenTrackingController.Mode.None;
         if (WebInspector.debuggerManager.paused)
             mode = WebInspector.CodeMirrorTokenTrackingController.Mode.JavaScriptExpression;
-        else if (this._typeTokenAnnotator && this._typeTokenAnnotator.isActive)
+        else if (this._typeTokenAnnotator && this._typeTokenAnnotator.isActive())
             mode = WebInspector.CodeMirrorTokenTrackingController.Mode.JavaScriptTypeInformation;
         else if (this._hasColorMarkers())
             mode = WebInspector.CodeMirrorTokenTrackingController.Mode.MarkedTokens;
@@ -1211,7 +1262,13 @@ WebInspector.SourceCodeTextEditor.prototype = {
             }
         }
 
-        DebuggerAgent.evaluateOnCallFrame.invoke({callFrameId: WebInspector.debuggerManager.activeCallFrame.id, expression: candidate.expression, objectGroup: "popover", doNotPauseOnExceptionsAndMuteConsole: true}, populate.bind(this));
+        if (WebInspector.debuggerManager.activeCallFrame) {
+            DebuggerAgent.evaluateOnCallFrame.invoke({callFrameId: WebInspector.debuggerManager.activeCallFrame.id, expression: candidate.expression, objectGroup: "popover", doNotPauseOnExceptionsAndMuteConsole: true}, populate.bind(this));
+            return;
+        }
+
+        // No call frame available. Use the main page's context.
+        RuntimeAgent.evaluate.invoke({expression: candidate.expression, objectGroup: "popover", doNotPauseOnExceptionsAndMuteConsole: true}, populate.bind(this));
     },
 
     _tokenTrackingControllerHighlightedJavaScriptTypeInformation: function(candidate)
@@ -1512,26 +1569,76 @@ WebInspector.SourceCodeTextEditor.prototype = {
         delete this._editingController;
     },
 
-    _makeTypeTokenAnnotator: function()
+    _setTypeTokenAnnotatorEnabledState: function(shouldActivate)
     {
-        if (!RuntimeAgent.getRuntimeTypesForVariablesAtOffsets)
+        console.assert(this._typeTokenAnnotator);
+        if (!this._typeTokenAnnotator)
             return;
 
+        if (shouldActivate) {
+            RuntimeAgent.enableTypeProfiler();
+
+            this._typeTokenAnnotator.reset();
+            if (this._basicBlockAnnotator) {
+                console.assert(!this._basicBlockAnnotator.isActive());
+                this._basicBlockAnnotator.reset();
+            }
+
+            if (!this._typeTokenScrollHandler)
+                this._enableScrollEventsForTypeTokenAnnotator();
+        } else {
+            // Because we disable type profiling when exiting the inspector, there is no need to call 
+            // RuntimeAgent.disableTypeProfiler() here.  If we were to call it here, JavaScriptCore would 
+            // compile out all the necessary type profiling information, so if a user were to quickly press then 
+            // unpress the type profiling button, we wouldn't be able to re-show type information which would 
+            // provide a confusing user experience.
+
+            this._typeTokenAnnotator.clear();
+            if (this._basicBlockAnnotator)
+                this._basicBlockAnnotator.clear();
+
+            if (this._typeTokenScrollHandler)
+                this._disableScrollEventsForTypeTokenAnnotator();
+        }
+
+        WebInspector.showJavaScriptTypeInformationSetting.value = shouldActivate;
+
+        this._updateTokenTrackingControllerState();
+    },
+
+    _getAssociatedScript: function()
+    {
         var script = null;
         // FIXME: This needs to me modified to work with HTML files with inline script tags.
         if (this._sourceCode instanceof WebInspector.Script)
             script = this._sourceCode;
         else if (this._sourceCode instanceof WebInspector.Resource && this._sourceCode.type === WebInspector.Resource.Type.Script && this._sourceCode.scripts.length)
             script = this._sourceCode.scripts[0];
+        return script;
+    },
 
+    _makeTypeTokenAnnotator: function()
+    {
+        if (!RuntimeAgent.getRuntimeTypesForVariablesAtOffsets)
+            return;
+
+        var script = this._getAssociatedScript();
         if (!script)
             return;
 
         this._typeTokenAnnotator = new WebInspector.TypeTokenAnnotator(this, script);
-        if (WebInspector.showJavaScriptTypeInformationSetting.value) {
-            this._typeTokenAnnotator.reset();
-            this._enableScrollEventsForTypeTokenAnnotator();
-        }
+    },
+
+    _makeBasicBlockAnnotator: function()
+    {
+        if (!RuntimeAgent.getBasicBlocks)
+            return;
+
+        var script = this._getAssociatedScript();
+        if (!script)
+            return;
+
+        this._basicBlockAnnotator = new WebInspector.BasicBlockAnnotator(this, script);
     },
 
     _enableScrollEventsForTypeTokenAnnotator: function()
@@ -1551,22 +1658,28 @@ WebInspector.SourceCodeTextEditor.prototype = {
 
     _makeTypeTokenScrollEventHandler: function()
     {
-        var typeTokenAnnotator = this._typeTokenAnnotator;
         var timeoutIdentifier = null;
         function scrollHandler()
         {
             if (timeoutIdentifier)
                 clearTimeout(timeoutIdentifier);
-            else
-                typeTokenAnnotator.pause();
+            else {
+                if (this._typeTokenAnnotator)
+                    this._typeTokenAnnotator.pause();
+                if (this._basicBlockAnnotator)
+                    this._basicBlockAnnotator.pause();
+            }
 
             timeoutIdentifier = setTimeout(function() {
                 timeoutIdentifier = null;
-                typeTokenAnnotator.resume();
-            }, WebInspector.SourceCodeTextEditor.DurationToUpdateTypeTokensAfterScrolling);
+                if (this._typeTokenAnnotator)
+                    this._typeTokenAnnotator.resume();
+                if (this._basicBlockAnnotator)
+                    this._basicBlockAnnotator.resume();
+            }.bind(this), WebInspector.SourceCodeTextEditor.DurationToUpdateTypeTokensAfterScrolling);
         }
 
-        return scrollHandler;
+        return scrollHandler.bind(this);
     }
 };
 

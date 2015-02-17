@@ -120,8 +120,12 @@ def configure_logging():
 
 def parse_args():
     parser = optparse.OptionParser(usage='usage: %prog [options] w3c_test_directory')
+
     parser.add_option('-n', '--no-overwrite', dest='overwrite', action='store_false', default=True,
         help='Flag to prevent duplicate test files from overwriting existing tests. By default, they will be overwritten')
+    parser.add_option('-l', '--no-links-conversion', dest='convert_test_harness_links', action='store_false', default=True,
+        help='Do not change links (testharness js or css e.g.). By default, links are converted to point to WebKit testharness files.')
+
     parser.add_option('-a', '--all', action='store_true', default=False,
         help='Import all tests including reftests, JS tests, and manual/pixel tests. By default, only reftests and JS tests are imported')
     parser.add_option('-d', '--dest-dir', dest='destination', default='w3c',
@@ -239,6 +243,7 @@ class TestImporter(object):
         total_imported_reftests = 0
         total_imported_jstests = 0
         total_prefixed_properties = {}
+        total_prefixed_property_values = {}
 
         failed_conversion_files = []
 
@@ -248,6 +253,7 @@ class TestImporter(object):
             total_imported_jstests += dir_to_copy['jstests']
 
             prefixed_properties = []
+            prefixed_property_values = []
 
             if not dir_to_copy['copy_list']:
                 continue
@@ -298,7 +304,7 @@ class TestImporter(object):
                 mimetype = mimetypes.guess_type(orig_filepath)
                 if 'html' in str(mimetype[0]) or 'xml' in str(mimetype[0])  or 'css' in str(mimetype[0]):
                     try:
-                        converted_file = convert_for_webkit(new_path, filename=orig_filepath, reference_support_info=reference_support_info)
+                        converted_file = convert_for_webkit(new_path, filename=orig_filepath, reference_support_info=reference_support_info, convert_test_harness_links=self.options.convert_test_harness_links)
                     except:
                         _log.warn('Failed converting %s', orig_filepath)
                         failed_conversion_files.append(orig_filepath)
@@ -312,16 +318,26 @@ class TestImporter(object):
                             total_prefixed_properties[prefixed_property] += 1
 
                         prefixed_properties.extend(set(converted_file[0]) - set(prefixed_properties))
+
+                        for prefixed_value in converted_file[1]:
+                            total_prefixed_property_values.setdefault(prefixed_value, 0)
+                            total_prefixed_property_values[prefixed_value] += 1
+
+                        prefixed_property_values.extend(set(converted_file[1]) - set(prefixed_property_values))
+
                         outfile = open(new_filepath, 'wb')
-                        outfile.write(converted_file[1])
+                        outfile.write(converted_file[2])
                         outfile.close()
+                elif orig_filepath.endswith('__init__.py') and not self.filesystem.getsize(orig_filepath):
+                    # Some bots dislike empty __init__.py.
+                    self.filesystem.write_text_file(new_filepath, '# This file is required for Python to search this directory for modules.')
                 else:
                     shutil.copyfile(orig_filepath, new_filepath)
 
                 copied_files.append(new_filepath.replace(self._webkit_root, ''))
 
             self.remove_deleted_files(new_path, copied_files)
-            self.write_import_log(new_path, copied_files, prefixed_properties)
+            self.write_import_log(new_path, copied_files, prefixed_properties, prefixed_property_values)
 
         _log.info('Import complete')
 
@@ -336,6 +352,11 @@ class TestImporter(object):
 
         for prefixed_property in sorted(total_prefixed_properties, key=lambda p: total_prefixed_properties[p]):
             _log.info('  %s: %s', prefixed_property, total_prefixed_properties[prefixed_property])
+        _log.info('')
+        _log.info('Property values needing prefixes (by count):')
+
+        for prefixed_value in sorted(total_prefixed_property_values, key=lambda p: total_prefixed_property_values[p]):
+            _log.info('  %s: %s', prefixed_value, total_prefixed_property_values[prefixed_value])
 
     def remove_deleted_files(self, import_directory, new_file_list):
         """ Reads an import log in |import_directory|, compares it to the |new_file_list|, and removes files not in the new list."""
@@ -361,10 +382,8 @@ class TestImporter(object):
 
         import_log.close()
 
-    def write_import_log(self, import_directory, file_list, prop_list):
+    def write_import_log(self, import_directory, file_list, prop_list, property_values_list):
         """ Writes a w3c-import.log file in each directory with imported files. """
-
-        now = datetime.datetime.now()
 
         import_log = open(os.path.join(import_directory, 'w3c-import.log'), 'w')
         import_log.write('The tests in this directory were imported from the W3C repository.\n')
@@ -376,17 +395,21 @@ class TestImporter(object):
         import_log.write('Then run the Tools/Scripts/import-w3c-tests in Webkit to reimport\n\n')
         import_log.write('Do NOT modify or remove this file\n\n')
         import_log.write('------------------------------------------------------------------------\n')
-        import_log.write('Last Import: ' + now.strftime('%Y-%m-%d %H:%M') + '\n')
-        import_log.write('------------------------------------------------------------------------\n')
         import_log.write('Properties requiring vendor prefixes:\n')
         if prop_list:
             for prop in prop_list:
                 import_log.write(prop + '\n')
         else:
             import_log.write('None\n')
+        import_log.write('Property values requiring vendor prefixes:\n')
+        if property_values_list:
+            for value in property_values_list:
+                import_log.write(value + '\n')
+        else:
+            import_log.write('None\n')
         import_log.write('------------------------------------------------------------------------\n')
         import_log.write('List of files:\n')
-        for item in file_list:
+        for item in sorted(file_list):
             import_log.write(item + '\n')
 
         import_log.close()

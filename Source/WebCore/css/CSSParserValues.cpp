@@ -140,6 +140,7 @@ PassRefPtr<CSSValue> CSSParserValue::createCSSValue()
     case CSSPrimitiveValue::CSS_PARSER_IDENTIFIER:
     case CSSPrimitiveValue::CSS_COUNTER_NAME:
     case CSSPrimitiveValue::CSS_SHAPE:
+    case CSSPrimitiveValue::CSS_FONT_FAMILY:
     case CSSPrimitiveValue::CSS_QUAD:
 #if ENABLE(CSS_SCROLL_SNAP)
     case CSSPrimitiveValue::CSS_LENGTH_REPEAT:
@@ -208,6 +209,9 @@ CSSParserSelector* CSSParserSelector::parsePseudoElementCueFunctionSelector(cons
 
 CSSParserSelector* CSSParserSelector::parsePseudoClassAndCompatibilityElementSelector(CSSParserString& pseudoTypeString)
 {
+    if (pseudoTypeString.length() && pseudoTypeString[pseudoTypeString.length() - 1] == '(')
+        return nullptr;
+
     PseudoClassOrCompatibilityPseudoElement pseudoType = parsePseudoClassAndCompatibilityElementString(pseudoTypeString);
     if (pseudoType.pseudoClass != CSSSelector::PseudoClassUnknown) {
         auto selector = std::make_unique<CSSParserSelector>();
@@ -258,32 +262,28 @@ void CSSParserSelector::adoptSelectorVector(Vector<std::unique_ptr<CSSParserSele
     m_selector->setSelectorList(WTF::move(selectorList));
 }
 
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+void CSSParserSelector::setLangArgumentList(const Vector<CSSParserString>& stringVector)
+{
+    ASSERT_WITH_MESSAGE(!stringVector.isEmpty(), "No CSS Selector takes an empty argument list.");
+    auto argumentList = std::make_unique<Vector<LanguageArgument>>();
+    argumentList->reserveInitialCapacity(stringVector.size());
+    for (const CSSParserString& string : stringVector) {
+        LanguageArgument languageArgument;
+        languageArgument.languageRange = string;
+        languageArgument.tokenType = string.tokenType();
+        argumentList->append(languageArgument);
+    }
+    m_selector->setLangArgumentList(WTF::move(argumentList));
+}
+#endif
+
 void CSSParserSelector::setPseudoClassValue(const CSSParserString& pseudoClassString)
 {
     ASSERT(m_selector->match() == CSSSelector::PseudoClass);
 
     PseudoClassOrCompatibilityPseudoElement pseudoType = parsePseudoClassAndCompatibilityElementString(pseudoClassString);
     m_selector->setPseudoClassType(pseudoType.pseudoClass);
-}
-
-bool CSSParserSelector::isSimple() const
-{
-    if (m_selector->selectorList() || m_selector->matchesPseudoElement())
-        return false;
-
-    if (!m_tagHistory)
-        return true;
-
-    if (m_selector->match() == CSSSelector::Tag) {
-        // We can't check against anyQName() here because namespace may not be nullAtom.
-        // Example:
-        //     @namespace "http://www.w3.org/2000/svg";
-        //     svg:not(:root) { ...
-        if (m_selector->tagQName().localName() == starAtom)
-            return m_tagHistory->isSimple();
-    }
-
-    return false;
 }
 
 static bool selectorListMatchesPseudoElement(const CSSSelectorList* selectorList)
@@ -323,7 +323,40 @@ void CSSParserSelector::appendTagHistory(CSSSelector::Relation relation, std::un
     CSSParserSelector* end = this;
     while (end->tagHistory())
         end = end->tagHistory();
+
     end->setRelation(relation);
+    end->setTagHistory(WTF::move(selector));
+}
+
+void CSSParserSelector::appendTagHistory(CSSParserSelectorCombinator relation, std::unique_ptr<CSSParserSelector> selector)
+{
+    CSSParserSelector* end = this;
+    while (end->tagHistory())
+        end = end->tagHistory();
+
+    CSSSelector::Relation selectorRelation;
+    switch (relation) {
+    case CSSParserSelectorCombinator::Child:
+        selectorRelation = CSSSelector::Child;
+        break;
+    case CSSParserSelectorCombinator::DescendantSpace:
+        selectorRelation = CSSSelector::Descendant;
+        break;
+    case CSSParserSelectorCombinator::DescendantDoubleChild:
+        selectorRelation = CSSSelector::Descendant;
+        break;
+    case CSSParserSelectorCombinator::DirectAdjacent:
+        selectorRelation = CSSSelector::DirectAdjacent;
+        break;
+    case CSSParserSelectorCombinator::IndirectAdjacent:
+        selectorRelation = CSSSelector::IndirectAdjacent;
+        break;
+    }
+    end->setRelation(selectorRelation);
+
+    if (relation == CSSParserSelectorCombinator::DescendantDoubleChild)
+        end->setDescendantUseDoubleChildSyntax();
+
     end->setTagHistory(WTF::move(selector));
 }
 

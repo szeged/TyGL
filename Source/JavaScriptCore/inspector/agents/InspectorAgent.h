@@ -30,10 +30,8 @@
 #ifndef InspectorAgent_h
 #define InspectorAgent_h
 
-#if ENABLE(INSPECTOR)
-
-#include "InspectorJSBackendDispatchers.h"
-#include "InspectorJSFrontendDispatchers.h"
+#include "InspectorBackendDispatchers.h"
+#include "InspectorFrontendDispatchers.h"
 #include "inspector/InspectorAgentBase.h"
 #include <wtf/Forward.h>
 #include <wtf/Vector.h>
@@ -61,8 +59,13 @@ public:
     virtual void disable(ErrorString&) override;
     virtual void initialized(ErrorString&) override;
 
-    void inspect(PassRefPtr<Protocol::Runtime::RemoteObject> objectToInspect, PassRefPtr<InspectorObject> hints);
+    void inspect(RefPtr<Protocol::Runtime::RemoteObject>&& objectToInspect, RefPtr<InspectorObject>&& hints);
     void evaluateForTestInFrontend(const String& script);
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    void activateExtraDomain(const String&);
+    void activateExtraDomains(const Vector<String>&);
+#endif
 
 private:
     InspectorEnvironment& m_environment;
@@ -70,11 +73,12 @@ private:
     RefPtr<InspectorInspectorBackendDispatcher> m_backendDispatcher;
     Vector<String> m_pendingEvaluateTestCommands;
     std::pair<RefPtr<Protocol::Runtime::RemoteObject>, RefPtr<InspectorObject>> m_pendingInspectData;
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    RefPtr<Inspector::Protocol::Array<String>> m_pendingExtraDomainsData;
+#endif
     bool m_enabled;
 };
 
 } // namespace Inspector
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(InspectorAgent_h)

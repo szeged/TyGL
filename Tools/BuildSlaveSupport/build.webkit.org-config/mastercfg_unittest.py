@@ -4,6 +4,8 @@ import sys
 import os
 import StringIO
 import unittest
+import make_passwords_json
+import json
 
 # Show DepricationWarnings come from buildbot - it isn't default with Python 2.7 or newer.
 # See https://bugs.webkit.org/show_bug.cgi?id=90161 for details.
@@ -20,13 +22,9 @@ class BuildBotConfigLoader(object):
         scripts_dir = os.path.join(webkit_tools_dir, 'Scripts')
         sys.path.append(scripts_dir)
 
-    def _create_mock_passwords_dict(self):
-        config_dict = json.load(open('config.json'))
-        return dict([(slave['name'], '1234') for slave in config_dict['slaves']])
-
     def _mock_open(self, filename):
         if filename == 'passwords.json':
-            return StringIO.StringIO(json.dumps(self._create_mock_passwords_dict()))
+            return StringIO.StringIO(json.dumps(make_passwords_json.create_mock_slave_passwords_dict()))
         return __builtins__.open(filename)
 
     def _add_dependant_modules_to_sys_modules(self):
@@ -53,12 +51,12 @@ class MasterCfgTest(unittest.TestCase):
     def test_nrwt_leaks_parsing(self):
         run_webkit_tests = RunWebKitTests()  # pylint is confused by the way we import the module ... pylint: disable-msg=E0602
         log_text = """
-12:44:24.295 77706 13981 total leaks found for a total of 197,936 bytes!
-12:44:24.295 77706 1 unique leaks found!
+12:44:24.295 77706 13981 total leaks found for a total of 197,936 bytes.
+12:44:24.295 77706 1 unique leaks found.
 """
         expected_incorrect_lines = [
-            '13981 total leaks found for a total of 197,936 bytes!',
-            '1 unique leaks found!',
+            '13981 total leaks found for a total of 197,936 bytes.',
+            '1 unique leaks found.',
         ]
         run_webkit_tests._parseRunWebKitTestsOutput(log_text)
         self.assertEqual(run_webkit_tests.incorrectLayoutLines, expected_incorrect_lines)
@@ -124,21 +122,21 @@ class RunJavaScriptCoreTestsTest(unittest.TestCase):
     OK.""")
 
     def test_mozilla_failure_old_output(self):
-        self.assertResults(FAILURE, ["jscore-test", '1 failing Mozilla test '], 1, """Results for Mozilla tests:
+        self.assertResults(FAILURE, ["1 JSC test failed"], 1, """Results for Mozilla tests:
     1 regression found.
     0 tests fixed.""")
 
     def test_mozilla_failures_old_output(self):
-        self.assertResults(FAILURE, ["jscore-test", '2 failing Mozilla tests '], 1, """Results for Mozilla tests:
+        self.assertResults(FAILURE, ["2 JSC tests failed"], 1, """Results for Mozilla tests:
     2 regressions found.
     0 tests fixed.""")
 
     def test_jsc_stress_failure_new_output(self):
-        self.assertResults(FAILURE, ["jscore-test", '1 failing JSC stress test '], 1,  """Results for JSC stress tests:
+        self.assertResults(FAILURE, ["1 JSC test failed"], 1,  """Results for JSC stress tests:
     1 failure found.""")
 
     def test_jsc_stress_failures_new_output(self):
-        self.assertResults(FAILURE, ["jscore-test", '5 failing JSC stress tests '], 1,  """Results for JSC stress tests:
+        self.assertResults(FAILURE, ["5 JSC tests failed"], 1,  """Results for JSC stress tests:
     5 failures found.""")
 
 
@@ -157,7 +155,7 @@ class RunLLINTCLoopTestsTest(unittest.TestCase):
         self.assertResults(FAILURE, ['5 regressions found.'], 1,  '    5 regressions found.')
 
     def test_failure(self):
-        self.assertResults(FAILURE, ['1 regressions found.'], 1,  '    1 regression found.')
+        self.assertResults(FAILURE, ['1 regression found.'], 1,  '    1 regression found.')
 
     def test_no_failure(self):
         self.assertResults(SUCCESS, ['webkit-jsc-cloop-test'], 0,  '    0 regressions found.')
@@ -178,7 +176,7 @@ class Run32bitJSCTestsTest(unittest.TestCase):
         self.assertResults(FAILURE, ['5 regressions found.'], 1,  '    5 failures found.')
 
     def test_failure(self):
-        self.assertResults(FAILURE, ['1 regressions found.'], 1,  '    1 failure found.')
+        self.assertResults(FAILURE, ['1 regression found.'], 1,  '    1 failure found.')
 
     def test_no_failure(self):
         self.assertResults(SUCCESS, ['webkit-32bit-jsc-test'], 0,  '    0 failures found.')
@@ -189,7 +187,8 @@ class RunUnitTestsTest(unittest.TestCase):
         if expected_failure_count:
             rc = 1
             expected_results = FAILURE
-            expected_text = '{0} unit tests failed or timed out'.format(expected_failure_count)
+            plural_suffix = "" if expected_failure_count == 1 else "s"
+            expected_text = '%d unit test%s failed or timed out' % (expected_failure_count, plural_suffix)
         else:
             rc = 0
             expected_results = SUCCESS

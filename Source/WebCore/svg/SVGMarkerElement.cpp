@@ -86,9 +86,9 @@ inline SVGMarkerElement::SVGMarkerElement(const QualifiedName& tagName, Document
     registerAnimatedPropertiesForSVGMarkerElement();
 }
 
-PassRefPtr<SVGMarkerElement> SVGMarkerElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGMarkerElement> SVGMarkerElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGMarkerElement(tagName, document));
+    return adoptRef(*new SVGMarkerElement(tagName, document));
 }
 
 const AtomicString& SVGMarkerElement::orientTypeIdentifier()
@@ -166,7 +166,7 @@ void SVGMarkerElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::refXAttr
         || attrName == SVGNames::refYAttr
@@ -213,7 +213,7 @@ void SVGMarkerElement::setOrientToAngle(const SVGAngle& angle)
     svgAttributeChanged(orientAnglePropertyInfo()->attributeName);
 }
 
-RenderPtr<RenderElement> SVGMarkerElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGMarkerElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGResourceMarker>(*this, WTF::move(style));
 }
@@ -248,7 +248,18 @@ PassRefPtr<SVGAnimatedProperty> SVGMarkerElement::lookupOrCreateOrientTypeWrappe
     return SVGAnimatedProperty::lookupOrCreateWrapper<SVGMarkerElement, SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>, SVGMarkerOrientType>
         (&ownerType, orientTypePropertyInfo(), ownerType.m_orientType.value);
 }
-  
+
+SVGMarkerOrientType& SVGMarkerElement::orientType() const
+{
+    if (SVGAnimatedEnumeration* wrapper = SVGAnimatedProperty::lookupWrapper<UseOwnerType, SVGAnimatedEnumeration>(this, orientTypePropertyInfo())) {
+        if (wrapper->isAnimating()) {
+            ASSERT(wrapper->currentAnimatedValue() < SVGMarkerOrientMax);
+            return reinterpret_cast<SVGMarkerOrientType&>(wrapper->currentAnimatedValue());
+        }
+    }
+    return m_orientType.value;
+}
+
 PassRefPtr<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>> SVGMarkerElement::orientTypeAnimated()
 {
     m_orientType.shouldSynchronize = true;

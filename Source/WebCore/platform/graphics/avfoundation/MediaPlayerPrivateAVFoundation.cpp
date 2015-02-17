@@ -60,7 +60,6 @@ MediaPlayerPrivateAVFoundation::MediaPlayerPrivateAVFoundation(MediaPlayer* play
     , m_cachedDuration(MediaTime::invalidTime())
     , m_reportedDuration(MediaTime::invalidTime())
     , m_maxTimeLoadedAtLastDidLoadingProgress(MediaTime::invalidTime())
-    , m_requestedRate(1)
     , m_delayCallbacks(0)
     , m_delayCharacteristicsChangedNotification(0)
     , m_mainThreadCallPending(false)
@@ -230,8 +229,10 @@ void MediaPlayerPrivateAVFoundation::play()
     // or the audio may start playing before we can render video.
     if (!m_cachedHasVideo || hasAvailableVideoFrame())
         platformPlay();
-    else
+    else {
+        LOG(Media, "MediaPlayerPrivateAVFoundation::play(%p) - waiting for first video frame", this);
         m_playWhenFramesAvailable = true;
+    }
 }
 
 void MediaPlayerPrivateAVFoundation::pause()
@@ -288,14 +289,6 @@ void MediaPlayerPrivateAVFoundation::seekWithTolerance(const MediaTime& mediaTim
     LOG(Media, "MediaPlayerPrivateAVFoundation::seek(%p) - seeking to %s", this, toString(time).utf8().data());
 
     seekToTime(time, negativeTolerance, positiveTolerance);
-}
-
-void MediaPlayerPrivateAVFoundation::setRate(float rate)
-{
-    LOG(Media, "MediaPlayerPrivateAVFoundation::setRate(%p) - seting to %f", this, rate);
-    m_requestedRate = rate;
-
-    updateRate();
 }
 
 bool MediaPlayerPrivateAVFoundation::paused() const
@@ -419,6 +412,11 @@ MediaTime MediaPlayerPrivateAVFoundation::minMediaTimeSeekable() const
     return m_cachedMinTimeSeekable;
 }
 
+double MediaPlayerPrivateAVFoundation::requestedRate() const
+{
+    return m_player->requestedRate();
+}
+
 MediaTime MediaPlayerPrivateAVFoundation::maxTimeLoaded() const
 {
     if (!metaDataAvailable())
@@ -432,7 +430,7 @@ MediaTime MediaPlayerPrivateAVFoundation::maxTimeLoaded() const
 
 bool MediaPlayerPrivateAVFoundation::didLoadingProgress() const
 {
-    if (!duration() || !totalBytes())
+    if (!durationMediaTime())
         return false;
     MediaTime currentMaxTimeLoaded = maxTimeLoaded();
     bool didLoadingProgress = currentMaxTimeLoaded != m_maxTimeLoadedAtLastDidLoadingProgress;
@@ -527,16 +525,12 @@ void MediaPlayerPrivateAVFoundation::updateStates()
                 break;
 
             case MediaPlayerAVPlayerItemStatusReadyToPlay:
-                // If the readyState is already HaveEnoughData, don't go lower because of this state change.
-                if (m_readyState == MediaPlayer::HaveEnoughData)
-                    break;
-                FALLTHROUGH;
+                if (m_readyState != MediaPlayer::HaveEnoughData && maxTimeLoaded() > currentMediaTime())
+                    m_readyState = MediaPlayer::HaveFutureData;
+                break;
 
             case MediaPlayerAVPlayerItemStatusPlaybackBufferEmpty:
-                if (maxTimeLoaded() > currentMediaTime())
-                    m_readyState = MediaPlayer::HaveFutureData;
-                else
-                    m_readyState = MediaPlayer::HaveCurrentData;
+                m_readyState = MediaPlayer::HaveCurrentData;
                 break;
             }
 
@@ -786,10 +780,12 @@ static const char* notificationName(MediaPlayerPrivateAVFoundation::Notification
 
 void MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(Notification notification)
 {
-    LOG(Media, "MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(%p) - notification %s", this, notificationName(notification));
+    if (notification.type() != Notification::FunctionType)
+        LOG(Media, "MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(%p) - notification %s", this, notificationName(notification));
+
     m_queueMutex.lock();
 
-    // It is important to always process the properties in the order that we are notified, 
+    // It is important to always process the properties in the order that we are notified,
     // so always go through the queue because notifications happen on different threads.
     m_queuedNotifications.append(notification);
 
@@ -806,7 +802,8 @@ void MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(Notification
     m_queueMutex.unlock();
 
     if (delayDispatch) {
-        LOG(Media, "MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(%p) - early return", this);
+        if (notification.type() != Notification::FunctionType)
+            LOG(Media, "MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(%p) - early return", this);
         return;
     }
 
@@ -837,7 +834,8 @@ void MediaPlayerPrivateAVFoundation::dispatchNotification()
             return;
     }
 
-    LOG(Media, "MediaPlayerPrivateAVFoundation::dispatchNotification(%p) - dispatching %s", this, notificationName(notification));
+    if (notification.type() != Notification::FunctionType)
+        LOG(Media, "MediaPlayerPrivateAVFoundation::dispatchNotification(%p) - dispatching %s", this, notificationName(notification));
 
     switch (notification.type()) {
     case Notification::ItemDidPlayToEndTime:
@@ -945,16 +943,6 @@ void MediaPlayerPrivateAVFoundation::trackModeChanged()
     scheduleMainThreadNotification(Notification::InbandTracksNeedConfiguration);
 }
 
-size_t MediaPlayerPrivateAVFoundation::extraMemoryCost() const
-{
-    MediaTime duration = this->durationMediaTime();
-    if (!duration)
-        return 0;
-
-    unsigned long long extra = totalBytes() * buffered()->totalDuration().toDouble() / duration.toDouble();
-    return static_cast<unsigned>(extra);
-}
-
 void MediaPlayerPrivateAVFoundation::clearTextTracks()
 {
     for (unsigned i = 0; i < m_textTracks.size(); ++i) {
@@ -1056,6 +1044,30 @@ bool MediaPlayerPrivateAVFoundation::extractKeyURIKeyIDAndCertificateFromInitDat
     return true;
 }
 #endif
+
+URL MediaPlayerPrivateAVFoundation::resolvedURL() const
+{
+    if (!m_assetURL.length())
+        return URL();
+
+    return URL(ParsedURLString, m_assetURL);
+}
+
+bool MediaPlayerPrivateAVFoundation::canSaveMediaData() const
+{
+    URL url = resolvedURL();
+
+    if (url.isLocalFile())
+        return true;
+
+    if (!url.protocolIsInHTTPFamily())
+        return false;
+
+    if (isLiveStream())
+        return false;
+
+    return true;
+}
 
 } // namespace WebCore
 

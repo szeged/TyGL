@@ -21,7 +21,9 @@ list(APPEND WebKit2_SOURCES
 
     Shared/API/c/efl/WKArrayEfl.cpp
 
+    Shared/CoordinatedGraphics/CoordinatedBackingStore.cpp
     Shared/CoordinatedGraphics/CoordinatedGraphicsArgumentCoders.cpp
+    Shared/CoordinatedGraphics/CoordinatedGraphicsScene.cpp
     Shared/CoordinatedGraphics/WebCoordinatedSurface.cpp
 
     Shared/Downloads/efl/DownloadSoupErrorsEfl.cpp
@@ -74,6 +76,7 @@ list(APPEND WebKit2_SOURCES
     UIProcess/API/efl/EwkView.cpp
     UIProcess/API/efl/GestureRecognizer.cpp
     UIProcess/API/efl/SnapshotImageGL.cpp
+    UIProcess/API/efl/WebAccessibility.cpp
     UIProcess/API/efl/ewk_application_cache_manager.cpp
     UIProcess/API/efl/ewk_auth_request.cpp
     UIProcess/API/efl/ewk_back_forward_list.cpp
@@ -106,9 +109,7 @@ list(APPEND WebKit2_SOURCES
     UIProcess/API/efl/ewk_view.cpp
     UIProcess/API/efl/ewk_window_features.cpp
 
-    UIProcess/CoordinatedGraphics/CoordinatedBackingStore.cpp
     UIProcess/CoordinatedGraphics/CoordinatedDrawingAreaProxy.cpp
-    UIProcess/CoordinatedGraphics/CoordinatedGraphicsScene.cpp
     UIProcess/CoordinatedGraphics/CoordinatedLayerTreeHostProxy.cpp
     UIProcess/CoordinatedGraphics/PageViewportController.cpp
     UIProcess/CoordinatedGraphics/WebPageProxyCoordinatedGraphics.cpp
@@ -165,13 +166,17 @@ list(APPEND WebKit2_SOURCES
     UIProcess/efl/WebUIPopupMenuClient.cpp
     UIProcess/efl/WebViewEfl.cpp
 
-    UIProcess/soup/WebContextSoup.cpp
     UIProcess/soup/WebCookieManagerProxySoup.cpp
+    UIProcess/soup/WebProcessPoolSoup.cpp
 
     WebProcess/Cookies/soup/WebCookieManagerSoup.cpp
     WebProcess/Cookies/soup/WebKitSoupCookieJarSqlite.cpp
 
+    WebProcess/InjectedBundle/API/efl/ewk_extension.cpp
+
     WebProcess/InjectedBundle/efl/InjectedBundleEfl.cpp
+
+    WebProcess/MediaCache/WebMediaKeyStorageManager.cpp
 
     WebProcess/Plugins/Netscape/unix/PluginProxyUnix.cpp
 
@@ -193,6 +198,7 @@ list(APPEND WebKit2_SOURCES
     WebProcess/WebPage/efl/WebInspectorUIEfl.cpp
     WebProcess/WebPage/efl/WebPageEfl.cpp
 
+    WebProcess/efl/ExtensionManagerEfl.cpp
     WebProcess/efl/SeccompFiltersWebProcessEfl.cpp
     WebProcess/efl/WebProcessMainEfl.cpp
 
@@ -266,6 +272,7 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess/efl"
     "${WEBKIT2_DIR}/WebProcess/soup"
     "${WEBKIT2_DIR}/WebProcess/unix"
+    "${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/efl"
     "${WEBKIT2_DIR}/WebProcess/WebCoreSupport/efl"
     "${WEBKIT2_DIR}/WebProcess/WebCoreSupport/soup"
     "${WEBKIT2_DIR}/WebProcess/WebPage/CoordinatedGraphics"
@@ -282,14 +289,12 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     ${EINA_INCLUDE_DIRS}
     ${EO_INCLUDE_DIRS}
     ${EVAS_INCLUDE_DIRS}
+    ${GLIB_INCLUDE_DIRS}
     ${HARFBUZZ_INCLUDE_DIRS}
     ${LIBSOUP_INCLUDE_DIRS}
     ${LIBXML2_INCLUDE_DIR}
     ${LIBXSLT_INCLUDE_DIRS}
     ${SQLITE_INCLUDE_DIRS}
-    ${GLIB_INCLUDE_DIRS}
-    ${LIBSOUP_INCLUDE_DIRS}
-    ${WTF_DIR}
 )
 
 list(APPEND WebKit2_LIBRARIES
@@ -364,7 +369,7 @@ if (ENABLE_SECCOMP_FILTERS)
 
     # If building with jhbuild, add the root build directory to the
     # filesystem access policy.
-    if (IS_DIRECTORY ${CMAKE_SOURCE_DIR}/WebKitBuild/Dependencies)
+    if (IS_DIRECTORY ${CMAKE_SOURCE_DIR}/WebKitBuild/DependenciesEFL)
         add_definitions(-DSOURCE_DIR=\"${CMAKE_SOURCE_DIR}\")
     endif ()
 endif ()
@@ -395,6 +400,7 @@ set(WEBKIT2_EXTRA_DEPENDENCIES
 )
 
 configure_file(efl/ewebkit2.pc.in ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2.pc @ONLY)
+configure_file(efl/ewebkit2-extension.pc.in ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2-extension.pc @ONLY)
 configure_file(efl/EWebKit2Config.cmake.in ${CMAKE_BINARY_DIR}/WebKit2/efl/EWebKit2Config.cmake @ONLY)
 configure_file(efl/EWebKit2ConfigVersion.cmake.in ${CMAKE_BINARY_DIR}/WebKit2/efl/EWebKit2ConfigVersion.cmake @ONLY)
 configure_file(UIProcess/API/efl/EWebKit2.h.in ${DERIVED_SOURCES_WEBKIT2_DIR}/include/EWebKit2.h)
@@ -436,13 +442,27 @@ set(EWebKit2_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_window_features.h"
 )
 
+set(EWebKit2_Extension_HEADERS
+    "${CMAKE_CURRENT_SOURCE_DIR}/WebProcess/InjectedBundle/API/efl/EWebKit_Extension.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/WebProcess/InjectedBundle/API/efl/ewk_extension.h"
+)
+
+install(FILES ${EWebKit2_HEADERS} DESTINATION include/${WebKit2_OUTPUT_NAME}-${PROJECT_VERSION_MAJOR})
+install(FILES ${EWebKit2_Extension_HEADERS} DESTINATION include/${WebKit2_OUTPUT_NAME}-${PROJECT_VERSION_MAJOR}/extension)
+
 install(FILES ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2.pc DESTINATION lib/pkgconfig)
+install(FILES ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2-extension.pc DESTINATION lib/pkgconfig)
 install(FILES
         ${CMAKE_BINARY_DIR}/WebKit2/efl/EWebKit2Config.cmake
         ${CMAKE_BINARY_DIR}/WebKit2/efl/EWebKit2ConfigVersion.cmake
         DESTINATION lib/cmake/EWebKit2)
 
-install(FILES ${EWebKit2_HEADERS} DESTINATION include/${WebKit2_OUTPUT_NAME}-${PROJECT_VERSION_MAJOR})
+set(EWEBKIT_EXTENSION_MANAGER_INSTALL_DIR "${LIB_INSTALL_DIR}/${WebKit2_OUTPUT_NAME}-${PROJECT_VERSION_MAJOR}/" CACHE PATH "Absolute path to install injected bundle which controls the extension library")
+
+add_library(ewebkit_extension_manager SHARED "${WEBKIT2_DIR}/WebProcess/efl/WebInjectedBundleMainEfl.cpp")
+target_link_libraries(ewebkit_extension_manager WebKit2)
+
+install(TARGETS ewebkit_extension_manager DESTINATION "${EWEBKIT_EXTENSION_MANAGER_INSTALL_DIR}")
 
 if (ENABLE_PLUGIN_PROCESS)
     list(APPEND PluginProcess_INCLUDE_DIRECTORIES
@@ -480,18 +500,26 @@ set(EWK2UnitTests_LIBRARIES
     gtest
 )
 
+if (ENABLE_ECORE_X)
+    list(APPEND EWK2UnitTests_LIBRARIES
+        ${ECORE_X_LIBRARIES}
+    )
+endif ()
+
 set(WEBKIT2_EFL_TEST_DIR "${WEBKIT2_DIR}/UIProcess/API/efl/tests")
 set(TEST_RESOURCES_DIR ${WEBKIT2_EFL_TEST_DIR}/resources)
-set(TEST_INJECTED_BUNDLE_DIR ${WEBKIT2_EFL_TEST_DIR}/InjectedBundle)
+set(TEST_EXTENSIONS_DIR ${WEBKIT2_EFL_TEST_DIR}/extensions)
 set(WEBKIT2_EFL_TEST_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/TestWebKitAPI/EWebKit2)
 
 add_definitions(-DTEST_RESOURCES_DIR=\"${TEST_RESOURCES_DIR}\"
     -DTEST_LIB_DIR=\"${CMAKE_LIBRARY_OUTPUT_DIRECTORY}\"
     -DGTEST_LINKED_AS_SHARED_LIBRARY=1
     -DLIBEXECDIR=\"${EXEC_INSTALL_DIR}\"
+    -DEXTENSIONMANAGERDIR=\"${CMAKE_INSTALL_PREFIX}/${EWEBKIT_EXTENSION_MANAGER_INSTALL_DIR}\"
     -DWEBPROCESSNAME=\"WebProcess\"
     -DPLUGINPROCESSNAME=\"PluginProcess\"
     -DNETWORKPROCESSNAME=\"NetworkProcess\"
+    -DEXTENSIONMANAGERNAME=\"libewebkit_extension_manager.so\"
     -DGTEST_HAS_RTTI=0
 )
 
@@ -507,6 +535,7 @@ target_link_libraries(ewk2UnitTestUtils ${EWK2UnitTests_LIBRARIES})
 # The "ewk" on the test name needs to be suffixed with "2", otherwise it
 # will clash with tests from the WebKit 1 test suite.
 set(EWK2UnitTests_BINARIES
+    test_ewk2_accessibility
     test_ewk2_application_cache_manager
     test_ewk2_auth_request
     test_ewk2_back_forward_list
@@ -523,7 +552,7 @@ set(EWK2UnitTests_BINARIES
     test_ewk2_popup_menu
     test_ewk2_settings
     test_ewk2_ssl
-    test_ewk2_storage_manager
+    test_ewk2_text_checker
     test_ewk2_view
     test_ewk2_window_features
 )
@@ -533,7 +562,7 @@ set(EWK2UnitTests_BINARIES
 # webkit.org/b/107422: test_ewk2_auth_request
 # webkit.org/b/132980: test_ewk2_context_menu
 # webkit.org/b/132981: test_ewk2_download_job
-# webkit.org/b/132982: test_ewk2_text_checker
+# webkit.org/b/141249: test_ewk2_storage_manager
 
 if (ENABLE_API_TESTS)
     foreach (testName ${EWK2UnitTests_BINARIES})
@@ -544,8 +573,7 @@ if (ENABLE_API_TESTS)
         target_link_libraries(${testName} ${EWK2UnitTests_LIBRARIES} ewk2UnitTestUtils)
     endforeach ()
 
-    add_library(ewk2UnitTestInjectedBundleSample SHARED ${TEST_INJECTED_BUNDLE_DIR}/injected_bundle_sample.cpp)
-    target_link_libraries(ewk2UnitTestInjectedBundleSample WebKit2)
+    add_library(ewk2UnitTestExtensionSample SHARED ${TEST_EXTENSIONS_DIR}/extension_sample.cpp)
 endif ()
 
 if (ENABLE_SPELLCHECK)
@@ -564,5 +592,11 @@ if (ENABLE_ACCESSIBILITY)
     )
     list(APPEND WebKit2_LIBRARIES
         ${ATK_LIBRARIES}
+    )
+endif ()
+
+if (ENABLE_BATTERY_STATUS)
+    list(APPEND WebKit2_LIBRARIES
+        ${ELDBUS_LIBRARIES}
     )
 endif ()

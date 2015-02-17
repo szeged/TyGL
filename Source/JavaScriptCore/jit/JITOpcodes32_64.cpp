@@ -37,6 +37,7 @@
 #include "JSCell.h"
 #include "JSEnvironmentRecord.h"
 #include "JSFunction.h"
+#include "JSNameScope.h"
 #include "JSPropertyNameEnumerator.h"
 #include "LinkBuffer.h"
 #include "MaxFrameExtentForSlowPathCall.h"
@@ -56,12 +57,6 @@ JIT::CodeRef JIT::privateCompileCTINativeCall(VM* vm, NativeFunction func)
     storePtr(callFrameRegister, &m_vm->topCallFrame);
 
 #if CPU(X86)
-    // Load caller frame's scope chain into this callframe so that whatever we call can
-    // get to its global data.
-    emitGetCallerFrameFromCallFrameHeaderPtr(regT0);
-    emitGetFromCallFrameHeaderPtr(JSStack::ScopeChain, regT1, regT0);
-    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
-
     // Calling convention:      f(ecx, edx, ...);
     // Host function signature: f(ExecState*);
     move(callFrameRegister, X86Registers::ecx);
@@ -75,11 +70,6 @@ JIT::CodeRef JIT::privateCompileCTINativeCall(VM* vm, NativeFunction func)
     addPtr(TrustedImm32(8), stackPointerRegister);
 
 #elif CPU(ARM) || CPU(SH4) || CPU(MIPS)
-    // Load caller frame's scope chain into this callframe so that whatever we call can get to its global data.
-    emitGetCallerFrameFromCallFrameHeaderPtr(regT2);
-    emitGetFromCallFrameHeaderPtr(JSStack::ScopeChain, regT1, regT2);
-    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
-
 #if CPU(MIPS)
     // Allocate stack space for (unused) 16 bytes (8-byte aligned) for 4 arguments.
     subPtr(TrustedImm32(16), stackPointerRegister);
@@ -752,13 +742,15 @@ void JIT::emit_op_throw(Instruction* currentInstruction)
 
 void JIT::emit_op_push_with_scope(Instruction* currentInstruction)
 {
-    emitLoad(currentInstruction[1].u.operand, regT1, regT0);
-    callOperation(operationPushWithScope, regT1, regT0);
+    int dst = currentInstruction[1].u.operand;
+    emitLoad(currentInstruction[2].u.operand, regT1, regT0);
+    callOperation(operationPushWithScope, dst, regT1, regT0);
 }
 
-void JIT::emit_op_pop_scope(Instruction*)
+void JIT::emit_op_pop_scope(Instruction* currentInstruction)
 {
-    callOperation(operationPopScope);
+    int scope = currentInstruction[1].u.operand;
+    callOperation(operationPopScope, scope);
 }
 
 void JIT::emit_op_to_number(Instruction* currentInstruction)
@@ -786,8 +778,15 @@ void JIT::emitSlow_op_to_number(Instruction* currentInstruction, Vector<SlowCase
 
 void JIT::emit_op_push_name_scope(Instruction* currentInstruction)
 {
-    emitLoad(currentInstruction[2].u.operand, regT1, regT0);
-    callOperation(operationPushNameScope, &m_codeBlock->identifier(currentInstruction[1].u.operand), regT1, regT0, currentInstruction[3].u.operand, currentInstruction[4].u.operand);
+    int dst = currentInstruction[1].u.operand;
+    emitLoad(currentInstruction[3].u.operand, regT1, regT0);
+    if (currentInstruction[5].u.operand == JSNameScope::CatchScope) {
+        callOperation(operationPushCatchScope, dst, &m_codeBlock->identifier(currentInstruction[2].u.operand), regT1, regT0, currentInstruction[4].u.operand);
+        return;
+    }
+
+    RELEASE_ASSERT(currentInstruction[5].u.operand == JSNameScope::FunctionNameScope);
+    callOperation(operationPushFunctionNameScope, dst, &m_codeBlock->identifier(currentInstruction[2].u.operand), regT1, regT0, currentInstruction[4].u.operand);
 }
 
 void JIT::emit_op_catch(Instruction* currentInstruction)
@@ -889,19 +888,37 @@ void JIT::emit_op_enter(Instruction* currentInstruction)
 void JIT::emit_op_create_lexical_environment(Instruction* currentInstruction)
 {
     int lexicalEnvironment = currentInstruction[1].u.operand;
+    int scope = currentInstruction[2].u.operand;
 
-    callOperation(operationCreateActivation, 0);
+    emitLoadPayload(currentInstruction[2].u.operand, regT0);
+    callOperation(operationCreateActivation, regT0, 0);
     emitStoreCell(lexicalEnvironment, returnValueGPR);
+    emitStoreCell(scope, returnValueGPR);
+}
+
+void JIT::emit_op_get_scope(Instruction* currentInstruction)
+{
+    int dst = currentInstruction[1].u.operand;
+    emitGetFromCallFrameHeaderPtr(JSStack::Callee, regT0);
+    loadPtr(Address(regT0, JSFunction::offsetOfScopeChain()), regT0);
+    emitStoreCell(dst, regT0);
 }
 
 void JIT::emit_op_create_arguments(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
+    int lexicalEnvironment = currentInstruction[2].u.operand;
 
     Jump argsCreated = branch32(NotEqual, tagFor(dst), TrustedImm32(JSValue::EmptyValueTag));
-    callOperation(operationCreateArguments);
+
+    if (VirtualRegister(lexicalEnvironment).isValid()) {
+        emitLoadPayload(lexicalEnvironment, regT0);
+        callOperation(operationCreateArguments, regT0);
+    } else
+        callOperation(operationCreateArguments, TrustedImmPtr(nullptr));
     emitStoreCell(dst, returnValueGPR);
     emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(dst)).offset(), returnValueGPR);
+
     argsCreated.link(this);
 }
 
@@ -1027,13 +1044,13 @@ void JIT::emit_op_get_argument_by_val(Instruction* currentInstruction)
     addSlowCase(branch32(NotEqual, tagFor(argumentsRegister), TrustedImm32(JSValue::EmptyValueTag)));
     emitLoad(property, regT1, regT2);
     addSlowCase(branch32(NotEqual, regT1, TrustedImm32(JSValue::Int32Tag)));
-    add32(TrustedImm32(1), regT2);
     // regT2 now contains the integer index of the argument we want, including this
     load32(payloadFor(JSStack::ArgumentCount), regT3);
+    sub32(TrustedImm32(1), regT3);
     addSlowCase(branch32(AboveOrEqual, regT2, regT3));
     
-    loadPtr(BaseIndex(callFrameRegister, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.payload) + CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register))), regT0);
-    loadPtr(BaseIndex(callFrameRegister, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.tag) + CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register))), regT1);
+    loadPtr(BaseIndex(callFrameRegister, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.payload) + CallFrame::argumentOffset(0) * static_cast<int>(sizeof(Register))), regT0);
+    loadPtr(BaseIndex(callFrameRegister, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.tag) + CallFrame::argumentOffset(0) * static_cast<int>(sizeof(Register))), regT1);
     emitValueProfilingSite();
     emitStore(dst, regT1, regT0);
 }
@@ -1043,6 +1060,7 @@ void JIT::emitSlow_op_get_argument_by_val(Instruction* currentInstruction, Vecto
     int dst = currentInstruction[1].u.operand;
     int arguments = currentInstruction[2].u.operand;
     int property = currentInstruction[3].u.operand;
+    int lexicalEnvironment = currentInstruction[4].u.operand;
 
     linkSlowCase(iter);
     Jump skipArgumentsCreation = jump();
@@ -1050,7 +1068,11 @@ void JIT::emitSlow_op_get_argument_by_val(Instruction* currentInstruction, Vecto
     linkSlowCase(iter);
     linkSlowCase(iter);
 
-    callOperation(operationCreateArguments);
+    if (VirtualRegister(lexicalEnvironment).isValid()) {
+        emitLoadPayload(lexicalEnvironment, regT0);
+        callOperation(operationCreateArguments, regT0);
+    } else
+        callOperation(operationCreateArguments, TrustedImmPtr(nullptr));
     emitStoreCell(arguments, returnValueGPR);
     emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(arguments)).offset(), returnValueGPR);
     
@@ -1352,6 +1374,13 @@ void JIT::emit_op_profile_type(Instruction* currentInstruction)
     callOperation(operationProcessTypeProfilerLog);
 
     jumpToEnd.link(this);
+}
+
+void JIT::emit_op_profile_control_flow(Instruction* currentInstruction)
+{
+    BasicBlockLocation* basicBlockLocation = currentInstruction[1].u.basicBlockLocation;
+    if (!basicBlockLocation->hasExecuted())
+        basicBlockLocation->emitExecuteCode(*this, regT1);
 }
 
 } // namespace JSC

@@ -39,9 +39,11 @@ BuildbotQueue = function(buildbot, id, info)
     this.builder = info.builder || false;
     this.tester = info.tester || false;
     this.performance = info.performance || false;
+    this.leaks = info.leaks || false;
     this.architecture = info.architecture || null;
     this.testCategory = info.testCategory || null;
-    this.performanceTestName = info.performanceTestName || null;
+    this.heading = info.heading || null;
+    this.crashesOnly = info.crashesOnly || false;
 
     this.iterations = [];
     this._knownIterations = {};
@@ -136,6 +138,8 @@ BuildbotQueue.prototype = {
                 callback(data);
             }.bind(this),
             function(data) {
+                if (data.errorType !== JSON.LoadError || data.errorHTTPCode !== 401)
+                    return;
                 if (this.buildbot.isAuthenticated) {
                     // FIXME (128006): Safari/WebKit should coalesce authentication requests with the same origin and authentication realm.
                     // In absence of the fix, Safari presents additional authentication dialogs regardless of whether an earlier authentication
@@ -145,10 +149,9 @@ BuildbotQueue.prototype = {
                     this._load(url, callback);
                     return;
                 }
-                if (data.errorType === JSON.LoadError && data.errorHTTPCode === 401) {
-                    this.buildbot.isAuthenticated = false;
-                    this.dispatchEventToListeners(BuildbotQueue.Event.UnauthorizedAccess, { });
-                }
+
+                this.buildbot.isAuthenticated = false;
+                this.dispatchEventToListeners(BuildbotQueue.Event.UnauthorizedAccess, { });
             }.bind(this),
             {withCredentials: this.buildbot.needsAuthentication}
         );

@@ -65,20 +65,20 @@ HTMLFormElement::HTMLFormElement(const QualifiedName& tagName, Document& documen
     , m_isInResetFunction(false)
     , m_wasDemoted(false)
 #if ENABLE(REQUEST_AUTOCOMPLETE)
-    , m_requestAutocompleteTimer(this, &HTMLFormElement::requestAutocompleteTimerFired)
+    , m_requestAutocompletetimer(*this, &HTMLFormElement::requestAutocompleteTimerFired)
 #endif
 {
     ASSERT(hasTagName(formTag));
 }
 
-PassRefPtr<HTMLFormElement> HTMLFormElement::create(Document& document)
+Ref<HTMLFormElement> HTMLFormElement::create(Document& document)
 {
-    return adoptRef(new HTMLFormElement(formTag, document));
+    return adoptRef(*new HTMLFormElement(formTag, document));
 }
 
-PassRefPtr<HTMLFormElement> HTMLFormElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLFormElement> HTMLFormElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLFormElement(tagName, document));
+    return adoptRef(*new HTMLFormElement(tagName, document));
 }
 
 HTMLFormElement::~HTMLFormElement()
@@ -472,7 +472,7 @@ void HTMLFormElement::finishRequestAutocomplete(AutocompleteResult result)
         m_requestAutocompleteTimer.startOneShot(0);
 }
 
-void HTMLFormElement::requestAutocompleteTimerFired(Timer<HTMLFormElement>*)
+void HTMLFormElement::requestAutocompleteTimerFired()
 {
     Vector<RefPtr<Event>> pendingEvents;
     m_pendingAutocompleteEvents.swap(pendingEvents);
@@ -508,16 +508,6 @@ void HTMLFormElement::parseAttribute(const QualifiedName& name, const AtomicStri
 #endif
     else
         HTMLElement::parseAttribute(name, value);
-}
-
-template<class T, size_t n> static void removeFromVector(Vector<T*, n> & vec, T* item)
-{
-    size_t size = vec.size();
-    for (size_t i = 0; i != size; ++i)
-        if (vec[i] == item) {
-            vec.remove(i);
-            break;
-        }
 }
 
 unsigned HTMLFormElement::formElementIndexWithFormAttribute(Element* element, unsigned rangeStart, unsigned rangeEnd)
@@ -608,18 +598,32 @@ void HTMLFormElement::registerFormElement(FormAssociatedElement* e)
 
 void HTMLFormElement::removeFormElement(FormAssociatedElement* e)
 {
-    unsigned index;
-    for (index = 0; index < m_associatedElements.size(); ++index) {
-        if (m_associatedElements[index] == e)
-            break;
-    }
+    unsigned index = m_associatedElements.find(e);
     ASSERT_WITH_SECURITY_IMPLICATION(index < m_associatedElements.size());
     if (index < m_associatedElementsBeforeIndex)
         --m_associatedElementsBeforeIndex;
     if (index < m_associatedElementsAfterIndex)
         --m_associatedElementsAfterIndex;
     removeFromPastNamesMap(e);
-    removeFromVector(m_associatedElements, e);
+    m_associatedElements.remove(index);
+}
+
+void HTMLFormElement::registerInvalidAssociatedFormControl(const HTMLFormControlElement& formControlElement)
+{
+    ASSERT_WITH_MESSAGE(!is<HTMLFieldSetElement>(formControlElement), "FieldSet are never candidates for constraint validation.");
+    ASSERT(static_cast<const Element&>(formControlElement).matchesInvalidPseudoClass());
+
+    if (m_invalidAssociatedFormControls.isEmpty())
+        setNeedsStyleRecalc();
+    m_invalidAssociatedFormControls.add(&formControlElement);
+}
+
+void HTMLFormElement::removeInvalidAssociatedFormControlIfNeeded(const HTMLFormControlElement& formControlElement)
+{
+    if (m_invalidAssociatedFormControls.remove(&formControlElement)) {
+        if (m_invalidAssociatedFormControls.isEmpty())
+            setNeedsStyleRecalc();
+    }
 }
 
 bool HTMLFormElement::isURLAttribute(const Attribute& attribute) const
@@ -635,12 +639,12 @@ void HTMLFormElement::registerImgElement(HTMLImageElement* e)
 
 void HTMLFormElement::removeImgElement(HTMLImageElement* e)
 {
-    ASSERT(m_imageElements.find(e) != notFound);
     removeFromPastNamesMap(e);
-    removeFromVector(m_imageElements, e);
+    bool removed = m_imageElements.removeFirst(e);
+    ASSERT_UNUSED(removed, removed);
 }
 
-PassRefPtr<HTMLCollection> HTMLFormElement::elements()
+RefPtr<HTMLCollection> HTMLFormElement::elements()
 {
     return ensureCachedHTMLCollection(FormControls);
 }
@@ -787,22 +791,34 @@ void HTMLFormElement::removeFromPastNamesMap(FormNamedItem* item)
     }
 }
 
+bool HTMLFormElement::matchesValidPseudoClass() const
+{
+    return m_invalidAssociatedFormControls.isEmpty();
+}
+
+bool HTMLFormElement::matchesInvalidPseudoClass() const
+{
+    return !m_invalidAssociatedFormControls.isEmpty();
+}
+
 bool HTMLFormElement::hasNamedElement(const AtomicString& name)
 {
     return elements()->hasNamedItem(name) || elementFromPastNamesMap(name);
 }
 
-// FIXME: Use RefPtr<HTMLElement> for namedItems. elements()->namedItems never return non-HTMLElement nodes.
-void HTMLFormElement::getNamedElements(const AtomicString& name, Vector<Ref<Element>>& namedItems)
+// FIXME: Use Ref<HTMLElement> for the function result since there are no non-HTML elements returned here.
+Vector<Ref<Element>> HTMLFormElement::namedElements(const AtomicString& name)
 {
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/forms.html#dom-form-nameditem
-    elements()->namedItems(name, namedItems);
+    Vector<Ref<Element>> namedItems = elements()->namedItems(name);
 
     HTMLElement* elementFromPast = elementFromPastNamesMap(name);
-    if (namedItems.size() == 1 && &namedItems.first().get() != elementFromPast)
+    if (namedItems.size() == 1 && namedItems.first().ptr() != elementFromPast)
         addToPastNamesMap(downcast<HTMLElement>(namedItems.first().get()).asFormNamedItem(), name);
     else if (elementFromPast && namedItems.isEmpty())
         namedItems.append(*elementFromPast);
+
+    return namedItems;
 }
 
 void HTMLFormElement::documentDidResumeFromPageCache()

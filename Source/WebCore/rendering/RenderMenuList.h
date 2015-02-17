@@ -43,7 +43,7 @@ class RenderText;
 class RenderMenuList final : public RenderFlexibleBox, private PopupMenuClient {
 
 public:
-    RenderMenuList(HTMLSelectElement&, PassRef<RenderStyle>);
+    RenderMenuList(HTMLSelectElement&, Ref<RenderStyle>&&);
     virtual ~RenderMenuList();
 
     HTMLSelectElement& selectElement() const;
@@ -66,7 +66,7 @@ private:
     virtual bool isMenuList() const override { return true; }
 
     virtual void addChild(RenderObject* newChild, RenderObject* beforeChild = 0) override;
-    virtual RenderObject* removeChild(RenderObject&) override;
+    virtual void removeChild(RenderObject&) override;
     virtual bool createsAnonymousWrapper() const override { return true; }
 
     virtual void updateFromElement() override;
@@ -151,8 +151,6 @@ private:
     bool m_popupIsVisible;
 #endif
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderMenuList, isMenuList())
 
 } // namespace WebCore
 

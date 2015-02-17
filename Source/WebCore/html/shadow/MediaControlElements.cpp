@@ -74,7 +74,7 @@ MediaControlPanelElement::MediaControlPanelElement(Document& document)
     , m_isBeingDragged(false)
     , m_isDisplayed(false)
     , m_opaque(true)
-    , m_transitionTimer(this, &MediaControlPanelElement::transitionTimerFired)
+    , m_transitionTimer(*this, &MediaControlPanelElement::transitionTimerFired)
 {
     setPseudo(AtomicString("-webkit-media-controls-panel", AtomicString::ConstructFromLiteral));
 }
@@ -149,7 +149,7 @@ void MediaControlPanelElement::stopTimer()
         m_transitionTimer.stop();
 }
 
-void MediaControlPanelElement::transitionTimerFired(Timer<MediaControlPanelElement>&)
+void MediaControlPanelElement::transitionTimerFired()
 {
     if (!m_opaque)
         hide();
@@ -310,7 +310,7 @@ void MediaControlTimelineContainerElement::setTimeDisplaysHidden(bool hidden)
     }
 }
 
-RenderPtr<RenderElement> MediaControlTimelineContainerElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> MediaControlTimelineContainerElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderMediaControlTimelineContainer>(*this, WTF::move(style));
 }
@@ -330,7 +330,7 @@ PassRefPtr<MediaControlVolumeSliderContainerElement> MediaControlVolumeSliderCon
     return element.release();
 }
 
-RenderPtr<RenderElement> MediaControlVolumeSliderContainerElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> MediaControlVolumeSliderContainerElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderMediaVolumeSliderContainer>(*this, WTF::move(style));
 }
@@ -872,8 +872,8 @@ void MediaControlTimelineElement::defaultEventHandler(Event* event)
     if (event->type() == eventNames().inputEvent && time != mediaController()->currentTime())
         mediaController()->setCurrentTime(time);
 
-    RenderSlider* slider = toRenderSlider(renderer());
-    if (slider && slider->inDragMode())
+    RenderSlider& slider = downcast<RenderSlider>(*renderer());
+    if (slider.inDragMode())
         m_controls->updateCurrentTimeDisplay();
 }
 
@@ -1073,7 +1073,7 @@ static const AtomicString& getMediaControlCurrentTimeDisplayElementShadowPseudoI
 
 MediaControlTextTrackContainerElement::MediaControlTextTrackContainerElement(Document& document)
     : MediaControlDivElement(document, MediaTextTrackDisplayContainer)
-    , m_updateTimer(this, &MediaControlTextTrackContainerElement::updateTimerFired)
+    , m_updateTimer(*this, &MediaControlTextTrackContainerElement::updateTimerFired)
     , m_fontSize(0)
     , m_fontSizeIsImportant(false)
     , m_updateTextTrackRepresentationStyle(false)
@@ -1088,7 +1088,7 @@ PassRefPtr<MediaControlTextTrackContainerElement> MediaControlTextTrackContainer
     return element.release();
 }
 
-RenderPtr<RenderElement> MediaControlTextTrackContainerElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> MediaControlTextTrackContainerElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderTextTrackContainerElement>(*this, WTF::move(style));
 }
@@ -1243,7 +1243,7 @@ void MediaControlTextTrackContainerElement::updateActiveCuesFontSize()
 
 }
 
-void MediaControlTextTrackContainerElement::updateTimerFired(Timer<MediaControlTextTrackContainerElement>&)
+void MediaControlTextTrackContainerElement::updateTimerFired()
 {
     if (!document().page())
         return;
@@ -1337,9 +1337,9 @@ void MediaControlTextTrackContainerElement::updateSizes(bool forceUpdate)
     if (m_textTrackRepresentation)
         videoBox = m_textTrackRepresentation->bounds();
     else {
-        if (!mediaElement->renderer() || !mediaElement->renderer()->isVideo())
+        if (!is<RenderVideo>(mediaElement->renderer()))
             return;
-        videoBox = toRenderVideo(*mediaElement->renderer()).videoBox();
+        videoBox = downcast<RenderVideo>(*mediaElement->renderer()).videoBox();
     }
 
     if (!forceUpdate && m_videoDisplaySize == videoBox)
@@ -1363,14 +1363,14 @@ PassRefPtr<Image> MediaControlTextTrackContainerElement::createTextTrackRepresen
 
     document().updateLayout();
 
-    auto renderer = this->renderer();
+    auto* renderer = this->renderer();
     if (!renderer)
         return nullptr;
 
     if (!renderer->hasLayer())
         return nullptr;
 
-    RenderLayer* layer = toRenderLayerModelObject(renderer)->layer();
+    RenderLayer* layer = downcast<RenderLayerModelObject>(*renderer).layer();
 
     float deviceScaleFactor = 1;
     if (Page* page = document().page())

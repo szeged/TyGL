@@ -55,9 +55,9 @@ inline SVGTextPathElement::SVGTextPathElement(const QualifiedName& tagName, Docu
     registerAnimatedPropertiesForSVGTextPathElement();
 }
 
-PassRefPtr<SVGTextPathElement> SVGTextPathElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGTextPathElement> SVGTextPathElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGTextPathElement(tagName, document));
+    return adoptRef(*new SVGTextPathElement(tagName, document));
 }
 
 SVGTextPathElement::~SVGTextPathElement()
@@ -112,7 +112,7 @@ void SVGTextPathElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (SVGURIReference::isKnownAttribute(attrName)) {
         buildPendingResource();
@@ -126,7 +126,7 @@ void SVGTextPathElement::svgAttributeChanged(const QualifiedName& attrName)
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
 }
 
-RenderPtr<RenderElement> SVGTextPathElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGTextPathElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGTextPath>(*this, WTF::move(style));
 }

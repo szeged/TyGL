@@ -40,7 +40,7 @@ class HTMLSelectElement;
 
 class RenderListBox final : public RenderBlockFlow, public ScrollableArea {
 public:
-    RenderListBox(HTMLSelectElement&, PassRef<RenderStyle>);
+    RenderListBox(HTMLSelectElement&, Ref<RenderStyle>&&);
     virtual ~RenderListBox();
 
     HTMLSelectElement& selectElement() const;
@@ -160,8 +160,6 @@ private:
 
     RefPtr<Scrollbar> m_vBar;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderListBox, isListBox())
 
 } // namepace WebCore
 

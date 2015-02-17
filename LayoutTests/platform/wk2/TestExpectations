@@ -45,24 +45,22 @@
 webkit.org/b/101773 fast/repaint/body-background-image.html [ ImageOnlyFailure Pass ]
 
 # AX tests that require hit testing do not work in WK2.
-# <https://bugs.webkit.org/show_bug.cgi?id=71298>
-accessibility/loading-iframe-updates-axtree.html
-platform/mac/accessibility/html-slider-indicator.html
-platform/mac/accessibility/listbox-hit-test.html
-platform/mac/accessibility/iframe-with-title-correct-hierarchy.html
+webkit.org/b/71298 accessibility/loading-iframe-updates-axtree.html
+webkit.org/b/71298 platform/mac/accessibility/html-slider-indicator.html
+webkit.org/b/71298 platform/mac/accessibility/listbox-hit-test.html
+webkit.org/b/71298 platform/mac/accessibility/iframe-with-title-correct-hierarchy.html
 
-# Some compositing tests flakey
-# <https://bugs.webkit.org/show_bug.cgi?id=48354>
-compositing/iframes/iframe-size-from-zero.html
-compositing/iframes/iframe-src-change.html
+# This test has been skipped for a long time. Temporarily marking as flaky to see what bots think.
+webkit.org/b/48354 compositing/iframes/iframe-src-change.html [ Pass Failure ]
 
-# Flakey on Snow Leopard Intel WebKit2 Release Tests
-# https://bugs.webkit.org/show_bug.cgi?id=58183
-editing/execCommand/convert-style-elements-to-spans.html
+# Perhaps this test just needs new expectations?
+webkit.org/b/48354 compositing/iframes/iframe-size-from-zero.html [ Failure ]
 
-# Flakey on Snow Leopard Intel WebKit2 Release Tests
-# https://bugs.webkit.org/show_bug.cgi?id=60648
-fast/frames/flattening/frameset-flattening-subframesets.html
+# This test has been skipped for a long time. Temporarily marking as flaky to see what bots think.
+webkit.org/b/58183 editing/execCommand/convert-style-elements-to-spans.html [ Pass Failure ]
+
+# This test has been skipped for a long time. Temporarily marking as flaky to see what bots think.
+webkit.org/b/60648 fast/frames/flattening/frameset-flattening-subframesets.html [ Pass Failure ]
 
 # WebKitTestRunner needs overridePreference for non-boolean values
 # (zero-font-size.html passes because overridePreference does not work)
@@ -70,19 +68,13 @@ webkit.org/b/42197 fast/harness/override-preferences-2.html [ Failure ]
 webkit.org/b/42197 fast/text/zero-font-size.html [ Pass ]
 
 # setIconDatabaseEnabled not implemented in WebKitTestRunner.
-# https://bugs.webkit.org/show_bug.cgi?id=115809
-webarchive/test-link-rel-icon-beforeload.html [ Skip ]
+webkit.org/b/115809 webarchive/test-link-rel-icon-beforeload.html [ Skip ]
 
-# https://bugs.webkit.org/show_bug.cgi?id=82665
-http/tests/webarchive/test-css-url-encoding.html [ Skip ]
-http/tests/webarchive/test-css-url-encoding-shift-jis.html [ Skip ]
-http/tests/webarchive/test-css-url-encoding-utf-8.html [ Skip ]
-webarchive/test-css-url-resources-in-stylesheets.html [ Skip ]
-webarchive/test-css-url-resources-inline-styles.html [ Skip ]
-
-# Fails on WebKit2
-# <https://bugs.webkit.org/show_bug.cgi?id=96741>
-fast/loader/recursive-before-unload-crash.html
+webkit.org/b/82665 http/tests/webarchive/test-css-url-encoding.html [ Skip ]
+webkit.org/b/82665 http/tests/webarchive/test-css-url-encoding-shift-jis.html [ Skip ]
+webkit.org/b/82665 http/tests/webarchive/test-css-url-encoding-utf-8.html [ Skip ]
+webkit.org/b/82665 webarchive/test-css-url-resources-in-stylesheets.html [ Skip ]
+webkit.org/b/82665 webarchive/test-css-url-resources-inline-styles.html [ Skip ]
 
 # WebKitTestRunner needs textInputController
 # <https://bugs.webkit.org/show_bug.cgi?id=42337>
@@ -123,17 +115,7 @@ platform/mac/fast/text/attributed-substring-from-range-in-textfield.html
 platform/mac/fast/text/attributed-substring-from-range.html
 platform/mac/fast/text/justified-text-rect.html
 
-# WebKitTestRunner needs to support needsDeletionUI mechanism to show deletion UI
-# <https://bugs.webkit.org/show_bug.cgi?id=42535>
-platform/mac/editing/deleting/id-in-deletebutton.html
-platform/mac/editing/deleting/deletionUI-click-on-delete-button.html
-platform/mac/editing/deleting/deletionUI-single-instance.html
-platform/mac/editing/deleting/deletionUI-borders.html
-platform/mac/editing/deleting/deletionUI-differing-background.html
-platform/mac/editing/deleting/deletionUI-minimum-size.html
-platform/mac/editing/deleting/deletionUI-successful-deletion.html
-
-# WebKitTestRunner needs layoutTestController.setDashboardCompatibilityMode
+# WebKitTestRunner needs testRunner.setDashboardCompatibilityMode
 # <https://bugs.webkit.org/show_bug.cgi?id=42547>
 fast/canvas/canvas-gradient-addStop-error.html
 http/tests/xmlhttprequest/default-content-type-dashboard.html
@@ -143,7 +125,7 @@ svg/custom/manually-parsed-embedded-svg-allowed-in-dashboard.html
 svg/custom/manually-parsed-svg-allowed-in-dashboard.html
 svg/custom/svg-allowed-in-dashboard-object.html
 
-# WebKitTestRunner needs layoutTestController.setMainFrameIsFirstResponder
+# WebKitTestRunner needs testRunner.setMainFrameIsFirstResponder
 # <https://bugs.webkit.org/show_bug.cgi?id=42685>
 editing/selection/caret-and-focus-ring.html
 editing/selection/designmode-no-caret.html
@@ -151,23 +133,23 @@ editing/selection/selection-background.html
 fast/dom/Window/window-onFocus.html
 platform/mac/scrollbars/key-window-not-first-responder.html
 
-# WebKitTestRunner needs layoutTestController.encodeHostName
+# WebKitTestRunner needs testRunner.encodeHostName
 # <https://bugs.webkit.org/show_bug.cgi?id=42686>
 fast/encoding/idn-security.html
 
-# WebKitTestRunner needs layoutTestController.abortModal
+# WebKitTestRunner needs testRunner.abortModal
 # <https://bugs.webkit.org/show_bug.cgi?id=69548>
 fast/events/show-modal-dialog-onblur-onfocus.html
 
-# WebKitTestRunner needs layoutTestController.setWillSendRequestClearHeader
+# WebKitTestRunner needs testRunner.setWillSendRequestClearHeader
 # <https://bugs.webkit.org/show_bug.cgi?id=42699>
 http/tests/security/no-referrer.html
 
-# WebKitTestRunner needs layoutTestController.setDomainRelaxationForbiddenForURLScheme
+# WebKitTestRunner needs testRunner.setDomainRelaxationForbiddenForURLScheme
 # <https://bugs.webkit.org/show_bug.cgi?id=42700>
 http/tests/security/setDomainRelaxationForbiddenForURLScheme.html
 
-# WebKit2 needs layoutTestController.setDeferMainResourceDataLoad
+# WebKit2 needs testRunner.setDeferMainResourceDataLoad
 # <https://bugs.webkit.org/show_bug.cgi?id=42777>
 fast/loader/non-deferred-substitute-load.html
 
@@ -181,7 +163,7 @@ http/tests/globalhistory/history-delegate-basic-refresh-redirect.html
 # <https://bugs.webkit.org/show_bug.cgi?id=56531>
 transitions/default-timing-function.html
 
-# WebKitTestRunner needs layoutTestController.setCallCloseOnWebViews
+# WebKitTestRunner needs testRunner.setCallCloseOnWebViews
 # http://webkit.org/b/46714
 plugins/geturlnotify-during-document-teardown.html
 plugins/open-and-close-window-with-plugin.html
@@ -203,11 +185,7 @@ http/tests/cache/history-only-cached-subresource-loads-max-age-https.html
 # https://bugs.webkit.org/show_bug.cgi?id=40361
 editing/text-iterator/findString-selection-disabled.html
 
-# WebKit2 needs an implementation of FrameLoaderClient::revertToProvisionalState
-# https://bugs.webkit.org/show_bug.cgi?id=81365
-http/tests/multipart/multipart-wait-before-boundary.html
-
-# layoutTestController.setWindowIsKey() has no effect on the web process side in WebKit2
+# testRunner.setWindowIsKey() has no effect on the web process side in WebKit2
 # https://bugs.webkit.org/show_bug.cgi?id=81736 rdar://problem/11088268
 fast/events/blur-focus-window-should-blur-focus-element.html
 fast/selectors/querySelector-window-inactive.html
@@ -244,14 +222,14 @@ webkit.org/b/132297 svg/custom/bug79798.html [ Skip ]
 ########################################
 ### START OF (2) Classified failures without bug reports (yet)
 
-# WebKitTestRunner needs layoutTestController.shouldPaintBrockenImage
+# WebKitTestRunner needs testRunner.shouldPaintBrokenImage
 fast/images/support-broken-image-delegate.html
 
-# WebKitTestrunner needs layoutTestController.dumpSourceAsWebArchive
+# WebKitTestRunner needs testRunner.dumpSourceAsWebArchive
 webarchive/doctype.html
 webarchive/archive-empty-frame-source.html
 
-# WebKitTestRunner needs layoutTestController.setIconDatabaseEnabled
+# WebKitTestRunner needs testRunner.setIconDatabaseEnabled
 webarchive/test-link-rel-icon.html
 http/tests/misc/favicon-loads-with-images-disabled.html
 http/tests/misc/favicon-loads-with-icon-loading-override.html
@@ -263,26 +241,27 @@ http/tests/incremental/slow-utf8-text.pl
 # WebKitTestRunner needs plainText.plainText
 editing/text-iterator/basic-iteration.html
 
-# WebKitTestRunner needs layoutTestController.setNewWindowsCopyBackForwardList
+# WebKitTestRunner needs testRunner.setNewWindowsCopyBackForwardList
 fast/loader/crash-copying-backforwardlist.html
 
-# WebKitTestRunner needs layoutTestController.authenticateSession
+# WebKitTestRunner needs testRunner.authenticateSession
 http/tests/xmlhttprequest/cross-origin-authorization-with-embedder.html
 
-# WebKitTestRunner needs layoutTestController.addDisallowedURL
+# WebKitTestRunner needs testRunner.addDisallowedURL
 plugins/get-url-that-the-resource-load-delegate-will-disallow.html
 
-# WebKitTestRunner needs layoutTestController.pageProperty
+# WebKitTestRunner needs testRunner.pageProperty
 printing/page-rule-selection.html
 
-# WebKitTestRunner needs layoutTestController.dumpUserGestureInFrameLoadCallbacks
+# WebKitTestRunner needs testRunner.dumpUserGestureInFrameLoadCallbacks
 fast/frames/location-redirect-user-gesture.html
 fast/frames/meta-refresh-user-gesture.html
 
-# WebKitTestRunner needs layoutTestController.setUseDashboardCompatibilityMode
-platform/mac/fast/dom/HTMLImageElement/dashboard-src-quirk.html
+# WebKitTestRunner needs testRunner.setUseDashboardCompatibilityMode
+platform/mac/fast/dom/HTMLImageElement/dashboard-src-quirk.html [ Skip ]
+mathml/mathml-in-dashboard.html [ Skip ]
 
-# WebKitTestRunner needs layoutTestController.addURLToRedirect
+# WebKitTestRunner needs testRunner.addURLToRedirect
 http/tests/loading/cross-origin-XHR-willLoadRequest.html
 
 # WebKit2 needs showModalDialog
@@ -335,18 +314,9 @@ fast/replaced/applet-disabled-positioned.html
 fast/replaced/applet-rendering-java-disabled.html
 java
 
-# WebKitTestRunner needs layoutTestController.displayInvalidatedRegion
+# WebKitTestRunner needs testRunner.displayInvalidatedRegion
 compositing/plugins/invalidate_rect.html
 plugins/windowless_plugin_paint_test.html
-
-# WebKitTestRunner needs layoutTestController.originsWithLocalStorage
-storage/domstorage/localstorage/storagetracker/storage-tracker-1-prepare.html
-storage/domstorage/localstorage/storagetracker/storage-tracker-2-create.html
-storage/domstorage/localstorage/storagetracker/storage-tracker-3-delete-all.html
-storage/domstorage/localstorage/storagetracker/storage-tracker-4-create.html
-storage/domstorage/localstorage/storagetracker/storage-tracker-5-delete-one.html
-storage/domstorage/localstorage/storagetracker/storage-tracker-6-create.html
-storage/domstorage/localstorage/storagetracker/storage-tracker-7-usage.html
 
 # WebKitTestRunner needs eventSender.contextClick()
 # https://bugs.webkit.org/show_bug.cgi?id=86881
@@ -383,6 +353,7 @@ fast/block/lineboxcontain/font.html
 # WTR needs an implementation of setAutomaticLinkDetectionEnabled.
 # https://bugs.webkit.org/show_bug.cgi?id=87162
 editing/inserting/smart-link-when-caret-is-moved-before-URL.html
+editing/inserting/smart-quote-with-all-configurations.html
 editing/inserting/typing-space-to-trigger-smart-link.html
 
 # No CORS support for media elements is implemented yet.
@@ -489,8 +460,6 @@ http/tests/security/cross-frame-access-protocol-explicit-domain.html
 http/tests/security/cross-frame-access-protocol.html
 
 # Flaky tests (slow)
-fast/workers/storage/interrupt-database.html
-fast/workers/storage/use-same-database-in-page-and-workers.html
 http/tests/cache/subresource-expiration-1.html
 http/tests/cache/subresource-expiration-2.html
 
@@ -528,11 +497,6 @@ plugins/pass-different-npp-struct.html
 plugins/reentrant-update-widget-positions.html
 plugins/set-status.html
 
-# Unexplained plugin timeouts
-# https://bugs.webkit.org/show_bug.cgi?id=81392
-plugins/crash-restoring-plugin-page-from-page-cache.html
-plugins/netscape-plugin-page-cache-works.html
-
 # Causes subsequent plugin tests to fail, time out or crash
 plugins/destroy-on-setwindow.html
 
@@ -556,12 +520,6 @@ transitions/min-max-width-height-transitions.html
 transitions/text-indent-transition.html
 
 # These storage tests fail in WebKit2 on the bot, but not running locally
-fast/workers/storage/executesql-accepts-only-one-statement-sync.html
-fast/workers/storage/change-version-handle-reuse-sync.html
-fast/workers/storage/multiple-databases-garbage-collection.html
-fast/workers/storage/open-database-creation-callback-sync.html
-fast/workers/storage/open-database-inputs-sync.html
-fast/workers/storage/sql-exception-codes-sync.html
 storage/websql/multiple-databases-garbage-collection.html
 
 # Crashes the WebProcess
@@ -600,10 +558,6 @@ http/tests/loading/pdf-commit-load-callbacks.html
 
 # Times out unexpectedly.
 http/tests/security/feed-urls-from-remote.html
-
-# Crashes in Debug builds
-# <rdar://problem/18216390>
-[ Debug ] fast/history/history-back-while-pdf-in-pagecache.html [ Crash ]
 
 ### END OF (3) Unclassified failures
 ########################################

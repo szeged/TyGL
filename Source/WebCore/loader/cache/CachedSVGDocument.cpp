@@ -23,16 +23,22 @@
 #include "config.h"
 #include "CachedSVGDocument.h"
 
-#include "CachedResourceClient.h"
-#include "CachedResourceHandle.h"
-#include "ResourceBuffer.h"
-#include <wtf/text/StringBuilder.h>
+#include "DocumentLoader.h"
+#include "EmptyClients.h"
+#include "FrameView.h"
+#include "MainFrame.h"
+#include "Page.h"
+#include "PageConfiguration.h"
+#include "Settings.h"
+#include "SharedBuffer.h"
 
 namespace WebCore {
 
 CachedSVGDocument::CachedSVGDocument(const ResourceRequest& request, SessionID sessionID)
     : CachedResource(request, SVGDocumentResource, sessionID)
     , m_decoder(TextResourceDecoder::create("application/xml"))
+    , m_shouldCreateFrameForDocument(true)
+    , m_canReuseResource(true)
 {
     setAccept("image/svg+xml");
 }
@@ -51,12 +57,20 @@ String CachedSVGDocument::encoding() const
     return m_decoder->encoding().name();
 }
 
-void CachedSVGDocument::finishLoading(ResourceBuffer* data)
+void CachedSVGDocument::finishLoading(SharedBuffer* data)
 {
     if (data) {
-        // We don't need to create a new frame because the new document belongs to the parent UseElement.
-        m_document = SVGDocument::create(nullptr, response().url());
-        m_document->setContent(m_decoder->decodeAndFlush(data->data(), data->size()));
+        // In certain situations (like the scenario when this document belongs to an UseElement) we don't need to create a frame.
+        if (m_shouldCreateFrameForDocument) {
+            PageConfiguration pageConfiguration;
+            fillWithEmptyClients(pageConfiguration);
+            
+            m_page = Page::createPageFromBuffer(pageConfiguration, data, "image/svg+xml", false, true);
+            m_document = downcast<SVGDocument>(m_page->mainFrame().document());
+        } else {
+            m_document = SVGDocument::create(nullptr, response().url());
+            m_document->setContent(m_decoder->decodeAndFlush(data->data(), data->size()));
+        }
     }
     CachedResource::finishLoading(data);
 }

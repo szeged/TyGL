@@ -59,7 +59,7 @@ public:
     RefPtr<StyleProperties> value;
 };
 
-typedef HashMap<unsigned, OwnPtr<PresentationAttributeCacheEntry>, AlreadyHashed> PresentationAttributeCache;
+typedef HashMap<unsigned, std::unique_ptr<PresentationAttributeCacheEntry>, AlreadyHashed> PresentationAttributeCache;
     
 static bool operator!=(const PresentationAttributeCacheKey& a, const PresentationAttributeCacheKey& b)
 {
@@ -79,7 +79,7 @@ class PresentationAttributeCacheCleaner {
 public:
     PresentationAttributeCacheCleaner()
         : m_hitCount(0)
-        , m_cleanTimer(this, &PresentationAttributeCacheCleaner::cleanCache)
+        , m_cleanTimer(*this, &PresentationAttributeCacheCleaner::cleanCache)
     {
     }
 
@@ -99,9 +99,8 @@ private:
     static const int minimumPresentationAttributeCacheSizeForCleaning = 100;
     static const unsigned minimumPresentationAttributeCacheHitCountPerMinute = (100 * presentationAttributeCacheCleanTimeInSeconds) / 60;
 
-    void cleanCache(Timer<PresentationAttributeCacheCleaner>* timer)
+    void cleanCache()
     {
-        ASSERT_UNUSED(timer, timer == &m_cleanTimer);
         unsigned hitCount = m_hitCount;
         m_hitCount = 0;
         if (hitCount > minimumPresentationAttributeCacheHitCountPerMinute)
@@ -110,7 +109,7 @@ private:
     }
 
     unsigned m_hitCount;
-    Timer<PresentationAttributeCacheCleaner> m_cleanTimer;
+    Timer m_cleanTimer;
 };
 
 static PresentationAttributeCacheCleaner& presentationAttributeCacheCleaner()
@@ -205,7 +204,7 @@ void StyledElement::styleAttributeChanged(const AtomicString& newStyleString, At
     elementData()->setStyleAttributeIsDirty(false);
 
     setNeedsStyleRecalc(InlineStyleChange);
-    InspectorInstrumentation::didInvalidateStyleAttr(&document(), this);
+    InspectorInstrumentation::didInvalidateStyleAttr(document(), *this);
 }
 
 void StyledElement::inlineStyleChanged()
@@ -213,7 +212,7 @@ void StyledElement::inlineStyleChanged()
     setNeedsStyleRecalc(InlineStyleChange);
     ASSERT(elementData());
     elementData()->setStyleAttributeIsDirty(true);
-    InspectorInstrumentation::didInvalidateStyleAttr(&document(), this);
+    InspectorInstrumentation::didInvalidateStyleAttr(document(), *this);
 }
     
 bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, CSSValueID identifier, bool important)
@@ -344,7 +343,7 @@ void StyledElement::rebuildPresentationAttributeStyle()
     if (!cacheHash || cacheIterator->value)
         return;
 
-    OwnPtr<PresentationAttributeCacheEntry> newEntry = adoptPtr(new PresentationAttributeCacheEntry);
+    std::unique_ptr<PresentationAttributeCacheEntry> newEntry = std::make_unique<PresentationAttributeCacheEntry>();
     newEntry->key = cacheKey;
     newEntry->value = style.release();
 
@@ -352,9 +351,9 @@ void StyledElement::rebuildPresentationAttributeStyle()
     if (presentationAttributeCache().size() > presentationAttributeCacheMaximumSize) {
         // Start building from scratch if the cache ever gets big.
         presentationAttributeCache().clear();
-        presentationAttributeCache().set(cacheHash, newEntry.release());
+        presentationAttributeCache().set(cacheHash, WTF::move(newEntry));
     } else
-        cacheIterator->value = newEntry.release();
+        cacheIterator->value = WTF::move(newEntry);
 }
 
 void StyledElement::addPropertyToPresentationAttributeStyle(MutableStyleProperties& style, CSSPropertyID propertyID, CSSValueID identifier)

@@ -35,8 +35,9 @@
 #include "TextureFontTyGL.h"
 #endif
 #include <fontconfig/fcfreetype.h>
-#include <ft2build.h>
 #include <freetype/tttables.h>
+#include <ft2build.h>
+#include <wtf/MathExtras.h>
 #include <wtf/text/WTFString.h>
 
 #if !PLATFORM(EFL)
@@ -127,19 +128,19 @@ static void rotateCairoMatrixForVerticalOrientation(cairo_matrix_t* matrix)
     // combination of rotation (R) and translation (T) applied on the
     // horizontal matrix (H). V = H . R . T, where R rotates by -90 degrees
     // and T translates by font size towards y axis.
-    cairo_matrix_rotate(matrix, -M_PI_2);
+    cairo_matrix_rotate(matrix, -piOverTwoDouble);
     cairo_matrix_translate(matrix, 0.0, 1.0);
 }
 #endif // USE(CAIRO)
 
 FontPlatformData::FontPlatformData(FcPattern* pattern, const FontDescription& fontDescription)
     : m_pattern(pattern)
-    , m_fallbacks(0)
+    , m_fallbacks(nullptr)
     , m_size(fontDescription.computedPixelSize())
     , m_syntheticBold(false)
     , m_syntheticOblique(false)
     , m_fixedWidth(false)
-    , m_scaledFont(0)
+    , m_scaledFont(nullptr)
     , m_orientation(fontDescription.orientation())
 {
 #if USE(CAIRO)
@@ -169,12 +170,12 @@ FontPlatformData::FontPlatformData(FcPattern* pattern, const FontDescription& fo
 }
 
 FontPlatformData::FontPlatformData(float size, bool bold, bool italic)
-    : m_fallbacks(0)
+    : m_fallbacks(nullptr)
     , m_size(size)
     , m_syntheticBold(bold)
     , m_syntheticOblique(italic)
     , m_fixedWidth(false)
-    , m_scaledFont(0)
+    , m_scaledFont(nullptr)
     , m_orientation(Horizontal)
 {
     // We cannot create a scaled font here.
@@ -182,15 +183,16 @@ FontPlatformData::FontPlatformData(float size, bool bold, bool italic)
 
 #if USE(CAIRO)
 FontPlatformData::FontPlatformData(cairo_font_face_t* fontFace, float size, bool bold, bool italic, FontOrientation orientation)
+
 #elif USE(TYGL)
 FontPlatformData::FontPlatformData(FT_Face fontFace, float size, bool bold, bool italic, FontOrientation orientation)
 #endif
-    : m_fallbacks(0)
+    : m_fallbacks(nullptr)
     , m_size(size)
     , m_syntheticBold(bold)
     , m_syntheticOblique(italic)
     , m_fixedWidth(false)
-    , m_scaledFont(0)
+    , m_scaledFont(nullptr)
     , m_orientation(orientation)
 {
 #if USE(TYGL)
@@ -229,7 +231,7 @@ FontPlatformData& FontPlatformData::operator=(const FontPlatformData& other)
     if (m_fallbacks) {
         FcFontSetDestroy(m_fallbacks);
         // This will be re-created on demand.
-        m_fallbacks = 0;
+        m_fallbacks = nullptr;
     }
 
 #if USE(CAIRO)
@@ -246,16 +248,19 @@ FontPlatformData& FontPlatformData::operator=(const FontPlatformData& other)
 }
 
 FontPlatformData::FontPlatformData(const FontPlatformData& other)
-    : m_fallbacks(0)
-    , m_scaledFont(0)
+    : m_fallbacks(nullptr)
+    , m_scaledFont(nullptr)
     , m_harfBuzzFace(other.m_harfBuzzFace)
 {
     *this = other;
 }
 
 FontPlatformData::FontPlatformData(const FontPlatformData& other, float size)
+    : m_fallbacks(nullptr)
+    , m_scaledFont(nullptr)
+
 #if USE(HARFBUZZ)
-    : m_harfBuzzFace(other.m_harfBuzzFace)
+    , m_harfBuzzFace(other.m_harfBuzzFace)
 #endif
 {
     *this = other;
@@ -280,7 +285,7 @@ FontPlatformData::~FontPlatformData()
 {
     if (m_fallbacks) {
         FcFontSetDestroy(m_fallbacks);
-        m_fallbacks = 0;
+        m_fallbacks = nullptr;
     }
 
     if (m_scaledFont && m_scaledFont != hashTableDeletedFontValue())

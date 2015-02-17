@@ -27,14 +27,14 @@ namespace WebCore {
 
 class SVGTextElement final : public SVGTextPositioningElement {
 public:
-    static PassRefPtr<SVGTextElement> create(const QualifiedName&, Document&);
+    static Ref<SVGTextElement> create(const QualifiedName&, Document&);
 
     virtual AffineTransform animatedLocalTransform() const override;
 
 private:
     SVGTextElement(const QualifiedName&, Document&);
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
     virtual bool childShouldCreateRenderer(const Node&) const override;
 };
 

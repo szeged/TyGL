@@ -87,6 +87,33 @@ private:
         m_insertionSet.execute(block);
     }
     
+    inline unsigned indexOfNode(Node* node, unsigned indexToSearchFrom)
+    {
+        unsigned index = indexToSearchFrom;
+        while (index) {
+            if (m_block->at(index) == node)
+                break;
+            index--;
+        }
+        ASSERT(m_block->at(index) == node);
+        return index;
+    }
+
+    inline unsigned indexOfFirstNodeOfExitOrigin(CodeOrigin& originForExit, unsigned indexToSearchFrom)
+    {
+        unsigned index = indexToSearchFrom;
+        ASSERT(m_block->at(index)->origin.forExit == originForExit);
+        while (index) {
+            index--;
+            if (m_block->at(index)->origin.forExit != originForExit) {
+                index++;
+                break;
+            }
+        }
+        ASSERT(m_block->at(index)->origin.forExit == originForExit);
+        return index;
+    }
+    
     void fixupNode(Node* node)
     {
         NodeType op = node->op();
@@ -1116,7 +1143,7 @@ private:
             // (The other direction does not hold in general).
 
             RefPtr<TypeSet> typeSet = node->typeLocation()->m_instructionTypeSet;
-            uint32_t seenTypes = typeSet->seenTypes();
+            uint8_t seenTypes = typeSet->seenTypes();
             if (typeSet->doesTypeConformTo(TypeMachineInt)) {
                 node->convertToCheck();
                 if (node->child1()->shouldSpeculateInt32())
@@ -1135,8 +1162,26 @@ private:
             } else if (typeSet->doesTypeConformTo(TypeUndefined | TypeNull) && (seenTypes & TypeUndefined) && (seenTypes & TypeNull)) {
                 node->convertToCheck();
                 fixEdge<OtherUse>(node->child1());
+            } else if (typeSet->doesTypeConformTo(TypeObject)) {
+                StructureSet set = typeSet->structureSet();
+                if (!set.isEmpty()) {
+                    node->convertToCheckStructure(m_graph.addStructureSet(set));
+                    fixEdge<CellUse>(node->child1());
+                }
             }
 
+            break;
+        }
+
+        case CreateActivation:
+        case NewFunction: {
+            fixEdge<CellUse>(node->child2());
+            break;
+        }
+
+        case NewFunctionNoCheck:
+        case NewFunctionExpression: {
+            fixEdge<CellUse>(node->child1());
             break;
         }
             
@@ -1149,7 +1194,6 @@ private:
         case Flush:
         case PhantomLocal:
         case GetLocalUnlinked:
-        case GetMyScope:
         case GetClosureVar:
         case GetGlobalVar:
         case NotifyWrite:
@@ -1158,8 +1202,7 @@ private:
         case AllocationProfileWatchpoint:
         case Call:
         case Construct:
-        case ProfiledCall:
-        case ProfiledConstruct:
+        case ProfileControlFlow:
         case NativeCall:
         case NativeConstruct:
         case NewObject:
@@ -1173,16 +1216,12 @@ private:
         case IsNumber:
         case IsObject:
         case IsFunction:
-        case CreateActivation:
         case CreateArguments:
         case PhantomArguments:
         case TearOffArguments:
         case GetMyArgumentsLength:
         case GetMyArgumentsLengthSafe:
         case CheckArgumentsNotCreated:
-        case NewFunction:
-        case NewFunctionNoCheck:
-        case NewFunctionExpression:
         case Jump:
         case Return:
         case Throw:
@@ -1400,7 +1439,7 @@ private:
     }
     
     bool isStringPrototypeMethodSane(
-        JSObject* stringPrototype, Structure* stringPrototypeStructure, StringImpl* uid)
+        JSObject* stringPrototype, Structure* stringPrototypeStructure, AtomicStringImpl* uid)
     {
         unsigned attributesUnused;
         PropertyOffset offset =
@@ -1704,7 +1743,19 @@ private:
     void insertCheck(unsigned indexInBlock, Node* node)
     {
         observeUseKindOnNode<useKind>(node);
-        m_insertionSet.insertNode(
+        CodeOrigin& checkedNodeOrigin = node->origin.forExit;
+        CodeOrigin& currentNodeOrigin = m_currentNode->origin.forExit;
+        if (currentNodeOrigin == checkedNodeOrigin) {
+            // The checked node is within the same bytecode. Hence, the earliest
+            // position we can insert the check is right after the checked node.
+            indexInBlock = indexOfNode(node, indexInBlock) + 1;
+        } else {
+            // The checked node is from a preceding bytecode. Hence, the earliest
+            // position we can insert the check is at the start of the current
+            // bytecode.
+            indexInBlock = indexOfFirstNodeOfExitOrigin(currentNodeOrigin, indexInBlock);
+        }
+        m_insertionSet.insertOutOfOrderNode(
             indexInBlock, SpecNone, Check, m_currentNode->origin, Edge(node, useKind));
     }
 

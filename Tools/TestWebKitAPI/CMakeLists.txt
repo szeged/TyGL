@@ -19,17 +19,24 @@ include_directories(${CMAKE_BINARY_DIR}
     ${JAVASCRIPTCORE_DIR}/parser
     ${JAVASCRIPTCORE_DIR}/runtime
     ${THIRDPARTY_DIR}/gtest/include
+    ${WEBCORE_DIR}/css
+    ${WEBCORE_DIR}/dom
     ${WEBCORE_DIR}/editing
     ${WEBCORE_DIR}/platform
+    ${WEBCORE_DIR}/platform/animation
     ${WEBCORE_DIR}/platform/graphics
     ${WEBCORE_DIR}/platform/text
     ${WEBCORE_DIR}/platform/network
     ${WEBCORE_DIR}/platform/network/soup
+    ${WEBCORE_DIR}/rendering
+    ${WEBCORE_DIR}/rendering/style
     ${WEBKIT2_DIR}/Platform/IPC
     ${WEBKIT2_DIR}/Shared
+    ${WEBKIT2_DIR}/Shared/API
     ${WEBKIT2_DIR}/Shared/API/c
     ${WEBKIT2_DIR}/Shared/Plugins
     ${WEBKIT2_DIR}/UIProcess
+    ${WEBKIT2_DIR}/UIProcess/API
     ${WEBKIT2_DIR}/WebProcess/InjectedBundle
     ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/c
     ${WTF_DIR}
@@ -163,6 +170,8 @@ add_executable(TestJavaScriptCore
 )
 
 target_link_libraries(TestJavaScriptCore ${TestJavaScriptCore_LIBRARIES})
+add_dependencies(TestJavaScriptCore ${ForwardingHeadersForTestWebKitAPI_NAME})
+
 add_test(TestJavaScriptCore ${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/JavaScriptCore/TestJavaScriptCore)
 set_tests_properties(TestJavaScriptCore PROPERTIES TIMEOUT 60)
 set_target_properties(TestJavaScriptCore PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/JavaScriptCore)

@@ -27,8 +27,6 @@
 #include "config.h"
 #include "InspectorAgentRegistry.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "InspectorAgentBase.h"
 
 namespace Inspector {
@@ -41,6 +39,15 @@ void InspectorAgentRegistry::append(std::unique_ptr<InspectorAgentBase> agent)
 {
     m_agents.append(WTF::move(agent));
 }
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+void InspectorAgentRegistry::appendExtraAgent(std::unique_ptr<InspectorAgentBase> agent)
+{
+    m_extraDomains.append(agent->domainName());
+
+    append(WTF::move(agent));
+}
+#endif
 
 void InspectorAgentRegistry::didCreateFrontendAndBackend(InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
 {
@@ -62,4 +69,3 @@ void InspectorAgentRegistry::discardAgents()
 
 } // namespace Inspector
 
-#endif // ENABLE(INSPECTOR)

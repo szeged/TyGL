@@ -34,7 +34,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderFieldset::RenderFieldset(HTMLFieldSetElement& element, PassRef<RenderStyle> style)
+RenderFieldset::RenderFieldset(HTMLFieldSetElement& element, Ref<RenderStyle>&& style)
     : RenderBlockFlow(element, WTF::move(style))
 {
 }
@@ -130,8 +130,8 @@ RenderBox* RenderFieldset::findLegend(FindLegendOption option) const
         if (option == IgnoreFloatingOrOutOfFlow && legend->isFloatingOrOutOfFlowPositioned())
             continue;
         
-        if (legend->node() && (legend->node()->hasTagName(legendTag)))
-            return toRenderBox(legend);
+        if (is<HTMLLegendElement>(legend->node()))
+            return downcast<RenderBox>(legend);
     }
     return nullptr;
 }

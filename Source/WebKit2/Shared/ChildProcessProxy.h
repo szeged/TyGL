@@ -79,13 +79,13 @@ protected:
     // ProcessLauncher::Client
     virtual void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
 
-    bool dispatchMessage(IPC::Connection*, IPC::MessageDecoder&);
-    bool dispatchSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
+    bool dispatchMessage(IPC::Connection&, IPC::MessageDecoder&);
+    bool dispatchSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
     
 private:
     virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) = 0;
-    virtual void connectionWillOpen(IPC::Connection*);
-    virtual void connectionWillClose(IPC::Connection*);
+    virtual void connectionWillOpen(IPC::Connection&);
+    virtual void connectionDidClose(IPC::Connection&);
 
     Vector<std::pair<std::unique_ptr<IPC::MessageEncoder>, unsigned>> m_pendingMessages;
     RefPtr<ProcessLauncher> m_processLauncher;

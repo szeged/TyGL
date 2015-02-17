@@ -84,7 +84,7 @@ typedef struct WKContextClient {
     WKContextPlugInAutoStartOriginHashesChangedCallback                 plugInAutoStartOriginHashesChanged;
     WKContextNetworkProcessDidCrashCallback                             networkProcessDidCrash;
     WKContextPlugInInformationBecameAvailableCallback                   plugInInformationBecameAvailable;
-} WKContextClient WK_DEPRECATED("Use an explicit versioned struct instead");
+} WKContextClient WK_C_DEPRECATED("Use an explicit versioned struct instead");
 
 enum {
     kWKProcessModelSharedSecondaryProcess = 0,
@@ -110,7 +110,8 @@ WK_EXPORT void WKContextSetHistoryClient(WKContextRef context, const WKContextHi
 WK_EXPORT void WKContextSetDownloadClient(WKContextRef context, const WKContextDownloadClientBase* client);
 WK_EXPORT void WKContextSetConnectionClient(WKContextRef context, const WKContextConnectionClientBase* client);
 
-WK_EXPORT WKDownloadRef WKContextDownloadURLRequest(WKContextRef context, const WKURLRequestRef request);
+WK_EXPORT WKDownloadRef WKContextDownloadURLRequest(WKContextRef context, WKURLRequestRef request);
+WK_EXPORT WKDownloadRef WKContextResumeDownload(WKContextRef context, WKDataRef resumeData, WKStringRef path);
 
 WK_EXPORT void WKContextSetInitializationUserDataForInjectedBundle(WKContextRef context, WKTypeRef userData);
 WK_EXPORT void WKContextPostMessageToInjectedBundle(WKContextRef context, WKStringRef messageName, WKTypeRef messageBody);

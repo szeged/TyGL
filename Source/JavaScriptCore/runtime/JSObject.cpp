@@ -724,22 +724,18 @@ ArrayStorage* JSObject::constructConvertedArrayStorageWithoutCopyingElements(VM&
     return newStorage;
 }
 
-ArrayStorage* JSObject::convertUndecidedToArrayStorage(VM& vm, NonPropertyTransition transition, unsigned neededLength)
+ArrayStorage* JSObject::convertUndecidedToArrayStorage(VM& vm, NonPropertyTransition transition)
 {
     DeferGC deferGC(vm.heap);
     ASSERT(hasUndecided(indexingType()));
-    
-    ArrayStorage* storage = constructConvertedArrayStorageWithoutCopyingElements(vm, neededLength);
+
+    unsigned vectorLength = m_butterfly->vectorLength();
+    ArrayStorage* storage = constructConvertedArrayStorageWithoutCopyingElements(vm, vectorLength);
     // No need to copy elements.
     
     Structure* newStructure = Structure::nonPropertyTransition(vm, structure(vm), transition);
     setStructureAndButterfly(vm, newStructure, storage->butterfly());
     return storage;
-}
-
-ArrayStorage* JSObject::convertUndecidedToArrayStorage(VM& vm, NonPropertyTransition transition)
-{
-    return convertUndecidedToArrayStorage(vm, transition, m_butterfly->vectorLength());
 }
 
 ArrayStorage* JSObject::convertUndecidedToArrayStorage(VM& vm)
@@ -775,28 +771,25 @@ ContiguousJSValues JSObject::convertInt32ToContiguous(VM& vm)
     return m_butterfly->contiguous();
 }
 
-ArrayStorage* JSObject::convertInt32ToArrayStorage(VM& vm, NonPropertyTransition transition, unsigned neededLength)
+ArrayStorage* JSObject::convertInt32ToArrayStorage(VM& vm, NonPropertyTransition transition)
 {
-    ASSERT(hasInt32(indexingType()));
-    
     DeferGC deferGC(vm.heap);
-    ArrayStorage* newStorage = constructConvertedArrayStorageWithoutCopyingElements(vm, neededLength);
-    for (unsigned i = m_butterfly->publicLength(); i--;) {
+    ASSERT(hasInt32(indexingType()));
+
+    unsigned vectorLength = m_butterfly->vectorLength();
+    ArrayStorage* newStorage = constructConvertedArrayStorageWithoutCopyingElements(vm, vectorLength);
+    for (unsigned i = 0; i < m_butterfly->publicLength(); i++) {
         JSValue v = m_butterfly->contiguous()[i].get();
-        if (!v)
-            continue;
-        newStorage->m_vector[i].setWithoutWriteBarrier(v);
-        newStorage->m_numValuesInVector++;
+        if (v) {
+            newStorage->m_vector[i].setWithoutWriteBarrier(v);
+            newStorage->m_numValuesInVector++;
+        } else
+            ASSERT(newStorage->m_vector[i].get().isEmpty());
     }
     
     Structure* newStructure = Structure::nonPropertyTransition(vm, structure(vm), transition);
     setStructureAndButterfly(vm, newStructure, newStorage->butterfly());
     return newStorage;
-}
-
-ArrayStorage* JSObject::convertInt32ToArrayStorage(VM& vm, NonPropertyTransition transition)
-{
-    return convertInt32ToArrayStorage(vm, transition, m_butterfly->vectorLength());
 }
 
 ArrayStorage* JSObject::convertInt32ToArrayStorage(VM& vm)
@@ -848,28 +841,25 @@ ContiguousJSValues JSObject::rageConvertDoubleToContiguous(VM& vm)
     return genericConvertDoubleToContiguous<RageConvertDoubleToValue>(vm);
 }
 
-ArrayStorage* JSObject::convertDoubleToArrayStorage(VM& vm, NonPropertyTransition transition, unsigned neededLength)
+ArrayStorage* JSObject::convertDoubleToArrayStorage(VM& vm, NonPropertyTransition transition)
 {
     DeferGC deferGC(vm.heap);
     ASSERT(hasDouble(indexingType()));
-    
-    ArrayStorage* newStorage = constructConvertedArrayStorageWithoutCopyingElements(vm, neededLength);
-    for (unsigned i = m_butterfly->publicLength(); i--;) {
+
+    unsigned vectorLength = m_butterfly->vectorLength();
+    ArrayStorage* newStorage = constructConvertedArrayStorageWithoutCopyingElements(vm, vectorLength);
+    for (unsigned i = 0; i < m_butterfly->publicLength(); i++) {
         double value = m_butterfly->contiguousDouble()[i];
-        if (value != value)
-            continue;
-        newStorage->m_vector[i].setWithoutWriteBarrier(JSValue(JSValue::EncodeAsDouble, value));
-        newStorage->m_numValuesInVector++;
+        if (value == value) {
+            newStorage->m_vector[i].setWithoutWriteBarrier(JSValue(JSValue::EncodeAsDouble, value));
+            newStorage->m_numValuesInVector++;
+        } else
+            ASSERT(newStorage->m_vector[i].get().isEmpty());
     }
     
     Structure* newStructure = Structure::nonPropertyTransition(vm, structure(vm), transition);
     setStructureAndButterfly(vm, newStructure, newStorage->butterfly());
     return newStorage;
-}
-
-ArrayStorage* JSObject::convertDoubleToArrayStorage(VM& vm, NonPropertyTransition transition)
-{
-    return convertDoubleToArrayStorage(vm, transition, m_butterfly->vectorLength());
 }
 
 ArrayStorage* JSObject::convertDoubleToArrayStorage(VM& vm)
@@ -877,28 +867,25 @@ ArrayStorage* JSObject::convertDoubleToArrayStorage(VM& vm)
     return convertDoubleToArrayStorage(vm, structure(vm)->suggestedArrayStorageTransition());
 }
 
-ArrayStorage* JSObject::convertContiguousToArrayStorage(VM& vm, NonPropertyTransition transition, unsigned neededLength)
+ArrayStorage* JSObject::convertContiguousToArrayStorage(VM& vm, NonPropertyTransition transition)
 {
     DeferGC deferGC(vm.heap);
     ASSERT(hasContiguous(indexingType()));
-    
-    ArrayStorage* newStorage = constructConvertedArrayStorageWithoutCopyingElements(vm, neededLength);
-    for (unsigned i = m_butterfly->publicLength(); i--;) {
+
+    unsigned vectorLength = m_butterfly->vectorLength();
+    ArrayStorage* newStorage = constructConvertedArrayStorageWithoutCopyingElements(vm, vectorLength);
+    for (unsigned i = 0; i < m_butterfly->publicLength(); i++) {
         JSValue v = m_butterfly->contiguous()[i].get();
-        if (!v)
-            continue;
-        newStorage->m_vector[i].setWithoutWriteBarrier(v);
-        newStorage->m_numValuesInVector++;
+        if (v) {
+            newStorage->m_vector[i].setWithoutWriteBarrier(v);
+            newStorage->m_numValuesInVector++;
+        } else
+            ASSERT(newStorage->m_vector[i].get().isEmpty());
     }
     
     Structure* newStructure = Structure::nonPropertyTransition(vm, structure(vm), transition);
     setStructureAndButterfly(vm, newStructure, newStorage->butterfly());
     return newStorage;
-}
-
-ArrayStorage* JSObject::convertContiguousToArrayStorage(VM& vm, NonPropertyTransition transition)
-{
-    return convertContiguousToArrayStorage(vm, transition, m_butterfly->vectorLength());
 }
 
 ArrayStorage* JSObject::convertContiguousToArrayStorage(VM& vm)
@@ -1705,11 +1692,11 @@ void JSObject::putIndexedDescriptor(ExecState* exec, SparseArrayEntry* entryInMa
         else if (oldDescriptor.isAccessorDescriptor())
             setter = oldDescriptor.setterObject();
 
-        GetterSetter* accessor = GetterSetter::create(vm);
+        GetterSetter* accessor = GetterSetter::create(vm, exec->lexicalGlobalObject());
         if (getter)
-            accessor->setGetter(vm, getter);
+            accessor->setGetter(vm, exec->lexicalGlobalObject(), getter);
         if (setter)
-            accessor->setSetter(vm, setter);
+            accessor->setSetter(vm, exec->lexicalGlobalObject(), setter);
 
         entryInMap->set(vm, this, accessor);
         entryInMap->attributes = descriptor.attributesOverridingCurrent(oldDescriptor) & ~ReadOnly;
@@ -2479,11 +2466,11 @@ static bool putDescriptor(ExecState* exec, JSObject* target, PropertyName proper
     VM& vm = exec->vm();
     if (descriptor.isGenericDescriptor() || descriptor.isDataDescriptor()) {
         if (descriptor.isGenericDescriptor() && oldDescriptor.isAccessorDescriptor()) {
-            GetterSetter* accessor = GetterSetter::create(vm);
+            GetterSetter* accessor = GetterSetter::create(vm, exec->lexicalGlobalObject());
             if (oldDescriptor.getterPresent())
-                accessor->setGetter(vm, oldDescriptor.getterObject());
+                accessor->setGetter(vm, exec->lexicalGlobalObject(), oldDescriptor.getterObject());
             if (oldDescriptor.setterPresent())
-                accessor->setSetter(vm, oldDescriptor.setterObject());
+                accessor->setSetter(vm, exec->lexicalGlobalObject(), oldDescriptor.setterObject());
             target->putDirectAccessor(exec, propertyName, accessor, attributes | Accessor);
             return true;
         }
@@ -2498,16 +2485,16 @@ static bool putDescriptor(ExecState* exec, JSObject* target, PropertyName proper
         return true;
     }
     attributes &= ~ReadOnly;
-    GetterSetter* accessor = GetterSetter::create(vm);
+    GetterSetter* accessor = GetterSetter::create(vm, exec->lexicalGlobalObject());
 
     if (descriptor.getterPresent())
-        accessor->setGetter(vm, descriptor.getterObject());
+        accessor->setGetter(vm, exec->lexicalGlobalObject(), descriptor.getterObject());
     else if (oldDescriptor.getterPresent())
-        accessor->setGetter(vm, oldDescriptor.getterObject());
+        accessor->setGetter(vm, exec->lexicalGlobalObject(), oldDescriptor.getterObject());
     if (descriptor.setterPresent())
-        accessor->setSetter(vm, descriptor.setterObject());
+        accessor->setSetter(vm, exec->lexicalGlobalObject(), descriptor.setterObject());
     else if (oldDescriptor.setterPresent())
-        accessor->setSetter(vm, oldDescriptor.setterObject());
+        accessor->setSetter(vm, exec->lexicalGlobalObject(), oldDescriptor.setterObject());
 
     target->putDirectAccessor(exec, propertyName, accessor, attributes | Accessor);
     return true;
@@ -2648,17 +2635,17 @@ bool JSObject::defineOwnNonIndexProperty(ExecState* exec, PropertyName propertyN
     GetterSetter* getterSetter;
     bool getterSetterChanged = false;
     if (accessor.isCustomGetterSetter())
-        getterSetter = GetterSetter::create(exec->vm());
+        getterSetter = GetterSetter::create(exec->vm(), exec->lexicalGlobalObject());
     else {
         ASSERT(accessor.isGetterSetter());
         getterSetter = asGetterSetter(accessor);
     }
     if (descriptor.setterPresent()) {
-        getterSetter = getterSetter->withSetter(exec->vm(), descriptor.setterObject());
+        getterSetter = getterSetter->withSetter(exec->vm(), exec->lexicalGlobalObject(), descriptor.setterObject());
         getterSetterChanged = true;
     }
     if (descriptor.getterPresent()) {
-        getterSetter = getterSetter->withGetter(exec->vm(), descriptor.getterObject());
+        getterSetter = getterSetter->withGetter(exec->vm(), exec->lexicalGlobalObject(), descriptor.getterObject());
         getterSetterChanged = true;
     }
     if (current.attributesEqual(descriptor) && !getterSetterChanged)

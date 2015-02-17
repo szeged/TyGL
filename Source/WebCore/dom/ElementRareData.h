@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2010, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2008 David Smith <catfish.man@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -30,17 +30,16 @@
 #include "RenderElement.h"
 #include "ShadowRoot.h"
 #include "StyleInheritedData.h"
-#include <wtf/OwnPtr.h>
 
 namespace WebCore {
 
 class ElementRareData : public NodeRareData {
 public:
-    explicit ElementRareData(RenderElement*);
+    ElementRareData(Element&, RenderElement*);
     ~ElementRareData();
 
-    void setBeforePseudoElement(PassRefPtr<PseudoElement>);
-    void setAfterPseudoElement(PassRefPtr<PseudoElement>);
+    void setBeforePseudoElement(RefPtr<PseudoElement>&&);
+    void setAfterPseudoElement(RefPtr<PseudoElement>&&);
 
     PseudoElement* beforePseudoElement() const { return m_beforePseudoElement.get(); }
     PseudoElement* afterPseudoElement() const { return m_afterPseudoElement.get(); }
@@ -76,6 +75,8 @@ public:
     void setChildrenAffectedByLastChildRules(bool value) { m_childrenAffectedByLastChildRules = value; }
     bool childrenAffectedByBackwardPositionalRules() const { return m_childrenAffectedByBackwardPositionalRules; }
     void setChildrenAffectedByBackwardPositionalRules(bool value) { m_childrenAffectedByBackwardPositionalRules = value; }
+    bool childrenAffectedByPropertyBasedBackwardPositionalRules() const { return m_childrenAffectedByPropertyBasedBackwardPositionalRules; }
+    void setChildrenAffectedByPropertyBasedBackwardPositionalRules(bool value) { m_childrenAffectedByPropertyBasedBackwardPositionalRules = value; }
 
     unsigned childIndex() const { return m_childIndex; }
     void setChildIndex(unsigned index) { m_childIndex = index; }
@@ -83,13 +84,13 @@ public:
 
     void clearShadowRoot() { m_shadowRoot = nullptr; }
     ShadowRoot* shadowRoot() const { return m_shadowRoot.get(); }
-    void setShadowRoot(PassRefPtr<ShadowRoot> shadowRoot) { m_shadowRoot = shadowRoot; }
+    void setShadowRoot(RefPtr<ShadowRoot>&& shadowRoot) { m_shadowRoot = WTF::move(shadowRoot); }
 
     NamedNodeMap* attributeMap() const { return m_attributeMap.get(); }
     void setAttributeMap(std::unique_ptr<NamedNodeMap> attributeMap) { m_attributeMap = WTF::move(attributeMap); }
 
     RenderStyle* computedStyle() const { return m_computedStyle.get(); }
-    void setComputedStyle(PassRef<RenderStyle> computedStyle) { m_computedStyle = WTF::move(computedStyle); }
+    void setComputedStyle(Ref<RenderStyle>&& computedStyle) { m_computedStyle = WTF::move(computedStyle); }
 
     ClassList* classList() const { return m_classList.get(); }
     void setClassList(std::unique_ptr<ClassList> classList) { m_classList = WTF::move(classList); }
@@ -112,6 +113,8 @@ public:
     bool hasPendingResources() const { return m_hasPendingResources; }
     void setHasPendingResources(bool has) { m_hasPendingResources = has; }
 
+    WeakPtrFactory<Element>& weakPtrFactory() { return m_weakPtrFactory; }
+
 private:
     short m_tabIndex;
     unsigned short m_childIndex;
@@ -130,6 +133,7 @@ private:
     // *-child-of-type, we will just give up and re-evaluate whenever children change at all.
     unsigned m_childrenAffectedByLastChildRules : 1;
     unsigned m_childrenAffectedByBackwardPositionalRules : 1;
+    unsigned m_childrenAffectedByPropertyBasedBackwardPositionalRules : 1;
 
     RegionOversetState m_regionOversetState;
 
@@ -144,6 +148,7 @@ private:
 
     RefPtr<PseudoElement> m_beforePseudoElement;
     RefPtr<PseudoElement> m_afterPseudoElement;
+    WeakPtrFactory<Element> m_weakPtrFactory;
 
     void releasePseudoElement(PseudoElement*);
 };
@@ -153,7 +158,7 @@ inline IntSize defaultMinimumSizeForResizing()
     return IntSize(LayoutUnit::max(), LayoutUnit::max());
 }
 
-inline ElementRareData::ElementRareData(RenderElement* renderer)
+inline ElementRareData::ElementRareData(Element& element, RenderElement* renderer)
     : NodeRareData(renderer)
     , m_tabIndex(0)
     , m_childIndex(0)
@@ -169,8 +174,10 @@ inline ElementRareData::ElementRareData(RenderElement* renderer)
     , m_childrenAffectedByDrag(false)
     , m_childrenAffectedByLastChildRules(false)
     , m_childrenAffectedByBackwardPositionalRules(false)
+    , m_childrenAffectedByPropertyBasedBackwardPositionalRules(false)
     , m_regionOversetState(RegionUndefined)
     , m_minimumSizeForResizing(defaultMinimumSizeForResizing())
+    , m_weakPtrFactory(&element)
 {
 }
 
@@ -181,16 +188,16 @@ inline ElementRareData::~ElementRareData()
     ASSERT(!m_afterPseudoElement);
 }
 
-inline void ElementRareData::setBeforePseudoElement(PassRefPtr<PseudoElement> pseudoElement)
+inline void ElementRareData::setBeforePseudoElement(RefPtr<PseudoElement>&& pseudoElement)
 {
     ASSERT(!m_beforePseudoElement || !pseudoElement);
-    m_beforePseudoElement = pseudoElement;
+    m_beforePseudoElement = WTF::move(pseudoElement);
 }
 
-inline void ElementRareData::setAfterPseudoElement(PassRefPtr<PseudoElement> pseudoElement)
+inline void ElementRareData::setAfterPseudoElement(RefPtr<PseudoElement>&& pseudoElement)
 {
     ASSERT(!m_afterPseudoElement || !pseudoElement);
-    m_afterPseudoElement = pseudoElement;
+    m_afterPseudoElement = WTF::move(pseudoElement);
 }
 
 inline void ElementRareData::resetComputedStyle()
@@ -206,6 +213,7 @@ inline void ElementRareData::resetDynamicRestyleObservations()
     setChildrenAffectedByDrag(false);
     setChildrenAffectedByLastChildRules(false);
     setChildrenAffectedByBackwardPositionalRules(false);
+    setChildrenAffectedByPropertyBasedBackwardPositionalRules(false);
 }
 
 } // namespace

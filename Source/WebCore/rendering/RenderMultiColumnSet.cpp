@@ -36,7 +36,7 @@
 
 namespace WebCore {
 
-RenderMultiColumnSet::RenderMultiColumnSet(RenderFlowThread& flowThread, PassRef<RenderStyle> style)
+RenderMultiColumnSet::RenderMultiColumnSet(RenderFlowThread& flowThread, Ref<RenderStyle>&& style)
     : RenderRegionSet(flowThread.document(), WTF::move(style), flowThread)
     , m_computedColumnCount(1)
     , m_computedColumnWidth(0)
@@ -51,8 +51,8 @@ RenderMultiColumnSet::RenderMultiColumnSet(RenderFlowThread& flowThread, PassRef
 RenderMultiColumnSet* RenderMultiColumnSet::nextSiblingMultiColumnSet() const
 {
     for (RenderObject* sibling = nextSibling(); sibling; sibling = sibling->nextSibling()) {
-        if (sibling->isRenderMultiColumnSet())
-            return toRenderMultiColumnSet(sibling);
+        if (is<RenderMultiColumnSet>(*sibling))
+            return downcast<RenderMultiColumnSet>(sibling);
     }
     return nullptr;
 }
@@ -60,8 +60,8 @@ RenderMultiColumnSet* RenderMultiColumnSet::nextSiblingMultiColumnSet() const
 RenderMultiColumnSet* RenderMultiColumnSet::previousSiblingMultiColumnSet() const
 {
     for (RenderObject* sibling = previousSibling(); sibling; sibling = sibling->previousSibling()) {
-        if (sibling->isRenderMultiColumnSet())
-            return toRenderMultiColumnSet(sibling);
+        if (is<RenderMultiColumnSet>(*sibling))
+            return downcast<RenderMultiColumnSet>(sibling);
     }
     return nullptr;
 }
@@ -573,7 +573,7 @@ void RenderMultiColumnSet::paintColumnRules(PaintInfo& paintInfo, const LayoutPo
 
     RenderMultiColumnFlowThread* flowThread = multiColumnFlowThread();
     const RenderStyle& blockStyle = parent()->style();
-    const Color& ruleColor = blockStyle.visitedDependentColor(CSSPropertyWebkitColumnRuleColor);
+    const Color& ruleColor = blockStyle.visitedDependentColor(CSSPropertyColumnRuleColor);
     bool ruleTransparent = blockStyle.columnRuleIsTransparent();
     EBorderStyle ruleStyle = blockStyle.columnRuleStyle();
     LayoutUnit ruleThickness = blockStyle.columnRuleWidth();

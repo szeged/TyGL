@@ -26,8 +26,6 @@
 #ifndef DatabaseManager_h
 #define DatabaseManager_h
 
-#if ENABLE(SQL_DATABASE)
-
 #include "DatabaseBasicTypes.h"
 #include "DatabaseDetails.h"
 #include "DatabaseError.h"
@@ -84,7 +82,6 @@ public:
     static ExceptionCode exceptionCodeForDatabaseError(DatabaseError);
 
     PassRefPtr<Database> openDatabase(ScriptExecutionContext*, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, PassRefPtr<DatabaseCallback>, DatabaseError&);
-    PassRefPtr<DatabaseSync> openDatabaseSync(ScriptExecutionContext*, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, PassRefPtr<DatabaseCallback>, DatabaseError&);
 
     WEBCORE_EXPORT bool hasOpenDatabases(ScriptExecutionContext*);
     void stopDatabases(ScriptExecutionContext*, DatabaseTaskSynchronizer*);
@@ -130,9 +127,7 @@ private:
     // it already exist previously. Otherwise, it returns 0.
     PassRefPtr<DatabaseContext> existingDatabaseContextFor(ScriptExecutionContext*);
 
-    PassRefPtr<DatabaseBackendBase> openDatabaseBackend(ScriptExecutionContext*,
-        DatabaseType, const String& name, const String& expectedVersion, const String& displayName,
-        unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError&, String& errorMessage);
+    PassRefPtr<DatabaseBackendBase> openDatabaseBackend(ScriptExecutionContext*, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError&, String& errorMessage);
 
     void addProposedDatabase(ProposedDatabase*);
     void removeProposedDatabase(ProposedDatabase*);
@@ -157,7 +152,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(SQL_DATABASE)
 
 #endif // DatabaseManager_h

@@ -41,14 +41,14 @@ struct ResourceLoaderOptions;
 class CSSImageSetValue : public CSSValueList {
 public:
 
-    static PassRef<CSSImageSetValue> create()
+    static Ref<CSSImageSetValue> create()
     {
         return adoptRef(*new CSSImageSetValue());
     }
     ~CSSImageSetValue();
 
-    StyleCachedImageSet* cachedImageSet(CachedResourceLoader*, const ResourceLoaderOptions&);
-    StyleCachedImageSet* cachedImageSet(CachedResourceLoader*);
+    StyleCachedImageSet* cachedImageSet(CachedResourceLoader&, const ResourceLoaderOptions&);
+    StyleCachedImageSet* cachedImageSet(CachedResourceLoader&);
 
     // Returns a StyleCachedImageSet if the best fit image has been cached already, otherwise a StylePendingImage.
     StyleImage* cachedOrPendingImageSet(Document&);

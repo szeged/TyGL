@@ -67,6 +67,7 @@ class ClientRectList;
 class Color;
 class ContextMenuClient;
 class ContextMenuController;
+class DatabaseProvider;
 class DragCaretController;
 class DragClient;
 class DragController;
@@ -80,7 +81,7 @@ class InspectorClient;
 class InspectorController;
 class MainFrame;
 class MediaCanStartListener;
-class PageActivityAssertionToken;
+class PageConfiguration;
 class PageConsoleClient;
 class PageDebuggable;
 class PageGroup;
@@ -100,12 +101,14 @@ class ScrollableArea;
 class ScrollingCoordinator;
 class Settings;
 class StorageNamespace;
+class StorageNamespaceProvider;
 class UserContentController;
 class ValidationMessageClient;
 class ViewStateChangeObserver;
 class VisitedLinkStore;
 
 typedef uint64_t LinkHash;
+class SharedBuffer;
 
 enum FindDirection { FindDirectionForward, FindDirectionBackward };
 
@@ -119,36 +122,12 @@ public:
     WEBCORE_EXPORT static void updateStyleForAllPagesAfterGlobalChangeInEnvironment();
     WEBCORE_EXPORT static void clearPreviousItemFromAllPages(HistoryItem*);
 
-    // It is up to the platform to ensure that non-null clients are provided where required.
-    // FIXME: Rename this to PageConfiguration and move it to its own class.
-    struct PageClients {
-        WTF_MAKE_NONCOPYABLE(PageClients); WTF_MAKE_FAST_ALLOCATED;
-    public:
-        WEBCORE_EXPORT PageClients();
-        WEBCORE_EXPORT ~PageClients();
-
-        AlternativeTextClient* alternativeTextClient;
-        ChromeClient* chromeClient;
-#if ENABLE(CONTEXT_MENUS)
-        ContextMenuClient* contextMenuClient;
-#endif
-        EditorClient* editorClient;
-        DragClient* dragClient;
-        InspectorClient* inspectorClient;
-        PlugInClient* plugInClient;
-        ProgressTrackerClient* progressTrackerClient;
-        RefPtr<BackForwardClient> backForwardClient;
-        ValidationMessageClient* validationMessageClient;
-        FrameLoaderClient* loaderClientForMainFrame;
-
-        RefPtr<UserContentController> userContentController;
-        RefPtr<VisitedLinkStore> visitedLinkStore;
-    };
-
-    WEBCORE_EXPORT explicit Page(PageClients&);
+    WEBCORE_EXPORT explicit Page(PageConfiguration&);
     WEBCORE_EXPORT ~Page();
 
     WEBCORE_EXPORT uint64_t renderTreeSize() const;
+    
+    static std::unique_ptr<Page> createPageFromBuffer(PageConfiguration&, const SharedBuffer*, const String& mimeType, bool canHaveScrollbars, bool transparent);
 
     void setNeedsRecalcStyleInAllFrames();
 
@@ -162,7 +141,7 @@ public:
     WEBCORE_EXPORT void setCanStartMedia(bool);
     bool canStartMedia() const { return m_canStartMedia; }
 
-    EditorClient* editorClient() const { return m_editorClient; }
+    EditorClient& editorClient() { return m_editorClient; }
     PlugInClient* plugInClient() const { return m_plugInClient; }
 
     MainFrame& mainFrame() { ASSERT(m_mainFrame); return *m_mainFrame; }
@@ -171,7 +150,7 @@ public:
     bool openedByDOM() const;
     void setOpenedByDOM();
 
-    WEBCORE_EXPORT void goToItem(HistoryItem*, FrameLoadType);
+    WEBCORE_EXPORT void goToItem(HistoryItem&, FrameLoadType);
 
     WEBCORE_EXPORT void setGroupName(const String&);
     WEBCORE_EXPORT const String& groupName() const;
@@ -202,9 +181,7 @@ public:
 #if ENABLE(WEB_REPLAY)
     ReplayController& replayController() const { return *m_replayController; }
 #endif
-#if ENABLE(INSPECTOR)
     InspectorController& inspectorController() const { return *m_inspectorController; }
-#endif
 #if ENABLE(POINTER_LOCK)
     PointerLockController& pointerLockController() const { return *m_pointerLockController; }
 #endif
@@ -214,7 +191,7 @@ public:
 
     WEBCORE_EXPORT String scrollingStateTreeAsText();
     WEBCORE_EXPORT String synchronousScrollingReasonsAsText();
-    WEBCORE_EXPORT PassRefPtr<ClientRectList> nonFastScrollableRects(const Frame*);
+    WEBCORE_EXPORT Ref<ClientRectList> nonFastScrollableRects(const Frame*);
 
     Settings& settings() const { return *m_settings; }
     ProgressTracker& progress() const { return *m_progress; }
@@ -240,7 +217,7 @@ public:
 
     WEBCORE_EXPORT bool findString(const String&, FindOptions);
 
-    WEBCORE_EXPORT PassRefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
+    WEBCORE_EXPORT RefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
 
     WEBCORE_EXPORT unsigned countFindMatches(const String&, FindOptions, unsigned maxMatchCount);
     WEBCORE_EXPORT unsigned markAllMatchesForText(const String&, FindOptions, bool shouldHighlight, unsigned maxMatchCount);
@@ -255,8 +232,8 @@ public:
     enum { NoMatchAfterUserSelection = -1 };
     WEBCORE_EXPORT void findStringMatchingRanges(const String&, FindOptions, int maxCount, Vector<RefPtr<Range>>&, int& indexForSelection);
 #if PLATFORM(COCOA)
-    WEBCORE_EXPORT void addSchedulePair(PassRefPtr<SchedulePair>);
-    WEBCORE_EXPORT void removeSchedulePair(PassRefPtr<SchedulePair>);
+    WEBCORE_EXPORT void addSchedulePair(Ref<SchedulePair>&&);
+    WEBCORE_EXPORT void removeSchedulePair(Ref<SchedulePair>&&);
     SchedulePairHashSet* scheduledRunLoopPairs() { return m_scheduledRunLoopPairs.get(); }
 
     std::unique_ptr<SchedulePairHashSet> m_scheduledRunLoopPairs;
@@ -313,6 +290,7 @@ public:
 
     // Notifications when the Page starts and stops being presented via a native window.
     WEBCORE_EXPORT void setViewState(ViewState::Flags);
+    void setPageActivityState(PageActivityState::Flags);
     WEBCORE_EXPORT void setIsVisible(bool);
     WEBCORE_EXPORT void setIsPrerender();
     bool isVisible() const { return m_viewState & ViewState::IsVisible; }
@@ -340,13 +318,11 @@ public:
     void setDebugger(JSC::Debugger*);
     JSC::Debugger* debugger() const { return m_debugger; }
 
-    static void removeAllVisitedLinks();
-
     WEBCORE_EXPORT void invalidateStylesForAllLinks();
     WEBCORE_EXPORT void invalidateStylesForLink(LinkHash);
 
     StorageNamespace* sessionStorage(bool optionalCreate = true);
-    void setSessionStorage(PassRefPtr<StorageNamespace>);
+    void setSessionStorage(RefPtr<StorageNamespace>&&);
 
     bool hasCustomHTMLTokenizerTimeDelay() const;
     double customHTMLTokenizerTimeDelay() const;
@@ -406,7 +382,6 @@ public:
     void resetSeenMediaEngines();
 
     PageThrottler& pageThrottler() { return m_pageThrottler; }
-    WEBCORE_EXPORT void enablePageThrottler();
 
     PageConsoleClient& console() { return *m_consoleClient; }
 
@@ -426,10 +401,16 @@ public:
     void setLastSpatialNavigationCandidateCount(unsigned count) { m_lastSpatialNavigationCandidatesCount = count; }
     unsigned lastSpatialNavigationCandidateCount() const { return m_lastSpatialNavigationCandidatesCount; }
 
-    void setUserContentController(UserContentController*);
+    DatabaseProvider& databaseProvider() { return m_databaseProvider; }
+
+    StorageNamespaceProvider& storageNamespaceProvider() { return m_storageNamespaceProvider.get(); }
+    void setStorageNamespaceProvider(Ref<StorageNamespaceProvider>&&);
+
     UserContentController* userContentController() { return m_userContentController.get(); }
+    WEBCORE_EXPORT void setUserContentController(UserContentController*);
 
     VisitedLinkStore& visitedLinkStore();
+    WEBCORE_EXPORT void setVisitedLinkStore(Ref<VisitedLinkStore>&&);
 
     WEBCORE_EXPORT SessionID sessionID() const;
     WEBCORE_EXPORT void setSessionID(SessionID);
@@ -438,6 +419,8 @@ public:
 
     bool isPlayingAudio() const { return m_isPlayingAudio; }
     void updateIsPlayingAudio();
+    bool isMuted() const { return m_muted; }
+    WEBCORE_EXPORT void setMuted(bool);
 
 private:
     WEBCORE_EXPORT void initGroup();
@@ -483,9 +466,7 @@ private:
 #if ENABLE(WEB_REPLAY)
     const std::unique_ptr<ReplayController> m_replayController;
 #endif
-#if ENABLE(INSPECTOR)
     const std::unique_ptr<InspectorController> m_inspectorController;
-#endif
 #if ENABLE(POINTER_LOCK)
     const std::unique_ptr<PointerLockController> m_pointerLockController;
 #endif
@@ -501,7 +482,7 @@ private:
 
     RefPtr<RenderTheme> m_theme;
 
-    EditorClient* m_editorClient;
+    EditorClient& m_editorClient;
     PlugInClient* m_plugInClient;
     ValidationMessageClient* m_validationMessageClient;
 
@@ -516,6 +497,7 @@ private:
     bool m_inLowQualityInterpolationMode;
     bool m_areMemoryCacheClientCallsEnabled;
     float m_mediaVolume;
+    bool m_muted;
 
     float m_pageScaleFactor;
     float m_zoomedOutPageScaleFactor;
@@ -590,8 +572,10 @@ private:
     unsigned m_lastSpatialNavigationCandidatesCount;
     unsigned m_framesHandlingBeforeUnloadEvent;
 
+    Ref<DatabaseProvider> m_databaseProvider;
+    Ref<StorageNamespaceProvider> m_storageNamespaceProvider;
     RefPtr<UserContentController> m_userContentController;
-    RefPtr<VisitedLinkStore> m_visitedLinkStore;
+    Ref<VisitedLinkStore> m_visitedLinkStore;
 
     HashSet<ViewStateChangeObserver*> m_viewStateChangeObservers;
 

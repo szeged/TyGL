@@ -39,7 +39,7 @@ namespace WebCore {
 
 using namespace MathMLNames;
 
-RenderMathMLMenclose::RenderMathMLMenclose(Element& element, PassRef<RenderStyle> style)
+RenderMathMLMenclose::RenderMathMLMenclose(Element& element, Ref<RenderStyle>&& style)
     : RenderMathMLRow(element, WTF::move(style))
 {
 }
@@ -54,7 +54,7 @@ void RenderMathMLMenclose::addChild(RenderObject* newChild, RenderObject* before
     
     if (newChild) {
         if (firstChild() && menclose->isRadical())
-            toRenderElement(firstChild())->addChild(newChild, beforeChild && beforeChild->parent() == firstChild() ? beforeChild : nullptr);
+            downcast<RenderElement>(*firstChild()).addChild(newChild, beforeChild && beforeChild->parent() == firstChild() ? beforeChild : nullptr);
         else
             RenderMathMLBlock::addChild(newChild, beforeChild);
     }
@@ -72,8 +72,8 @@ void RenderMathMLMenclose::computePreferredLogicalWidths()
     size_t notationalValueSize = notationValues.size();
     for (size_t i = 0; i < notationalValueSize; i++) {
         if (notationValues[i] == "circle") {
-            m_minPreferredLogicalWidth = minPreferredLogicalWidth() * float(M_SQRT2);
-            m_maxPreferredLogicalWidth = maxPreferredLogicalWidth() * float(M_SQRT2);
+            m_minPreferredLogicalWidth = minPreferredLogicalWidth() * sqrtOfTwoFloat;
+            m_maxPreferredLogicalWidth = maxPreferredLogicalWidth() * sqrtOfTwoFloat;
         }
     }
 
@@ -91,7 +91,7 @@ void RenderMathMLMenclose::updateLogicalHeight()
     size_t notationalValueSize = notationValues.size();
     for (size_t i = 0; i < notationalValueSize; i++)
         if (notationValues[i] == "circle")
-            setLogicalHeight(logicalHeight() * float(M_SQRT2));
+            setLogicalHeight(logicalHeight() * sqrtOfTwoFloat);
 }
 
 void RenderMathMLMenclose::paint(PaintInfo& info, const LayoutPoint& paintOffset)

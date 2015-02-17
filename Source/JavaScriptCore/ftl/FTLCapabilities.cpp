@@ -99,7 +99,6 @@ inline CapabilityLevel canCompile(Node* node)
     case Upsilon:
     case ExtractOSREntryLocal:
     case LoopHint:
-    case GetMyScope:
     case SkipScope:
     case GetClosureRegisters:
     case GetClosureVar:
@@ -176,11 +175,6 @@ inline CapabilityLevel canCompile(Node* node)
     case PutStructureHint:
     case MaterializeNewObject:
         // These are OK.
-        break;
-    case ProfiledCall:
-    case ProfiledConstruct:
-        // These are OK not because the FTL can support them, but because if the DFG sees one of
-        // these then the FTL will see a normal Call/Construct.
         break;
     case Identity:
         // No backend handles this because it will be optimized out. But we may check

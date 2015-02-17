@@ -110,6 +110,10 @@ WebInspector.TextEditor.prototype = {
     {
         function update()
         {
+            // Clear any styles that may have been set on the empty line before content loaded.
+            if (this._initialStringNotSet)
+                this._codeMirror.removeLineClass(0, "wrap");
+
             this._codeMirror.setValue(newString);
 
             if (this._initialStringNotSet) {
@@ -448,6 +452,16 @@ WebInspector.TextEditor.prototype = {
     line: function(lineNumber)
     {
         return this._codeMirror.getLine(lineNumber);
+    },
+
+    getTextInRange: function(startPosition, endPosition)
+    {
+        return this._codeMirror.getRange(startPosition, endPosition);
+    },
+
+    addStyleToTextRange: function(startPosition, endPosition, styleClassName)
+    {
+        return this._codeMirror.getDoc().markText(startPosition, endPosition, {className: styleClassName});
     },
 
     revealPosition: function(position, textRangeToSelect, forceUnformatted, noHighlight)
@@ -812,6 +826,11 @@ WebInspector.TextEditor.prototype = {
     },
 
     // Private
+
+    hasEdits: function()
+    {
+        return !this._codeMirror.isClean();
+    },
 
     _contentChanged: function(codeMirror, change)
     {

@@ -116,10 +116,10 @@ private:
     void configureTrackRendering();
     void trackDidEnd();
     void scheduleEventDispatch(PassRefPtr<Event>);
-    void dispatchQueuedEvents();
 
     // ActiveDOMObject
     virtual void stop() override final;
+    virtual const char* activeDOMObjectName() const override { return "MediaStreamTrack"; }
 
     // EventTarget
     virtual void refEventTarget() override final { ref(); }

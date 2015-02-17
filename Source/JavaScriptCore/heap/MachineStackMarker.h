@@ -22,6 +22,7 @@
 #ifndef MachineThreads_h
 #define MachineThreads_h
 
+#include <setjmp.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/ThreadingPrimitives.h>
@@ -36,23 +37,25 @@ namespace JSC {
     class MachineThreads {
         WTF_MAKE_NONCOPYABLE(MachineThreads);
     public:
+        typedef jmp_buf RegisterState;
+
         MachineThreads(Heap*);
         ~MachineThreads();
 
-        void gatherConservativeRoots(ConservativeRoots&, JITStubRoutineSet&, CodeBlockSet&, void* stackCurrent);
+        void gatherConservativeRoots(ConservativeRoots&, JITStubRoutineSet&, CodeBlockSet&, void* stackCurrent, RegisterState& registers);
 
-        JS_EXPORT_PRIVATE void makeUsableFromMultipleThreads();
         JS_EXPORT_PRIVATE void addCurrentThread(); // Only needs to be called by clients that can use the same heap from multiple threads.
 
     private:
-        void gatherFromCurrentThread(ConservativeRoots&, JITStubRoutineSet&, CodeBlockSet&, void* stackCurrent);
-
         class Thread;
+
+        void gatherFromCurrentThread(ConservativeRoots&, JITStubRoutineSet&, CodeBlockSet&, void* stackCurrent, RegisterState& registers);
+
+        void tryCopyOtherThreadStack(Thread*, void*, size_t capacity, size_t*);
+        bool tryCopyOtherThreadStacks(MutexLocker&, void*, size_t capacity, size_t*);
 
         static void removeThread(void*);
         void removeCurrentThread();
-
-        void gatherFromOtherThread(ConservativeRoots&, Thread*, JITStubRoutineSet&, CodeBlockSet&);
 
         Mutex m_registeredThreadsMutex;
         Thread* m_registeredThreads;
@@ -63,5 +66,25 @@ namespace JSC {
     };
 
 } // namespace JSC
+
+#if COMPILER(GCC)
+#define REGISTER_BUFFER_ALIGNMENT __attribute__ ((aligned (sizeof(void*))))
+#else
+#define REGISTER_BUFFER_ALIGNMENT
+#endif
+
+// ALLOCATE_AND_GET_REGISTER_STATE() is a macro so that it is always "inlined" even in debug builds.
+#if COMPILER(MSVC)
+#pragma warning(push)
+#pragma warning(disable: 4611)
+#define ALLOCATE_AND_GET_REGISTER_STATE(registers) \
+    MachineThreads::RegisterState registers REGISTER_BUFFER_ALIGNMENT; \
+    setjmp(registers)
+#pragma warning(pop)
+#else
+#define ALLOCATE_AND_GET_REGISTER_STATE(registers) \
+    MachineThreads::RegisterState registers REGISTER_BUFFER_ALIGNMENT; \
+    setjmp(registers)
+#endif
 
 #endif // MachineThreads_h

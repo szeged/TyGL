@@ -112,18 +112,17 @@ private:
     friend class TimerHeapReference;
 };
 
-template <typename TimerFiredClass> class Timer : public TimerBase {
-public:
-    typedef void (TimerFiredClass::*TimerFiredFunction)(Timer&);
-    typedef void (TimerFiredClass::*DeprecatedTimerFiredFunction)(Timer*);
 
-    Timer(TimerFiredClass* object, TimerFiredFunction function)
-        : m_function(std::bind(function, object, std::ref(*this)))
+class Timer : public TimerBase {
+public:
+    template <typename TimerFiredClass, typename TimerFiredBaseClass>
+    Timer(TimerFiredClass& object, void (TimerFiredBaseClass::*function)())
+        : m_function(std::bind(function, &object))
     {
     }
 
-    Timer(TimerFiredClass* object, DeprecatedTimerFiredFunction function)
-        : m_function(std::bind(function, object, this))
+    Timer(std::function<void ()> function)
+        : m_function(WTF::move(function))
     {
     }
 
@@ -132,7 +131,7 @@ private:
     {
         m_function();
     }
-
+    
     std::function<void ()> m_function;
 };
 
@@ -150,8 +149,8 @@ inline bool TimerBase::isActive() const
 class DeferrableOneShotTimer : protected TimerBase {
 public:
     template<typename TimerFiredClass>
-    DeferrableOneShotTimer(TimerFiredClass* object, void (TimerFiredClass::*function)(), std::chrono::milliseconds delay)
-        : DeferrableOneShotTimer(std::bind(function, object), delay)
+    DeferrableOneShotTimer(TimerFiredClass& object, void (TimerFiredClass::*function)(), std::chrono::milliseconds delay)
+        : DeferrableOneShotTimer(std::bind(function, &object), delay)
     {
     }
 

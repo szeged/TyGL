@@ -43,9 +43,9 @@ inline SVGFontFaceUriElement::SVGFontFaceUriElement(const QualifiedName& tagName
     ASSERT(hasTagName(font_face_uriTag));
 }
 
-PassRefPtr<SVGFontFaceUriElement> SVGFontFaceUriElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFontFaceUriElement> SVGFontFaceUriElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFontFaceUriElement(tagName, document));
+    return adoptRef(*new SVGFontFaceUriElement(tagName, document));
 }
 
 SVGFontFaceUriElement::~SVGFontFaceUriElement()
@@ -54,7 +54,7 @@ SVGFontFaceUriElement::~SVGFontFaceUriElement()
         m_cachedFont->removeClient(this);
 }
 
-PassRef<CSSFontFaceSrcValue> SVGFontFaceUriElement::srcValue() const
+Ref<CSSFontFaceSrcValue> SVGFontFaceUriElement::srcValue() const
 {
     auto src = CSSFontFaceSrcValue::create(getAttribute(XLinkNames::hrefAttr));
     AtomicString value(fastGetAttribute(formatAttr));
@@ -88,6 +88,12 @@ Node::InsertionNotificationRequest SVGFontFaceUriElement::insertedInto(Container
     return SVGElement::insertedInto(rootParent);
 }
 
+static bool isSVGFontTarget(const SVGFontFaceUriElement& element)
+{
+    Ref<CSSFontFaceSrcValue> srcValue(element.srcValue());
+    return srcValue->isSVGFontTarget();
+}
+
 void SVGFontFaceUriElement::loadFont()
 {
     if (m_cachedFont)
@@ -95,10 +101,10 @@ void SVGFontFaceUriElement::loadFont()
 
     const AtomicString& href = getAttribute(XLinkNames::hrefAttr);
     if (!href.isNull()) {
-        CachedResourceLoader* cachedResourceLoader = document().cachedResourceLoader();
+        CachedResourceLoader& cachedResourceLoader = document().cachedResourceLoader();
         CachedResourceRequest request(ResourceRequest(document().completeURL(href)));
         request.setInitiator(this);
-        m_cachedFont = cachedResourceLoader->requestFont(request);
+        m_cachedFont = cachedResourceLoader.requestFont(request, isSVGFontTarget(*this));
         if (m_cachedFont) {
             m_cachedFont->addClient(this);
             m_cachedFont->beginLoadIfNeeded(cachedResourceLoader);

@@ -36,16 +36,15 @@ class SVGFilterPrimitiveStandardAttributes;
 
 class RenderSVGResourceFilterPrimitive final : public RenderSVGHiddenContainer {
 public:
-    RenderSVGResourceFilterPrimitive(SVGFilterPrimitiveStandardAttributes&, PassRef<RenderStyle>);
+    RenderSVGResourceFilterPrimitive(SVGFilterPrimitiveStandardAttributes&, Ref<RenderStyle>&&);
     SVGFilterPrimitiveStandardAttributes& filterPrimitiveElement() const;
 
-    virtual void styleDidChange(StyleDifference, const RenderStyle*);
+    virtual void styleDidChange(StyleDifference, const RenderStyle*) override;
 
-    virtual const char* renderName() const { return "RenderSVGResourceFilterPrimitive"; }
-    virtual bool isSVGResourceFilterPrimitive() const { return true; }
+    virtual const char* renderName() const override { return "RenderSVGResourceFilterPrimitive"; }
 
     // They depend on the RenderObject argument of RenderSVGResourceFilter::applyResource.
-    static FloatRect determineFilterPrimitiveSubregion(FilterEffect*);
+    static FloatRect determineFilterPrimitiveSubregion(FilterEffect&);
 
     inline void primitiveAttributeChanged(const QualifiedName& attribute)
     {
@@ -55,6 +54,7 @@ public:
         static_cast<RenderSVGResourceFilter*>(filter)->primitiveAttributeChanged(this, attribute);
     }
 private:
+    virtual bool isSVGResourceFilterPrimitive() const override { return true; }
     void element() const = delete;
 };
 

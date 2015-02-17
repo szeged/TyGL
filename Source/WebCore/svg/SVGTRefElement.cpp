@@ -48,16 +48,16 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGTRefElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTextPositioningElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-PassRefPtr<SVGTRefElement> SVGTRefElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGTRefElement> SVGTRefElement::create(const QualifiedName& tagName, Document& document)
 {
-    RefPtr<SVGTRefElement> element = adoptRef(new SVGTRefElement(tagName, document));
+    Ref<SVGTRefElement> element = adoptRef(*new SVGTRefElement(tagName, document));
     element->ensureUserAgentShadowRoot();
-    return element.release();
+    return element;
 }
 
 class SVGTRefTargetEventListener : public EventListener {
 public:
-    static PassRef<SVGTRefTargetEventListener> create(SVGTRefElement& trefElement)
+    static Ref<SVGTRefTargetEventListener> create(SVGTRefElement& trefElement)
     {
         return adoptRef(*new SVGTRefTargetEventListener(trefElement));
     }
@@ -206,7 +206,7 @@ void SVGTRefElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (SVGURIReference::isKnownAttribute(attrName)) {
         buildPendingResource();
@@ -218,7 +218,7 @@ void SVGTRefElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderPtr<RenderElement> SVGTRefElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGTRefElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGInline>(*this, WTF::move(style));
 }

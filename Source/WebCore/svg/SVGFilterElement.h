@@ -39,7 +39,7 @@ class SVGFilterElement final : public SVGElement,
                                public SVGURIReference,
                                public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGFilterElement> create(const QualifiedName&, Document&);
+    static Ref<SVGFilterElement> create(const QualifiedName&, Document&);
 
     void setFilterRes(unsigned filterResX, unsigned filterResY);
 
@@ -53,7 +53,7 @@ private:
     virtual void svgAttributeChanged(const QualifiedName&) override;
     virtual void childrenChanged(const ChildChange&) override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
     virtual bool childShouldCreateRenderer(const Node&) const override;
 
     virtual bool selfHasRelativeLengths() const override { return true; }

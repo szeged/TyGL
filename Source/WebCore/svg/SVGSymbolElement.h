@@ -34,7 +34,7 @@ class SVGSymbolElement final : public SVGElement,
                                public SVGExternalResourcesRequired,
                                public SVGFitToViewBox {
 public:
-    static PassRefPtr<SVGSymbolElement> create(const QualifiedName&, Document&);
+    static Ref<SVGSymbolElement> create(const QualifiedName&, Document&);
 
 private:
     SVGSymbolElement(const QualifiedName&, Document&);
@@ -42,7 +42,7 @@ private:
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     virtual bool selfHasRelativeLengths() const override;
 

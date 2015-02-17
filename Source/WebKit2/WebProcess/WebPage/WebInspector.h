@@ -26,8 +26,6 @@
 #ifndef WebInspector_h
 #define WebInspector_h
 
-#if ENABLE(INSPECTOR)
-
 #include "APIObject.h"
 #include "Connection.h"
 #include "MessageReceiver.h"
@@ -50,11 +48,13 @@ public:
     virtual bool sendMessageToFrontend(const String& message) override;
 
     // Implemented in generated WebInspectorMessageReceiver.cpp
-    void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&);
+    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     // IPC::Connection::Client
-    void didClose(IPC::Connection*) { close(); }
-    void didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference, IPC::StringReference) { close(); }
+    void didClose(IPC::Connection&) override { close(); }
+    void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference) override { close(); }
+    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::Web; }
+    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::UI; }
 
     // Called by WebInspector messages
     void connectionEstablished();
@@ -85,6 +85,8 @@ public:
     void remoteFrontendDisconnected();
 #endif
 
+    void disconnectFromPage() { close(); }
+
 private:
     friend class WebInspectorClient;
 
@@ -110,7 +112,5 @@ private:
 };
 
 } // namespace WebKit
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // WebInspector_h

@@ -56,7 +56,7 @@ static Frame* getMainFrame(Frame* frame)
 #endif
 
 AutoscrollController::AutoscrollController()
-    : m_autoscrollTimer(this, &AutoscrollController::autoscrollTimerFired)
+    : m_autoscrollTimer(*this, &AutoscrollController::autoscrollTimerFired)
     , m_autoscrollRenderer(0)
     , m_autoscrollType(NoAutoscroll)
     , m_dragAndDropAutoscrollStartTime(0)
@@ -135,9 +135,9 @@ void AutoscrollController::updateAutoscrollRenderer()
         renderer = nodeAtPoint->renderer();
 #endif
 
-    while (renderer && !(renderer->isBox() && toRenderBox(renderer)->canAutoscroll()))
+    while (renderer && !(is<RenderBox>(*renderer) && downcast<RenderBox>(*renderer).canAutoscroll()))
         renderer = renderer->parent();
-    m_autoscrollRenderer = renderer && renderer->isBox() ? toRenderBox(renderer) : 0;
+    m_autoscrollRenderer = is<RenderBox>(renderer) ? downcast<RenderBox>(renderer) : nullptr;
 }
 
 void AutoscrollController::updateDragAndDrop(Node* dropTargetNode, const IntPoint& eventPosition, double eventTime)
@@ -231,7 +231,7 @@ bool AutoscrollController::panScrollInProgress() const
 }
 #endif
 
-void AutoscrollController::autoscrollTimerFired(Timer<AutoscrollController>&)
+void AutoscrollController::autoscrollTimerFired()
 {
     if (!m_autoscrollRenderer) {
         stopAutoscrollTimer();

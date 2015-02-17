@@ -35,8 +35,8 @@ class HTMLMapElement;
 
 class RenderImage : public RenderReplaced {
 public:
-    RenderImage(Element&, PassRef<RenderStyle>, StyleImage* = nullptr, const float = 1.0f);
-    RenderImage(Document&, PassRef<RenderStyle>, StyleImage* = nullptr);
+    RenderImage(Element&, Ref<RenderStyle>&&, StyleImage* = nullptr, const float = 1.0f);
+    RenderImage(Document&, Ref<RenderStyle>&&, StyleImage* = nullptr);
     virtual ~RenderImage();
 
     RenderImageResource& imageResource() { return *m_imageResource; }
@@ -99,7 +99,6 @@ private:
 
     virtual LayoutUnit minimumReplacedHeight() const override;
 
-    virtual void notifyFinished(CachedResource*) override final;
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) override final;
 
     virtual bool boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox*) const override final;
@@ -127,8 +126,6 @@ private:
 
     friend class RenderImageScaleObserver;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderImage, isRenderImage())
 
 } // namespace WebCore
 

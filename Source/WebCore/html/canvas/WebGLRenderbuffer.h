@@ -33,11 +33,11 @@
 
 namespace WebCore {
 
-class WebGLRenderbuffer : public WebGLSharedObject {
+class WebGLRenderbuffer final : public WebGLSharedObject {
 public:
     virtual ~WebGLRenderbuffer();
 
-    static PassRefPtr<WebGLRenderbuffer> create(WebGLRenderingContext*);
+    static PassRefPtr<WebGLRenderbuffer> create(WebGLRenderingContextBase*);
 
     void setInternalFormat(GC3Denum internalformat)
     {
@@ -65,7 +65,7 @@ public:
     void setHasEverBeenBound() { m_hasEverBeenBound = true; }
 
 protected:
-    WebGLRenderbuffer(WebGLRenderingContext*);
+    WebGLRenderbuffer(WebGLRenderingContextBase*);
 
     virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject) override;
 

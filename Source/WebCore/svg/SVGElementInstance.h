@@ -33,8 +33,6 @@ void addChildNodesToDeletionQueue(GenericNode*& head, GenericNode*& tail, Generi
 
 class Document;
 class SVGElement;
-class SVGElementInstanceList;
-class SVGElement;
 class SVGUseElement;
 
 // SVGElementInstance mimics Node, but without providing all its functionality
@@ -64,7 +62,6 @@ public:
     void detach();
 
     SVGElementInstance* parentNode() const { return m_parentInstance; }
-    PassRefPtr<SVGElementInstanceList> childNodes();
 
     SVGElementInstance* previousSibling() const { return m_previousSibling; }
     SVGElementInstance* nextSibling() const { return m_nextSibling; }
@@ -73,27 +70,6 @@ public:
     SVGElementInstance* lastChild() const { return m_lastChild; }
 
     Document* ownerDocument() const;
-
-    class InvalidationGuard {
-        WTF_MAKE_NONCOPYABLE(InvalidationGuard);
-    public:    
-        InvalidationGuard(SVGElement* element) : m_element(element) { }
-        ~InvalidationGuard() { SVGElementInstance::invalidateAllInstancesOfElement(m_element); }
-    private:
-        SVGElement* m_element;
-    };
-
-    class InstanceUpdateBlocker {
-        WTF_MAKE_NONCOPYABLE(InstanceUpdateBlocker);
-    public:
-        InstanceUpdateBlocker(SVGElement* targetElement);
-        ~InstanceUpdateBlocker();
-
-    private:
-        SVGElement* m_targetElement;
-    };
-    
-    static void invalidateAllInstancesOfElement(SVGElement*);
 
     using TreeShared<SVGElementInstance>::ref;
     using TreeShared<SVGElementInstance>::deref;

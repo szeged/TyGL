@@ -34,6 +34,7 @@
 #include <chrono>
 #include <functional>
 #include <wtf/Forward.h>
+#include <wtf/FunctionDispatcher.h>
 #include <wtf/Functional.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
@@ -51,7 +52,7 @@
 #include <DispatchQueueEfl.h>
 #endif
 
-class WorkQueue : public ThreadSafeRefCounted<WorkQueue> {
+class WorkQueue final : public FunctionDispatcher {
 public:
     enum class QOS {
         UserInteractive,
@@ -62,9 +63,9 @@ public:
     };
     
     static PassRefPtr<WorkQueue> create(const char* name, QOS = QOS::Default);
-    ~WorkQueue();
+    virtual ~WorkQueue();
 
-    void dispatch(std::function<void ()>);
+    virtual void dispatch(std::function<void ()>) override;
     void dispatchAfter(std::chrono::nanoseconds, std::function<void ()>);
 
 #if OS(DARWIN)
@@ -87,9 +88,6 @@ private:
     static void executeFunction(void*);
     dispatch_queue_t m_dispatchQueue;
 #elif PLATFORM(GTK)
-    static void startWorkQueueThread(WorkQueue*);
-    void workQueueThreadBody();
-
     ThreadIdentifier m_workQueueThread;
     GRefPtr<GMainContext> m_eventContext;
     Mutex m_eventLoopLock;

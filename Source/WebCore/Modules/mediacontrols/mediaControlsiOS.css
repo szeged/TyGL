@@ -66,9 +66,10 @@ audio::-webkit-media-controls-panel button {
     -webkit-appearance: none;
 }
 
-video::-webkit-media-controls-wireless-playback-status,
-audio::-webkit-media-controls-wireless-playback-status {
+video::-webkit-media-controls-inline-playback-placeholder,
+audio::-webkit-media-controls-inline-playback-placeholder {
     display: block;
+    z-index: 0;
     width: 100%;
     height: 100%;
     background-color: black;
@@ -77,35 +78,37 @@ audio::-webkit-media-controls-wireless-playback-status {
     background-size: 100% 50%;
 }
 
-video::-webkit-media-controls-wireless-playback-status.hidden,
-audio::-webkit-media-controls-wireless-playback-status.hidden {
+video::-webkit-media-controls-inline-playback-placeholder.hidden,
+audio::-webkit-media-controls-inline-playback-placeholder.hidden {
     display: none;
 }
 
 audio::-webkit-media-controls-wireless-playback-picker-button,
 video::-webkit-media-controls-wireless-playback-picker-button {
     display: block;
-    background-color: black;
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-position: 0 1px;
+    opacity: 0.9;
 }
 
 audio::-webkit-media-controls-wireless-playback-picker-button {
     width: 44px;
     height: 39px;
-    -webkit-mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 39"><g fill="none"><path stroke="white" stroke-width="1" d="M15.5,24.5  10.5,24.5  10.5,11.5  31.5,11.5  31.5,24.5  26.5,24.5  31.5,24.5  31.5,11.5  10.5,11.5  10.5,24.5  15.5,24.5 Z" /><path fill="white" d="M21,21  13.5,29  28.5,29" /></g></svg>');
+    background-size: 44px 39px;
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 39"><g fill="none"><path stroke="black" stroke-width="1" d="M15.5,24.5  10.5,24.5  10.5,11.5  31.5,11.5  31.5,24.5  26.5,24.5  31.5,24.5  31.5,11.5  10.5,11.5  10.5,24.5  15.5,24.5 Z" /><path fill="black" d="M21,21  13.5,29  28.5,29" /></g></svg>');
 }
 
 video::-webkit-media-controls-wireless-playback-picker-button {
     width: 42px;
     height: 44px;
-    -webkit-mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 42 44"><g fill="none"><path stroke="white" stroke-width="1" d="M15,27.5  10.5,27.5  10.5,14.5  30.5,14.5  30.5,27.5  26,27.5  30.5,27.5  30.5,14.5  10.5,14.5  10.5,27.5  15,27.5 Z" /><path fill="white" d="M20.5,23.5  13,31.5  28,31.5" /></g></svg>');
-    opacity: 0.5;
+    background-size: 42px 44px;
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 42 44"><g fill="none"><path stroke="black" stroke-width="1" d="M15,27.5  10.5,27.5  10.5,14.5  30.5,14.5  30.5,27.5  26,27.5  30.5,27.5  30.5,14.5  10.5,14.5  10.5,27.5  15,27.5 Z" /><path fill="black" d="M20.5,23.5  13,31.5  28,31.5" /></g></svg>');
 }
 
-video::-webkit-media-controls-wireless-playback-picker-button.active,
+video::-webkit-media-controls-wireless-playback-picker-button.active {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 42 44"><g fill="none"><path stroke="#1060FE" stroke-width="1" d="M15,27.5  10.5,27.5  10.5,14.5  30.5,14.5  30.5,27.5  26,27.5  30.5,27.5  30.5,14.5  10.5,14.5  10.5,27.5  15,27.5 Z" /><path fill="#1060FE" d="M20.5,23.5  13,31.5  28,31.5" /></g></svg>');
+}
+
 audio::-webkit-media-controls-wireless-playback-picker-button.active {
-    background-color: #1060FE;
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 39"><g fill="none"><path stroke="#1060FE" stroke-width="1" d="M15.5,24.5  10.5,24.5  10.5,11.5  31.5,11.5  31.5,24.5  26.5,24.5  31.5,24.5  31.5,11.5  10.5,11.5  10.5,24.5  15.5,24.5 Z" /><path fill="#1060FE" d="M21,21  13.5,29  28.5,29" /></g></svg>');
 }
 
 video::-webkit-media-text-track-container,
@@ -209,7 +212,9 @@ audio::-webkit-media-controls-start-playback-button.failed {
 video::-webkit-media-controls-play-button,
 audio::-webkit-media-controls-play-button,
 video::-webkit-media-controls-fullscreen-button,
-audio::-webkit-media-controls-fullscreen-button {
+audio::-webkit-media-controls-fullscreen-button,
+video::-webkit-media-controls-optimized-fullscreen-button,
+audio::-webkit-media-controls-optimized-fullscreen-button {
     -webkit-appearance: none;
     display: block;
     padding: 0;
@@ -241,6 +246,12 @@ video::-webkit-media-controls-fullscreen-button {
     background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 35 44"><g stroke="rgba(0, 0, 0, 0.4)" fill="none"><path d="M 10.5,20.5 v -5 h 5 M 10.5,15.5 l 5,5"/><path d="M 24.5,24.5 v 5 h -5 M 24.5,29.5 l -5,-5"/></g></svg>');
 }
 
+video::-webkit-media-controls-optimized-fullscreen-button {
+    width: 35px;
+    height: 44px;
+    opacity: 0.4;
+}
+
 video::-webkit-media-controls-play-button {
     width: 41px;
     height: 44px;
@@ -267,26 +278,32 @@ audio::-webkit-media-controls-timeline {
     -webkit-flex: 1 1 0;
     height: 3px;
     margin: 0;
-
-    border-radius: 1.5px;
 }
 
 video::-webkit-media-controls-timeline {
     opacity: 0.75;
 }
 
+video::-webkit-media-controls-timeline::-webkit-slider-runnable-track {
+  height: 3px !important;
+  border-radius: 1.5px !important;
+  background-color: white !important;
+}
+
 video::-webkit-media-controls-timeline::-webkit-slider-thumb,
 audio::-webkit-media-controls-timeline::-webkit-slider-thumb {
     -webkit-appearance: none;
+    position: relative;
+    top: -6px;
     width: 16px;
     height: 16px;
-    border: 0;
+    border-width: 0px !important;
     border-radius: 8px;
-    background-image: url('data:image/svg+xml,<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle r="7.75" cy="8" cx="8" fill="white" stroke="rgba(0, 0, 0, .25)" stroke-width=".5"/></svg>');
+    background-image: url('data:image/svg+xml,<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle r="7.75" cy="8" cx="8" fill="white" stroke="rgba(0, 0, 0, .25)" stroke-width=".5"/></svg>') !important;
     background-color: transparent !important;
     box-shadow: 0 3px 1px -1px rgba(0, 0, 0, .15);
 
-    /* rotateZ() forces the layer into compositing mode. Slider 
+    /* rotateZ() forces the layer into compositing mode. Slider
        thumbs are small, so forcing a compositing layer is inexpensive,
        and it keeps the slider from having to repaint while sliding. */
     -webkit-transform: rotateZ(0deg);

@@ -58,9 +58,10 @@ static CounterMaps& counterMaps()
 // including pseudo elements as defined in CSS 2.1.
 static RenderElement* previousInPreOrder(const RenderElement& renderer)
 {
-    Element* previous = ElementTraversal::previousIncludingPseudo(renderer.element());
+    ASSERT(renderer.element());
+    Element* previous = ElementTraversal::previousIncludingPseudo(*renderer.element());
     while (previous && !previous->renderer())
-        previous = ElementTraversal::previousIncludingPseudo(previous);
+        previous = ElementTraversal::previousIncludingPseudo(*previous);
     return previous ? previous->renderer() : 0;
 }
 
@@ -75,9 +76,10 @@ static inline Element* parentOrPseudoHostElement(const RenderElement& renderer)
 // including pseudo elements as defined in CSS 2.1.
 static RenderElement* previousSiblingOrParent(const RenderElement& renderer)
 {
-    Element* previous = ElementTraversal::pseudoAwarePreviousSibling(renderer.element());
+    ASSERT(renderer.element());
+    Element* previous = ElementTraversal::pseudoAwarePreviousSibling(*renderer.element());
     while (previous && !previous->renderer())
-        previous = ElementTraversal::pseudoAwarePreviousSibling(previous);
+        previous = ElementTraversal::pseudoAwarePreviousSibling(*previous);
     if (previous)
         return previous->renderer();
     previous = parentOrPseudoHostElement(renderer);
@@ -93,11 +95,12 @@ static inline bool areRenderersElementsSiblings(const RenderElement& first, cons
 // including pseudo elements as defined in CSS 2.1.
 static RenderElement* nextInPreOrder(const RenderElement& renderer, const Element* stayWithin, bool skipDescendants = false)
 {
-    Element* self = renderer.element();
+    ASSERT(renderer.element());
+    Element& self = *renderer.element();
     Element* next = skipDescendants ? ElementTraversal::nextIncludingPseudoSkippingChildren(self, stayWithin) : ElementTraversal::nextIncludingPseudo(self, stayWithin);
     while (next && !next->renderer())
-        next = skipDescendants ? ElementTraversal::nextIncludingPseudoSkippingChildren(next, stayWithin) : ElementTraversal::nextIncludingPseudo(next, stayWithin);
-    return next ? next->renderer() : 0;
+        next = skipDescendants ? ElementTraversal::nextIncludingPseudoSkippingChildren(*next, stayWithin) : ElementTraversal::nextIncludingPseudo(*next, stayWithin);
+    return next ? next->renderer() : nullptr;
 }
 
 static bool planCounter(RenderElement& renderer, const AtomicString& identifier, bool& isReset, int& value)
@@ -131,9 +134,9 @@ static bool planCounter(RenderElement& renderer, const AtomicString& identifier,
     }
 
     if (identifier == "list-item") {
-        if (renderer.isListItem()) {
-            if (toRenderListItem(renderer).hasExplicitValue()) {
-                value = toRenderListItem(renderer).explicitValue();
+        if (is<RenderListItem>(renderer)) {
+            if (downcast<RenderListItem>(renderer).hasExplicitValue()) {
+                value = downcast<RenderListItem>(renderer).explicitValue();
                 isReset = true;
                 return true;
             }
@@ -350,16 +353,12 @@ RenderCounter::RenderCounter(Document& document, const CounterContent& counter)
 
 RenderCounter::~RenderCounter()
 {
+    view().removeRenderCounter();
+
     if (m_counterNode) {
         m_counterNode->removeRenderer(this);
         ASSERT(!m_counterNode);
     }
-}
-
-void RenderCounter::willBeDestroyed()
-{
-    view().removeRenderCounter();
-    RenderText::willBeDestroyed();
 }
 
 const char* RenderCounter::renderName() const
@@ -496,8 +495,8 @@ void RenderCounter::rendererRemovedFromTree(RenderElement& renderer)
     if (!currentRenderer)
         currentRenderer = &renderer;
     while (true) {
-        if (currentRenderer->isRenderElement())
-            destroyCounterNodes(toRenderElement(*currentRenderer));
+        if (is<RenderElement>(*currentRenderer))
+            destroyCounterNodes(downcast<RenderElement>(*currentRenderer));
         if (currentRenderer == &renderer)
             break;
         currentRenderer = currentRenderer->previousInPreOrder();
@@ -551,8 +550,8 @@ void RenderCounter::rendererSubtreeAttached(RenderElement& renderer)
     if (element && !element->renderer())
         return; // No need to update if the parent is not attached yet
     for (RenderObject* descendant = &renderer; descendant; descendant = descendant->nextInPreOrder(&renderer)) {
-        if (descendant->isRenderElement())
-            updateCounters(toRenderElement(*descendant));
+        if (is<RenderElement>(*descendant))
+            updateCounters(downcast<RenderElement>(*descendant));
     }
 }
 
@@ -613,15 +612,15 @@ void showCounterRendererTree(const WebCore::RenderObject* renderer, const char* 
 
     AtomicString identifier(counterName);
     for (const WebCore::RenderObject* current = root; current; current = current->nextInPreOrder()) {
-        if (!current->isRenderElement())
+        if (!is<WebCore::RenderElement>(*current))
             continue;
         fprintf(stderr, "%c", (current == renderer) ? '*' : ' ');
         for (const WebCore::RenderObject* parent = current; parent && parent != root; parent = parent->parent())
             fprintf(stderr, "    ");
         fprintf(stderr, "%p N:%p P:%p PS:%p NS:%p C:%p\n",
             current, current->node(), current->parent(), current->previousSibling(),
-            current->nextSibling(), toRenderElement(current)->hasCounterNodeMap() ?
-            counterName ? WebCore::counterMaps().get(toRenderElement(current))->get(identifier) : (WebCore::CounterNode*)1 : (WebCore::CounterNode*)0);
+            current->nextSibling(), downcast<WebCore::RenderElement>(*current).hasCounterNodeMap() ?
+            counterName ? WebCore::counterMaps().get(downcast<WebCore::RenderElement>(current))->get(identifier) : (WebCore::CounterNode*)1 : (WebCore::CounterNode*)0);
     }
     fflush(stderr);
 }

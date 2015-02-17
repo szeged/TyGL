@@ -26,9 +26,14 @@
 #include "config.h"
 #include "MainFrame.h"
 
+#include "Element.h"
+#include "EmptyClients.h"
+#include "PageConfiguration.h"
 #include "PageOverlayController.h"
 #include "ScrollLatchingState.h"
+#include "Settings.h"
 #include "WheelEventDeltaTracker.h"
+#include <wtf/NeverDestroyed.h>
 
 #if PLATFORM(MAC)
 #include "ServicesOverlayController.h"
@@ -36,17 +41,17 @@
 
 namespace WebCore {
 
-inline MainFrame::MainFrame(Page& page, FrameLoaderClient& client)
-    : Frame(page, nullptr, client)
+inline MainFrame::MainFrame(Page& page, PageConfiguration& configuration)
+    : Frame(page, nullptr, *configuration.loaderClientForMainFrame)
     , m_selfOnlyRefCount(0)
 #if PLATFORM(MAC)
-    , m_latchingState(std::make_unique<ScrollLatchingState>())
 #if ENABLE(SERVICE_CONTROLS) || ENABLE(TELEPHONE_NUMBER_DETECTION)
     , m_servicesOverlayController(std::make_unique<ServicesOverlayController>(*this))
 #endif
 #endif
     , m_recentWheelEventDeltaTracker(std::make_unique<WheelEventDeltaTracker>())
     , m_pageOverlayController(std::make_unique<PageOverlayController>(*this))
+    , m_diagnosticLoggingClient(configuration.diagnosticLoggingClient)
 {
 }
 
@@ -54,9 +59,9 @@ MainFrame::~MainFrame()
 {
 }
 
-RefPtr<MainFrame> MainFrame::create(Page& page, FrameLoaderClient& client)
+RefPtr<MainFrame> MainFrame::create(Page& page, PageConfiguration& configuration)
 {
-    return adoptRef(new MainFrame(page, client));
+    return adoptRef(new MainFrame(page, configuration));
 }
 
 void MainFrame::selfOnlyRef()
@@ -79,6 +84,15 @@ void MainFrame::selfOnlyDeref()
     deref();
 }
 
+DiagnosticLoggingClient& MainFrame::diagnosticLoggingClient() const
+{
+    static NeverDestroyed<EmptyDiagnosticLoggingClient> dummyClient;
+    if (!settings().diagnosticLoggingEnabled() || !m_diagnosticLoggingClient)
+        return dummyClient;
+
+    return *m_diagnosticLoggingClient;
+}
+
 void MainFrame::dropChildren()
 {
     while (Frame* child = tree().firstChild())
@@ -86,13 +100,29 @@ void MainFrame::dropChildren()
 }
 
 #if PLATFORM(MAC)
+ScrollLatchingState* MainFrame::latchingState()
+{
+    if (m_latchingState.isEmpty())
+        return nullptr;
+
+    return &m_latchingState.last();
+}
+
+void MainFrame::pushNewLatchingState()
+{
+    m_latchingState.append(ScrollLatchingState());
+}
+
 void MainFrame::resetLatchingState()
 {
-    if (!m_latchingState)
-        return;
-
-    m_latchingState->clear();
+    m_latchingState.clear();
 }
+    
+void MainFrame::popLatchingState()
+{
+    m_latchingState.removeLast();
+}
+
 #endif
 
 }

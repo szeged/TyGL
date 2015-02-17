@@ -59,10 +59,6 @@ typedef const struct __AXUIElement *AXUIElementRef;
 #if !PLATFORM(IOS)
 typedef struct _NSRange NSRange;
 typedef double NSTimeInterval;
-
-typedef UInt32 FMFont;
-typedef FMFont ATSUFontID;
-typedef UInt16 ATSGlyphRef;
 #endif
 
 #if PLATFORM(COCOA) && USE(CA)
@@ -103,6 +99,7 @@ OBJC_CLASS NSControl;
 OBJC_CLASS NSCursor;
 OBJC_CLASS NSData;
 OBJC_CLASS NSDate;
+OBJC_CLASS NSDictionary;
 OBJC_CLASS NSEvent;
 OBJC_CLASS NSFont;
 OBJC_CLASS NSHTTPCookie;
@@ -135,7 +132,7 @@ typedef enum {
     wkPatternTilingConstantSpacing
 } wkPatternTiling;
 extern void (*wkCGContextResetClip)(CGContextRef);
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+#if !PLATFORM(IOS)
 extern bool (*wkCGContextDrawsWithCorrectShadowOffsets)(CGContextRef);
 #endif
 extern CGPatternRef (*wkCGPatternCreateWithImageAndTransform)(CGImageRef, CGAffineTransform, int);
@@ -148,9 +145,6 @@ extern void (*wkDrawBezeledTextArea)(NSRect, BOOL enabled);
 extern void (*wkDrawFocusRing)(CGContextRef, CGColorRef, int);
 extern bool (*wkDrawFocusRingAtTime)(CGContextRef, NSTimeInterval time);
 extern bool (*wkDrawCellFocusRingWithFrameAtTime)(NSCell *cell, NSRect cellFrame, NSView *controlView, NSTimeInterval time);
-
-extern NSFont* (*wkGetFontInLanguageForRange)(NSFont*, NSString*, NSRange);
-extern NSFont* (*wkGetFontInLanguageForCharacter)(NSFont*, UniChar);
 #endif
 #if !PLATFORM(IOS)
 extern void (*wkDrawMediaSliderTrack)(CGContextRef context, CGRect rect, float timeLoaded, float currentTime,
@@ -159,7 +153,6 @@ extern void (*wkDrawMediaUIPart)(int part, CGContextRef context, CGRect rect, un
 extern CFStringRef (*wkSignedPublicKeyAndChallengeString)(unsigned keySize, CFStringRef challenge, CFStringRef keyDescription);
 #endif
 #if !PLATFORM(IOS)
-extern ATSUFontID (*wkGetNSFontATSUFontId)(NSFont*);
 extern double (*wkGetNSURLResponseCalculatedExpiration)(NSURLResponse *response);
 #endif
 extern NSDate *(*wkGetNSURLResponseLastModifiedDate)(NSURLResponse *response);
@@ -214,7 +207,6 @@ extern void (*wkSetBaseCTM)(CGContextRef, CGAffineTransform);
 extern void (*wkSetPatternPhaseInUserSpace)(CGContextRef, CGPoint);
 extern CGAffineTransform (*wkGetUserToBaseCTM)(CGContextRef);
 extern bool (*wkCGContextIsPDFContext)(CGContextRef);
-extern void (*wkSetUpFontCache)();
 extern unsigned (*wkInitializeMaximumHTTPConnectionCountPerHost)(unsigned preferredConnectionCount);
 extern int (*wkGetHTTPRequestPriority)(CFURLRequestRef);
 extern void (*wkSetHTTPRequestMaximumPriority)(int maximumPriority);
@@ -225,30 +217,9 @@ extern void (*wkSetCONNECTProxyForStream)(CFReadStreamRef, CFStringRef proxyHost
 extern void (*wkSetCONNECTProxyAuthorizationForStream)(CFReadStreamRef, CFStringRef proxyAuthorizationString);
 extern CFHTTPMessageRef (*wkCopyCONNECTProxyResponse)(CFReadStreamRef, CFURLRef responseURL, CFStringRef proxyHost, CFNumberRef proxyPort);
 
-extern bool (*wkGetVerticalGlyphsForCharacters)(CTFontRef, const UniChar[], CGGlyph[], size_t);
-
-extern BOOL (*wkUseSharedMediaUI)();
-
 #if !PLATFORM(IOS)
 extern void* wkGetHyphenationLocationBeforeIndex;
 #endif
-
-extern CTLineRef (*wkCreateCTLineWithUniCharProvider)(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*);
-
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-enum {
-    wkCTFontTransformApplyShaping = (1 << 0),
-    wkCTFontTransformApplyPositioning = (1 << 1)
-};
-
-typedef int wkCTFontTransformOptions;
-
-extern bool (*wkCTFontTransformGlyphs)(CTFontRef font, CGGlyph glyphs[], CGSize advances[], CFIndex count, wkCTFontTransformOptions options);
-#endif
-
-extern CTTypesetterRef (*wkCreateCTTypesetterWithUniCharProviderAndOptions)(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*, CFDictionaryRef options);
-
-extern CGSize (*wkCTRunGetInitialAdvance)(CTRunRef);
 
 #if PLATFORM(COCOA) && USE(CA) && !PLATFORM(IOS_SIMULATOR)
 extern CGContextRef (*wkIOSurfaceContextCreate)(IOSurfaceRef surface, unsigned width, unsigned height, CGColorSpaceRef colorSpace);
@@ -326,11 +297,11 @@ extern void (*wkSetMetadataURL)(NSString *urlString, NSString *referrer, NSStrin
 extern dispatch_source_t (*wkCreateVMPressureDispatchOnMainQueue)(void);
 #endif
 
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if PLATFORM(MAC)
 extern dispatch_source_t (*wkCreateMemoryStatusPressureCriticalDispatchOnMainQueue)(void);
 #endif
     
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+#if !PLATFORM(IOS)
 extern bool (*wkExecutableWasLinkedOnOrBeforeLion)(void);
 #endif
 
@@ -338,7 +309,7 @@ extern void (*wkCGPathAddRoundedRect)(CGMutablePathRef path, const CGAffineTrans
 
 extern void (*wkCFURLRequestAllowAllPostCaching)(CFURLRequestRef);
 
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+#if !PLATFORM(IOS)
 extern CGFloat (*wkNSElasticDeltaForTimeDelta)(CGFloat initialPosition, CGFloat initialVelocity, CGFloat elapsedTime);
 extern CGFloat (*wkNSElasticDeltaForReboundDelta)(CGFloat delta);
 extern CGFloat (*wkNSReboundDeltaForElasticDelta)(CGFloat delta);

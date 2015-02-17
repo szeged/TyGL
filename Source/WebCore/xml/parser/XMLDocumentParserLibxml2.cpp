@@ -508,7 +508,7 @@ static void errorFunc(void*, const char*, ...)
 
 static bool didInit = false;
 
-PassRefPtr<XMLParserContext> XMLParserContext::createStringParser(xmlSAXHandlerPtr handlers, void* userData)
+Ref<XMLParserContext> XMLParserContext::createStringParser(xmlSAXHandlerPtr handlers, void* userData)
 {
     if (!didInit) {
         xmlInitParser();
@@ -526,12 +526,12 @@ PassRefPtr<XMLParserContext> XMLParserContext::createStringParser(xmlSAXHandlerP
 
     switchToUTF16(parser);
 
-    return adoptRef(new XMLParserContext(parser));
+    return adoptRef(*new XMLParserContext(parser));
 }
 
 
 // Chunk should be encoded in UTF-8
-PassRefPtr<XMLParserContext> XMLParserContext::createMemoryParser(xmlSAXHandlerPtr handlers, void* userData, const CString& chunk)
+RefPtr<XMLParserContext> XMLParserContext::createMemoryParser(xmlSAXHandlerPtr handlers, void* userData, const CString& chunk)
 {
     if (!didInit) {
         xmlInitParser();
@@ -562,7 +562,7 @@ PassRefPtr<XMLParserContext> XMLParserContext::createMemoryParser(xmlSAXHandlerP
     parser->str_xml_ns = xmlDictLookup(parser->dict, XML_XML_NAMESPACE, 36);
     parser->_private = userData;
 
-    return adoptRef(new XMLParserContext(parser));
+    return adoptRef(*new XMLParserContext(parser));
 }
 
 // --------------------------------
@@ -680,7 +680,7 @@ void XMLDocumentParser::doWrite(const String& parseString)
         // keep this alive until this function is done.
         Ref<XMLDocumentParser> protect(*this);
 
-        XMLDocumentParserScope scope(document()->cachedResourceLoader());
+        XMLDocumentParserScope scope(&document()->cachedResourceLoader());
 
         // FIXME: Can we parse 8-bit strings directly as Latin-1 instead of upconverting to UTF-16?
         switchToUTF16(context->context());
@@ -1352,7 +1352,7 @@ void XMLDocumentParser::initializeParserContext(const CString& chunk)
     m_sawXSLTransform = false;
     m_sawFirstElement = false;
 
-    XMLDocumentParserScope scope(document()->cachedResourceLoader());
+    XMLDocumentParserScope scope(&document()->cachedResourceLoader());
     if (m_parsingFragment)
         m_context = XMLParserContext::createMemoryParser(&sax, this, chunk);
     else {
@@ -1367,11 +1367,11 @@ void XMLDocumentParser::doEnd()
         if (m_context) {
             // Tell libxml we're done.
             {
-                XMLDocumentParserScope scope(document()->cachedResourceLoader());
+                XMLDocumentParserScope scope(&document()->cachedResourceLoader());
                 xmlParseChunk(context(), 0, 0, 1);
             }
 
-            m_context = 0;
+            m_context = nullptr;
         }
     }
 
@@ -1406,10 +1406,10 @@ static inline const char* nativeEndianUTF16Encoding()
     return BOMHighByte == 0xFF ? "UTF-16LE" : "UTF-16BE";
 }
 
-void* xmlDocPtrForString(CachedResourceLoader* cachedResourceLoader, const String& source, const String& url)
+void* xmlDocPtrForString(CachedResourceLoader& cachedResourceLoader, const String& source, const String& url)
 {
     if (source.isEmpty())
-        return 0;
+        return nullptr;
 
     // Parse in a single chunk into an xmlDocPtr
     // FIXME: Hook up error handlers so that a failure to parse the main document results in
@@ -1420,7 +1420,7 @@ void* xmlDocPtrForString(CachedResourceLoader* cachedResourceLoader, const Strin
     size_t sizeInBytes = source.length() * (is8Bit ? sizeof(LChar) : sizeof(UChar));
     const char* encoding = is8Bit ? "iso-8859-1" : nativeEndianUTF16Encoding();
 
-    XMLDocumentParserScope scope(cachedResourceLoader, errorFunc, 0);
+    XMLDocumentParserScope scope(&cachedResourceLoader, errorFunc);
     return xmlReadMemory(characters, sizeInBytes, url.latin1().data(), encoding, XSLT_PARSE_OPTIONS);
 }
 #endif
@@ -1432,6 +1432,11 @@ TextPosition XMLDocumentParser::textPosition() const
         return TextPosition::minimumPosition();
     return TextPosition(OrdinalNumber::fromOneBasedInt(context->input->line),
                         OrdinalNumber::fromOneBasedInt(context->input->col));
+}
+
+bool XMLDocumentParser::shouldAssociateConsoleMessagesWithTextPosition() const
+{
+    return !m_parserPaused && !m_requestingScript;
 }
 
 void XMLDocumentParser::stopParsing()

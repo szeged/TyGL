@@ -14,14 +14,12 @@
 #else
 #import <CoreImage/CoreImage.h>
 #import <CoreText/CoreText.h>
-#if !TARGET_IPHONE_SIMULATOR
-#import <IOSurface/IOSurface.h>
-#endif
 #import <WebKitSystemInterfaceIOS.h>
 #endif
 
 @class AVAsset;
 @class AVPlayer;
+@class DDActionContext;
 @class QTMovie;
 @class QTMovieView;
 
@@ -128,8 +126,9 @@ void WKSetDragImage(NSImage *image, NSPoint offset);
 
 void WKDrawBezeledTextArea(NSRect, BOOL enabled);
 
-void WKPopupMenu(NSMenu*, NSPoint location, float width, NSView*, int selectedItem, NSFont*, NSControlSize controlSize, bool hideArrows);
+void WKPopupMenu(NSMenu*, NSPoint location, float width, NSView*, int selectedItem, NSFont*, NSControlSize controlSize, bool usesCustomAppearance);
 void WKPopupContextMenu(NSMenu *menu, NSPoint screenLocation);
+void WKSetDDActionContextIsForActionMenu(DDActionContext *actionContext);
 void WKSendUserChangeNotifications(void);
 #ifndef __LP64__
 BOOL WKConvertNSEventToCarbonEvent(EventRecord *carbonEvent, NSEvent *cocoaEvent);
@@ -170,6 +169,8 @@ CTTypesetterRef WKCreateCTTypesetterWithUniCharProviderAndOptions(const UniChar*
 CGSize WKCTRunGetInitialAdvance(CTRunRef);
 
 #if (TARGET_OS_IPHONE && TARGET_OS_EMBEDDED) || MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+typedef struct __IOSurface *IOSurfaceRef;
+
 CGContextRef WKIOSurfaceContextCreate(IOSurfaceRef, unsigned width, unsigned height, CGColorSpaceRef);
 CGImageRef WKIOSurfaceContextCreateImage(CGContextRef context);
 #endif

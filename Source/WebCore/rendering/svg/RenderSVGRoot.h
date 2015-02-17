@@ -36,7 +36,7 @@ class SVGSVGElement;
 
 class RenderSVGRoot final : public RenderReplaced {
 public:
-    RenderSVGRoot(SVGSVGElement&, PassRef<RenderStyle>);
+    RenderSVGRoot(SVGSVGElement&, Ref<RenderStyle>&&);
     virtual ~RenderSVGRoot();
 
     SVGSVGElement& svgSVGElement() const;
@@ -80,7 +80,7 @@ private:
     virtual void willBeDestroyed() override;
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0) override;
-    virtual RenderObject* removeChild(RenderObject&) override;
+    virtual void removeChild(RenderObject&) override;
 
     virtual const AffineTransform& localToParentTransform() const override;
 
@@ -90,7 +90,7 @@ private:
     virtual FloatRect objectBoundingBox() const override { return m_objectBoundingBox; }
     virtual FloatRect strokeBoundingBox() const override { return m_strokeBoundingBox; }
     virtual FloatRect repaintRectInLocalCoordinates() const override { return m_repaintBoundingBox; }
-    virtual FloatRect repaintRectInLocalCoordinatesExcludingSVGShadow() const { return m_repaintBoundingBoxExcludingShadow; }
+    FloatRect repaintRectInLocalCoordinatesExcludingSVGShadow() const { return m_repaintBoundingBoxExcludingShadow; }
 
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) override;
 
@@ -121,8 +121,6 @@ private:
     bool m_hasSVGShadow : 1;
     bool m_hasBoxDecorations : 1;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderSVGRoot, isSVGRoot())
 
 } // namespace WebCore
 

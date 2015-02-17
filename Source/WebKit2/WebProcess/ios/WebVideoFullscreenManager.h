@@ -29,6 +29,7 @@
 
 #include "MessageReceiver.h"
 #include <WebCore/EventListener.h>
+#include <WebCore/HTMLMediaElement.h>
 #include <WebCore/PlatformCALayer.h>
 #include <WebCore/WebVideoFullscreenInterface.h>
 #include <WebCore/WebVideoFullscreenModelVideoElement.h>
@@ -56,10 +57,10 @@ public:
     static PassRefPtr<WebVideoFullscreenManager> create(PassRefPtr<WebPage>);
     virtual ~WebVideoFullscreenManager();
     
-    void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&);
+    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
     
     bool supportsVideoFullscreen() const;
-    void enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement*);
+    void enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement*, WebCore::HTMLMediaElement::VideoFullscreenMode);
     void exitVideoFullscreen();
     
 protected:
@@ -67,6 +68,7 @@ protected:
     virtual bool operator==(const EventListener& rhs) override { return static_cast<WebCore::EventListener*>(this) == &rhs; }
     
     // FullscreenInterface
+    virtual void resetMediaState() override;
     virtual void setDuration(double) override;
     virtual void setCurrentTime(double currentTime, double anchorTime) override;
     virtual void setRate(bool isPlaying, float playbackRate) override;
@@ -92,6 +94,7 @@ protected:
     
     bool m_isAnimating;
     bool m_targetIsFullscreen;
+    WebCore::HTMLMediaElement::VideoFullscreenMode m_fullscreenMode;
     bool m_isFullscreen;
 };
     

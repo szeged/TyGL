@@ -29,7 +29,7 @@
 #if PLATFORM(IOS)
 
 #import "WKWebViewInternal.h"
-#import <CoreGraphics/CGFloat.h>
+#import <WebCore/CoreGraphicsSPI.h>
 
 @interface UIScrollView (UIScrollViewInternalHack)
 - (CGFloat)_rubberBandOffsetForOffset:(CGFloat)newOffset maxOffset:(CGFloat)maxOffset minOffset:(CGFloat)minOffset range:(CGFloat)range outside:(BOOL *)outside;
@@ -109,6 +109,17 @@
 @implementation WKScrollView {
     id <UIScrollViewDelegate> _externalDelegate;
     WKScrollViewDelegateForwarder *_delegateForwarder;
+}
+
+- (id)initWithFrame:(CGRect)frame
+{
+    if (self = [super initWithFrame:frame]) {
+        ASSERT([self verticalScrollDecelerationFactor] == [self horizontalScrollDecelerationFactor]);
+        // FIXME: use UIWebPreferredScrollDecelerationFactor() from UIKit: rdar://problem/18931007.
+        _preferredScrollDecelerationFactor = [self verticalScrollDecelerationFactor];
+    }
+    
+    return self;
 }
 
 - (void)setInternalDelegate:(WKWebView <UIScrollViewDelegate> *)internalDelegate

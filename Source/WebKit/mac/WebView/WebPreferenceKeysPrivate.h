@@ -86,7 +86,7 @@
 #define WebKitDeveloperExtrasEnabledPreferenceKey @"WebKitDeveloperExtrasEnabledPreferenceKey"
 #define WebKitJavaScriptExperimentsEnabledPreferenceKey @"WebKitJavaScriptExperimentsEnabledPreferenceKey"
 #define WebKitAuthorAndUserStylesEnabledPreferenceKey @"WebKitAuthorAndUserStylesEnabledPreferenceKey"
-#define WebKitApplicationChromeModeEnabledPreferenceKey @"WebKitApplicationChromeModeEnabledPreferenceKey"
+#define WebKitDOMTimersThrottlingEnabledPreferenceKey @"WebKitDOMTimersThrottlingEnabledPreferenceKey"
 #define WebKitWebArchiveDebugModeEnabledPreferenceKey @"WebKitWebArchiveDebugModeEnabledPreferenceKey"
 #define WebKitLocalFileContentSniffingEnabledPreferenceKey @"WebKitLocalFileContentSniffingEnabledPreferenceKey"
 #define WebKitLocalStorageDatabasePathPreferenceKey @"WebKitLocalStorageDatabasePathPreferenceKey"
@@ -103,6 +103,7 @@
 #define WebKitCSSRegionsEnabledPreferenceKey @"WebKitCSSRegionsEnabled"
 #define WebKitCSSCompositingEnabledPreferenceKey @"WebKitCSSCompositingEnabled"
 #define WebKitShowDebugBordersPreferenceKey @"WebKitShowDebugBorders"
+#define WebKitSimpleLineLayoutDebugBordersEnabledPreferenceKey @"WebKitSimpleLineLayoutDebugBordersEnabled"
 #define WebKitShowRepaintCounterPreferenceKey @"WebKitShowRepaintCounter"
 #define WebKitWebAudioEnabledPreferenceKey @"WebKitWebAudioEnabled"
 #define WebKitWebGLEnabledPreferenceKey @"WebKitWebGLEnabled"
@@ -119,6 +120,7 @@
 #define WebKitHixie76WebSocketProtocolEnabledKey @"WebKitHixie76WebSocketProtocolEnabled"
 #define WebKitMediaPlaybackRequiresUserGesturePreferenceKey @"WebKitMediaPlaybackRequiresUserGesture"
 #define WebKitMediaPlaybackAllowsInlinePreferenceKey @"WebKitMediaPlaybackAllowsInline"
+#define WebKitAllowsAlternateFullscreenPreferenceKey @"WebKitAllowsAlternateFullscreen"
 #define WebKitMockScrollbarsEnabledPreferenceKey @"WebKitMockScrollbarsEnabled"
 #define WebKitShouldDisplaySubtitlesPreferenceKey @"WebKitShouldDisplaySubtitles"
 #define WebKitShouldDisplayCaptionsPreferenceKey @"WebKitShouldDisplayCaptions"
@@ -134,7 +136,6 @@
 #define WebKitShouldRespectImageOrientationKey @"WebKitShouldRespectImageOrientation"
 #define WebKitRequestAnimationFrameEnabledPreferenceKey @"WebKitRequestAnimationFrameEnabled"
 #define WebKitDiagnosticLoggingEnabledKey @"WebKitDiagnosticLoggingEnabled"
-#define WebKitScreenFontSubstitutionEnabledKey @"WebKitScreenFontSubstitutionEnabled"
 #define WebKitStorageBlockingPolicyKey @"WebKitStorageBlockingPolicy"
 #define WebKitPlugInSnapshottingEnabledPreferenceKey @"WebKitPlugInSnapshottingEnabled"
 #define WebKitQTKitEnabledPreferenceKey @"WebKitQTKitEnabled"
@@ -147,6 +148,7 @@
 #define WebKitImageControlsEnabledPreferenceKey @"WebKitImageControlsEnabled"
 #define WebKitGamepadsEnabledPreferenceKey @"WebKitGamepadsEnabled"
 #define WebKitServiceControlsEnabledPreferenceKey @"WebKitServiceControlsEnabled"
+#define WebKitMediaKeysStorageDirectoryKey @"WebKitMediaKeysStorageDirectory"
 
 #if !TARGET_OS_IPHONE
 // These are private both because callers should be using the cover methods and because the
@@ -173,7 +175,6 @@
 #if TARGET_OS_IPHONE
 #define WebKitStandalonePreferenceKey @"WebKitStandalonePreferenceKey"
 #define WebKitTelephoneParsingEnabledPreferenceKey @"WebKitTelephoneParsingEnabledPreferenceKey"
-#define WebKitAlwaysUseBaselineOfPrimaryFontPreferenceKey @"WebKitAlwaysUseBaselineOfPrimaryFontPreferenceKey"
 #define WebKitAllowMultiElementImplicitFormSubmissionPreferenceKey @"WebKitAllowMultiElementImplicitFormSubmissionPreferenceKey"
 #define WebKitAlwaysRequestGeolocationPermissionPreferenceKey @"WebKitAlwaysRequestGeolocationPermission"
 #define WebKitLayoutIntervalPreferenceKey @"WebKitLayoutIntervalPreferenceKey"

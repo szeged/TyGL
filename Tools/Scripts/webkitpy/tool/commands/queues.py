@@ -46,7 +46,6 @@ from webkitpy.common.net.statusserver import StatusServer
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.tool.bot.botinfo import BotInfo
 from webkitpy.tool.bot.commitqueuetask import CommitQueueTask, CommitQueueTaskDelegate
-from webkitpy.tool.bot.expectedfailures import ExpectedFailures
 from webkitpy.tool.bot.feeders import CommitQueueFeeder, EWSFeeder
 from webkitpy.tool.bot.flakytestreporter import FlakyTestReporter
 from webkitpy.tool.bot.layouttestresultsreader import LayoutTestResultsReader
@@ -75,6 +74,8 @@ class AbstractQueue(Command, QueueEngineDelegate):
         self.help_text = "Run the %s" % self.name
         Command.__init__(self, options=options_list)
         self._iteration_count = 0
+        if not hasattr(self, 'architecture'):
+            self.architecture = None
 
     def _cc_watchers(self, bug_id):
         try:
@@ -276,7 +277,10 @@ class PatchProcessingQueue(AbstractPatchQueue):
         self._deprecated_port = DeprecatedPort.port(self.port_name)
         # FIXME: This violates abstraction
         self._tool._deprecated_port = self._deprecated_port
+
         self._port = self._tool.port_factory.get(self._new_port_name_from_old(self.port_name, self._tool.platform))
+        if self.architecture:
+            self._port.set_architecture(self.architecture)
 
     def _upload_results_archive_for_patch(self, patch, results_archive_zip):
         if not self._port:
@@ -299,15 +303,18 @@ class PatchProcessingQueue(AbstractPatchQueue):
 
 
 class CommitQueue(PatchProcessingQueue, StepSequenceErrorHandler, CommitQueueTaskDelegate):
+    def __init__(self, commit_queue_task_class=CommitQueueTask):
+        self._commit_queue_task_class = commit_queue_task_class
+        PatchProcessingQueue.__init__(self)
+
     name = "commit-queue"
-    port_name = "mac-mountainlion"
+    port_name = "mac"
 
     # AbstractPatchQueue methods
 
     def begin_work_queue(self):
         PatchProcessingQueue.begin_work_queue(self)
         self.committer_validator = CommitterValidator(self._tool)
-        self._expected_failures = ExpectedFailures()
         self._layout_test_results_reader = LayoutTestResultsReader(self._tool, self._port.results_directory(), self._log_directory())
 
     def next_work_item(self):
@@ -315,7 +322,7 @@ class CommitQueue(PatchProcessingQueue, StepSequenceErrorHandler, CommitQueueTas
 
     def process_work_item(self, patch):
         self._cc_watchers(patch.bug_id())
-        task = CommitQueueTask(self, patch)
+        task = self._commit_queue_task_class(self, patch)
         try:
             if task.run():
                 self._did_pass(patch)
@@ -336,12 +343,13 @@ class CommitQueue(PatchProcessingQueue, StepSequenceErrorHandler, CommitQueueTas
 
     def _failing_tests_message(self, task, patch):
         results = task.results_from_patch_test_run(patch)
-        unexpected_failures = self._expected_failures.unexpected_failures_observed(results)
-        if not unexpected_failures:
+
+        if not results:
             return None
-        if results and results.did_exceed_test_failure_limit():
+
+        if results.did_exceed_test_failure_limit():
             return "Number of test failures exceeded the failure limit."
-        return "New failing tests:\n%s" % "\n".join(unexpected_failures)
+        return "New failing tests:\n%s" % "\n".join(results.failing_tests())
 
     def _error_message_for_bug(self, task, patch, script_error):
         message = self._failing_tests_message(task, patch)

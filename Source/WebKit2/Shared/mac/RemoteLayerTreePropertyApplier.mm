@@ -29,22 +29,15 @@
 #import "PlatformCAAnimationRemote.h"
 #import "PlatformCALayerRemote.h"
 #import "RemoteLayerTreeHost.h"
-#import <QuartzCore/CALayer.h>
+#import <QuartzCore/QuartzCore.h>
 #import <WebCore/BlockExceptions.h>
 #import <WebCore/PlatformCAFilters.h>
+#import <WebCore/QuartzCoreSPI.h>
 #import <WebCore/ScrollbarThemeMac.h>
 
 #if PLATFORM(IOS)
 #import <UIKit/UIView.h>
 #endif
-
-#if __has_include(<QuartzCore/CALayerPrivate.h>)
-#import <QuartzCore/CALayerPrivate.h>
-#endif
-
-@interface CALayer (Details)
-@property BOOL contentsOpaque;
-@end
 
 #if PLATFORM(IOS)
 @interface UIView (WKUIViewUtilities)
@@ -89,6 +82,9 @@ namespace WebKit {
 
 static RetainPtr<CGColorRef> cgColorFromColor(Color color)
 {
+    if (!color.isValid())
+        return nil;
+
     CGFloat components[4];
     color.getRGBA(components[0], components[1], components[2], components[3]);
 
@@ -188,6 +184,17 @@ static void applyPropertiesToLayer(CALayer *layer, RemoteLayerTreeHost* layerTre
     if (properties.changedProperties & RemoteLayerTreeTransaction::ContentsScaleChanged) {
         layer.contentsScale = properties.contentsScale;
         layer.rasterizationScale = properties.contentsScale;
+    }
+
+    if (properties.changedProperties & RemoteLayerTreeTransaction::CornerRadiusChanged)
+        layer.cornerRadius = properties.cornerRadius;
+
+    if (properties.changedProperties & RemoteLayerTreeTransaction::ShapeRoundedRectChanged) {
+        Path path;
+        if (properties.shapeRoundedRect)
+            path.addRoundedRect(*properties.shapeRoundedRect);
+        ASSERT([layer isKindOfClass:[CAShapeLayer class]]);
+        [(CAShapeLayer *)layer setPath:path.platformPath()];
     }
 
     if (properties.changedProperties & RemoteLayerTreeTransaction::MinificationFilterChanged)

@@ -32,7 +32,7 @@
 #import <WebCore/IOSurface.h>
 
 #if PLATFORM(IOS)
-#import <QuartzCore/QuartzCorePrivate.h>
+#import <WebCore/QuartzCoreSPI.h>
 #endif
 
 using namespace WebCore;
@@ -56,7 +56,7 @@ ViewSnapshotStore::~ViewSnapshotStore()
     discardSnapshotImages();
 }
 
-ViewSnapshotStore& ViewSnapshotStore::shared()
+ViewSnapshotStore& ViewSnapshotStore::singleton()
 {
     static ViewSnapshotStore& store = *new ViewSnapshotStore;
     return store;
@@ -106,19 +106,14 @@ void ViewSnapshotStore::pruneSnapshots(WebPageProxy& webPageProxy)
     m_snapshotsWithImages.first()->clearImage();
 }
 
-void ViewSnapshotStore::recordSnapshot(WebPageProxy& webPageProxy)
+void ViewSnapshotStore::recordSnapshot(WebPageProxy& webPageProxy, WebBackForwardListItem& item)
 {
     if (webPageProxy.isShowingNavigationGestureSnapshot())
         return;
 
-    WebBackForwardListItem* item = webPageProxy.backForwardList().currentItem();
-
-    if (!item)
-        return;
-
     pruneSnapshots(webPageProxy);
 
-    webPageProxy.willRecordNavigationSnapshot(*item);
+    webPageProxy.willRecordNavigationSnapshot(item);
 
     RefPtr<ViewSnapshot> snapshot = webPageProxy.takeViewSnapshot();
     if (!snapshot || !snapshot->hasImage())
@@ -128,7 +123,7 @@ void ViewSnapshotStore::recordSnapshot(WebPageProxy& webPageProxy)
     snapshot->setDeviceScaleFactor(webPageProxy.deviceScaleFactor());
     snapshot->setBackgroundColor(webPageProxy.pageExtendedBackgroundColor());
 
-    item->setSnapshot(snapshot.release());
+    item.setSnapshot(snapshot.release());
 }
 
 void ViewSnapshotStore::discardSnapshotImages()
@@ -161,7 +156,7 @@ ViewSnapshot::ViewSnapshot(uint32_t slotID, IntSize size, size_t imageSizeInByte
     , m_size(size)
 {
     if (hasImage())
-        ViewSnapshotStore::shared().didAddImageToSnapshot(*this);
+        ViewSnapshotStore::singleton().didAddImageToSnapshot(*this);
 }
 
 ViewSnapshot::~ViewSnapshot()
@@ -183,7 +178,7 @@ void ViewSnapshot::clearImage()
     if (!hasImage())
         return;
 
-    ViewSnapshotStore::shared().willRemoveImageFromSnapshot(*this);
+    ViewSnapshotStore::singleton().willRemoveImageFromSnapshot(*this);
 
 #if USE_IOSURFACE_VIEW_SNAPSHOTS
     m_surface = nullptr;

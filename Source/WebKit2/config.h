@@ -36,18 +36,6 @@
 #include <wtf/ExportMacros.h>
 
 #ifdef __cplusplus
-#ifndef EXTERN_C_BEGIN
-#define EXTERN_C_BEGIN extern "C" {
-#endif
-#ifndef EXTERN_C_END
-#define EXTERN_C_END }
-#endif
-#else
-#define EXTERN_C_BEGIN
-#define EXTERN_C_END
-#endif
-
-#ifdef __cplusplus
 
 // These undefs match up with defines in WebKit2Prefix.h for Mac OS X.
 // Helps us catch if anyone uses new or delete by accident in code and doesn't include "config.h".
@@ -70,7 +58,7 @@
 #define PLUGIN_ARCHITECTURE(ARCH) (defined PLUGIN_ARCHITECTURE_##ARCH && PLUGIN_ARCHITECTURE_##ARCH)
 
 #ifndef ENABLE_INSPECTOR_SERVER
-#if ENABLE(INSPECTOR) && ENABLE(WEB_SOCKETS) && (PLATFORM(GTK) || PLATFORM(EFL))
+#if ENABLE(WEB_SOCKETS) && (PLATFORM(GTK) || PLATFORM(EFL))
 #define ENABLE_INSPECTOR_SERVER 1
 #endif
 #endif
@@ -81,8 +69,8 @@
 #endif
 #endif
 
+#if PLATFORM(MAC)
 #ifndef HAVE_WINDOW_SERVER_OCCLUSION_NOTIFICATIONS
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
 #define HAVE_WINDOW_SERVER_OCCLUSION_NOTIFICATIONS 1
 #endif
 #endif
@@ -90,5 +78,13 @@
 #ifndef HAVE_SEC_ACCESS_CONTROL
 #if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000)
 #define HAVE_SEC_ACCESS_CONTROL 1
+#endif
+#endif
+
+#ifndef ENABLE_NETWORK_CACHE
+#if ENABLE(NETWORK_PROCESS) && PLATFORM(MAC)
+#define ENABLE_NETWORK_CACHE 1
+#else
+#define ENABLE_NETWORK_CACHE 0
 #endif
 #endif

@@ -43,7 +43,7 @@ class Document;
 class CSSCrossfadeValue : public CSSImageGeneratorValue {
     friend class CrossfadeSubimageObserverProxy;
 public:
-    static PassRef<CSSCrossfadeValue> create(PassRefPtr<CSSValue> fromValue, PassRefPtr<CSSValue> toValue)
+    static Ref<CSSCrossfadeValue> create(PassRefPtr<CSSValue> fromValue, PassRefPtr<CSSValue> toValue)
     {
         return adoptRef(*new CSSCrossfadeValue(fromValue, toValue));
     }
@@ -59,7 +59,7 @@ public:
     bool isPending() const;
     bool knownToBeOpaque(const RenderElement*) const;
 
-    void loadSubimages(CachedResourceLoader*);
+    void loadSubimages(CachedResourceLoader&);
 
     void setPercentage(PassRefPtr<CSSPrimitiveValue> percentageValue) { m_percentageValue = percentageValue; }
 
@@ -80,7 +80,7 @@ private:
     {
     }
 
-    class CrossfadeSubimageObserverProxy : public CachedImageClient {
+    class CrossfadeSubimageObserverProxy final : public CachedImageClient {
     public:
         CrossfadeSubimageObserverProxy(CSSCrossfadeValue* ownerValue)
             : m_ownerValue(ownerValue)
@@ -89,7 +89,7 @@ private:
         }
 
         virtual ~CrossfadeSubimageObserverProxy() { }
-        virtual void imageChanged(CachedImage*, const IntRect* = 0) override;
+        virtual void imageChanged(CachedImage*, const IntRect* = nullptr) override;
         void setReady(bool ready) { m_ready = ready; }
     private:
         CSSCrossfadeValue* m_ownerValue;

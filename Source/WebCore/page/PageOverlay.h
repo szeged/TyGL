@@ -69,14 +69,17 @@ public:
         Document, // Scales and scrolls with the document.
     };
 
-    static PassRefPtr<PageOverlay> create(Client&, OverlayType = OverlayType::View);
+    WEBCORE_EXPORT static PassRefPtr<PageOverlay> create(Client&, OverlayType = OverlayType::View);
     virtual ~PageOverlay();
 
-    PageOverlayController* controller() const;
+    WEBCORE_EXPORT PageOverlayController* controller() const;
+
+    typedef uint64_t PageOverlayID;
+    virtual PageOverlayID pageOverlayID() const { return m_pageOverlayID; }
 
     void setPage(Page*);
-    void setNeedsDisplay(const IntRect& dirtyRect);
-    void setNeedsDisplay();
+    WEBCORE_EXPORT void setNeedsDisplay(const IntRect& dirtyRect);
+    WEBCORE_EXPORT void setNeedsDisplay();
 
     void drawRect(GraphicsContext&, const IntRect& dirtyRect);
     bool mouseEvent(const PlatformMouseEvent&);
@@ -88,9 +91,9 @@ public:
     
     void startFadeInAnimation();
     void startFadeOutAnimation();
-    void stopFadeOutAnimation();
+    WEBCORE_EXPORT void stopFadeOutAnimation();
 
-    void clear();
+    WEBCORE_EXPORT void clear();
 
     Client& client() const { return m_client; }
 
@@ -98,7 +101,7 @@ public:
 
     OverlayType overlayType() { return m_overlayType; }
 
-    IntRect bounds() const;
+    WEBCORE_EXPORT IntRect bounds() const;
     IntRect frame() const;
     void setFrame(IntRect);
 
@@ -106,18 +109,18 @@ public:
     void setBackgroundColor(RGBA32);
 
     // FIXME: PageOverlay should own its layer, instead of PageOverlayController.
-    GraphicsLayer& layer();
+    WEBCORE_EXPORT GraphicsLayer& layer();
 
 private:
     explicit PageOverlay(Client&, OverlayType);
 
     void startFadeAnimation();
-    void fadeAnimationTimerFired(Timer<PageOverlay>&);
+    void fadeAnimationTimerFired();
 
     Client& m_client;
     Page* m_page;
 
-    Timer<PageOverlay> m_fadeAnimationTimer;
+    Timer m_fadeAnimationTimer;
     double m_fadeAnimationStartTime;
     double m_fadeAnimationDuration;
 
@@ -134,6 +137,7 @@ private:
     IntRect m_overrideFrame;
 
     RGBA32 m_backgroundColor;
+    PageOverlayID m_pageOverlayID;
 };
 
 } // namespace WebKit

@@ -192,64 +192,40 @@ static float systemFontSizeForControlSize(NSControlSize controlSize)
     return sizes[controlSize];
 }
 
-void RenderThemeSafari::systemFont(CSSValueID valueID, FontDescription& fontDescription) const
+void RenderThemeSafari::updateCachedSystemFontDescription(CSSValueID valueID, FontDescription& fontDescription) const
 {
-    static FontDescription systemFont;
-    static FontDescription smallSystemFont;
-    static FontDescription menuFont;
-    static FontDescription labelFont;
-    static FontDescription miniControlFont;
-    static FontDescription smallControlFont;
-    static FontDescription controlFont;
-
-    FontDescription* cachedDesc;
-    float fontSize = 0;
+    float fontSize;
     switch (valueID) {
     case CSSValueSmallCaption:
-        cachedDesc = &smallSystemFont;
-        if (!smallSystemFont.isAbsoluteSize())
-            fontSize = systemFontSizeForControlSize(NSSmallControlSize);
+        fontSize = systemFontSizeForControlSize(NSSmallControlSize);
         break;
     case CSSValueMenu:
-        cachedDesc = &menuFont;
-        if (!menuFont.isAbsoluteSize())
-            fontSize = systemFontSizeForControlSize(NSRegularControlSize);
+        fontSize = systemFontSizeForControlSize(NSRegularControlSize);
         break;
     case CSSValueStatusBar:
-        cachedDesc = &labelFont;
-        if (!labelFont.isAbsoluteSize())
-            fontSize = 10.0f;
+        fontSize = 10.0f;
         break;
     case CSSValueWebkitMiniControl:
-        cachedDesc = &miniControlFont;
-        if (!miniControlFont.isAbsoluteSize())
-            fontSize = systemFontSizeForControlSize(NSMiniControlSize);
+        fontSize = systemFontSizeForControlSize(NSMiniControlSize);
         break;
     case CSSValueWebkitSmallControl:
-        cachedDesc = &smallControlFont;
-        if (!smallControlFont.isAbsoluteSize())
-            fontSize = systemFontSizeForControlSize(NSSmallControlSize);
+        fontSize = systemFontSizeForControlSize(NSSmallControlSize);
         break;
     case CSSValueWebkitControl:
-        cachedDesc = &controlFont;
-        if (!controlFont.isAbsoluteSize())
-            fontSize = systemFontSizeForControlSize(NSRegularControlSize);
+        fontSize = systemFontSizeForControlSize(NSRegularControlSize);
         break;
     default:
-        cachedDesc = &systemFont;
-        if (!systemFont.isAbsoluteSize())
-            fontSize = 13.0f;
+        fontSize = 13.0f;
     }
 
-    if (fontSize) {
-        cachedDesc->setIsAbsoluteSize(true);
-        cachedDesc->setGenericFamily(FontDescription::NoFamily);
-        cachedDesc->setOneFamily("Lucida Grande");
-        cachedDesc->setSpecifiedSize(fontSize);
-        cachedDesc->setWeight(FontWeightNormal);
-        cachedDesc->setItalic(false);
-    }
-    fontDescription = *cachedDesc;
+    if (!fontSize)
+        return;
+
+    fontDescription.setIsAbsoluteSize(true);
+    fontDescription.setOneFamily("Lucida Grande");
+    fontDescription.setSpecifiedSize(fontSize);
+    fontDescription.setWeight(FontWeightNormal);
+    fontDescription.setItalic(FontItalicOff);
 }
 
 bool RenderThemeSafari::isControlStyled(const RenderStyle& style, const BorderData& border,
@@ -317,17 +293,17 @@ IntRect RenderThemeSafari::inflateRect(const IntRect& r, const IntSize& size, co
     return result;
 }
 
-int RenderThemeSafari::baselinePosition(const RenderObject& o) const
+int RenderThemeSafari::baselinePosition(const RenderObject& renderer) const
 {
-    if (!o.isBox())
+    if (!is<RenderBox>(renderer))
         return 0;
 
-    if (o.style().appearance() == CheckboxPart || o.style().appearance() == RadioPart) {
-        const RenderBox& box = toRenderBox(o);
+    if (renderer.style().appearance() == CheckboxPart || renderer.style().appearance() == RadioPart) {
+        const auto& box = downcast<RenderBox>(renderer);
         return box.marginTop() + box.height() - 2; // The baseline is 2px up from the bottom of the checkbox/radio in AppKit.
     }
 
-    return RenderTheme::baselinePosition(o);
+    return RenderTheme::baselinePosition(renderer);
 }
 
 bool RenderThemeSafari::controlSupportsTints(const RenderObject& o) const
@@ -392,7 +368,6 @@ void RenderThemeSafari::setFontFromControlSize(StyleResolver& styleResolver, Ren
 {
     FontDescription fontDescription;
     fontDescription.setIsAbsoluteSize(true);
-    fontDescription.setGenericFamily(FontDescription::SerifFamily);
 
     float fontSize = systemFontSizeForControlSize(controlSize);
     fontDescription.setOneFamily("Lucida Grande");
@@ -403,7 +378,7 @@ void RenderThemeSafari::setFontFromControlSize(StyleResolver& styleResolver, Ren
     style.setLineHeight(RenderStyle::initialLineHeight());
 
     if (style.setFontDescription(fontDescription))
-        style.font().update(styleResolver.fontSelector());
+        style.fontCascade().update(&styleResolver.document().fontSelector());
 }
 
 NSControlSize RenderThemeSafari::controlSizeForSystemFont(RenderStyle& style) const
@@ -1216,10 +1191,10 @@ bool RenderThemeSafari::paintMeter(const RenderObject& renderObject, const Paint
 {
     // NOTE: This routine is for testing only. It should be fleshed out with a real CG-based implementation.
     // Right now it uses a slider, with the thumb positioned at the meter point.
-    if (!renderObject.isMeter())
+    if (!is<RenderMeter>(renderObject))
         return true;
 
-    HTMLMeterElement* element = toRenderMeter(renderObject).meterElement();
+    HTMLMeterElement* element = downcast<RenderMeter>(renderObject).meterElement();
 
     int remaining = static_cast<int>((1.0 - element->valueRatio()) * static_cast<double>(rect.size().width()));
 

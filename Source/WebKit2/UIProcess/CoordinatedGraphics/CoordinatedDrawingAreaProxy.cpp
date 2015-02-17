@@ -55,7 +55,7 @@ CoordinatedDrawingAreaProxy::CoordinatedDrawingAreaProxy(WebPageProxy& webPagePr
 {
     // Construct the proxy early to allow messages to be sent to the web process while AC is entered there.
     if (webPageProxy.pageGroup().preferences().forceCompositingMode())
-        m_coordinatedLayerTreeHostProxy = adoptPtr(new CoordinatedLayerTreeHostProxy(this));
+        m_coordinatedLayerTreeHostProxy = std::make_unique<CoordinatedLayerTreeHostProxy>(this);
 }
 
 CoordinatedDrawingAreaProxy::~CoordinatedDrawingAreaProxy()
@@ -253,8 +253,8 @@ void CoordinatedDrawingAreaProxy::incorporateUpdate(const UpdateInfo& updateInfo
     if (shouldScroll && !m_webPageProxy.canScrollView())
         m_webPageProxy.setViewNeedsDisplay(IntRect(IntPoint(), m_webPageProxy.viewSize()));
     else {
-        for (size_t i = 0; i < updateInfo.updateRects.size(); ++i)
-            m_webPageProxy.setViewNeedsDisplay(updateInfo.updateRects[i]);
+        for (auto& updateRect : updateInfo.updateRects)
+            m_webPageProxy.setViewNeedsDisplay(updateRect);
     }
 
     if (shouldScroll)
@@ -324,7 +324,7 @@ void CoordinatedDrawingAreaProxy::enterAcceleratedCompositingMode(const LayerTre
     m_layerTreeContext = layerTreeContext;
     m_webPageProxy.enterAcceleratedCompositingMode(layerTreeContext);
     if (!m_coordinatedLayerTreeHostProxy)
-        m_coordinatedLayerTreeHostProxy = adoptPtr(new CoordinatedLayerTreeHostProxy(this));
+        m_coordinatedLayerTreeHostProxy = std::make_unique<CoordinatedLayerTreeHostProxy>(this);
 }
 
 void CoordinatedDrawingAreaProxy::setVisibleContentsRect(const WebCore::FloatRect& visibleContentsRect, const WebCore::FloatPoint& trajectoryVector)

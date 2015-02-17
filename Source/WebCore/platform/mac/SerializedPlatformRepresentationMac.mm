@@ -71,7 +71,7 @@ SerializedPlatformRepresentationMac::~SerializedPlatformRepresentationMac()
 {
 }
 
-PassRef<SerializedPlatformRepresentation> SerializedPlatformRepresentationMac::create(id nativeValue)
+Ref<SerializedPlatformRepresentation> SerializedPlatformRepresentationMac::create(id nativeValue)
 {
     return adoptRef(*new SerializedPlatformRepresentationMac(nativeValue));
 }
@@ -196,6 +196,7 @@ static JSValue *jsValueWithDictionaryInContext(NSDictionary *dictionary, JSConte
 
         JSStringRef name = JSStringCreateWithCFString((CFStringRef)key);
         JSObjectSetProperty([context JSGlobalContextRef], resultObject, name, [value JSValueRef], 0, &exception);
+        JSStringRelease(name);
         if (exception)
             continue;
     }

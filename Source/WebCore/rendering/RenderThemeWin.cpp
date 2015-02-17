@@ -323,29 +323,14 @@ Color RenderThemeWin::platformInactiveSelectionForegroundColor() const
 static void fillFontDescription(FontDescription& fontDescription, LOGFONT& logFont, float fontSize)
 {    
     fontDescription.setIsAbsoluteSize(true);
-    fontDescription.setGenericFamily(FontDescription::NoFamily);
     fontDescription.setOneFamily(String(logFont.lfFaceName));
     fontDescription.setSpecifiedSize(fontSize);
     fontDescription.setWeight(logFont.lfWeight >= 700 ? FontWeightBold : FontWeightNormal); // FIXME: Use real weight.
-    fontDescription.setItalic(logFont.lfItalic);
+    fontDescription.setIsItalic(logFont.lfItalic);
 }
 
-static void fillFontDescription(FontDescription& fontDescription, LOGFONT& logFont)
-{   
-    fillFontDescription(fontDescription, logFont, abs(logFont.lfHeight));
-}
-
-void RenderThemeWin::systemFont(CSSValueID valueID, FontDescription& fontDescription) const
+void RenderThemeWin::updateCachedSystemFontDescription(CSSValueID valueID, FontDescription& fontDescription) const
 {
-    static FontDescription captionFont;
-    static FontDescription controlFont;
-    static FontDescription smallCaptionFont;
-    static FontDescription menuFont;
-    static FontDescription iconFont;
-    static FontDescription messageBoxFont;
-    static FontDescription statusBarFont;
-    static FontDescription systemFont;
-    
     static bool initialized;
     static NONCLIENTMETRICS ncm;
 
@@ -355,66 +340,41 @@ void RenderThemeWin::systemFont(CSSValueID valueID, FontDescription& fontDescrip
         ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
     }
  
+    LOGFONT logFont;
+    bool shouldUseDefaultControlFontPixelSize = false;
     switch (valueID) {
-    case CSSValueIcon: {
-        if (!iconFont.isAbsoluteSize()) {
-            LOGFONT logFont;
-            ::SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof(logFont), &logFont, 0);
-            fillFontDescription(iconFont, logFont);
-        }
-        fontDescription = iconFont;
+    case CSSValueIcon:
+        ::SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof(logFont), &logFont, 0);
         break;
-    }
     case CSSValueMenu:
-        if (!menuFont.isAbsoluteSize())
-            fillFontDescription(menuFont, ncm.lfMenuFont);
-        fontDescription = menuFont;
+        logFont = ncm.lfMenuFont;
         break;
     case CSSValueMessageBox:
-        if (!messageBoxFont.isAbsoluteSize())
-            fillFontDescription(messageBoxFont, ncm.lfMessageFont);
-        fontDescription = messageBoxFont;
+        logFont = ncm.lfMessageFont;
         break;
     case CSSValueStatusBar:
-        if (!statusBarFont.isAbsoluteSize())
-            fillFontDescription(statusBarFont, ncm.lfStatusFont);
-        fontDescription = statusBarFont;
+        logFont = ncm.lfStatusFont;
         break;
     case CSSValueCaption:
-        if (!captionFont.isAbsoluteSize())
-            fillFontDescription(captionFont, ncm.lfCaptionFont);
-        fontDescription = captionFont;
+        logFont = ncm.lfCaptionFont;
         break;
     case CSSValueSmallCaption:
-        if (!smallCaptionFont.isAbsoluteSize())
-            fillFontDescription(smallCaptionFont, ncm.lfSmCaptionFont);
-        fontDescription = smallCaptionFont;
+        logFont = ncm.lfSmCaptionFont;
         break;
     case CSSValueWebkitSmallControl:
     case CSSValueWebkitMiniControl: // Just map to small.
     case CSSValueWebkitControl: // Just map to small.
-        if (!controlFont.isAbsoluteSize()) {
-            HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
-            if (hGDI) {
-                LOGFONT logFont;
-                if (::GetObject(hGDI, sizeof(logFont), &logFont) > 0)
-                    fillFontDescription(controlFont, logFont, defaultControlFontPixelSize);
-            }
-        }
-        fontDescription = controlFont;
-        break;
+        shouldUseDefaultControlFontPixelSize = true;
+        FALLTHROUGH;
     default: { // Everything else uses the stock GUI font.
-        if (!systemFont.isAbsoluteSize()) {
-            HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
-            if (hGDI) {
-                LOGFONT logFont;
-                if (::GetObject(hGDI, sizeof(logFont), &logFont) > 0)
-                    fillFontDescription(systemFont, logFont);
-            }
-        }
-        fontDescription = systemFont;
+        HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
+        if (!hGDI)
+            return;
+        if (::GetObject(hGDI, sizeof(logFont), &logFont) <= 0)
+            return;
     }
     }
+    fillFontDescription(fontDescription, logFont, shouldUseDefaultControlFontPixelSize ? defaultControlFontPixelSize : abs(logFont.lfHeight));
 }
 
 bool RenderThemeWin::supportsFocus(ControlPart appearance) const
@@ -618,9 +578,7 @@ ThemeData RenderThemeWin::getThemeData(const RenderObject& o, ControlSubPart sub
         case MenulistButtonPart: {
             const bool isVistaOrLater = (windowsVersion() >= WindowsVista);
             result.m_part = isVistaOrLater ? CP_DROPDOWNBUTTONRIGHT : CP_DROPDOWNBUTTON;
-            if (isVistaOrLater && o.frame().settings().applicationChromeMode()) {
-                // The "readonly" look we use in application chrome mode
-                // only uses a "normal" look for the drop down button.
+            if (isVistaOrLater) {
                 result.m_state = TS_NORMAL;
             } else
                 result.m_state = determineState(o);
@@ -783,10 +741,7 @@ bool RenderThemeWin::paintMenuList(const RenderObject& renderer, const PaintInfo
     int part;
     if (haveTheme && (windowsVersion() >= WindowsVista)) {
         theme = menuListTheme();
-        if (renderer.frame().settings().applicationChromeMode())
-            part = CP_READONLY;
-        else
-            part = CP_BORDER;
+        part = CP_READONLY;
     } else {
         theme = textFieldTheme();
         part = TFP_TEXTFIELD;
@@ -923,12 +878,10 @@ bool RenderThemeWin::paintSearchFieldCancelButton(const RenderObject& o, const P
 {
     IntRect bounds = r;
     ASSERT(o.parent());
-    if (!o.parent() || !o.parent()->isBox())
+    if (!is<RenderBox>(o.parent()))
         return false;
-    
-    RenderBox* parentRenderBox = toRenderBox(o.parent());
 
-    IntRect parentBox = parentRenderBox->absoluteContentBox();
+    IntRect parentBox = downcast<RenderBox>(*o.parent()).absoluteContentBox();
     
     // Make sure the scaled button stays square and will fit in its parent's box
     bounds.setHeight(min(parentBox.width(), min(parentBox.height(), bounds.height())));
@@ -974,11 +927,10 @@ bool RenderThemeWin::paintSearchFieldResultsDecorationPart(const RenderObject& o
 {
     IntRect bounds = r;
     ASSERT(o.parent());
-    if (!o.parent() || !o.parent()->isBox())
+    if (!is<RenderBox>(o.parent()))
         return false;
     
-    RenderBox* parentRenderBox = toRenderBox(o.parent());
-    IntRect parentBox = parentRenderBox->absoluteContentBox();
+    IntRect parentBox = downcast<RenderBox>(*o.parent()).absoluteContentBox();
     
     // Make sure the scaled decoration stays square and will fit in its parent's box
     bounds.setHeight(min(parentBox.width(), min(parentBox.height(), bounds.height())));
@@ -1010,11 +962,10 @@ bool RenderThemeWin::paintSearchFieldResultsButton(const RenderObject& o, const 
     ASSERT(o.parent());
     if (!o.parent())
         return false;
-    if (!o.parent() || !o.parent()->isBox())
+    if (!is<RenderBox>(o.parent()))
         return false;
     
-    RenderBox* parentRenderBox = toRenderBox(o.parent());
-    IntRect parentBox = parentRenderBox->absoluteContentBox();
+    IntRect parentBox = downcast<RenderBox>(*o.parent()).absoluteContentBox();
     
     // Make sure the scaled decoration will fit in its parent's box
     bounds.setHeight(min(parentBox.height(), bounds.height()));
@@ -1179,10 +1130,10 @@ IntSize RenderThemeWin::meterSizeForBounds(const RenderMeter&, const IntRect& bo
 
 bool RenderThemeWin::paintMeter(const RenderObject& renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    if (!renderObject.isMeter())
+    if (!is<RenderMeter>(renderObject))
         return true;
 
-    HTMLMeterElement* element = toRenderMeter(renderObject).meterElement();
+    HTMLMeterElement* element = downcast<RenderMeter>(renderObject).meterElement();
 
     ThemeData theme = getThemeData(renderObject);
 

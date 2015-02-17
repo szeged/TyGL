@@ -49,6 +49,7 @@
 #import "WebPlugin.h"
 #import "WebQuotaManager.h"
 #import "WebSecurityOriginInternal.h"
+#import "WebSelectionServiceController.h"
 #import "WebUIDelegatePrivate.h"
 #import "WebView.h"
 #import "WebViewInternal.h"
@@ -296,7 +297,7 @@ Page* WebChromeClient::createWindow(Frame* frame, const FrameLoadRequest&, const
 
 #if USE(PLUGIN_HOST_PROCESS) && ENABLE(NETSCAPE_PLUGIN_API)
     if (newWebView)
-        WebKit::NetscapePluginHostManager::shared().didCreateWindow();
+        WebKit::NetscapePluginHostManager::singleton().didCreateWindow();
 #endif
     
     return core(newWebView);
@@ -675,8 +676,6 @@ void WebChromeClient::print(Frame* frame)
         CallUIDelegate(m_webView, @selector(webView:printFrameView:), [webFrame frameView]);
 }
 
-#if ENABLE(SQL_DATABASE)
-
 void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseName, DatabaseDetails)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
@@ -687,8 +686,6 @@ void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& database
 
     END_BLOCK_OBJC_EXCEPTIONS;
 }
-
-#endif
 
 void WebChromeClient::reachedMaxAppCacheSize(int64_t spaceNeeded)
 {
@@ -703,22 +700,6 @@ void WebChromeClient::reachedApplicationCacheOriginQuota(SecurityOrigin* origin,
     CallUIDelegate(m_webView, @selector(webView:exceededApplicationCacheOriginQuotaForSecurityOrigin:totalSpaceNeeded:), webOrigin, static_cast<NSUInteger>(totalSpaceNeeded));
     [webOrigin release];
 
-    END_BLOCK_OBJC_EXCEPTIONS;
-}
-
-void WebChromeClient::populateVisitedLinks()
-{
-    if ([m_webView historyDelegate]) {
-        WebHistoryDelegateImplementationCache* implementations = WebViewGetHistoryDelegateImplementations(m_webView);
-        
-        if (implementations->populateVisitedLinksFunc)
-            CallHistoryDelegate(implementations->populateVisitedLinksFunc, m_webView, @selector(populateVisitedLinksForWebView:));
-
-        return;
-    }
-
-    BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    [[WebHistory optionalSharedHistory] _addVisitedLinksToPageGroup:[m_webView page]->group()];
     END_BLOCK_OBJC_EXCEPTIONS;
 }
 
@@ -952,10 +933,11 @@ bool WebChromeClient::supportsVideoFullscreen()
     return true;
 }
 
-void WebChromeClient::enterVideoFullscreenForVideoElement(HTMLVideoElement* videoElement)
+void WebChromeClient::enterVideoFullscreenForVideoElement(HTMLVideoElement* videoElement, HTMLMediaElement::VideoFullscreenMode mode)
 {
+    ASSERT(mode != HTMLMediaElement::VideoFullscreenModeNone);
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    [m_webView _enterVideoFullscreenForVideoElement:videoElement];
+    [m_webView _enterVideoFullscreenForVideoElement:videoElement mode:mode];
     END_BLOCK_OBJC_EXCEPTIONS;
 }
 
@@ -1038,4 +1020,17 @@ bool WebChromeClient::unwrapCryptoKey(const Vector<uint8_t>& wrappedKey, Vector<
 
     return unwrapSerializedCryptoKey(masterKey, wrappedKey, key);
 }
+#endif
+
+#if ENABLE(SERVICE_CONTROLS)
+void WebChromeClient::handleSelectionServiceClick(WebCore::FrameSelection& selection, const Vector<String>& telephoneNumbers, const WebCore::IntPoint& point)
+{
+    [m_webView _selectionServiceController].handleSelectionServiceClick(selection, telephoneNumbers, point);
+}
+
+bool WebChromeClient::hasRelevantSelectionServices(bool isTextOnly) const
+{
+    return [m_webView _selectionServiceController].hasRelevantSelectionServices(isTextOnly);
+}
+
 #endif

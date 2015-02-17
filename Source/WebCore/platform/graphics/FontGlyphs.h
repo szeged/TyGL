@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2010, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2010, 2013-2015 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,8 +21,10 @@
 #ifndef FontGlyphs_h
 #define FontGlyphs_h
 
+#include "Font.h"
+#include "FontRanges.h"
 #include "FontSelector.h"
-#include "SimpleFontData.h"
+#include "GlyphPage.h"
 #include "WidthCache.h"
 #include <wtf/Forward.h>
 #include <wtf/MainThread.h>
@@ -33,99 +35,86 @@
 
 namespace WebCore {
 
-class GlyphPageTreeNode;
 class GraphicsContext;
 class IntRect;
 class FontDescription;
 class FontPlatformData;
 class FontSelector;
 
-const int cAllFamiliesScanned = -1;
-
 class FontGlyphs : public RefCounted<FontGlyphs> {
     WTF_MAKE_NONCOPYABLE(FontGlyphs);
 public:
-    typedef HashMap<int, GlyphPageTreeNode*, DefaultHash<int>::Hash> GlyphPages;
+    static Ref<FontGlyphs> create(PassRefPtr<FontSelector> fontSelector) { return adoptRef(*new FontGlyphs(fontSelector)); }
+    static Ref<FontGlyphs> createForPlatformFont(const FontPlatformData& platformData) { return adoptRef(*new FontGlyphs(platformData)); }
 
-    class GlyphPagesStateSaver {
-    public:
-        GlyphPagesStateSaver(FontGlyphs& glyphs)
-            : m_glyphs(glyphs)
-            , m_pages(glyphs.m_pages)
-            , m_pageZero(glyphs.m_pageZero)
-        {
-        }
-
-        ~GlyphPagesStateSaver()
-        {
-            m_glyphs.m_pages = m_pages;
-            m_glyphs.m_pageZero = m_pageZero;
-        }
-
-    private:
-        FontGlyphs& m_glyphs;
-        GlyphPages& m_pages;
-        GlyphPageTreeNode* m_pageZero;
-    };
-
-    static PassRef<FontGlyphs> create(PassRefPtr<FontSelector> fontSelector) { return adoptRef(*new FontGlyphs(fontSelector)); }
-    static PassRef<FontGlyphs> createForPlatformFont(const FontPlatformData& platformData) { return adoptRef(*new FontGlyphs(platformData)); }
-
-    ~FontGlyphs() { releaseFontData(); }
+    ~FontGlyphs();
 
     bool isForPlatformFont() const { return m_isForPlatformFont; }
 
-    std::pair<GlyphData, GlyphPage*> glyphDataAndPageForCharacter(const FontDescription&, UChar32, bool mirror, FontDataVariant) const;
-    
-    bool isFixedPitch(const FontDescription&) const;
-    void determinePitch(const FontDescription&) const;
+    GlyphData glyphDataForCharacter(UChar32, const FontDescription&, FontVariant);
 
-    bool loadingCustomFonts() const { return m_loadingCustomFonts; }
+    bool isFixedPitch(const FontDescription&);
+    void determinePitch(const FontDescription&);
 
-    FontSelector* fontSelector() const { return m_fontSelector.get(); }
+    bool isLoadingCustomFonts() const;
+
+    FontSelector* fontSelector() { return m_fontSelector.get(); }
     // FIXME: It should be possible to combine fontSelectorVersion and generation.
     unsigned fontSelectorVersion() const { return m_fontSelectorVersion; }
     unsigned generation() const { return m_generation; }
 
-    WidthCache& widthCache() const { return m_widthCache; }
+    WidthCache& widthCache() { return m_widthCache; }
+    const WidthCache& widthCache() const { return m_widthCache; }
 
-    const SimpleFontData* primarySimpleFontData(const FontDescription&) const;
-    const FontData* primaryFontData(const FontDescription& description) const { return realizeFontDataAt(description, 0); }
-    WEBCORE_EXPORT const FontData* realizeFontDataAt(const FontDescription&, unsigned index) const;
+    const Font& primaryFont(const FontDescription&);
+    WEBCORE_EXPORT const FontRanges& realizeFallbackRangesAt(const FontDescription&, unsigned fallbackIndex);
+
+    void pruneSystemFallbacks();
 
 private:
     FontGlyphs(PassRefPtr<FontSelector>);
     FontGlyphs(const FontPlatformData&);
 
-    WEBCORE_EXPORT void releaseFontData();
-    
-    mutable Vector<RefPtr<FontData>, 1> m_realizedFontData;
-    mutable GlyphPages m_pages;
-    mutable GlyphPageTreeNode* m_pageZero;
-    mutable const SimpleFontData* m_cachedPrimarySimpleFontData;
+    GlyphData glyphDataForSystemFallback(UChar32, const FontDescription&, FontVariant);
+    GlyphData glyphDataForNormalVariant(UChar32, const FontDescription&);
+    GlyphData glyphDataForVariant(UChar32, const FontDescription&, FontVariant, unsigned fallbackIndex);
+
+    Vector<FontRanges, 1> m_realizedFallbackRanges;
+    unsigned m_lastRealizedFallbackIndex { 0 };
+
+    RefPtr<GlyphPage> m_cachedPageZero;
+    HashMap<int, RefPtr<GlyphPage>> m_cachedPages;
+
+    HashSet<RefPtr<Font>> m_systemFallbackFontSet;
+
+    const Font* m_cachedPrimaryFont;
     RefPtr<FontSelector> m_fontSelector;
-    mutable WidthCache m_widthCache;
+
+    WidthCache m_widthCache;
+
     unsigned m_fontSelectorVersion;
-    mutable int m_familyIndex;
     unsigned short m_generation;
-    mutable unsigned m_pitch : 3; // Pitch
-    mutable bool m_loadingCustomFonts : 1;
-    bool m_isForPlatformFont : 1;
+    Pitch m_pitch { UnknownPitch };
+    bool m_isForPlatformFont { false };
 };
 
-inline bool FontGlyphs::isFixedPitch(const FontDescription& description) const
+inline bool FontGlyphs::isFixedPitch(const FontDescription& description)
 {
     if (m_pitch == UnknownPitch)
         determinePitch(description);
     return m_pitch == FixedPitch;
 };
 
-inline const SimpleFontData* FontGlyphs::primarySimpleFontData(const FontDescription& description) const
+inline const Font& FontGlyphs::primaryFont(const FontDescription& description)
 {
     ASSERT(isMainThread());
-    if (!m_cachedPrimarySimpleFontData)
-        m_cachedPrimarySimpleFontData = primaryFontData(description)->fontDataForCharacter(' ');
-    return m_cachedPrimarySimpleFontData;
+    if (!m_cachedPrimaryFont) {
+        auto& primaryRanges = realizeFallbackRangesAt(description, 0);
+        m_cachedPrimaryFont = primaryRanges.fontForCharacter(' ');
+        if (!m_cachedPrimaryFont)
+            m_cachedPrimaryFont = &primaryRanges.fontForFirstRange();
+    }
+    return *m_cachedPrimaryFont;
 }
 
 }

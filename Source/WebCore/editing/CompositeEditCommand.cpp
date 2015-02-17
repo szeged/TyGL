@@ -57,6 +57,7 @@
 #include "RemoveNodePreservingChildrenCommand.h"
 #include "RenderBlockFlow.h"
 #include "RenderText.h"
+#include "RenderedDocumentMarker.h"
 #include "ReplaceNodeWithSpanCommand.h"
 #include "ReplaceSelectionCommand.h"
 #include "ScopedEventQueue.h"
@@ -71,19 +72,14 @@
 #include "htmlediting.h"
 #include "markup.h"
 
-#if ENABLE(DELETION_UI)
-#include "DeleteButtonController.h"
-#endif
-
-
 namespace WebCore {
 
 using namespace HTMLNames;
 
-PassRefPtr<EditCommandComposition> EditCommandComposition::create(Document& document,
+Ref<EditCommandComposition> EditCommandComposition::create(Document& document,
     const VisibleSelection& startingSelection, const VisibleSelection& endingSelection, EditAction editAction)
 {
-    return adoptRef(new EditCommandComposition(document, startingSelection, endingSelection, editAction));
+    return adoptRef(*new EditCommandComposition(document, startingSelection, endingSelection, editAction));
 }
 
 EditCommandComposition::EditCommandComposition(Document& document, const VisibleSelection& startingSelection, const VisibleSelection& endingSelection, EditAction editAction)
@@ -115,15 +111,9 @@ void EditCommandComposition::unapply()
     frame->editor().cancelComposition();
 #endif
 
-    {
-#if ENABLE(DELETION_UI)
-        DeleteButtonControllerDisableScope deleteButtonControllerDisableScope(frame.get());
-#endif
-
-        size_t size = m_commands.size();
-        for (size_t i = size; i; --i)
-            m_commands[i - 1]->doUnapply();
-    }
+    size_t size = m_commands.size();
+    for (size_t i = size; i; --i)
+        m_commands[i - 1]->doUnapply();
 
     frame->editor().unappliedEditing(this);
 }
@@ -139,15 +129,10 @@ void EditCommandComposition::reapply()
     // if one is necessary (like for the creation of VisiblePositions).
     m_document->updateLayoutIgnorePendingStylesheets();
 
-    {
-#if ENABLE(DELETION_UI)
-        DeleteButtonControllerDisableScope deleteButtonControllerDisableScope(frame.get());
-#endif
-        size_t size = m_commands.size();
-        for (size_t i = 0; i != size; ++i)
-            m_commands[i]->doReapply();
-    }
-    
+    size_t size = m_commands.size();
+    for (size_t i = 0; i != size; ++i)
+        m_commands[i]->doReapply();
+
     frame->editor().reappliedEditing(this);
 }
 
@@ -219,9 +204,6 @@ void CompositeEditCommand::apply()
 
     {
         EventQueueScope eventQueueScope;
-#if ENABLE(DELETION_UI)
-        DeleteButtonControllerDisableScope deleteButtonControllerDisableScope(&frame());
-#endif
         doApply();
     }
 
@@ -435,13 +417,13 @@ void CompositeEditCommand::moveRemainingSiblingsToNewParent(Node* node, Node* pa
     for (; node && node != pastLastNodeToMove; node = node->nextSibling())
         nodesToRemove.append(*node);
 
-    for (unsigned i = 0; i < nodesToRemove.size(); i++) {
-        removeNode(&nodesToRemove[i].get());
-        appendNode(&nodesToRemove[i].get(), newParent);
+    for (auto& nodeToRemove : nodesToRemove) {
+        removeNode(nodeToRemove.ptr());
+        appendNode(nodeToRemove.ptr(), newParent);
     }
 }
 
-void CompositeEditCommand::updatePositionForNodeRemovalPreservingChildren(Position& position, Node* node)
+void CompositeEditCommand::updatePositionForNodeRemovalPreservingChildren(Position& position, Node& node)
 {
     int offset = (position.anchorType() == Position::PositionIsOffsetInAnchor) ? position.offsetInContainerNode() : 0;
     updatePositionForNodeRemoval(position, node);
@@ -574,7 +556,7 @@ Position CompositeEditCommand::replaceSelectedTextInNode(const String& text)
     return Position(textNode.release(), start.offsetInContainerNode() + text.length());
 }
 
-static void copyMarkers(const Vector<DocumentMarker*>& markerPointers, Vector<DocumentMarker>& markers)
+static void copyMarkers(const Vector<RenderedDocumentMarker*>& markerPointers, Vector<RenderedDocumentMarker>& markers)
 {
     size_t arraySize = markerPointers.size();
     markers.reserveCapacity(arraySize);
@@ -586,15 +568,15 @@ void CompositeEditCommand::replaceTextInNodePreservingMarkers(PassRefPtr<Text> p
 {
     RefPtr<Text> node(prpNode);
     DocumentMarkerController& markerController = document().markers();
-    Vector<DocumentMarker> markers;
-    copyMarkers(markerController.markersInRange(Range::create(document(), node, offset, node, offset + count).get(), DocumentMarker::AllMarkers()), markers);
+    Vector<RenderedDocumentMarker> markers;
+    copyMarkers(markerController.markersInRange(Range::create(document(), node, offset, node, offset + count).ptr(), DocumentMarker::AllMarkers()), markers);
     replaceTextInNode(node, offset, count, replacementText);
     RefPtr<Range> newRange = Range::create(document(), node, offset, node, offset + replacementText.length());
-    for (size_t i = 0; i < markers.size(); ++i)
+    for (const auto& marker : markers)
 #if PLATFORM(IOS)
-        markerController.addMarker(newRange.get(), markers[i].type(), markers[i].description(), markers[i].alternatives(), markers[i].metadata());
+        markerController.addMarker(newRange.get(), marker.type(), marker.description(), marker.alternatives(), marker.metadata());
 #else
-        markerController.addMarker(newRange.get(), markers[i].type(), markers[i].description());
+        markerController.addMarker(newRange.get(), marker.type(), marker.description());
 #endif // PLATFORM(IOS)
 }
 
@@ -877,7 +859,7 @@ void CompositeEditCommand::deleteInsignificantText(const Position& start, const 
         return;
 
     Vector<RefPtr<Text>> nodes;
-    for (Node* node = start.deprecatedNode(); node; node = NodeTraversal::next(node)) {
+    for (Node* node = start.deprecatedNode(); node; node = NodeTraversal::next(*node)) {
         if (is<Text>(*node))
             nodes.append(downcast<Text>(node));
         if (node == end.deprecatedNode())
@@ -973,7 +955,7 @@ PassRefPtr<Node> CompositeEditCommand::insertNewDefaultParagraphElementAt(const 
 PassRefPtr<Node> CompositeEditCommand::moveParagraphContentsToNewBlockIfNecessary(const Position& pos)
 {
     if (pos.isNull())
-        return 0;
+        return nullptr;
     
     document().updateLayoutIgnorePendingStylesheets();
     
@@ -991,7 +973,7 @@ PassRefPtr<Node> CompositeEditCommand::moveParagraphContentsToNewBlockIfNecessar
     // If there are no VisiblePositions in the same block as pos then 
     // upstreamStart will be outside the paragraph
     if (comparePositions(pos, upstreamStart) < 0)
-        return 0;
+        return nullptr;
 
     // Perform some checks to see if we need to perform work in this function.
     if (isBlock(upstreamStart.deprecatedNode())) {
@@ -1000,22 +982,22 @@ PassRefPtr<Node> CompositeEditCommand::moveParagraphContentsToNewBlockIfNecessar
         if (upstreamStart.deprecatedNode() == editableRootForPosition(upstreamStart)) {
             // If the block is the root editable element and it contains no visible content, create a new
             // block but don't try and move content into it, since there's nothing for moveParagraphs to move.
-            if (!Position::hasRenderedNonAnonymousDescendantsWithHeight(toRenderElement(*upstreamStart.deprecatedNode()->renderer())))
+            if (!Position::hasRenderedNonAnonymousDescendantsWithHeight(downcast<RenderElement>(*upstreamStart.deprecatedNode()->renderer())))
                 return insertNewDefaultParagraphElementAt(upstreamStart);
         } else if (isBlock(upstreamEnd.deprecatedNode())) {
             if (!upstreamEnd.deprecatedNode()->isDescendantOf(upstreamStart.deprecatedNode())) {
                 // If the paragraph end is a descendant of paragraph start, then we need to run
                 // the rest of this function. If not, we can bail here.
-                return 0;
+                return nullptr;
             }
         } else if (enclosingBlock(upstreamEnd.deprecatedNode()) != upstreamStart.deprecatedNode()) {
             // The visibleEnd.  It must be an ancestor of the paragraph start.
             // We can bail as we have a full block to work with.
             ASSERT(upstreamStart.deprecatedNode()->isDescendantOf(enclosingBlock(upstreamEnd.deprecatedNode())));
-            return 0;
+            return nullptr;
         } else if (isEndOfEditableOrNonEditableContent(visibleEnd)) {
             // At the end of the editable region. We can bail here as well.
-            return 0;
+            return nullptr;
         }
     }
 
@@ -1089,7 +1071,7 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(const Position& start, 
         }
 
         RefPtr<Node> startNode = start.deprecatedNode();
-        for (RefPtr<Node> node = NodeTraversal::nextSkippingChildren(startNode.get(), outerNode.get()); node; node = NodeTraversal::nextSkippingChildren(node.get(), outerNode.get())) {
+        for (RefPtr<Node> node = NodeTraversal::nextSkippingChildren(*startNode, outerNode.get()); node; node = NodeTraversal::nextSkippingChildren(*node, outerNode.get())) {
             // Move lastNode up in the tree as much as node was moved up in the
             // tree by NodeTraversal::nextSkippingChildren, so that the relative depth between
             // node and the original start node is maintained in the clone.
@@ -1368,8 +1350,8 @@ bool CompositeEditCommand::breakOutOfEmptyListItem()
     if (!newBlock)
         newBlock = createDefaultParagraphElement(document());
 
-    RefPtr<Node> previousListNode = emptyListItem->isElementNode() ? ElementTraversal::previousSibling(emptyListItem.get()): emptyListItem->previousSibling();
-    RefPtr<Node> nextListNode = emptyListItem->isElementNode() ? ElementTraversal::nextSibling(emptyListItem.get()): emptyListItem->nextSibling();
+    RefPtr<Node> previousListNode = emptyListItem->isElementNode() ? ElementTraversal::previousSibling(*emptyListItem): emptyListItem->previousSibling();
+    RefPtr<Node> nextListNode = emptyListItem->isElementNode() ? ElementTraversal::nextSibling(*emptyListItem): emptyListItem->nextSibling();
     if (isListItem(nextListNode.get()) || isListElement(nextListNode.get())) {
         // If emptyListItem follows another list item or nested list, split the list node.
         if (isListItem(previousListNode.get()) || isListElement(previousListNode.get()))

@@ -54,9 +54,9 @@ void AccessibilityScrollView::detach(AccessibilityDetachmentType detachmentType,
     m_scrollView = nullptr;
 }
 
-PassRefPtr<AccessibilityScrollView> AccessibilityScrollView::create(ScrollView* view)
+Ref<AccessibilityScrollView> AccessibilityScrollView::create(ScrollView* view)
 {
-    return adoptRef(new AccessibilityScrollView(view));
+    return adoptRef(*new AccessibilityScrollView(view));
 }
     
 AccessibilityObject* AccessibilityScrollView::scrollBar(AccessibilityOrientation orientation)
@@ -106,13 +106,11 @@ void AccessibilityScrollView::setFocused(bool focused)
 
 void AccessibilityScrollView::updateChildrenIfNecessary()
 {
-    if (m_childrenDirty)
-        clearChildren();
-
-    if (!m_haveChildren)
-        addChildren();
-    
-    updateScrollbars();
+    // Always update our children when asked for them so that we don't inadvertently cache them after
+    // a new web area has been created for this scroll view (like when moving back and forth through history).
+    // Since a ScrollViews children will always be relatively small and limited this should not be a performance problem.
+    clearChildren();
+    addChildren();
 }
 
 void AccessibilityScrollView::updateScrollbars()
@@ -153,10 +151,10 @@ AccessibilityScrollbar* AccessibilityScrollView::addChildScrollbar(Scrollbar* sc
     if (!cache)
         return nullptr;
 
-    AccessibilityScrollbar* scrollBarObject = toAccessibilityScrollbar(cache->getOrCreate(scrollbar));
-    scrollBarObject->setParent(this);
-    m_children.append(scrollBarObject);
-    return scrollBarObject;
+    auto& scrollBarObject = downcast<AccessibilityScrollbar>(*cache->getOrCreate(scrollbar));
+    scrollBarObject.setParent(this);
+    m_children.append(&scrollBarObject);
+    return &scrollBarObject;
 }
         
 void AccessibilityScrollView::clearChildren()

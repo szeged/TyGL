@@ -43,16 +43,12 @@ void InitWebCoreSystemInterface(void)
         INIT(CGContextGetShouldSmoothFonts);
         INIT(CGPatternCreateWithImageAndTransform);
         INIT(CGContextResetClip);
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+#if !PLATFORM(IOS)
         INIT(CGContextDrawsWithCorrectShadowOffsets);
-#endif
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-        INIT(CTFontTransformGlyphs);
 #endif
         INIT(CopyCONNECTProxyResponse);
         INIT(CopyNSURLResponseStatusLine);
         INIT(CopyNSURLResponseCertificateChain);
-        INIT(CreateCTLineWithUniCharProvider);
 #if !PLATFORM(IOS)
         INIT(DrawBezeledTextArea);
         INIT(DrawCapsLockIndicator);
@@ -61,10 +57,7 @@ void InitWebCoreSystemInterface(void)
         INIT(DrawCellFocusRingWithFrameAtTime);
         INIT(DrawMediaSliderTrack);
         INIT(DrawMediaUIPart);
-        INIT(GetFontInLanguageForCharacter);
-        INIT(GetFontInLanguageForRange);
 #endif
-        INIT(GetVerticalGlyphsForCharacters);
         INIT(GetHTTPRequestPriority);
         INIT(GetNSURLResponseLastModifiedDate);
 #if !PLATFORM(IOS)
@@ -111,7 +104,6 @@ void InitWebCoreSystemInterface(void)
         INIT(SetNSURLConnectionDefersCallbacks);
         INIT(SetNSURLRequestShouldContentSniff);
         INIT(SetPatternPhaseInUserSpace);
-        INIT(SetUpFontCache);
         INIT(CreatePrivateStorageSession);
         INIT(CopyRequestWithStorageSession);
         INIT(CopyHTTPCookieStorage);
@@ -131,8 +123,6 @@ void InitWebCoreSystemInterface(void)
         INIT(IOSurfaceContextCreate);
         INIT(IOSurfaceContextCreateImage);
 #endif // !PLATFORM(IOS_SIMULATOR)
-        INIT(CreateCTTypesetterWithUniCharProviderAndOptions);
-        INIT(CTRunGetInitialAdvance);
 #if !PLATFORM(IOS)
         INIT(RecommendedScrollerStyle);
         INIT(ExecutableWasLinkedOnOrBeforeSnowLeopard);
@@ -176,11 +166,8 @@ void InitWebCoreSystemInterface(void)
 
         INIT(DestroyRenderingResources);
 
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+#if PLATFORM(MAC)
         INIT(ExecutableWasLinkedOnOrBeforeLion);
-#endif
-        
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
         INIT(CreateMemoryStatusPressureCriticalDispatchOnMainQueue);
 #endif
 
@@ -195,7 +182,7 @@ void InitWebCoreSystemInterface(void)
         INIT(GetVendorNameForNavigator);
 #endif
 
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+#if !PLATFORM(IOS)
         INIT(NSElasticDeltaForTimeDelta);
         INIT(NSElasticDeltaForReboundDelta);
         INIT(NSReboundDeltaForElasticDelta);
@@ -207,6 +194,8 @@ void InitWebCoreSystemInterface(void)
         INIT(GetAvailableScreenSize);
         INIT(GetScreenScaleFactor);
         INIT(IsGB18030ComplianceRequired);
+        INIT(IsOptimizedFullscreenSupported);
+        INIT(GetMediaUIImageData);
 #endif
 
 #if ENABLE(PUBLIC_SUFFIX_LIST)

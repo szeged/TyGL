@@ -37,7 +37,7 @@
 
 namespace WebCore {
 
-RenderSVGForeignObject::RenderSVGForeignObject(SVGForeignObjectElement& element, PassRef<RenderStyle> style)
+RenderSVGForeignObject::RenderSVGForeignObject(SVGForeignObjectElement& element, Ref<RenderStyle>&& style)
     : RenderSVGBlock(element, WTF::move(style))
     , m_needsTransformUpdate(true)
 {
@@ -100,6 +100,13 @@ LayoutRect RenderSVGForeignObject::clippedOverflowRectForRepaint(const RenderLay
 void RenderSVGForeignObject::computeFloatRectForRepaint(const RenderLayerModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const
 {
     SVGRenderSupport::computeFloatRectForRepaint(*this, repaintContainer, repaintRect, fixed);
+}
+
+void RenderSVGForeignObject::computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect& repaintRect, bool fixed) const
+{
+    FloatRect floatRect(repaintRect);
+    computeFloatRectForRepaint(repaintContainer, floatRect, fixed);
+    repaintRect = enclosingLayoutRect(floatRect);
 }
 
 const AffineTransform& RenderSVGForeignObject::localToParentTransform() const

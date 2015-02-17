@@ -43,7 +43,7 @@
 #import "DOMNodeInternal.h"
 #import "DOMRangeInternal.h"
 #import "FloatPoint.h"
-#import "Font.h"
+#import "FontCascade.h"
 #import "FrameSelection.h"
 #import "HTMLAreaElement.h"
 #import "htmlediting.h"
@@ -62,7 +62,6 @@
 #import "RenderObject.h"
 #import "RenderStyleConstants.h"
 #import "RenderText.h"
-#import "ResourceBuffer.h"
 #import "SharedBuffer.h"
 #import "VisiblePosition.h"
 #import "VisibleUnits.h"
@@ -72,7 +71,7 @@
 using namespace WebCore;
 
 using WebCore::FloatPoint;
-using WebCore::Font;
+using WebCore::FontCascade;
 using WebCore::HTMLAreaElement;
 using WebCore::HTMLImageElement;
 using WebCore::HTMLSelectElement;
@@ -193,9 +192,8 @@ using WebCore::VisiblePosition;
 {
     RenderObject* renderer = core(self)->renderer();
     
-
-    if (renderer && renderer->isBox()) {
-        RoundedRect::Radii radii = toRenderBox(renderer)->borderRadii();
+    if (is<RenderBox>(renderer)) {
+        RoundedRect::Radii radii = downcast<RenderBox>(*renderer).borderRadii();
         return @[[NSValue valueWithSize:(FloatSize)radii.topLeft()],
                  [NSValue valueWithSize:(FloatSize)radii.topRight()],
                  [NSValue valueWithSize:(FloatSize)radii.bottomLeft()],
@@ -465,23 +463,15 @@ using WebCore::VisiblePosition;
 
 - (NSData *)dataRepresentation:(BOOL)rawImageData
 {
-    WebCore::CachedImage *cachedImage = core(self)->cachedImage();
+    WebCore::CachedImage* cachedImage = core(self)->cachedImage();
     if (!cachedImage)
         return nil;
-    WebCore::Image *image = cachedImage->image();
+    WebCore::Image* image = cachedImage->image();
     if (!image)
         return nil;
-    WebCore::SharedBuffer *data = nil;
-    if (rawImageData) {
-        ResourceBuffer *resourceBuffer = cachedImage->resourceBuffer();
-        if (resourceBuffer)
-            data = resourceBuffer->sharedBuffer();
-    } else {
-        data = image->data();
-    }
+    WebCore::SharedBuffer* data = rawImageData ? cachedImage->resourceBuffer() : image->data();
     if (!data)
         return nil;
-
     return data->createNSData().autorelease();
 }
 

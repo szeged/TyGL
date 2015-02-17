@@ -897,17 +897,15 @@ TEST_F(EWK2ViewTest, window_move_resize)
 
 TEST_F(EWK2ViewTest, ewk_view_inspector)
 {
-#if ENABLE(INSPECTOR)
     ASSERT_TRUE(ewk_view_inspector_show(webView()));
     ASSERT_TRUE(ewk_view_inspector_close(webView()));
-#else
-    ASSERT_FALSE(ewk_view_inspector_show(webView()));
-    ASSERT_FALSE(ewk_view_inspector_close(webView()));
-#endif
 }
 
-TEST_F(EWK2ViewTest, DISABLED_ewk_view_scale)
+TEST_F(EWK2ViewTest, DISABLED_ewk_view_scale_with_fixed_layout)
 {
+    // ewk_view_scale() can work only when fixed layout is enabled.
+    EXPECT_TRUE(ewk_view_layout_fixed_set(webView(), true));
+
     ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
 
     // Default scale value is 1.0.
@@ -956,7 +954,7 @@ TEST_F(EWK2ViewTest, ewk_view_pagination)
     ASSERT_EQ(EWK_PAGINATION_MODE_UNPAGINATED, ewk_view_pagination_mode_get(webView()));
 }
 
-TEST_F(EWK2ViewTest, ewk_context_vibration_client_callbacks_set)
+TEST_F(EWK2ViewTest, DISABLED_ewk_context_vibration_client_callbacks_set)
 {
     VibrationCbData data = { false, false, false, 0, 5000 };
     evas_object_smart_callback_add(webView(), "vibrate", onVibrate, &data);

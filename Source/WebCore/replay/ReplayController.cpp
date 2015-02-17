@@ -113,10 +113,8 @@ static const char* segmentStateToString(SegmentState state)
 
 ReplayController::ReplayController(Page& page)
     : m_page(page)
-    , m_loadedSegment(nullptr)
     , m_loadedSession(ReplaySession::create())
     , m_emptyCursor(EmptyInputCursor::create())
-    , m_activeCursor(nullptr)
     , m_targetPosition(ReplayPosition(0, 0))
     , m_currentPosition(ReplayPosition(0, 0))
     , m_segmentState(SegmentState::Unloaded)
@@ -127,7 +125,7 @@ ReplayController::ReplayController(Page& page)
 
 void ReplayController::setForceDeterministicSettings(bool shouldForceDeterministicBehavior)
 {
-    ASSERT(shouldForceDeterministicBehavior ^ (m_sessionState == SessionState::Inactive));
+    ASSERT_ARG(shouldForceDeterministicBehavior, shouldForceDeterministicBehavior ^ (m_sessionState == SessionState::Inactive));
 
     if (shouldForceDeterministicBehavior) {
         m_savedSettings.usesPageCache = m_page.settings().usesPageCache();
@@ -145,7 +143,7 @@ void ReplayController::setForceDeterministicSettings(bool shouldForceDeterminist
 
 void ReplayController::setSessionState(SessionState state)
 {
-    ASSERT(state != m_sessionState);
+    ASSERT_ARG(state, state != m_sessionState);
 
     LOG(WebReplay, "%-20s SessionState transition: %10s --> %10s.\n", "ReplayController", sessionStateToString(m_sessionState), sessionStateToString(state));
 
@@ -173,7 +171,7 @@ void ReplayController::setSessionState(SessionState state)
 
 void ReplayController::setSegmentState(SegmentState state)
 {
-    ASSERT(state != m_segmentState);
+    ASSERT_ARG(state, state != m_segmentState);
 
     LOG(WebReplay, "%-20s SegmentState transition: %10s --> %10s.\n", "ReplayController", segmentStateToString(m_segmentState), segmentStateToString(state));
 
@@ -198,8 +196,9 @@ void ReplayController::setSegmentState(SegmentState state)
     m_segmentState = state;
 }
 
-void ReplayController::switchSession(PassRefPtr<ReplaySession> session)
+void ReplayController::switchSession(RefPtr<ReplaySession>&& session)
 {
+    ASSERT_ARG(session, session);
     ASSERT(m_segmentState == SegmentState::Unloaded);
     ASSERT(m_sessionState == SessionState::Inactive);
 
@@ -207,7 +206,7 @@ void ReplayController::switchSession(PassRefPtr<ReplaySession> session)
     m_currentPosition = ReplayPosition(0, 0);
 
     LOG(WebReplay, "%-20sSwitching sessions from %p to %p.\n", "ReplayController", m_loadedSession.get(), session.get());
-    InspectorInstrumentation::sessionLoaded(&m_page, m_loadedSession);
+    InspectorInstrumentation::sessionLoaded(m_page, m_loadedSession.copyRef());
 }
 
 void ReplayController::createSegment()
@@ -223,9 +222,9 @@ void ReplayController::createSegment()
     m_loadedSegment = ReplaySessionSegment::create();
 
     LOG(WebReplay, "%-20s Created segment: %p.\n", "ReplayController", m_loadedSegment.get());
-    InspectorInstrumentation::segmentCreated(&m_page, m_loadedSegment);
+    InspectorInstrumentation::segmentCreated(m_page, m_loadedSegment.copyRef());
 
-    m_activeCursor = CapturingInputCursor::create(m_loadedSegment);
+    m_activeCursor = CapturingInputCursor::create(m_loadedSegment.copyRef());
     m_activeCursor->appendInput<BeginSegmentSentinel>();
 
     std::unique_ptr<InitialNavigation> navigationInput = InitialNavigation::createFromPage(m_page);
@@ -247,15 +246,15 @@ void ReplayController::completeSegment()
     unloadSegment(shouldSuppressNotifications);
 
     LOG(WebReplay, "%-20s Completed segment: %p.\n", "ReplayController", segment.get());
-    InspectorInstrumentation::segmentCompleted(&m_page, segment);
+    InspectorInstrumentation::segmentCompleted(m_page, segment.copyRef());
 
-    m_loadedSession->appendSegment(segment);
-    InspectorInstrumentation::sessionModified(&m_page, m_loadedSession);
+    m_loadedSession->appendSegment(segment.copyRef());
+    InspectorInstrumentation::sessionModified(m_page, m_loadedSession.copyRef());
 }
 
 void ReplayController::loadSegmentAtIndex(size_t segmentIndex)
 {
-    ASSERT(segmentIndex < m_loadedSession->size());
+    ASSERT_ARG(segmentIndex, segmentIndex >= 0 && segmentIndex < m_loadedSession->size());
     RefPtr<ReplaySessionSegment> segment = m_loadedSession->at(segmentIndex);
 
     ASSERT(m_sessionState == SessionState::Replaying);
@@ -269,10 +268,10 @@ void ReplayController::loadSegmentAtIndex(size_t segmentIndex)
     m_currentPosition.segmentOffset = segmentIndex;
     m_currentPosition.inputOffset = 0;
 
-    m_activeCursor = ReplayingInputCursor::create(m_loadedSegment, m_page, this);
+    m_activeCursor = ReplayingInputCursor::create(m_loadedSegment.copyRef(), m_page, this);
 
     LOG(WebReplay, "%-20sLoading segment: %p.\n", "ReplayController", segment.get());
-    InspectorInstrumentation::segmentLoaded(&m_page, segment);
+    InspectorInstrumentation::segmentLoaded(m_page, segment.copyRef());
 }
 
 void ReplayController::unloadSegment(bool suppressNotifications)
@@ -287,15 +286,15 @@ void ReplayController::unloadSegment(bool suppressNotifications)
     m_activeCursor = nullptr;
     RefPtr<ReplaySessionSegment> unloadedSegment = m_loadedSegment.release();
     for (Frame* frame = &m_page.mainFrame(); frame; frame = frame->tree().traverseNext()) {
-        frame->script().globalObject(mainThreadNormalWorld())->setInputCursor(m_emptyCursor);
-        frame->document()->setInputCursor(m_emptyCursor);
+        frame->script().globalObject(mainThreadNormalWorld())->setInputCursor(m_emptyCursor.copyRef());
+        frame->document()->setInputCursor(m_emptyCursor.copyRef());
     }
 
     // When we stop capturing, don't send out segment unloaded events since we
     // didn't send out the corresponding segmentLoaded event at the start of capture.
     if (!suppressNotifications) {
         LOG(WebReplay, "%-20sUnloading segment: %p.\n", "ReplayController", unloadedSegment.get());
-        InspectorInstrumentation::segmentUnloaded(&m_page);
+        InspectorInstrumentation::segmentUnloaded(m_page);
     }
 }
 
@@ -308,7 +307,7 @@ void ReplayController::startCapturing()
     setForceDeterministicSettings(true);
 
     LOG(WebReplay, "%-20s Starting capture.\n", "ReplayController");
-    InspectorInstrumentation::captureStarted(&m_page);
+    InspectorInstrumentation::captureStarted(m_page);
 
     m_currentPosition = ReplayPosition(0, 0);
 
@@ -326,7 +325,7 @@ void ReplayController::stopCapturing()
     setForceDeterministicSettings(false);
 
     LOG(WebReplay, "%-20s Stopping capture.\n", "ReplayController");
-    InspectorInstrumentation::captureStopped(&m_page);
+    InspectorInstrumentation::captureStopped(m_page);
 }
 
 void ReplayController::startPlayback()
@@ -337,7 +336,7 @@ void ReplayController::startPlayback()
     setSegmentState(SegmentState::Dispatching);
 
     LOG(WebReplay, "%-20s Starting playback to position (segment: %d, input: %d).\n", "ReplayController", m_targetPosition.segmentOffset, m_targetPosition.inputOffset);
-    InspectorInstrumentation::playbackStarted(&m_page);
+    InspectorInstrumentation::playbackStarted(m_page);
 
     dispatcher().setDispatchSpeed(m_dispatchSpeed);
     dispatcher().run();
@@ -354,7 +353,7 @@ void ReplayController::pausePlayback()
     setSegmentState(SegmentState::Loaded);
 
     LOG(WebReplay, "%-20s Pausing playback at position (segment: %d, input: %d).\n", "ReplayController", m_currentPosition.segmentOffset, m_currentPosition.inputOffset);
-    InspectorInstrumentation::playbackPaused(&m_page, m_currentPosition);
+    InspectorInstrumentation::playbackPaused(m_page, m_currentPosition);
 }
 
 void ReplayController::cancelPlayback()
@@ -372,7 +371,7 @@ void ReplayController::cancelPlayback()
     unloadSegment();
     m_sessionState = SessionState::Inactive;
     setForceDeterministicSettings(false);
-    InspectorInstrumentation::playbackFinished(&m_page);
+    InspectorInstrumentation::playbackFinished(m_page);
 }
 
 void ReplayController::replayToPosition(const ReplayPosition& position, DispatchSpeed speed)
@@ -407,7 +406,8 @@ void ReplayController::replayToPosition(const ReplayPosition& position, Dispatch
 void ReplayController::frameNavigated(DocumentLoader* loader)
 {
     ASSERT(m_sessionState != SessionState::Inactive);
-
+    ASSERT_ARG(loader, loader);
+    
     // The initial capturing segment is created prior to main frame navigation.
     // Otherwise, the prior capturing segment was completed when the frame detached,
     // and it is now time to create a new segment.
@@ -425,18 +425,17 @@ void ReplayController::frameNavigated(DocumentLoader* loader)
     loader->frame()->script().globalObject(mainThreadNormalWorld())->setInputCursor(m_activeCursor.get());
 }
 
-void ReplayController::frameDetached(Frame* frame)
+void ReplayController::frameDetached(Frame& frame)
 {
     ASSERT(m_sessionState != SessionState::Inactive);
-    ASSERT(frame);
 
-    if (!frame->document())
+    if (!frame.document())
         return;
 
     // If the frame's cursor isn't capturing or replaying, we should do nothing.
     // This is the case for the "outbound" frame when starting capture, or when
     // we clear the input cursor to finish or prematurely unload a segment.
-    if (frame->document()->inputCursor().isCapturing()) {
+    if (frame.document()->inputCursor().isCapturing()) {
         ASSERT(m_segmentState == SegmentState::Appending);
         completeSegment();
     }
@@ -479,27 +478,26 @@ void ReplayController::willDispatchEvent(const Event& event, Frame* frame)
 #endif
 }
 
-PassRefPtr<ReplaySession> ReplayController::loadedSession() const
+RefPtr<ReplaySession> ReplayController::loadedSession() const
 {
-    return m_loadedSession;
+    return m_loadedSession.copyRef();
 }
 
-PassRefPtr<ReplaySessionSegment> ReplayController::loadedSegment() const
+RefPtr<ReplaySessionSegment> ReplayController::loadedSegment() const
 {
-    return m_loadedSegment;
+    return m_loadedSegment.copyRef();
 }
 
-InputCursor& ReplayController::activeInputCursor() const
+InputCursor& ReplayController::activeInputCursor()
 {
-    return m_activeCursor ? *m_activeCursor : *m_emptyCursor;
+    return m_activeCursor ? *m_activeCursor : m_emptyCursor.get();
 }
 
 EventLoopInputDispatcher& ReplayController::dispatcher() const
 {
     ASSERT(m_sessionState == SessionState::Replaying);
     ASSERT(m_segmentState == SegmentState::Dispatching);
-    ASSERT(m_activeCursor);
-    ASSERT(m_activeCursor->isReplaying());
+    ASSERT(m_activeCursor && m_activeCursor->isReplaying());
 
     return static_cast<ReplayingInputCursor&>(*m_activeCursor).dispatcher();
 }
@@ -511,7 +509,7 @@ void ReplayController::willDispatchInput(const EventLoopInputBase&)
 
     m_currentPosition.inputOffset++;
 
-    InspectorInstrumentation::playbackHitPosition(&m_page, m_currentPosition);
+    InspectorInstrumentation::playbackHitPosition(m_page, m_currentPosition);
 
     if (m_currentPosition == m_targetPosition)
         pausePlayback();

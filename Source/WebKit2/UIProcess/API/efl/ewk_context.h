@@ -169,7 +169,7 @@ EAPI Ewk_Context *ewk_context_default_get(void);
  * @return Ewk_Context object on success or @c NULL on failure
  *
  * @see ewk_object_unref
- * @see ewk_context_new_with_injected_bundle_path
+ * @see ewk_context_new_with_extensions_path
  */
 EAPI Ewk_Context *ewk_context_new(void);
 
@@ -178,14 +178,17 @@ EAPI Ewk_Context *ewk_context_new(void);
  *
  * The returned Ewk_Context object @b should be unref'ed after use.
  *
- * @param path path of injected bundle library
+ * @param path directory path of extensions
  *
  * @return Ewk_Context object on success or @c NULL on failure
  *
+ * @note All shared objects which have ewk_extension_init() in the given @a path will be loaded.
+ *
  * @see ewk_object_unref
  * @see ewk_context_new
+ * @see Ewk_Extension_Initialize_Function
  */
-EAPI Ewk_Context *ewk_context_new_with_injected_bundle_path(const char *path);
+EAPI Ewk_Context *ewk_context_new_with_extensions_path(const char *path);
 
 /**
  * Gets the application cache manager instance for this @a context.
@@ -439,6 +442,16 @@ EAPI void ewk_context_tls_error_policy_set(Ewk_Context *context, Ewk_TLS_Error_P
  * @note all contexts will be affected.
  */
 EAPI void ewk_context_preferred_languages_set(Eina_List *languages);
+
+
+/**
+ * Allows accepting the specified TLS certificate for the speficied host.
+ *
+ * @param context context object to allow accepting a specific certificate for a specific host
+ * @param pem the certificate to be accepted in PEM format
+ * @param host the host for which the certificate is to be accepted
+ */
+EAPI void ewk_context_tls_certificate_for_host_allow(Ewk_Context *context, const char *pem, const char *host);
 
 #ifdef __cplusplus
 }

@@ -67,7 +67,7 @@ public:
     SVGElement& element() const { return downcast<SVGElement>(nodeForNonAnonymous()); }
 
 protected:
-    RenderSVGModelObject(SVGElement&, PassRef<RenderStyle>);
+    RenderSVGModelObject(SVGElement&, Ref<RenderStyle>&&);
 
     virtual void willBeDestroyed() override;
 
@@ -79,8 +79,6 @@ private:
     virtual void absoluteFocusRingQuads(Vector<FloatQuad>&) override final;
     bool m_hasSVGShadow;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderSVGModelObject, isRenderSVGModelObject())
 
 } // namespace WebCore
 

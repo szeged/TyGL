@@ -29,12 +29,12 @@
 
 #import "NetscapePluginHostProxy.h"
 #import "NetscapePluginInstanceProxy.h"
-#import "WebLocalizableStringsInternal.h"
 #import "WebKitSystemInterface.h"
+#import "WebLocalizableStringsInternal.h"
 #import "WebNetscapePluginPackage.h"
+#import <WebCore/ServersSPI.h>
 #import <WebCore/WebCoreNSStringExtras.h>
 #import <mach/mach_port.h>
-#import <servers/bootstrap.h>
 #import <spawn.h>
 #import <wtf/Assertions.h>
 #import <wtf/RetainPtr.h>
@@ -49,7 +49,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-NetscapePluginHostManager& NetscapePluginHostManager::shared()
+NetscapePluginHostManager& NetscapePluginHostManager::singleton()
 {
     DEPRECATED_DEFINE_STATIC_LOCAL(NetscapePluginHostManager, pluginHostManager, ());
     

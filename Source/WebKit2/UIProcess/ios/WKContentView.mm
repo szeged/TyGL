@@ -32,6 +32,7 @@
 #import "RemoteLayerTreeDrawingAreaProxy.h"
 #import "RemoteScrollingCoordinatorProxy.h"
 #import "SmartMagnificationController.h"
+#import "UIKitSPI.h"
 #import "WKBrowsingContextControllerInternal.h"
 #import "WKBrowsingContextGroupPrivate.h"
 #import "WKInspectorHighlightView.h"
@@ -39,28 +40,20 @@
 #import "WKProcessGroupPrivate.h"
 #import "WKWebViewConfiguration.h"
 #import "WKWebViewInternal.h"
-#import "WebContext.h"
 #import "WebFrameProxy.h"
 #import "WebKit2Initialize.h"
 #import "WebKitSystemInterfaceIOS.h"
 #import "WebPageGroup.h"
+#import "WebProcessPool.h"
 #import "WebSystemInterface.h"
 #import <CoreGraphics/CoreGraphics.h>
-#import <UIKit/UIWindow_Private.h>
 #import <WebCore/FloatQuad.h>
 #import <WebCore/FrameView.h>
 #import <WebCore/InspectorOverlay.h>
 #import <WebCore/NotImplemented.h>
+#import <WebCore/QuartzCoreSPI.h>
 #import <wtf/CurrentTime.h>
 #import <wtf/RetainPtr.h>
-
-#if __has_include(<QuartzCore/QuartzCorePrivate.h>)
-#import <QuartzCore/QuartzCorePrivate.h>
-#endif
-
-@interface CALayer (Details)
-@property BOOL hitTestsAsOpaque;
-@end
 
 using namespace WebCore;
 using namespace WebKit;
@@ -181,28 +174,23 @@ private:
     RetainPtr<WKInspectorHighlightView> _inspectorHighlightView;
 
     HistoricalVelocityData _historicalKinematicData;
+
+    RetainPtr<NSUndoManager> _undoManager;
 }
 
-- (instancetype)initWithFrame:(CGRect)frame context:(WebKit::WebContext&)context configuration:(WebKit::WebPageConfiguration)webPageConfiguration webView:(WKWebView *)webView
+- (instancetype)_commonInitializationWithProcessPool:(WebKit::WebProcessPool&)processPool configuration:(WebKit::WebPageConfiguration)webPageConfiguration
 {
-    if (!(self = [super initWithFrame:frame]))
-        return nil;
+    ASSERT(_pageClient);
 
-    InitializeWebKit2();
-
-    _pageClient = std::make_unique<PageClientImpl>(self, webView);
-
-    _page = context.createWebPage(*_pageClient, WTF::move(webPageConfiguration));
+    _page = processPool.createWebPage(*_pageClient, WTF::move(webPageConfiguration));
     _page->initializeWebPage();
     _page->setIntrinsicDeviceScaleFactor(WKGetScaleFactorForScreen([UIScreen mainScreen]));
     _page->setUseFixedLayout(true);
     _page->setDelegatesScrolling(true);
 
-    _webView = webView;
-    
     _isBackground = [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
 
-    WebContext::statistics().wkViewCount++;
+    WebProcessPool::statistics().wkViewCount++;
 
     _rootContentView = adoptNS([[UIView alloc] init]);
     [_rootContentView layer].masksToBounds = NO;
@@ -231,6 +219,31 @@ private:
     return self;
 }
 
+- (instancetype)initWithFrame:(CGRect)frame processPool:(WebKit::WebProcessPool&)processPool configuration:(WebKit::WebPageConfiguration)webPageConfiguration webView:(WKWebView *)webView
+{
+    if (!(self = [super initWithFrame:frame]))
+        return nil;
+
+    InitializeWebKit2();
+
+    _pageClient = std::make_unique<PageClientImpl>(self, webView);
+    _webView = webView;
+
+    return [self _commonInitializationWithProcessPool:processPool configuration:webPageConfiguration];
+}
+
+- (instancetype)initWithFrame:(CGRect)frame processPool:(WebKit::WebProcessPool&)processPool configuration:(WebKit::WebPageConfiguration)webPageConfiguration wkView:(WKView *)wkView
+{
+    if (!(self = [super initWithFrame:frame]))
+        return nil;
+
+    InitializeWebKit2();
+
+    _pageClient = std::make_unique<PageClientImpl>(self, wkView);
+
+    return [self _commonInitializationWithProcessPool:processPool configuration:webPageConfiguration];
+}
+
 - (void)dealloc
 {
     [self cleanupInteraction];
@@ -239,7 +252,7 @@ private:
 
     _page->close();
 
-    WebContext::statistics().wkViewCount--;
+    WebProcessPool::statistics().wkViewCount--;
 
     [super dealloc];
 }
@@ -378,6 +391,14 @@ private:
     [self _didEndScrollingOrZooming];
 }
 
+- (NSUndoManager *)undoManager
+{
+    if (!_undoManager)
+        _undoManager = adoptNS([[NSUndoManager alloc] init]);
+
+    return _undoManager.get();
+}
+
 #pragma mark Internal
 
 - (void)_windowDidMoveToScreenNotification:(NSNotification *)notification
@@ -440,6 +461,7 @@ private:
 - (void)_didCommitLoadForMainFrame
 {
     [self _stopAssistingNode];
+    [self _cancelLongPressGestureRecognizer];
     [_webView _didCommitLoadForMainFrame];
 }
 
@@ -458,6 +480,9 @@ private:
     if (boundsChanged) {
         FloatRect fixedPositionRect = _page->computeCustomFixedPositionRect(_page->unobscuredContentRect(), [[_webView scrollView] zoomScale]);
         [self updateFixedClippingView:fixedPositionRect];
+
+        // We need to push the new content bounds to the webview to update fixed position rects.
+        [_webView _updateVisibleContentRects];
     }
     
     [self _updateChangedSelection];

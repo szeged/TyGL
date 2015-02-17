@@ -48,10 +48,9 @@
 #include "HTMLFormElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
-#include "HTMLTemplateElement.h"
 #include "HTMLTextFormControlElement.h"
 #include "NodeTraversal.h"
-#include "RenderLineBreak.h"
+#include "RenderElement.h"
 #include "ScriptController.h"
 #include "Settings.h"
 #include "StyleProperties.h"
@@ -68,9 +67,9 @@ namespace WebCore {
 using namespace HTMLNames;
 using namespace WTF;
 
-PassRefPtr<HTMLElement> HTMLElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLElement> HTMLElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLElement(tagName, document));
+    return adoptRef(*new HTMLElement(tagName, document));
 }
 
 String HTMLElement::nodeName() const
@@ -326,6 +325,9 @@ void HTMLElement::populateEventNameForAttributeLocalNameMap(HashMap<AtomicString
     };
 
     const CustomMapping customTable[] = {
+        { onanimationendAttr, eventNames().animationendEvent },
+        { onanimationiterationAttr, eventNames().animationiterationEvent },
+        { onanimationstartAttr, eventNames().animationstartEvent },
         { ontransitionendAttr, eventNames().webkitTransitionEndEvent },
         { onwebkitanimationendAttr, eventNames().webkitAnimationEndEvent },
         { onwebkitanimationiterationAttr, eventNames().webkitAnimationIterationEvent },
@@ -411,66 +413,7 @@ void HTMLElement::parseAttribute(const QualifiedName& name, const AtomicString& 
     }
 }
 
-String HTMLElement::innerHTML() const
-{
-    return createMarkup(*this, ChildrenOnly);
-}
-
-String HTMLElement::outerHTML() const
-{
-    return createMarkup(*this);
-}
-
-void HTMLElement::setInnerHTML(const String& html, ExceptionCode& ec)
-{
-    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(html, this, AllowScriptingContent, ec)) {
-        ContainerNode* container = this;
-#if ENABLE(TEMPLATE_ELEMENT)
-        if (is<HTMLTemplateElement>(*this))
-            container = downcast<HTMLTemplateElement>(*this).content();
-#endif
-        replaceChildrenWithFragment(*container, fragment.release(), ec);
-    }
-}
-
-static void mergeWithNextTextNode(Text& node, ExceptionCode& ec)
-{
-    Node* next = node.nextSibling();
-    if (!is<Text>(next))
-        return;
-
-    Ref<Text> textNode(node);
-    Ref<Text> textNext(downcast<Text>(*next));
-    textNode->appendData(textNext->data(), ec);
-    if (ec)
-        return;
-    textNext->remove(ec);
-}
-
-void HTMLElement::setOuterHTML(const String& html, ExceptionCode& ec)
-{
-    Element* p = parentElement();
-    if (!is<HTMLElement>(p)) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
-        return;
-    }
-    RefPtr<HTMLElement> parent = downcast<HTMLElement>(p);
-    RefPtr<Node> prev = previousSibling();
-    RefPtr<Node> next = nextSibling();
-
-    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(html, parent.get(), AllowScriptingContent, ec);
-    if (ec)
-        return;
-      
-    parent->replaceChild(fragment.release(), this, ec);
-    RefPtr<Node> node = next ? next->previousSibling() : nullptr;
-    if (!ec && is<Text>(node.get()))
-        mergeWithNextTextNode(downcast<Text>(*node), ec);
-    if (!ec && is<Text>(prev.get()))
-        mergeWithNextTextNode(downcast<Text>(*prev), ec);
-}
-
-PassRefPtr<DocumentFragment> HTMLElement::textToFragment(const String& text, ExceptionCode& ec)
+RefPtr<DocumentFragment> HTMLElement::textToFragment(const String& text, ExceptionCode& ec)
 {
     RefPtr<DocumentFragment> fragment = DocumentFragment::create(document());
     unsigned int i, length = text.length();
@@ -515,6 +458,35 @@ static inline bool shouldProhibitSetInnerOuterText(const HTMLElement& element)
         || element.hasTagName(tfootTag)
         || element.hasTagName(theadTag)
         || element.hasTagName(trTag);
+}
+
+// Returns the conforming 'dir' value associated with the state the attribute is in (in its canonical case), if any,
+// or the empty string if the attribute is in a state that has no associated keyword value or if the attribute is
+// not in a defined state (e.g. the attribute is missing and there is no missing value default).
+// http://www.whatwg.org/specs/web-apps/current-work/multipage/common-dom-interfaces.html#limited-to-only-known-values
+static inline const AtomicString& toValidDirValue(const AtomicString& value)
+{
+    static NeverDestroyed<AtomicString> ltrValue("ltr", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> rtlValue("rtl", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> autoValue("auto", AtomicString::ConstructFromLiteral);
+
+    if (equalIgnoringCase(value, ltrValue))
+        return ltrValue;
+    if (equalIgnoringCase(value, rtlValue))
+        return rtlValue;
+    if (equalIgnoringCase(value, autoValue))
+        return autoValue;
+    return nullAtom;
+}
+
+const AtomicString& HTMLElement::dir() const
+{
+    return toValidDirValue(fastGetAttribute(dirAttr));
+}
+
+void HTMLElement::setDir(const AtomicString& value)
+{
+    setAttribute(dirAttr, value);
 }
 
 void HTMLElement::setInnerText(const String& text, ExceptionCode& ec)
@@ -834,7 +806,7 @@ void HTMLElement::setTranslate(bool enable)
     setAttribute(translateAttr, enable ? "yes" : "no");
 }
 
-PassRefPtr<HTMLCollection> HTMLElement::children()
+RefPtr<HTMLCollection> HTMLElement::children()
 {
     return ensureCachedHTMLCollection(NodeChildren);
 }
@@ -853,10 +825,8 @@ bool HTMLElement::rendererIsNeeded(const RenderStyle& style)
     return StyledElement::rendererIsNeeded(style);
 }
 
-RenderPtr<RenderElement> HTMLElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
-    if (hasTagName(wbrTag))
-        return createRenderer<RenderLineBreak>(*this, WTF::move(style));
     return RenderElement::createFor(*this, WTF::move(style));
 }
 
@@ -886,13 +856,13 @@ static void setHasDirAutoFlagRecursively(Node* firstNode, bool flag, Node* lastN
         if (elementAffectsDirectionality(*node)) {
             if (node == lastNode)
                 return;
-            node = NodeTraversal::nextSkippingChildren(node, firstNode);
+            node = NodeTraversal::nextSkippingChildren(*node, firstNode);
             continue;
         }
         node->setSelfOrAncestorHasDirAutoAttribute(flag);
         if (node == lastNode)
             return;
-        node = NodeTraversal::next(node, firstNode);
+        node = NodeTraversal::next(*node, firstNode);
     }
 }
 
@@ -935,7 +905,7 @@ TextDirection HTMLElement::directionality(Node** strongDirectionalityTextNode) c
         // Skip bdi, script, style and text form controls.
         if (equalIgnoringCase(node->nodeName(), "bdi") || node->hasTagName(scriptTag) || node->hasTagName(styleTag) 
             || (is<Element>(*node) && downcast<Element>(*node).isTextFormControl())) {
-            node = NodeTraversal::nextSkippingChildren(node, this);
+            node = NodeTraversal::nextSkippingChildren(*node, this);
             continue;
         }
 
@@ -943,7 +913,7 @@ TextDirection HTMLElement::directionality(Node** strongDirectionalityTextNode) c
         if (is<Element>(*node)) {
             AtomicString dirAttributeValue = downcast<Element>(*node).fastGetAttribute(dirAttr);
             if (isLTROrRTLIgnoringCase(dirAttributeValue) || equalIgnoringCase(dirAttributeValue, "auto")) {
-                node = NodeTraversal::nextSkippingChildren(node, this);
+                node = NodeTraversal::nextSkippingChildren(*node, this);
                 continue;
             }
         }
@@ -957,7 +927,7 @@ TextDirection HTMLElement::directionality(Node** strongDirectionalityTextNode) c
                 return (textDirection == U_LEFT_TO_RIGHT) ? LTR : RTL;
             }
         }
-        node = NodeTraversal::next(node, this);
+        node = NodeTraversal::next(*node, this);
     }
     if (strongDirectionalityTextNode)
         *strongDirectionalityTextNode = nullptr;
@@ -1003,22 +973,13 @@ void HTMLElement::calculateAndAdjustDirectionality()
 void HTMLElement::adjustDirectionalityIfNeededAfterChildrenChanged(Element* beforeChange, ChildChangeType changeType)
 {
     // FIXME: This function looks suspicious.
-    if (document().renderView() && (changeType == ElementRemoved || changeType == TextRemoved)) {
-        Node* node = beforeChange ? beforeChange->nextSibling() : nullptr;
-        for (; node; node = node->nextSibling()) {
-            if (elementAffectsDirectionality(*node))
-                continue;
-
-            setHasDirAutoFlagRecursively(node, false);
-        }
-    }
 
     if (!selfOrAncestorHasDirAutoAttribute())
         return;
 
     Node* oldMarkedNode = nullptr;
     if (beforeChange)
-        oldMarkedNode = changeType == ElementInserted ? ElementTraversal::nextSibling(beforeChange) : beforeChange->nextSibling();
+        oldMarkedNode = changeType == ElementInserted ? ElementTraversal::nextSibling(*beforeChange) : beforeChange->nextSibling();
 
     while (oldMarkedNode && elementAffectsDirectionality(*oldMarkedNode))
         oldMarkedNode = oldMarkedNode->nextSibling();
@@ -1031,11 +992,6 @@ void HTMLElement::adjustDirectionalityIfNeededAfterChildrenChanged(Element* befo
             return;
         }
     }
-}
-
-bool HTMLElement::isURLAttribute(const Attribute& attribute) const
-{
-    return StyledElement::isURLAttribute(attribute);
 }
 
 void HTMLElement::addHTMLLengthToStyle(MutableStyleProperties& style, CSSPropertyID propertyID, const String& value)

@@ -32,8 +32,6 @@
 #include "config.h"
 #include "InjectedScript.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "InspectorValues.h"
 #include "JSCInlines.h"
 #include "ScriptFunctionCall.h"
@@ -106,14 +104,15 @@ void InjectedScript::getFunctionDetails(ErrorString& errorString, const String& 
         return;
     }
 
-    *result = BindingTraits<Inspector::Protocol::Debugger::FunctionDetails>::runtimeCast(resultValue);
+    *result = BindingTraits<Inspector::Protocol::Debugger::FunctionDetails>::runtimeCast(WTF::move(resultValue));
 }
 
-void InjectedScript::getProperties(ErrorString& errorString, const String& objectId, bool ownProperties, RefPtr<Array<Inspector::Protocol::Runtime::PropertyDescriptor>>* properties)
+void InjectedScript::getProperties(ErrorString& errorString, const String& objectId, bool ownProperties, bool ownAndGetterProperties, RefPtr<Array<Inspector::Protocol::Runtime::PropertyDescriptor>>* properties)
 {
     Deprecated::ScriptFunctionCall function(injectedScriptObject(), ASCIILiteral("getProperties"), inspectorEnvironment()->functionCallHandler());
     function.appendArgument(objectId);
     function.appendArgument(ownProperties);
+    function.appendArgument(ownAndGetterProperties);
 
     RefPtr<InspectorValue> result;
     makeCall(function, &result);
@@ -122,7 +121,7 @@ void InjectedScript::getProperties(ErrorString& errorString, const String& objec
         return;
     }
 
-    *properties = BindingTraits<Array<Inspector::Protocol::Runtime::PropertyDescriptor>>::runtimeCast(result);
+    *properties = BindingTraits<Array<Inspector::Protocol::Runtime::PropertyDescriptor>>::runtimeCast(WTF::move(result));
 }
 
 void InjectedScript::getInternalProperties(ErrorString& errorString, const String& objectId, RefPtr<Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>* properties)
@@ -137,12 +136,29 @@ void InjectedScript::getInternalProperties(ErrorString& errorString, const Strin
         return;
     }
 
-    auto array = BindingTraits<Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>::runtimeCast(result);
-    if (array->length() > 0)
-        *properties = array;
+    auto array = BindingTraits<Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>::runtimeCast(WTF::move(result));
+    *properties = array->length() > 0 ? array : nullptr;
 }
 
-PassRefPtr<Array<Inspector::Protocol::Debugger::CallFrame>> InjectedScript::wrapCallFrames(const Deprecated::ScriptValue& callFrames)
+void InjectedScript::getCollectionEntries(ErrorString& errorString, const String& objectId, const String& objectGroup, int startIndex, int numberToFetch, RefPtr<Protocol::Array<Protocol::Runtime::CollectionEntry>>* entries)
+{
+    Deprecated::ScriptFunctionCall function(injectedScriptObject(), ASCIILiteral("getCollectionEntries"), inspectorEnvironment()->functionCallHandler());
+    function.appendArgument(objectId);
+    function.appendArgument(objectGroup);
+    function.appendArgument(startIndex);
+    function.appendArgument(numberToFetch);
+
+    RefPtr<InspectorValue> result;
+    makeCall(function, &result);
+    if (!result || result->type() != InspectorValue::Type::Array) {
+        errorString = ASCIILiteral("Internal error");
+        return;
+    }
+
+    *entries = BindingTraits<Array<Protocol::Runtime::CollectionEntry>>::runtimeCast(WTF::move(result));
+}
+
+Ref<Array<Inspector::Protocol::Debugger::CallFrame>> InjectedScript::wrapCallFrames(const Deprecated::ScriptValue& callFrames)
 {
     ASSERT(!hasNoValue());
     Deprecated::ScriptFunctionCall function(injectedScriptObject(), ASCIILiteral("wrapCallFrames"), inspectorEnvironment()->functionCallHandler());
@@ -153,12 +169,12 @@ PassRefPtr<Array<Inspector::Protocol::Debugger::CallFrame>> InjectedScript::wrap
     ASSERT(!hadException);
     RefPtr<InspectorValue> result = callFramesValue.toInspectorValue(scriptState());
     if (result->type() == InspectorValue::Type::Array)
-        return BindingTraits<Array<Inspector::Protocol::Debugger::CallFrame>>::runtimeCast(result);
+        return BindingTraits<Array<Inspector::Protocol::Debugger::CallFrame>>::runtimeCast(WTF::move(result)).releaseNonNull();
 
     return Array<Inspector::Protocol::Debugger::CallFrame>::create();
 }
 
-PassRefPtr<Inspector::Protocol::Runtime::RemoteObject> InjectedScript::wrapObject(const Deprecated::ScriptValue& value, const String& groupName, bool generatePreview) const
+RefPtr<Inspector::Protocol::Runtime::RemoteObject> InjectedScript::wrapObject(const Deprecated::ScriptValue& value, const String& groupName, bool generatePreview) const
 {
     ASSERT(!hasNoValue());
     Deprecated::ScriptFunctionCall wrapFunction(injectedScriptObject(), ASCIILiteral("wrapObject"), inspectorEnvironment()->functionCallHandler());
@@ -179,7 +195,7 @@ PassRefPtr<Inspector::Protocol::Runtime::RemoteObject> InjectedScript::wrapObjec
     return BindingTraits<Inspector::Protocol::Runtime::RemoteObject>::runtimeCast(resultObject);
 }
 
-PassRefPtr<Inspector::Protocol::Runtime::RemoteObject> InjectedScript::wrapTable(const Deprecated::ScriptValue& table, const Deprecated::ScriptValue& columns) const
+RefPtr<Inspector::Protocol::Runtime::RemoteObject> InjectedScript::wrapTable(const Deprecated::ScriptValue& table, const Deprecated::ScriptValue& columns) const
 {
     ASSERT(!hasNoValue());
     Deprecated::ScriptFunctionCall wrapFunction(injectedScriptObject(), ASCIILiteral("wrapTable"), inspectorEnvironment()->functionCallHandler());
@@ -200,6 +216,23 @@ PassRefPtr<Inspector::Protocol::Runtime::RemoteObject> InjectedScript::wrapTable
     ASSERT_UNUSED(castSucceeded, castSucceeded);
 
     return BindingTraits<Inspector::Protocol::Runtime::RemoteObject>::runtimeCast(resultObject);
+}
+
+void InjectedScript::setExceptionValue(const Deprecated::ScriptValue& value)
+{
+    ASSERT(!hasNoValue());
+    Deprecated::ScriptFunctionCall function(injectedScriptObject(), ASCIILiteral("setExceptionValue"), inspectorEnvironment()->functionCallHandler());
+    function.appendArgument(value);
+    RefPtr<InspectorValue> result;
+    makeCall(function, &result);
+}
+
+void InjectedScript::clearExceptionValue()
+{
+    ASSERT(!hasNoValue());
+    Deprecated::ScriptFunctionCall function(injectedScriptObject(), ASCIILiteral("clearExceptionValue"), inspectorEnvironment()->functionCallHandler());
+    RefPtr<InspectorValue> result;
+    makeCall(function, &result);
 }
 
 Deprecated::ScriptValue InjectedScript::findObjectById(const String& objectId) const
@@ -245,4 +278,3 @@ void InjectedScript::releaseObjectGroup(const String& objectGroup)
 
 } // namespace Inspector
 
-#endif // ENABLE(INSPECTOR)

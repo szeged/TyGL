@@ -52,8 +52,8 @@ class Text;
 
     class XMLParserContext : public RefCounted<XMLParserContext> {
     public:
-        static PassRefPtr<XMLParserContext> createMemoryParser(xmlSAXHandlerPtr, void* userData, const CString& chunk);
-        static PassRefPtr<XMLParserContext> createStringParser(xmlSAXHandlerPtr, void* userData);
+        static RefPtr<XMLParserContext> createMemoryParser(xmlSAXHandlerPtr, void* userData, const CString& chunk);
+        static Ref<XMLParserContext> createStringParser(xmlSAXHandlerPtr, void* userData);
         ~XMLParserContext();
         xmlParserCtxtPtr context() const { return m_context; }
 
@@ -65,16 +65,16 @@ class Text;
         xmlParserCtxtPtr m_context;
     };
 
-    class XMLDocumentParser : public ScriptableDocumentParser, public CachedResourceClient {
+    class XMLDocumentParser final : public ScriptableDocumentParser, public CachedResourceClient {
         WTF_MAKE_FAST_ALLOCATED;
     public:
-        static PassRefPtr<XMLDocumentParser> create(Document& document, FrameView* view)
+        static Ref<XMLDocumentParser> create(Document& document, FrameView* view)
         {
-            return adoptRef(new XMLDocumentParser(document, view));
+            return adoptRef(*new XMLDocumentParser(document, view));
         }
-        static PassRefPtr<XMLDocumentParser> create(DocumentFragment& fragment, Element* element, ParserContentPolicy parserContentPolicy)
+        static Ref<XMLDocumentParser> create(DocumentFragment& fragment, Element* element, ParserContentPolicy parserContentPolicy)
         {
-            return adoptRef(new XMLDocumentParser(fragment, element, parserContentPolicy));
+            return adoptRef(*new XMLDocumentParser(fragment, element, parserContentPolicy));
         }
 
         ~XMLDocumentParser();
@@ -90,8 +90,6 @@ class Text;
         // Used by the XMLHttpRequest to check if the responseXML was well formed.
         virtual bool wellFormed() const { return !m_sawError; }
 
-        TextPosition textPosition() const;
-
         static bool supportsXMLVersion(const String&);
 
     private:
@@ -105,6 +103,9 @@ class Text;
         virtual bool isWaitingForScripts() const override;
         virtual void stopParsing() override;
         virtual void detach() override;
+
+        virtual TextPosition textPosition() const override;
+        virtual bool shouldAssociateConsoleMessagesWithTextPosition() const override;
 
         // from CachedResourceClient
         virtual void notifyFinished(CachedResource*) override;
@@ -191,7 +192,7 @@ class Text;
     };
 
 #if ENABLE(XSLT)
-void* xmlDocPtrForString(CachedResourceLoader*, const String& source, const String& url);
+void* xmlDocPtrForString(CachedResourceLoader&, const String& source, const String& url);
 #endif
 
 HashMap<String, String> parseAttributes(const String&, bool& attrsOK);

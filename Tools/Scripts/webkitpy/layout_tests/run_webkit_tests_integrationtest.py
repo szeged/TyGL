@@ -224,21 +224,6 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         for batch in batch_tests_run:
             self.assertTrue(len(batch) <= 2, '%s had too many tests' % ', '.join(batch))
 
-    def test_max_locked_shards(self):
-        # Tests for the default of using one locked shard even in the case of more than one child process.
-        if not self.should_test_processes:
-            return
-        save_env_webkit_test_max_locked_shards = None
-        if "WEBKIT_TEST_MAX_LOCKED_SHARDS" in os.environ:
-            save_env_webkit_test_max_locked_shards = os.environ["WEBKIT_TEST_MAX_LOCKED_SHARDS"]
-            del os.environ["WEBKIT_TEST_MAX_LOCKED_SHARDS"]
-        _, regular_output, _ = logging_run(['--debug-rwt-logging', '--child-processes', '2'], shared_port=False)
-        try:
-            self.assertTrue(any(['1 locked' in line for line in regular_output.buflist]))
-        finally:
-            if save_env_webkit_test_max_locked_shards:
-                os.environ["WEBKIT_TEST_MAX_LOCKED_SHARDS"] = save_env_webkit_test_max_locked_shards
-
     def test_child_processes_2(self):
         if self.should_test_processes:
             _, regular_output, _ = logging_run(
@@ -339,9 +324,9 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         self.assertEqual(tests_to_run, tests_run)
 
     def test_no_order_with_directory_entries_in_natural_order(self):
-        tests_to_run = ['http/tests/ssl', 'perf/foo', 'http/tests/passes']
+        tests_to_run = ['http/tests/ssl', 'http/tests/passes']
         tests_run = get_tests_run(['--order=none'] + tests_to_run)
-        self.assertEqual(tests_run, ['http/tests/ssl/text.html', 'perf/foo/test.html', 'http/tests/passes/image.html', 'http/tests/passes/text.html'])
+        self.assertEqual(tests_run, ['http/tests/ssl/text.html', 'http/tests/passes/image.html', 'http/tests/passes/text.html'])
 
     def test_gc_between_tests(self):
         self.assertTrue(passing_run(['--gc-between-tests']))
@@ -671,6 +656,22 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         self.assertFalse(json["pixel_tests_enabled"])
         self.assertEqual(details.enabled_pixel_tests_in_retry, True)
 
+    def test_failed_text_with_missing_pixel_results_on_retry(self):
+        # Test what happens when pixel results are missing on retry.
+        host = MockHost()
+        details, err, _ = logging_run(['--no-show-results',
+            '--no-new-test-results', '--no-pixel-tests',
+            'failures/unexpected/text-image-missing.html'],
+            tests_included=True, host=host)
+        file_list = host.filesystem.written_files.keys()
+        self.assertEqual(details.exit_code, 1)
+        expected_token = '"unexpected":{"text-image-missing.html":{"report":"REGRESSION","expected":"PASS","actual":"TEXT MISSING","is_missing_image":true}}'
+        json_string = host.filesystem.read_text_file('/tmp/layout-test-results/full_results.json')
+        self.assertTrue(json_string.find(expected_token) != -1)
+        self.assertTrue(json_string.find('"num_regressions":1') != -1)
+        self.assertTrue(json_string.find('"num_flaky":0') != -1)
+        self.assertTrue(json_string.find('"num_missing":1') != -1)
+
     def test_retrying_uses_retries_directory(self):
         host = MockHost()
         details, err, _ = logging_run(['--debug-rwt-logging', 'failures/unexpected/text-image-checksum.html'], tests_included=True, host=host)
@@ -714,10 +715,6 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         # should be used.
         test_port = get_port_for_run(base_args)
         self.assertEqual(None, test_port.tolerance_used_for_diff_image)
-
-    def test_virtual(self):
-        self.assertTrue(passing_run(['passes/text.html', 'passes/args.html',
-                                     'virtual/passes/text.html', 'virtual/passes/args.html']))
 
     def test_reftest_run(self):
         tests_run = get_tests_run(['passes/reftest.html'])

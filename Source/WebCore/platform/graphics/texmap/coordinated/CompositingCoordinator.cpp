@@ -64,7 +64,7 @@ CompositingCoordinator::CompositingCoordinator(Page* page, CompositingCoordinato
     , m_isFlushingLayerChanges(false)
     , m_shouldSyncFrame(false)
     , m_didInitializeRootCompositingLayer(false)
-    , m_releaseInactiveAtlasesTimer(this, &CompositingCoordinator::releaseInactiveAtlasesTimerFired)
+    , m_releaseInactiveAtlasesTimer(*this, &CompositingCoordinator::releaseInactiveAtlasesTimerFired)
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     , m_lastAnimationServiceTime(0)
 #endif
@@ -271,9 +271,9 @@ void CompositingCoordinator::paintContents(const GraphicsLayer* graphicsLayer, G
     m_client->paintLayerContents(graphicsLayer, graphicsContext, enclosingIntRect(clipRect));
 }
 
-std::unique_ptr<GraphicsLayer> CompositingCoordinator::createGraphicsLayer(GraphicsLayerClient& client)
+std::unique_ptr<GraphicsLayer> CompositingCoordinator::createGraphicsLayer(GraphicsLayer::Type layerType, GraphicsLayerClient& client)
 {
-    CoordinatedGraphicsLayer* layer = new CoordinatedGraphicsLayer(client);
+    CoordinatedGraphicsLayer* layer = new CoordinatedGraphicsLayer(layerType, client);
     layer->setCoordinator(this);
     m_registeredLayers.add(layer->id(), layer);
     m_state.layersToCreate.append(layer->id());
@@ -332,7 +332,7 @@ void CompositingCoordinator::setVisibleContentsRect(const FloatRect& rect, const
     }
 
     FrameView* view = m_page->mainFrame().view();
-    if (view->useFixedLayout()) {
+    if (view->useFixedLayout() && contentsRectDidChange) {
         // Round the rect instead of enclosing it to make sure that its size stays
         // the same while panning. This can have nasty effects on layout.
         view->setFixedVisibleContentRect(roundedIntRect(rect));
@@ -372,8 +372,8 @@ void CompositingCoordinator::commitScrollOffset(uint32_t layerID, const WebCore:
 
 void CompositingCoordinator::renderNextFrame()
 {
-    for (unsigned i = 0; i < m_updateAtlases.size(); ++i)
-        m_updateAtlases[i]->didSwapBuffers();
+    for (auto& atlas : m_updateAtlases)
+        atlas->didSwapBuffers();
 }
 
 void CompositingCoordinator::purgeBackingStores()
@@ -389,8 +389,8 @@ void CompositingCoordinator::purgeBackingStores()
 
 bool CompositingCoordinator::paintToSurface(const IntSize& size, CoordinatedSurface::Flags flags, uint32_t& atlasID, IntPoint& offset, CoordinatedSurface::Client* client)
 {
-    for (unsigned i = 0; i < m_updateAtlases.size(); ++i) {
-        UpdateAtlas* atlas = m_updateAtlases[i].get();
+    for (auto& updateAtlas : m_updateAtlases) {
+        UpdateAtlas* atlas = updateAtlas.get();
         if (atlas->supportsAlpha() == (flags & CoordinatedSurface::SupportsAlpha)) {
             // This will be false if there is no available buffer space.
             if (atlas->paintOnAvailableBuffer(size, atlasID, offset, client))
@@ -412,7 +412,7 @@ void CompositingCoordinator::scheduleReleaseInactiveAtlases()
         m_releaseInactiveAtlasesTimer.startRepeating(ReleaseInactiveAtlasesTimerInterval);
 }
 
-void CompositingCoordinator::releaseInactiveAtlasesTimerFired(Timer<CompositingCoordinator>*)
+void CompositingCoordinator::releaseInactiveAtlasesTimerFired()
 {
     // We always want to keep one atlas for root contents layer.
     std::unique_ptr<UpdateAtlas> atlasToKeepAnyway;

@@ -64,6 +64,7 @@ private:
     virtual void didBeginEditing() override;
     virtual void respondToChangedContents() override;
     virtual void respondToChangedSelection(WebCore::Frame*) override;
+    virtual void discardedComposition(WebCore::Frame*) override;
     virtual void didEndEditing() override;
     virtual void willWriteSelectionToPasteboard(WebCore::Range*) override;
     virtual void didWriteSelectionToPasteboard() override;
@@ -119,10 +120,6 @@ private:
     virtual void toggleAutomaticTextReplacement() override;
     virtual bool isAutomaticSpellingCorrectionEnabled() override;
     virtual void toggleAutomaticSpellingCorrection() override;
-#endif
-
-#if ENABLE(DELETION_UI)
-    virtual bool shouldShowDeleteInterface(WebCore::HTMLElement*) override;
 #endif
 
 #if PLATFORM(GTK)

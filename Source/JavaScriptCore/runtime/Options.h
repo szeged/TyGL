@@ -112,7 +112,7 @@ typedef const char* optionString;
     v(bool, forceDebuggerBytecodeGeneration, false) \
     v(bool, forceProfilerBytecodeGeneration, false) \
     \
-    v(bool, enableFunctionDotArguments, false) \
+    v(bool, enableFunctionDotArguments, true) \
     \
     /* showDisassembly implies showDFGDisassembly. */ \
     v(bool, showDisassembly, false) \
@@ -150,7 +150,6 @@ typedef const char* optionString;
     v(bool, enableOSREntryToFTL, true) \
     \
     v(bool, useFTLJIT, true) \
-    v(bool, enableExperimentalFTLCoverage, false) \
     v(bool, useFTLTBAA, true) \
     v(bool, enableLLVMFastISel, false) \
     v(bool, useLLVMSmallCodeModel, false) \
@@ -171,12 +170,11 @@ typedef const char* optionString;
     v(bool, enablePolyvariantDevirtualization, true) \
     v(bool, enablePolymorphicAccessInlining, true) \
     v(bool, enablePolymorphicCallInlining, true) \
-    v(bool, callStatusShouldUseCallEdgeProfile, true) \
-    v(bool, callEdgeProfileReallyProcessesLog, true) \
-    v(bool, baselineDoesCallEdgeProfiling, false) \
-    v(bool, dfgDoesCallEdgeProfiling, true) \
-    v(bool, enableCallEdgeProfiling, true) \
+    v(unsigned, maxPolymorphicCallVariantListSize, 15) \
+    v(unsigned, maxPolymorphicCallVariantListSizeForTopTier, 5) \
+    v(unsigned, maxPolymorphicCallVariantsForInlining, 5) \
     v(unsigned, frequentCallThreshold, 2) \
+    v(double, minimumCallToKnownRate, 0.51) \
     v(bool, optimizeNativeCalls, false) \
     v(bool, enableObjectAllocationSinking, true) \
     \
@@ -206,8 +204,6 @@ typedef const char* optionString;
     /* Depth of inline stack, so 1 = no inlining, 2 = one level, etc. */ \
     v(unsigned, maximumInliningDepth, 5) \
     v(unsigned, maximumInliningRecursion, 2) \
-    v(unsigned, maximumInliningDepthForMustInline, 7) \
-    v(unsigned, maximumInliningRecursionForMustInline, 3) \
     \
     v(unsigned, maximumLLVMInstructionCountForNativeInlining, 80) \
     \
@@ -250,7 +246,6 @@ typedef const char* optionString;
     v(unsigned, osrExitCountForReoptimizationFromLoop, 5) \
     \
     v(unsigned, reoptimizationRetryCounterMax, 0)  \
-    v(unsigned, reoptimizationRetryCounterStep, 1) \
     \
     v(unsigned, minimumOptimizationDelay, 1) \
     v(unsigned, maximumOptimizationDelay, 5) \
@@ -286,6 +281,10 @@ typedef const char* optionString;
     v(bool, recordGCPauseTimes, false) \
     v(bool, logHeapStatisticsAtExit, false) \
     v(bool, enableTypeProfiler, false) \
+    v(bool, enableControlFlowProfiler, false) \
+    \
+    v(bool, verifyHeap, false) \
+    v(unsigned, numberOfGCCyclesToRecordForVerification, 3) \
     \
     v(bool, enableExceptionFuzz, false) \
     v(unsigned, fireExceptionFuzzAt, 0)

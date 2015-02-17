@@ -35,10 +35,10 @@ class TextRun;
 // For example, <embed src="foo.html"> does not invoke a plug-in.
 class RenderEmbeddedObject : public RenderWidget {
 public:
-    RenderEmbeddedObject(HTMLFrameOwnerElement&, PassRef<RenderStyle>);
+    RenderEmbeddedObject(HTMLFrameOwnerElement&, Ref<RenderStyle>&&);
     virtual ~RenderEmbeddedObject();
 
-    static RenderPtr<RenderEmbeddedObject> createForApplet(HTMLAppletElement&, PassRef<RenderStyle>);
+    static RenderPtr<RenderEmbeddedObject> createForApplet(HTMLAppletElement&, Ref<RenderStyle>&&);
 
     enum PluginUnavailabilityReason {
         PluginMissing,
@@ -86,7 +86,7 @@ private:
     void setUnavailablePluginIndicatorIsPressed(bool);
     bool isInUnavailablePluginIndicator(const MouseEvent&) const;
     bool isInUnavailablePluginIndicator(const FloatPoint&) const;
-    bool getReplacementTextGeometry(const LayoutPoint& accumulatedOffset, FloatRect& contentRect, FloatRect& indicatorRect, FloatRect& replacementTextRect, FloatRect& arrowRect, Font&, TextRun&, float& textWidth) const;
+    bool getReplacementTextGeometry(const LayoutPoint& accumulatedOffset, FloatRect& contentRect, FloatRect& indicatorRect, FloatRect& replacementTextRect, FloatRect& arrowRect, FontCascade&, TextRun&, float& textWidth) const;
     LayoutRect unavailablePluginIndicatorBounds(const LayoutPoint&) const;
 
     virtual bool canHaveChildren() const override final;
@@ -100,8 +100,6 @@ private:
     bool m_mouseDownWasInUnavailablePluginIndicator;
     String m_unavailabilityDescription;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderEmbeddedObject, isEmbeddedObject())
 
 } // namespace WebCore
 

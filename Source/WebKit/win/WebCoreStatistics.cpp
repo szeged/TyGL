@@ -23,7 +23,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#include "config.h"
 #include "WebKitDLL.h"
 #include "WebCoreStatistics.h"
 
@@ -32,7 +31,7 @@
 #include <JavaScriptCore/MemoryStatistics.h>
 #include <WebCore/FontCache.h>
 #include <WebCore/GCController.h>
-#include <WebCore/GlyphPageTreeNode.h>
+#include <WebCore/GlyphPage.h>
 #include <WebCore/IconDatabase.h>
 #include <WebCore/JSDOMWindow.h>
 #include <WebCore/PageCache.h>
@@ -145,7 +144,7 @@ HRESULT STDMETHODCALLTYPE WebCoreStatistics::javaScriptProtectedObjectTypeCounts
     /* [retval][out] */ IPropertyBag2** typeNamesAndCounts)
 {
     JSLockHolder lock(JSDOMWindow::commonVM());
-    OwnPtr<TypeCountSet> jsObjectTypeNames(JSDOMWindow::commonVM().heap.protectedObjectTypeCounts());
+    std::unique_ptr<TypeCountSet> jsObjectTypeNames(JSDOMWindow::commonVM().heap.protectedObjectTypeCounts());
     typedef TypeCountSet::const_iterator Iterator;
     Iterator end = jsObjectTypeNames->end();
     HashMap<String, int> typeCountMap;
@@ -163,7 +162,7 @@ HRESULT WebCoreStatistics::javaScriptObjectTypeCounts(IPropertyBag2** typeNamesA
         return E_POINTER;
 
     JSLockHolder lock(JSDOMWindow::commonVM());
-    OwnPtr<TypeCountSet> jsObjectTypeNames(JSDOMWindow::commonVM().heap.objectTypeCounts());
+    std::unique_ptr<TypeCountSet> jsObjectTypeNames(JSDOMWindow::commonVM().heap.objectTypeCounts());
     typedef TypeCountSet::const_iterator Iterator;
     Iterator end = jsObjectTypeNames->end();
     HashMap<String, int> typeCountMap;
@@ -216,7 +215,7 @@ HRESULT STDMETHODCALLTYPE WebCoreStatistics::cachedFontDataCount(
 {
     if (!count)
         return E_POINTER;
-    *count = (UINT) fontCache().fontDataCount();
+    *count = (UINT) fontCache().fontCount();
     return S_OK;
 }
 
@@ -225,7 +224,7 @@ HRESULT STDMETHODCALLTYPE WebCoreStatistics::cachedFontDataInactiveCount(
 {
     if (!count)
         return E_POINTER;
-    *count = (UINT) fontCache().inactiveFontDataCount();
+    *count = (UINT) fontCache().inactiveFontCount();
     return S_OK;
 }
 
@@ -240,7 +239,7 @@ HRESULT STDMETHODCALLTYPE WebCoreStatistics::glyphPageCount(
 {
     if (!count)
         return E_POINTER;
-    *count = (UINT) GlyphPageTreeNode::treeGlyphPageCount();
+    *count = (UINT) GlyphPage::count();
     return S_OK;
 }
 
@@ -328,7 +327,7 @@ HRESULT WebCoreStatistics::cachedPageCount(INT* count)
     if (!count)
         return E_POINTER;
 
-    *count = pageCache()->pageCount();
+    *count = PageCache::singleton().pageCount();
     return S_OK;
 }
 
@@ -337,6 +336,6 @@ HRESULT WebCoreStatistics::cachedFrameCount(INT* count)
     if (!count)
         return E_POINTER;
 
-    *count = pageCache()->frameCount();
+    *count = PageCache::singleton().frameCount();
     return S_OK;
 }

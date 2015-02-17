@@ -12,7 +12,10 @@
     <script src="data.js" defer></script>
     <script src="app.js" defer></script>
     <script src="manifest.js" defer></script>
+    <script src="analysis.js" defer></script>
     <script src="popup.js" defer></script>
+    <script src="interactive-chart.js" defer></script>
+    <script src="commits-viewer.js" defer></script>
     <link rel="stylesheet" href="app.css">
     <link rel="stylesheet" href="chart-pane.css">
 
@@ -75,7 +78,7 @@
                                 {{/if}}
                             {{else}}
                                 {{#if chartData}}
-                                    {{#link-to 'charts' (query-params paneList=paneList)}}
+                                    {{#link-to 'charts' (query-params paneList=paneList since=controller.since)}}
                                     {{interactive-chart
                                         chartData=chartData
                                         domain=controller.sharedDomain
@@ -128,29 +131,36 @@
         {{#each panes itemController="pane"}}
             <section class="chart-pane" tabindex="0">
                 <header>
-                    <h1 {{action "toggleDetails"}}>
-                    {{#each metric.path}}
-                        {{this}} &ni;
-                    {{/each}}
-                    {{metric.label}}
-                    - {{ platform.name}}</h2>
+                    <h1 {{action "toggleDetails"}}>{{metric.fullName}} - {{ platform.name}}</h1>
                     <a href="#" title="Close" class="close-button" {{action "close"}}>{{partial "close-button"}}</a>
+                    {{#if App.Manifest.bugTrackers}}
+                        <a href="#" title="Analysis" class="bugs-button" {{action "toggleBugsPane"}}>
+                            {{partial "analysis-button"}}
+                        </a>
+                    {{/if}}
+                    {{#if App.Manifest.repositoriesWithReportedCommits}}
+                        <a href="#" title="Search" class="search-button" {{action "toggleSearchPane"}}>{{partial "search-button"}}</a>
+                    {{/if}}
                 </header>
 
-                <div {{bind-attr class=":body showingDetails"}}>
+                <div class="body">
                     <div class="svg-container">
                     {{#if chartData}}
                         {{interactive-chart
                             chartData=chartData
+                            ranges=analyticRanges
                             domain=mainPlotDomain
                             interactive=true
+                            chartPointRadius=2
                             currentItem=currentItem
                             currentTime=sharedTime
                             selectedItem=selectedItem
+                            highlightedItems=highlightedItems
+                            rangeRoute="analysisTask"
                             selection=timeRange
-                            sharedSelection=sharedSelection
-                            selectionChanged="rangeChanged"
+                            selectedPoints=selectedPoints
                             selectionIsLocked=timeRangeIsLocked
+                            markedPoints=markedPoints
                             zoom="zoomed"}}
                     {{else}}
                         {{#if failure}}
@@ -167,9 +177,7 @@
                                 chartData=chartData
                                 showYAxis=false
                                 domain=overviewDomain
-                                domainChanged="overviewDomainChanged"
-                                selection=mainPlotDomain
-                                selectionChanged="zoomed"}}
+                                selection=overviewSelection}}
                         {{/if}}
                         </div>
                         {{#if details}}
@@ -177,6 +185,31 @@
                         {{/if}}
                     </div>
                 </div>
+
+                <form {{bind-attr class=":search-pane showingSearchPane::hidden"}}>
+                    <span class="repositories">
+                        {{view Ember.Select
+                            content=App.Manifest.repositoriesWithReportedCommits
+                            optionValuePath='content.id'
+                            optionLabelPath='content.name'
+                            selection=commitSearchRepository}}
+                    </span>
+                    {{input action="searchCommit" placeholder="Name or email" value=commitSearchKeyword}}
+                </form>
+
+                <div {{bind-attr class=":analysis-pane showingAnalysisPane::hidden"}}>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <th>
+                                    <label>Name: {{input type=text value=newAnalysisTaskName}}</label>
+                                    <button {{action "createAnalysisTask"}} {{bind-attr disabled=cannotAnalyze}}>Analyze</button>
+                                </th>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
             </section>
         {{/each}}
     </script>
@@ -195,15 +228,48 @@
                 </a>
             </div>
         {{/if}}
+        <div class="rangeBarsContainerInlineStyle">
+            {{#each rangeBars}}
+                {{#link-to linkRoute linkId title=label}}
+                    <span class="rangeBar" {{bind-attr style=inlineStyle}}></span>
+                {{/link-to}}
+            {{/each}}
+        </div>
     </script>
 
     <script type="text/x-handlebars" data-template-name="chart-details">
     <div class="details-table-container">
         <table class="details-table">
-            <tr><th>Current</th><td>{{details.currentValue}} {{chartData.unit}}
-            {{#if details.oldValue}}
-                (from {{details.oldValue}})
-            {{/if}}</td></tr>
+            <tbody class="bugs">
+            {{#each details.bugTrackers}}
+                {{#if bugs}}
+                    <tr>
+                        <th>{{label}}</th>
+                        <td>
+                            {{#each bugs}}
+                                <a {{bind-attr href=bugUrl}} target="_blank">{{bugNumber}}</a>
+                            {{/each}}
+                        </td>
+                    </tr>
+                {{/if}}
+            {{/each}}
+            </tbody>
+            <tbody class="status">
+                <tr>
+                    <th>Current</th>
+                    <td>
+                        {{details.currentValue}} {{chartData.unit}}
+                        {{#if details.valueDiff}}
+                            ({{details.valueDiff}} {{chartData.unit}})
+                        {{/if}}
+                        {{#if details.status.label}}
+                            <br>
+                            <span {{bind-attr class=details.status.className}}>{{details.status.label}}</span>
+                        {{/if}}
+                    </td>
+                </tr>
+            </tbody>
+            <tbody>
             {{#if details.buildNumber}}
                 <tr>
                     <th>Build</th>
@@ -228,41 +294,69 @@
                         {{/if}}
                     </td>
                 </tr>
-                <tr>
-                    <td colspan="2">{{commits-viewer repository=repository revisionInfo=this}}</td>
-                </tr>
             {{/each}}
+            </tbody>
         </table>
+        <div class="commits">
+            {{#each details.revisions}}
+                {{commits-viewer repository=repository revisionInfo=this caption=name}}
+            {{/each}}
+        </div>
     </div>
     </script>
 
     <script type="text/x-handlebars" data-template-name="components/commits-viewer">
     {{#if commits}}
-        <table>
-            <tbody>
-                {{#each commits}}
-                    <tr>
-                        <td>
-                            {{#if url}}
-                                <a {{bind-attr href=url}} target="_blank">{{author}}</a>
-                            {{else}}
-                                {{author}}
-                            {{/if}}
-                        </td>
-                        <td>{{message}}</td>
-                    </tr>
-                {{/each}}
-            </tbody>
+        <table {{bind-attr class=":commits-viewer visible::hidden"}}>
+            {{#if caption}}
+                <caption {{action toggleVisibility}}>{{caption}} commits</caption>
+            {{/if}}
+            {{#if visible}}
+                <tbody>
+                    {{#each commits}}
+                        <tr>
+                            <th>
+                                {{#if url}}
+                                    <a {{bind-attr href=url}} target="_blank">{{revision}}</a>
+                                {{else}}
+                                    {{revision}}
+                                {{/if}}
+                            </th>
+                            <th>{{author}}</th>
+                            <td>{{message}}</td>
+                        </tr>
+                    {{/each}}
+                </tbody>
+            {{/if}}
         </table>
     {{/if}}
     </script>
 
     <script type="text/x-handlebars" data-template-name="close-button">
-        <svg class="close-button" viewBox="0 0 100 100">
+        <svg class="close-button icon-button" viewBox="0 0 100 100">
             <g stroke="black" stroke-width="10">
                 <circle cx="50" cy="50" r="45" fill="transparent"/>
                 <polygon points="30,30 70,70" />
                 <polygon points="30,70 70,30" />
+            </g>
+        </svg>
+    </script>
+
+    <script type="text/x-handlebars" data-template-name="analysis-button">
+        <svg class="analysis-button icon-button" viewBox="0 0 100 100">
+            <g stroke="black" stroke-width="15">
+                <circle cx="50" cy="50" r="40" fill="transparent"/>
+                <line x1="50" y1="25" x2="50" y2="55"/>
+                <circle cx="50" cy="67.5" r="2.5" fill="transparent"/>
+            </g>
+        </svg>
+    </script>
+
+    <script type="text/x-handlebars" data-template-name="search-button">
+        <svg class="search-button icon-button" viewBox="0 0 100 100">
+            <g stroke="black" stroke-width="15">
+                <circle cx="60" cy="40" r="30" fill="transparent"/>
+                <line x1="10" y1="90" x2="40" y2="60"/>
             </g>
         </svg>
     </script>
@@ -289,6 +383,9 @@
                 {{/link-to}}
                 {{#link-to 'charts' tagName='li'}}
                     {{#link-to 'charts'}}Charts{{/link-to}}
+                {{/link-to}}
+                {{#link-to 'analysis' tagName='li'}}
+                    {{#link-to 'analysis'}}Analysis{{/link-to}}
                 {{/link-to}}
             </ul>
         </nav>
@@ -340,6 +437,150 @@
                 </li>
             {{/if}} {{/if}}
         {{/each}}
+    </script>
+
+    <script type="text/x-handlebars" data-template-name="analysis">
+        <header id="header">
+            {{partial "navbar"}}
+        </header>
+
+        <table id="analysis-tasks">
+            <thead>
+                <tr>
+                    <td>ID</td>
+                    <td>Name</td>
+                    <td>Created at</td>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each model.tasks}}
+                    <tr>
+                        <td>{{#link-to 'analysisTask' id}}{{id}}{{/link-to}}</td>
+                        <td>{{name}}</td>
+                        <td>{{createdAt}}</td>
+                    </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </script>
+
+    <script type="text/x-handlebars" data-template-name="analysisTask">
+        <header id="header">
+            {{partial "navbar"}}
+        </header>
+
+        <h2 id="analysis-task-title">{{label}}</h2>
+        {{#if platform.label}}
+            <h3 id="analysis-task-testname">{{metric.fullName}} - {{platform.label}}</h3>
+        {{/if}}
+
+        {{#if chartData}}
+            <section class="analysis-chart-pane chart-pane">
+                <div class="svg-container">
+                    {{interactive-chart
+                        chartData=chartData
+                        enableSelection=false
+                        chartPointRadius=2
+                        domain=chartDomain
+                        highlightedItems=highlightedItems}}
+                </div>
+                <div class="details">
+                    <table class="analysis-bugs">
+                        <tbody>
+                            {{#each bugTrackers}}
+                                <tr>
+                                    <th>{{label}}</th>
+                                    <td>
+                                        <form {{action "associateBug" this editedBugNumber on="submit"}}>
+                                            {{input type=text value=editedBugNumber}}
+                                        </form>
+                                    </td>
+                                </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                    <table>
+                        <tbody>
+                            {{#each analysisPoints}}
+                                <tr><td>{{label}}</td><td>{{value}}</td></tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {{#each testGroups}}
+                <section class="analysis-group">
+                    <table>
+                        <caption>{{name}}</caption>
+                        <thead>
+                            <tr>
+                                <td>Order</td>
+                                <td>Configuration</td>
+                                <td>Status</td>
+                                <td>Build</td>
+                                <td>{{../metric.fullName}}</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each buildRequests}}
+                                <tr>
+                                    <td>{{orderLabel}}</td>
+                                    <td>{{config}}</td>
+                                    <td>{{#if url}}{{#link-to url}}{{statusLabel}}{{/link-to}}{{else}}{{statusLabel}}{{/if}}</td>
+                                    <td>{{build}}</td>
+                                    <td>{{mean}}</td>
+                                </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </section>
+            {{/each}}
+
+            {{#if roots}}
+            <form method="POST" {{action "createTestGroup" newTestGroupName repetitionCount on="submit"}} class="analysis-group">
+                <table>
+                    <caption>{{input name="name" value=newTestGroupName placeholder="Test group name" required=true type="text"}}</caption>
+                    <thead>
+                        <tr>
+                            <th>Root</th>
+                            {{#each testSets}}
+                                <th>
+                                    {{name}}
+                                    {{view Ember.Select
+                                        content=options
+                                        optionValuePath="content.value"
+                                        optionLabelPath="content.label"
+                                        selection=selection}}
+                                </th>
+                            {{/each}}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#each roots}}
+                            <tr>
+                                <th>{{name}}</th>
+                                {{#each sets}}
+                                    <td>{{view Ember.Select name=name content=revisions disabled=true
+                                        optionValuePath="content.value" optionLabelPath="content.label"
+                                        selection=selection}}</td>
+                                {{/each}}
+                            </tr>
+                        {{/each}}
+                    </tbody>
+                    <tbody>
+                        <tr>
+                            <th>Number of runs</th>
+                            <td colspan=2>
+                                {{view Ember.Select content=possibleRepetitionCounts value=repetitionCount}}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <button type="submit">Start A/B testing</button>
+            </form>
+            {{/if}}
+        {{/if}}
     </script>
 
 </head>

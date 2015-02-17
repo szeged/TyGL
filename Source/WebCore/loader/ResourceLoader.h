@@ -47,7 +47,6 @@ class DocumentLoader;
 class Frame;
 class FrameLoader;
 class URL;
-class ResourceBuffer;
 
 #if USE(QUICK_LOOK)
 class QuickLookHandle;
@@ -72,6 +71,7 @@ public:
 #endif
 
     WEBCORE_EXPORT FrameLoader* frameLoader() const;
+    FrameLoader& dataProtocolFrameLoader() const;
     DocumentLoader* documentLoader() const { return m_documentLoader.get(); }
     WEBCORE_EXPORT const ResourceRequest& originalRequest() const { return m_originalRequest; }
     
@@ -88,12 +88,13 @@ public:
     virtual void releaseResources();
     const ResourceResponse& response() const;
 
-    ResourceBuffer* resourceData() const { return m_resourceData.get(); }
+    SharedBuffer* resourceData() const { return m_resourceData.get(); }
     void clearResourceData();
     
     virtual bool isSubresourceLoader();
-    
+
     virtual void willSendRequest(ResourceRequest&, const ResourceResponse& redirectResponse);
+    virtual void willSendRequest(ResourceRequest&&, const ResourceResponse& redirectResponse, std::function<void(ResourceRequest&)> callback);
     virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent);
     virtual void didReceiveResponse(const ResourceResponse&);
     virtual void didReceiveData(const char*, unsigned, long long encodedDataLength, DataPayloadType);
@@ -204,7 +205,7 @@ private:
 
     ResourceRequest m_request;
     ResourceRequest m_originalRequest; // Before redirects.
-    RefPtr<ResourceBuffer> m_resourceData;
+    RefPtr<SharedBuffer> m_resourceData;
     
     unsigned long m_identifier;
 

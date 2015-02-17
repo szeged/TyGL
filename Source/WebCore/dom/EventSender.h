@@ -49,17 +49,17 @@ public:
 #endif
 
 private:
-    void timerFired(Timer<EventSender<T>>&) { dispatchPendingEvents(); }
+    void timerFired() { dispatchPendingEvents(); }
 
     AtomicString m_eventType;
-    Timer<EventSender<T>> m_timer;
+    Timer m_timer;
     Vector<T*> m_dispatchSoonList;
     Vector<T*> m_dispatchingList;
 };
 
 template<typename T> EventSender<T>::EventSender(const AtomicString& eventType)
     : m_eventType(eventType)
-    , m_timer(this, &EventSender::timerFired)
+    , m_timer(*this, &EventSender::timerFired)
 {
 }
 

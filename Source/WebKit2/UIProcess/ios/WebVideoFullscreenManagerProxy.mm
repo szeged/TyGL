@@ -29,6 +29,7 @@
 #if PLATFORM(IOS)
 
 #import "RemoteLayerTreeDrawingAreaProxy.h"
+#import "UIKitSPI.h"
 #import "WebPageProxy.h"
 #import "WebProcessProxy.h"
 #import "WebVideoFullscreenManagerMessages.h"
@@ -37,19 +38,12 @@
 #import <WebCore/TimeRanges.h>
 #import <WebKitSystemInterface.h>
 
-#if USE(APPLE_INTERNAL_SDK)
-#import <UIKit/UIWindow_Private.h>
-#else
-#import <UIKit/UIWindow.h>
-@interface UIWindow (Details)
-+ (mach_port_t)_synchronizeDrawingAcrossProcesses;
-@end
-#endif
-
 using namespace WebCore;
 
 namespace WebKit {
-    
+
+#if __IPHONE_OS_VERSION_MIN_REQUIRED > 80200
+
 PassRefPtr<WebVideoFullscreenManagerProxy> WebVideoFullscreenManagerProxy::create(WebPageProxy& page)
 {
     return adoptRef(new WebVideoFullscreenManagerProxy(page));
@@ -67,7 +61,7 @@ WebVideoFullscreenManagerProxy::~WebVideoFullscreenManagerProxy()
 {
     if (!m_page)
         return;
-    m_page->process().removeMessageReceiver(Messages::WebVideoFullscreenManagerProxy::messageReceiverName(), m_page->pageID());
+    invalidate();
 }
 
 void WebVideoFullscreenManagerProxy::invalidate()
@@ -81,7 +75,7 @@ void WebVideoFullscreenManagerProxy::invalidate()
     m_layerHost.clear();
 }
 
-void WebVideoFullscreenManagerProxy::setupFullscreenWithID(uint32_t videoLayerID, WebCore::IntRect initialRect, float hostingDeviceScaleFactor)
+void WebVideoFullscreenManagerProxy::setupFullscreenWithID(uint32_t videoLayerID, WebCore::IntRect initialRect, float hostingDeviceScaleFactor, HTMLMediaElement::VideoFullscreenMode videoFullscreenMode, bool allowOptimizedFullscreen)
 {
     ASSERT(videoLayerID);
     m_layerHost = WKMakeRenderLayer(videoLayerID);
@@ -92,10 +86,15 @@ void WebVideoFullscreenManagerProxy::setupFullscreenWithID(uint32_t videoLayerID
     }
 
     UIView *parentView = downcast<RemoteLayerTreeDrawingAreaProxy>(*m_page->drawingArea()).remoteLayerTreeHost().rootLayer();
-    setupFullscreen(*m_layerHost.get(), initialRect, parentView);
+    setupFullscreen(*m_layerHost.get(), initialRect, parentView, videoFullscreenMode, allowOptimizedFullscreen);
 }
     
-void WebVideoFullscreenManagerProxy::setSeekableRangesVector(Vector<std::pair<double, double>>& ranges)
+void WebVideoFullscreenManagerProxy::fullscreenModeChanged(HTMLMediaElement::VideoFullscreenMode mode)
+{
+    m_page->send(Messages::WebVideoFullscreenManager::fullscreenModeChanged(mode), m_page->pageID());
+}
+    
+void WebVideoFullscreenManagerProxy::setSeekableRangesVector(const Vector<std::pair<double, double>>& ranges)
 {
     RefPtr<TimeRanges> timeRanges = TimeRanges::create();
     for (const auto& range : ranges)
@@ -118,6 +117,11 @@ void WebVideoFullscreenManagerProxy::setExternalPlaybackProperties(bool enabled,
     setExternalPlayback(enabled, type, localizedDeviceName);
 }
     
+void WebVideoFullscreenManagerProxy::fullscreenMayReturnToInline()
+{
+    m_page->fullscreenMayReturnToInline();
+}
+
 void WebVideoFullscreenManagerProxy::requestExitFullscreen()
 {
     m_page->send(Messages::WebVideoFullscreenManager::RequestExitFullscreen(), m_page->pageID());
@@ -126,10 +130,12 @@ void WebVideoFullscreenManagerProxy::requestExitFullscreen()
 void WebVideoFullscreenManagerProxy::didExitFullscreen()
 {
     m_page->send(Messages::WebVideoFullscreenManager::DidExitFullscreen(), m_page->pageID());
+    m_page->didExitFullscreen();
 }
     
 void WebVideoFullscreenManagerProxy::didCleanupFullscreen()
 {
+    [CATransaction flush];
     [m_layerHost removeFromSuperlayer];
     m_layerHost.clear();
     m_page->send(Messages::WebVideoFullscreenManager::DidCleanupFullscreen(), m_page->pageID());
@@ -143,6 +149,7 @@ void WebVideoFullscreenManagerProxy::didSetupFullscreen()
 void WebVideoFullscreenManagerProxy::didEnterFullscreen()
 {
     m_page->send(Messages::WebVideoFullscreenManager::DidEnterFullscreen(), m_page->pageID());
+    m_page->didEnterFullscreen();
 }
 
 void WebVideoFullscreenManagerProxy::play()
@@ -215,6 +222,7 @@ void WebVideoFullscreenManagerProxy::selectLegibleMediaOption(uint64_t index)
 {
     m_page->send(Messages::WebVideoFullscreenManager::SelectLegibleMediaOption(index), m_page->pageID());
 }
+#endif
 
 } // namespace WebKit
 

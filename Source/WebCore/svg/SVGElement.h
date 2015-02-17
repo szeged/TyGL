@@ -49,6 +49,7 @@ class SVGDocumentExtensions;
 class SVGElementInstance;
 class SVGElementRareData;
 class SVGSVGElement;
+class SVGUseElement;
 
 void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap, const QualifiedName& attrName);
 
@@ -66,7 +67,7 @@ public:
     static bool isAnimatableCSSProperty(const QualifiedName&);
     bool isPresentationAttributeWithSVGDOM(const QualifiedName&);
     bool isKnownAttribute(const QualifiedName&);
-    PassRefPtr<CSSValue> getPresentationAttribute(const String& name);
+    RefPtr<CSSValue> getPresentationAttribute(const String& name);
     virtual bool supportsMarkers() const { return false; }
     bool hasRelativeLengths() const { return !m_elementsWithRelativeLengths.isEmpty(); }
     virtual bool needsPendingResourceHandling() const { return true; }
@@ -85,12 +86,12 @@ public:
 
     virtual void svgAttributeChanged(const QualifiedName&);
 
-    void animatedPropertyTypeForAttribute(const QualifiedName&, Vector<AnimatedPropertyType>&);
+    Vector<AnimatedPropertyType> animatedPropertyTypesForAttribute(const QualifiedName&);
 
     void sendSVGLoadEventIfPossible(bool sendParentLoadEvents = false);
     void sendSVGLoadEventIfPossibleAsynchronously();
-    void svgLoadEventTimerFired(Timer<SVGElement>*);
-    virtual Timer<SVGElement>* svgLoadEventTimer();
+    void svgLoadEventTimerFired();
+    virtual Timer* svgLoadEventTimer();
 
     virtual AffineTransform* supplementalTransform() { return 0; }
 
@@ -102,7 +103,8 @@ public:
         setNeedsStyleRecalc(InlineStyleChange);
     }
 
-    const HashSet<SVGElementInstance*>& instancesForElement() const;
+    // The instances of an element are clones made in shadow trees to implement <use>.
+    const HashSet<SVGElement*>& instances() const;
 
     bool getBoundingBox(FloatRect&, SVGLocatable::StyleUpdateStrategy = SVGLocatable::AllowStyleUpdate);
 
@@ -112,12 +114,14 @@ public:
     void cursorImageValueRemoved();
 
     SVGElement* correspondingElement();
+    SVGUseElement* correspondingUseElement() const;
+
     void setCorrespondingElement(SVGElement*);
 
     void synchronizeAnimatedSVGAttribute(const QualifiedName&) const;
     static void synchronizeAllAnimatedSVGAttribute(SVGElement*);
  
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer(RenderStyle& parentStyle) override;
+    virtual RefPtr<RenderStyle> customStyleForRenderer(RenderStyle& parentStyle) override;
 
     static void synchronizeRequiredFeatures(SVGElement* contextElement);
     static void synchronizeRequiredExtensions(SVGElement* contextElement);
@@ -151,6 +155,8 @@ public:
 
     void callClearTarget() { clearTarget(); }
 
+    class InstanceUpdateBlocker;
+
 protected:
     SVGElement(const QualifiedName&, Document&);
     virtual ~SVGElement();
@@ -179,6 +185,8 @@ protected:
     void updateRelativeLengthsInformation() { updateRelativeLengthsInformation(selfHasRelativeLengths(), this); }
     void updateRelativeLengthsInformation(bool hasRelativeLengths, SVGElement*);
 
+    class InstanceInvalidationGuard;
+
 private:
     friend class SVGElementInstance;
 
@@ -189,15 +197,14 @@ private:
 
     virtual void clearTarget() { }
 
-    void mapInstanceToElement(SVGElementInstance*);
-    void removeInstanceMapping(SVGElementInstance*);
-
     void buildPendingResourcesIfNeeded();
     virtual void accessKeyAction(bool sendMouseEvents) override;
 
 #ifndef NDEBUG
     virtual bool filterOutAnimatableAttribute(const QualifiedName&) const;
 #endif
+
+    void invalidateInstances();
 
     std::unique_ptr<SVGElementRareData> m_svgRareData;
 
@@ -207,6 +214,22 @@ private:
         DECLARE_ANIMATED_STRING(ClassName, className)
     END_DECLARE_ANIMATED_PROPERTIES
 
+};
+
+class SVGElement::InstanceInvalidationGuard {
+public:
+    InstanceInvalidationGuard(SVGElement&);
+    ~InstanceInvalidationGuard();
+private:
+    SVGElement& m_element;
+};
+
+class SVGElement::InstanceUpdateBlocker {
+public:
+    InstanceUpdateBlocker(SVGElement&);
+    ~InstanceUpdateBlocker();
+private:
+    SVGElement& m_element;
 };
 
 struct SVGAttributeHashTranslator {
@@ -220,6 +243,27 @@ struct SVGAttributeHashTranslator {
     }
     static bool equal(const QualifiedName& a, const QualifiedName& b) { return a.matches(b); }
 };
+
+inline SVGElement::InstanceInvalidationGuard::InstanceInvalidationGuard(SVGElement& element)
+    : m_element(element)
+{
+}
+
+inline SVGElement::InstanceInvalidationGuard::~InstanceInvalidationGuard()
+{
+    m_element.invalidateInstances();
+}
+
+inline SVGElement::InstanceUpdateBlocker::InstanceUpdateBlocker(SVGElement& element)
+    : m_element(element)
+{
+    m_element.setInstanceUpdatesBlocked(true);
+}
+
+inline SVGElement::InstanceUpdateBlocker::~InstanceUpdateBlocker()
+{
+    m_element.setInstanceUpdatesBlocked(false);
+}
 
 inline bool Node::hasTagName(const SVGQualifiedName& name) const
 {

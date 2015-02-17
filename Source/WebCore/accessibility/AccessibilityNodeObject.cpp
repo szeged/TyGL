@@ -31,6 +31,7 @@
 
 #include "AXObjectCache.h"
 #include "AccessibilityImageMapLink.h"
+#include "AccessibilityList.h"
 #include "AccessibilityListBox.h"
 #include "AccessibilitySpinButton.h"
 #include "AccessibilityTable.h"
@@ -88,7 +89,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static String accessibleNameForNode(Node*);
+static String accessibleNameForNode(Node* node, Node* labelledbyNode = nullptr);
 
 AccessibilityNodeObject::AccessibilityNodeObject(Node* node)
     : AccessibilityObject()
@@ -116,9 +117,9 @@ void AccessibilityNodeObject::init()
     m_role = determineAccessibilityRole();
 }
 
-PassRefPtr<AccessibilityNodeObject> AccessibilityNodeObject::create(Node* node)
+Ref<AccessibilityNodeObject> AccessibilityNodeObject::create(Node* node)
 {
-    return adoptRef(new AccessibilityNodeObject(node));
+    return adoptRef(*new AccessibilityNodeObject(node));
 }
 
 void AccessibilityNodeObject::detach(AccessibilityDetachmentType detachmentType, AXObjectCache* cache)
@@ -280,12 +281,9 @@ AccessibilityRole AccessibilityNodeObject::determineAccessibilityRole()
     if (!node())
         return UnknownRole;
 
-    m_ariaRole = determineAriaRoleAttribute();
+    if ((m_ariaRole = determineAriaRoleAttribute()) != UnknownRole)
+        return m_ariaRole;
     
-    AccessibilityRole ariaRole = ariaRoleAttribute();
-    if (ariaRole != UnknownRole)
-        return ariaRole;
-
     if (node()->isLink())
         return WebCoreLinkRole;
     if (node()->isTextNode())
@@ -302,7 +300,9 @@ AccessibilityRole AccessibilityNodeObject::determineAccessibilityRole()
             return buttonRoleType();
         if (input.isRangeControl())
             return SliderRole;
-
+        if (input.isInputTypeHidden())
+            return IgnoredRole;
+        
 #if ENABLE(INPUT_TYPE_COLOR)
         const AtomicString& type = input.getAttribute(typeAttr);
         if (equalIgnoringCase(type, "color"))
@@ -319,6 +319,8 @@ AccessibilityRole AccessibilityNodeObject::determineAccessibilityRole()
         return TextAreaRole;
     if (headingLevel())
         return HeadingRole;
+    if (node()->hasTagName(blockquoteTag))
+        return BlockquoteRole;
     if (node()->hasTagName(divTag))
         return DivRole;
     if (node()->hasTagName(pTag))
@@ -436,6 +438,9 @@ bool AccessibilityNodeObject::computeAccessibilityIsIgnored() const
     if (isDescendantOfBarrenParent())
         return true;
 
+    if (roleValue() == IgnoredRole)
+        return true;
+    
     return m_role == UnknownRole;
 }
 
@@ -454,11 +459,6 @@ bool AccessibilityNodeObject::canvasHasFallbackContent() const
 bool AccessibilityNodeObject::isImageButton() const
 {
     return isNativeImage() && isButton();
-}
-
-bool AccessibilityNodeObject::isAnchor() const
-{
-    return !isNativeImage() && isLink();
 }
 
 bool AccessibilityNodeObject::isNativeTextControl() const
@@ -959,7 +959,7 @@ Element* AccessibilityNodeObject::anchorElement() const
     // search up the DOM tree for an anchor element
     // NOTE: this assumes that any non-image with an anchor is an HTMLAnchorElement
     for ( ; node; node = node->parentNode()) {
-        if (is<HTMLAnchorElement>(*node) || (node->renderer() && cache->getOrCreate(node->renderer())->isAnchor()))
+        if (is<HTMLAnchorElement>(*node) || (node->renderer() && cache->getOrCreate(node->renderer())->isLink()))
             return downcast<Element>(node);
     }
 
@@ -1076,13 +1076,13 @@ void AccessibilityNodeObject::alterSliderValue(bool increase)
     
 void AccessibilityNodeObject::increment()
 {
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture, document());
     alterSliderValue(true);
 }
 
 void AccessibilityNodeObject::decrement()
 {
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture, document());
     alterSliderValue(false);
 }
 
@@ -1279,8 +1279,8 @@ void AccessibilityNodeObject::alternativeText(Vector<AccessibilityText>& textOrd
         textOrder.append(AccessibilityText(ariaLabel, AlternativeText));
     
     if (usesAltTagForTextComputation()) {
-        if (renderer() && renderer()->isRenderImage()) {
-            String renderAltText = toRenderImage(renderer())->altText();
+        if (is<RenderImage>(renderer())) {
+            String renderAltText = downcast<RenderImage>(*renderer()).altText();
 
             // RenderImage will return title as a fallback from altText, but we don't want title here because we consider that in helpText.
             if (!renderAltText.isEmpty() && renderAltText != getAttribute(titleAttr)) {
@@ -1468,7 +1468,7 @@ String AccessibilityNodeObject::alternativeTextForWebArea() const
     if (!documentTitle.isEmpty())
         return documentTitle;
     
-    if (auto* body = document->body())
+    if (auto* body = document->bodyOrFrameset())
         return body->getNameAttribute();
     
     return String();
@@ -1582,7 +1582,7 @@ unsigned AccessibilityNodeObject::hierarchicalLevel() const
 
 // When building the textUnderElement for an object, determine whether or not
 // we should include the inner text of this given descendant object or skip it.
-static bool shouldUseAccessiblityObjectInnerText(AccessibilityObject* obj, AccessibilityTextUnderElementMode mode)
+static bool shouldUseAccessibilityObjectInnerText(AccessibilityObject* obj, AccessibilityTextUnderElementMode mode)
 {
     // Do not use any heuristic if we are explicitly asking to include all the children.
     if (mode.childrenInclusion == AccessibilityTextUnderElementMode::TextUnderElementModeIncludeAllChildren)
@@ -1623,7 +1623,13 @@ static bool shouldUseAccessiblityObjectInnerText(AccessibilityObject* obj, Acces
         return false;
 
     // Skip big container elements like lists, tables, etc.
-    if (obj->isList() || obj->isAccessibilityTable() || obj->isTree() || obj->isCanvas())
+    if (is<AccessibilityList>(*obj))
+        return false;
+
+    if (is<AccessibilityTable>(*obj) && downcast<AccessibilityTable>(*obj).isExposableThroughAccessibility())
+        return false;
+
+    if (obj->isTree() || obj->isCanvas())
         return false;
 
     return true;
@@ -1659,6 +1665,8 @@ String AccessibilityNodeObject::textUnderElement(AccessibilityTextUnderElementMo
 
     StringBuilder builder;
     for (AccessibilityObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (mode.ignoredChildNode && child->node() == mode.ignoredChildNode)
+            continue;
         
         bool shouldDeriveNameFromAuthor = (mode.childrenInclusion == AccessibilityTextUnderElementMode::TextUnderElementModeIncludeNameFromContentsChildren && !child->accessibleNameDerivesFromContent());
         if (shouldDeriveNameFromAuthor) {
@@ -1666,12 +1674,12 @@ String AccessibilityNodeObject::textUnderElement(AccessibilityTextUnderElementMo
             continue;
         }
         
-        if (!shouldUseAccessiblityObjectInnerText(child, mode))
+        if (!shouldUseAccessibilityObjectInnerText(child, mode))
             continue;
 
-        if (child->isAccessibilityNodeObject()) {
+        if (is<AccessibilityNodeObject>(*child)) {
             Vector<AccessibilityText> textOrder;
-            toAccessibilityNodeObject(child)->alternativeText(textOrder);
+            downcast<AccessibilityNodeObject>(*child).alternativeText(textOrder);
             if (textOrder.size() > 0 && textOrder[0].text.length()) {
                 appendNameToStringBuilder(builder, textOrder[0].text);
                 continue;
@@ -1835,7 +1843,7 @@ void AccessibilityNodeObject::colorValue(int& r, int& g, int& b) const
 
 // This function implements the ARIA accessible name as described by the Mozilla                                        
 // ARIA Implementer's Guide.                                                                                            
-static String accessibleNameForNode(Node* node)
+static String accessibleNameForNode(Node* node, Node* labelledbyNode)
 {
     ASSERT(node);
     if (!is<Element>(node))
@@ -1865,7 +1873,7 @@ static String accessibleNameForNode(Node* node)
     String text;
     if (axObject) {
         if (axObject->accessibleNameDerivesFromContent())
-            text = axObject->textUnderElement(AccessibilityTextUnderElementMode(AccessibilityTextUnderElementMode::TextUnderElementModeIncludeNameFromContentsChildren, true));
+            text = axObject->textUnderElement(AccessibilityTextUnderElementMode(AccessibilityTextUnderElementMode::TextUnderElementModeIncludeNameFromContentsChildren, true, labelledbyNode));
     } else
         text = element.innerText();
 
@@ -1884,7 +1892,7 @@ String AccessibilityNodeObject::accessibilityDescriptionForElements(Vector<Eleme
     StringBuilder builder;
     unsigned size = elements.size();
     for (unsigned i = 0; i < size; ++i)
-        appendNameToStringBuilder(builder, accessibleNameForNode(elements[i]));
+        appendNameToStringBuilder(builder, accessibleNameForNode(elements[i], node()));
     return builder.toString();
 }
 

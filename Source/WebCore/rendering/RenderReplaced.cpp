@@ -46,21 +46,21 @@ namespace WebCore {
 const int cDefaultWidth = 300;
 const int cDefaultHeight = 150;
 
-RenderReplaced::RenderReplaced(Element& element, PassRef<RenderStyle> style)
+RenderReplaced::RenderReplaced(Element& element, Ref<RenderStyle>&& style)
     : RenderBox(element, WTF::move(style), RenderReplacedFlag)
     , m_intrinsicSize(cDefaultWidth, cDefaultHeight)
 {
     setReplaced(true);
 }
 
-RenderReplaced::RenderReplaced(Element& element, PassRef<RenderStyle> style, const LayoutSize& intrinsicSize)
+RenderReplaced::RenderReplaced(Element& element, Ref<RenderStyle>&& style, const LayoutSize& intrinsicSize)
     : RenderBox(element, WTF::move(style), RenderReplacedFlag)
     , m_intrinsicSize(intrinsicSize)
 {
     setReplaced(true);
 }
 
-RenderReplaced::RenderReplaced(Document& document, PassRef<RenderStyle> style, const LayoutSize& intrinsicSize)
+RenderReplaced::RenderReplaced(Document& document, Ref<RenderStyle>&& style, const LayoutSize& intrinsicSize)
     : RenderBox(document, WTF::move(style), RenderReplacedFlag)
     , m_intrinsicSize(intrinsicSize)
 {
@@ -74,7 +74,7 @@ RenderReplaced::~RenderReplaced()
 void RenderReplaced::willBeDestroyed()
 {
     if (!documentBeingDestroyed() && parent())
-        parent()->dirtyLinesFromChangedChild(this);
+        parent()->dirtyLinesFromChangedChild(*this);
 
     RenderBox::willBeDestroyed();
 }
@@ -286,8 +286,8 @@ void RenderReplaced::computeAspectRatioInformationForRenderBox(RenderBox* conten
         // Handle zoom & vertical writing modes here, as the embedded document doesn't know about them.
         intrinsicSize.scale(style().effectiveZoom());
 
-        if (isRenderImage())
-            intrinsicSize.scale(toRenderImage(this)->imageDevicePixelRatio());
+        if (is<RenderImage>(*this))
+            intrinsicSize.scale(downcast<RenderImage>(*this).imageDevicePixelRatio());
 
         // Update our intrinsic size to match what the content renderer has computed, so that when we
         // constrain the size below, the correct intrinsic size will be obtained for comparison against
@@ -324,11 +324,11 @@ void RenderReplaced::computeAspectRatioInformationForRenderBox(RenderBox* conten
 LayoutRect RenderReplaced::replacedContentRect(const LayoutSize& intrinsicSize) const
 {
     LayoutRect contentRect = contentBoxRect();
-    ObjectFit objectFit = style().objectFit();
-    if (objectFit == ObjectFitFill)
+    if (intrinsicSize.isEmpty())
         return contentRect;
 
-    if (!intrinsicSize.width() || !intrinsicSize.height())
+    ObjectFit objectFit = style().objectFit();
+    if (objectFit == ObjectFitFill)
         return contentRect;
 
     LayoutRect finalRect = contentRect;

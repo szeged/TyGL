@@ -1,3 +1,122 @@
+2015-02-03  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix. Turn on feature flags for items
+        we currently ship/test on Mac.
+
+        * win/tools/vsprops/FeatureDefines.props: Activate ENABLE_DOM4_EVENTS_CONSTRUCTOR
+        and CURSOR_VISIBILITY.
+
+2015-01-28  Sam Weinig  <sam@webkit.org>
+
+        Remove libWebKitSystemInterfaceMountainLion.a
+
+        Reviewed by Mark Rowe.
+
+        * libWebKitSystemInterfaceMountainLion.a: Removed.
+
+2015-01-28  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Enable CSS_SELECTORS_LEVEL4.
+        https://bugs.webkit.org/show_bug.cgi?id=141003
+
+        Reviewed by Brent Fulgham.
+
+        * win/tools/vsprops/FeatureDefinesCairo.props:
+
+2015-01-22  David Kilzer  <ddkilzer@apple.com>
+
+        [iOS] Fix build for external iphoneos SDK
+
+        Reviewed by Daniel Bates.
+
+        * WebKitSystemInterface.h: Remove import of the
+        <IOSurface/IOSurface.h> header, and add a typedef for
+        IOSurfaceRef in its place.
+
+2015-01-22  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed gardening.
+
+        Activate ENABLE(MOUSE_CURSOR_SCALE). This works on Windows and causes more tests to pass.
+
+        * win/tools/vsprops/FeatureDefines.props:
+        * win/tools/vsprops/FeatureDefinesCairo.props:
+
+2015-01-20  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed gardening.
+
+        * win/tools/vsprops/FeatureDefines.props: Add feature definition for SVG converter,
+        but do NOT turn it on.
+        * win/tools/vsprops/FeatureDefinesCairo.props: Ditto.
+
+2015-01-19  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo][Video] Windows Media Foundation implementation is not completed.
+        https://bugs.webkit.org/show_bug.cgi?id=140337
+
+        Reviewed by Alex Christensen.
+
+        Link with Media Foundation libraries.
+
+        * win/tools/vsprops/WinCairo.props:
+
+2015-01-01  Jeff Miller  <jeffm@apple.com>
+
+        Update user-visible copyright strings to include 2015
+        https://bugs.webkit.org/show_bug.cgi?id=139880
+
+        Reviewed by Darin Adler.
+
+        * win/tools/scripts/COPYRIGHT-END-YEAR:
+
+2014-12-19  Daniel Bates  <dabates@apple.com>
+
+        [iOS] Add WebKitSystemInterface for iOS 8.1
+        https://bugs.webkit.org/show_bug.cgi?id=139831
+
+        Reviewed by Alexey Proskuryakov.
+
+        Towards building the iOS WebKit port using the public SDK, add the
+        WebKitSystemInterface for iOS version 8.1.
+
+        * WebKitSystemInterfaceIOS.h: Added.
+        * libWebKitSystemInterfaceIOSDevice8.1.a: Added.
+        * libWebKitSystemInterfaceIOSSimulator8.1.a: Added.
+
+2014-12-17  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix (for full build)
+
+        * win/tools/vsprops/FeatureDefines.props: Add missing export so the
+        derived sources are generated properly.
+        * win/tools/vsprops/FeatureDefinesCairo.props: Ditto.
+
+2014-10-29  Tim Horton  <timothy_horton@apple.com>
+
+        Implement action menus for data detected items
+        https://bugs.webkit.org/show_bug.cgi?id=138178
+        <rdar://problem/18709436>
+
+        Reviewed by Anders Carlsson.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceMavericks.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+        * libWebKitSystemInterfaceYosemite.a:
+        Update WebKitSystemInterface.
+
+2014-10-14  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Enable Encrypted Media Support
+        https://bugs.webkit.org/show_bug.cgi?id=137710
+        <rdar://problem/18652699>
+
+        Reviewed by Jer Noble.
+
+        * win/tools/vsprops/FeatureDefines.props: Activate the
+        ENCRYPTED_MEDIA_V2 flag on Windows.
+
 2014-10-01  Mark Rowe  <mrowe@apple.com>
 
         <https://webkit.org/b/137308> WebKit should build on OS X Yosemite for external users

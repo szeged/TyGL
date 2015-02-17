@@ -31,7 +31,6 @@
 #include "PlatformCALayer.h"
 #include "PlatformCALayerClient.h"
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RetainPtr.h>
 
 namespace WebCore {
@@ -50,7 +49,7 @@ public:
     void update();
     void setPosition(const FloatPoint& position) { m_position = position; }
 
-    PlatformCALayer& layer() { return m_layer.get(); }
+    PlatformCALayer& layer() { return m_layer; }
 
     void setDeviceScaleFactor(float);
 

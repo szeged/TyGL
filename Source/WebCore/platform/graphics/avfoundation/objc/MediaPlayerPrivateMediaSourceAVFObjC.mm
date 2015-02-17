@@ -29,6 +29,7 @@
 #if ENABLE(MEDIA_SOURCE) && USE(AVFOUNDATION)
 
 #import "CDMSessionMediaSourceAVFObjC.h"
+#import "FileSystem.h"
 #import "Logging.h"
 #import "MediaSourcePrivateAVFObjC.h"
 #import "MediaSourcePrivateClient.h"
@@ -57,6 +58,7 @@ SOFT_LINK_CLASS_OPTIONAL(AVFoundation, AVSampleBufferAudioRenderer)
 SOFT_LINK_CLASS_OPTIONAL(AVFoundation, AVSampleBufferDisplayLayer)
 SOFT_LINK_CLASS_OPTIONAL(AVFoundation, AVSampleBufferRenderSynchronizer)
 SOFT_LINK_CLASS_OPTIONAL(AVFoundation, AVStreamDataParser)
+SOFT_LINK_CLASS_OPTIONAL(AVFoundation, AVStreamSession);
 SOFT_LINK_CLASS_OPTIONAL(AVFoundation, AVVideoPerformanceMetrics)
 
 typedef struct opaqueCMNotificationCenter *CMNotificationCenterRef;
@@ -115,6 +117,13 @@ SOFT_LINK_CONSTANT(CoreMedia, kCMTimebaseNotification_EffectiveRateChanged, CFSt
 - (void)removeTimeObserver:(id)observer;
 @end
 
+#pragma mark - 
+#pragma mark AVStreamSession
+
+@interface AVStreamSession : NSObject
+- (instancetype)initWithStorageDirectoryAtURL:(NSURL *)storageDirectory;
+@end
+
 namespace WebCore {
 
 #pragma mark -
@@ -134,8 +143,8 @@ static void CMTimebaseEffectiveRateChangedCallback(CMNotificationCenterRef, cons
 MediaPlayerPrivateMediaSourceAVFObjC::MediaPlayerPrivateMediaSourceAVFObjC(MediaPlayer* player)
     : m_player(player)
     , m_weakPtrFactory(this)
-    , m_synchronizer(adoptNS([[getAVSampleBufferRenderSynchronizerClass() alloc] init]))
-    , m_seekTimer(this, &MediaPlayerPrivateMediaSourceAVFObjC::seekTimerFired)
+    , m_synchronizer(adoptNS([allocAVSampleBufferRenderSynchronizerInstance() init]))
+    , m_seekTimer(*this, &MediaPlayerPrivateMediaSourceAVFObjC::seekTimerFired)
     , m_session(nullptr)
     , m_networkState(MediaPlayer::Empty)
     , m_readyState(MediaPlayer::HaveNothing)
@@ -328,7 +337,7 @@ void MediaPlayerPrivateMediaSourceAVFObjC::pauseInternal()
 
 bool MediaPlayerPrivateMediaSourceAVFObjC::paused() const
 {
-    return !m_playing;
+    return ![m_synchronizer rate];
 }
 
 void MediaPlayerPrivateMediaSourceAVFObjC::setVolume(float volume)
@@ -414,7 +423,7 @@ void MediaPlayerPrivateMediaSourceAVFObjC::seekWithTolerance(const MediaTime& ti
     m_seekTimer.startOneShot(0);
 }
 
-void MediaPlayerPrivateMediaSourceAVFObjC::seekTimerFired(Timer<MediaPlayerPrivateMediaSourceAVFObjC>&)
+void MediaPlayerPrivateMediaSourceAVFObjC::seekTimerFired()
 {
     seekInternal();
 }
@@ -598,7 +607,11 @@ void MediaPlayerPrivateMediaSourceAVFObjC::ensureLayer()
     if (m_sampleBufferDisplayLayer)
         return;
 
-    m_sampleBufferDisplayLayer = adoptNS([[getAVSampleBufferDisplayLayerClass() alloc] init]);
+    m_sampleBufferDisplayLayer = adoptNS([allocAVSampleBufferDisplayLayerInstance() init]);
+#ifndef NDEBUG
+    [m_sampleBufferDisplayLayer setName:@"MediaPlayerPrivateMediaSource AVSampleBufferDisplayLayer"];
+#endif
+
     [m_synchronizer addRenderer:m_sampleBufferDisplayLayer.get()];
 }
 
@@ -666,6 +679,27 @@ void MediaPlayerPrivateMediaSourceAVFObjC::sizeChanged()
 }
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
+AVStreamSession* MediaPlayerPrivateMediaSourceAVFObjC::streamSession()
+{
+    if (!getAVStreamSessionClass() || ![getAVStreamSessionClass() instancesRespondToSelector:@selector(initWithStorageDirectoryAtURL:)])
+        return nil;
+
+    if (!m_streamSession) {
+        String storageDirectory = m_player->mediaKeysStorageDirectory();
+        if (storageDirectory.isEmpty())
+            return nil;
+
+        if (!fileExists(storageDirectory)) {
+            if (!makeAllDirectories(storageDirectory))
+                return nil;
+        }
+
+        String storagePath = pathByAppendingComponent(storageDirectory, "SecureStop.plist");
+        m_streamSession = adoptNS([allocAVStreamSessionInstance() initWithStorageDirectoryAtURL:[NSURL fileURLWithPath:storagePath]]);
+    }
+    return m_streamSession.get();
+}
+
 void MediaPlayerPrivateMediaSourceAVFObjC::setCDMSession(CDMSession* session)
 {
     if (m_session) {
@@ -677,6 +711,7 @@ void MediaPlayerPrivateMediaSourceAVFObjC::setCDMSession(CDMSession* session)
     m_session = toCDMSessionMediaSourceAVFObjC(session);
 
     if (m_session) {
+        m_session->setStreamSession(m_streamSession.get());
         for (auto& sourceBuffer : m_mediaSourcePrivate->sourceBuffers())
             m_session->addSourceBuffer(sourceBuffer.get());
     }
@@ -767,6 +802,11 @@ void MediaPlayerPrivateMediaSourceAVFObjC::removeAudioRenderer(AVSampleBufferAud
 
     m_sampleBufferAudioRenderers.remove(pos);
     m_player->client().mediaPlayerRenderingModeChanged(m_player);
+}
+
+void MediaPlayerPrivateMediaSourceAVFObjC::characteristicsChanged()
+{
+    m_player->characteristicChanged();
 }
 
 }

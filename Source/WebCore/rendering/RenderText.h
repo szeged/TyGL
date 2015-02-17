@@ -27,6 +27,7 @@
 #include "RenderTextLineBoxes.h"
 #include "SimpleLineLayout.h"
 #include "Text.h"
+#include "TextBreakIterator.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -48,6 +49,11 @@ public:
 
     RenderStyle& style() const;
     RenderStyle& firstLineStyle() const;
+    RenderStyle* getCachedPseudoStyle(PseudoId, RenderStyle* parentStyle = nullptr) const;
+
+    Color selectionBackgroundColor() const;
+    Color selectionForegroundColor() const;
+    Color selectionEmphasisMarkColor() const;
 
     virtual String originalText() const;
 
@@ -83,8 +89,8 @@ public:
     unsigned textLength() const { return m_text.impl()->length(); } // non virtual implementation of length()
     void positionLineBox(InlineTextBox&);
 
-    virtual float width(unsigned from, unsigned len, const Font&, float xPos, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
-    virtual float width(unsigned from, unsigned len, float xPos, bool firstLine = false, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
+    virtual float width(unsigned from, unsigned len, const FontCascade&, float xPos, HashSet<const Font*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
+    virtual float width(unsigned from, unsigned len, float xPos, bool firstLine = false, HashSet<const Font*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
 
     float minLogicalWidth() const;
     float maxLogicalWidth() const;
@@ -132,8 +138,7 @@ public:
 
     bool containsReversedText() const { return m_containsReversedText; }
 
-    bool isSecure() const { return style().textSecurity() != TSNONE; }
-    void momentarilyRevealLastTypedCharacter(unsigned lastTypedCharacterOffset);
+    void momentarilyRevealLastTypedCharacter(unsigned offsetAfterLastTypedCharacter);
 
     InlineTextBox* findNextInlineTextBox(int offset, int& pos) const { return m_lineBoxes.findNext(offset, pos); }
 
@@ -158,6 +163,11 @@ public:
 
     StringView stringView(int start = 0, int stop = -1) const;
 
+    LayoutUnit topOfFirstText() const;
+
+    bool contentIsKnownToFollow() { return m_contentIsKnownToFollow; }
+    void setContentIsKnownToFollow(bool contentIsKnownToFollow) { m_contentIsKnownToFollow = contentIsKnownToFollow; }
+
 protected:
     virtual void computePreferredLogicalWidths(float leadWidth);
     virtual void willBeDestroyed() override;
@@ -170,7 +180,7 @@ private:
 
     virtual bool canHaveChildren() const override final { return false; }
 
-    void computePreferredLogicalWidths(float leadWidth, HashSet<const SimpleFontData*>& fallbackFonts, GlyphOverflow&);
+    void computePreferredLogicalWidths(float leadWidth, HashSet<const Font*>& fallbackFonts, GlyphOverflow&);
 
     bool computeCanUseSimpleFontCodePath() const;
     
@@ -182,7 +192,7 @@ private:
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation&, const LayoutPoint&, HitTestAction) override final { ASSERT_NOT_REACHED(); return false; }
 
     bool containsOnlyWhitespace(unsigned from, unsigned len) const;
-    float widthFromCache(const Font&, int start, int len, float xPos, HashSet<const SimpleFontData*>* fallbackFonts, GlyphOverflow*, const RenderStyle&) const;
+    float widthFromCache(const FontCascade&, int start, int len, float xPos, HashSet<const Font*>* fallbackFonts, GlyphOverflow*, const RenderStyle&) const;
     bool isAllASCII() const { return m_isAllASCII; }
     bool computeUseBackslashAsYenSymbol() const;
 
@@ -193,21 +203,22 @@ private:
     void node() const = delete;
 
     // We put the bitfield first to minimize padding on 64-bit.
-    bool m_hasBreakableChar : 1; // Whether or not we can be broken into multiple lines.
-    bool m_hasBreak : 1; // Whether or not we have a hard break (e.g., <pre> with '\n').
-    bool m_hasTab : 1; // Whether or not we have a variable width tab character (e.g., <pre> with '\t').
-    bool m_hasBeginWS : 1; // Whether or not we begin with WS (only true if we aren't pre)
-    bool m_hasEndWS : 1; // Whether or not we end with WS (only true if we aren't pre)
-    bool m_linesDirty : 1; // This bit indicates that the text run has already dirtied specific
+    unsigned m_hasBreakableChar : 1; // Whether or not we can be broken into multiple lines.
+    unsigned m_hasBreak : 1; // Whether or not we have a hard break (e.g., <pre> with '\n').
+    unsigned m_hasTab : 1; // Whether or not we have a variable width tab character (e.g., <pre> with '\t').
+    unsigned m_hasBeginWS : 1; // Whether or not we begin with WS (only true if we aren't pre)
+    unsigned m_hasEndWS : 1; // Whether or not we end with WS (only true if we aren't pre)
+    unsigned m_linesDirty : 1; // This bit indicates that the text run has already dirtied specific
                            // line boxes, and this hint will enable layoutInlineChildren to avoid
                            // just dirtying everything when character data is modified (e.g., appended/inserted
                            // or removed).
-    bool m_containsReversedText : 1;
-    bool m_isAllASCII : 1;
-    bool m_canUseSimpleFontCodePath : 1;
-    mutable bool m_knownToHaveNoOverflowAndNoFallbackFonts : 1;
-    bool m_useBackslashAsYenSymbol : 1;
-    bool m_originalTextDiffersFromRendered : 1;
+    unsigned m_containsReversedText : 1;
+    unsigned m_isAllASCII : 1;
+    unsigned m_canUseSimpleFontCodePath : 1;
+    mutable unsigned m_knownToHaveNoOverflowAndNoFallbackFonts : 1;
+    unsigned m_useBackslashAsYenSymbol : 1;
+    unsigned m_originalTextDiffersFromRendered : 1;
+    unsigned m_contentIsKnownToFollow : 1;
 
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     // FIXME: This should probably be part of the text sizing structures in Document instead. That would save some memory.
@@ -247,8 +258,29 @@ inline RenderStyle& RenderText::firstLineStyle() const
     return parent()->firstLineStyle();
 }
 
+inline RenderStyle* RenderText::getCachedPseudoStyle(PseudoId pseudoId, RenderStyle* parentStyle) const
+{
+    return parent()->getCachedPseudoStyle(pseudoId, parentStyle);
+}
+
+inline Color RenderText::selectionBackgroundColor() const
+{
+    return parent()->selectionBackgroundColor();
+}
+
+inline Color RenderText::selectionForegroundColor() const
+{
+    return parent()->selectionForegroundColor();
+}
+
+inline Color RenderText::selectionEmphasisMarkColor() const
+{
+    return parent()->selectionEmphasisMarkColor();
+}
+
 void applyTextTransform(const RenderStyle&, String&, UChar);
 void makeCapitalized(String*, UChar previous);
+LineBreakIteratorMode mapLineBreakToIteratorMode(LineBreak);
     
 inline RenderText* Text::renderer() const
 {

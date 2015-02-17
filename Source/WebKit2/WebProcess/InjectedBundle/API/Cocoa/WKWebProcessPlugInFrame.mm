@@ -48,7 +48,7 @@ using namespace WebKit;
 
 + (instancetype)lookUpFrameFromHandle:(_WKFrameHandle *)handle
 {
-    WebFrame* webFrame = WebProcess::shared().webFrame(handle._frameID);
+    WebFrame* webFrame = WebProcess::singleton().webFrame(handle._frameID);
     if (!webFrame)
         return nil;
 
@@ -100,7 +100,7 @@ using namespace WebKit;
 
 - (_WKFrameHandle *)handle
 {
-    return [wrapper(*API::FrameHandle::create(_frame->frameID()).leakRef()) autorelease];
+    return [wrapper(API::FrameHandle::create(_frame->frameID()).leakRef()) autorelease];
 }
 
 - (BOOL)_hasCustomContentProvider

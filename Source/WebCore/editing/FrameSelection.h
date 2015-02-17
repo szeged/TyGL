@@ -46,6 +46,7 @@ class Frame;
 class GraphicsContext;
 class HTMLFormElement;
 class MutableStyleProperties;
+class RenderBlock;
 class RenderObject;
 class RenderView;
 class Settings;
@@ -92,7 +93,7 @@ class DragCaretController : private CaretBase {
 public:
     DragCaretController();
 
-    RenderObject* caretRenderer() const;
+    RenderBlock* caretRenderer() const;
     void paintDragCaret(Frame*, GraphicsContext*, const LayoutPoint&, const LayoutRect& clipRect) const;
 
     bool isContentEditable() const { return m_position.rootEditableElement(); }
@@ -103,7 +104,7 @@ public:
     void setCaretPosition(const VisiblePosition&);
     WEBCORE_EXPORT void clear() { setCaretPosition(VisiblePosition()); }
 
-    void nodeWillBeRemoved(Node*);
+    void nodeWillBeRemoved(Node&);
 
 private:
     VisiblePosition m_position;
@@ -169,7 +170,7 @@ public:
     void setExtent(const Position&, EAffinity, EUserTriggered = NotUserTriggered);
 
     // Return the renderer that is responsible for painting the caret (in the selection start node)
-    RenderObject* caretRendererWithoutUpdatingLayout() const;
+    RenderBlock* caretRendererWithoutUpdatingLayout() const;
 
     // Bounds of (possibly transformed) caret in absolute coords
     WEBCORE_EXPORT IntRect absoluteCaretBounds();
@@ -187,7 +188,7 @@ public:
 
     void debugRenderer(RenderObject*, bool selected) const;
 
-    void nodeWillBeRemoved(Node*);
+    void nodeWillBeRemoved(Node&);
     void textWasReplaced(CharacterData*, unsigned offset, unsigned oldLength, unsigned newLength);
 
     void setCaretVisible(bool caretIsVisible) { setCaretVisibility(caretIsVisible ? Visible : Hidden); }
@@ -276,7 +277,7 @@ private:
 
     bool setSelectionWithoutUpdatingAppearance(const VisibleSelection&, SetSelectionOptions, CursorAlignOnScroll, TextGranularity);
 
-    void respondToNodeModification(Node*, bool baseRemoved, bool extentRemoved, bool startRemoved, bool endRemoved);
+    void respondToNodeModification(Node&, bool baseRemoved, bool extentRemoved, bool startRemoved, bool endRemoved);
     TextDirection directionOfEnclosingBlock();
     TextDirection directionOfSelection();
 
@@ -309,7 +310,7 @@ private:
     void setFocusedElementIfNeeded();
     void focusedOrActiveStateChanged();
 
-    void caretBlinkTimerFired(Timer<FrameSelection>&);
+    void caretBlinkTimerFired();
 
     void setCaretVisibility(CaretVisibility);
     bool recomputeCaretRect();
@@ -329,7 +330,7 @@ private:
 
     RefPtr<EditingStyle> m_typingStyle;
 
-    Timer<FrameSelection> m_caretBlinkTimer;
+    Timer m_caretBlinkTimer;
     // The painted bounds of the caret in absolute coordinates
     IntRect m_absCaretBounds;
     bool m_absCaretBoundsDirty : 1;

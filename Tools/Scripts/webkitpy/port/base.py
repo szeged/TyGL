@@ -54,12 +54,12 @@ from webkitpy.common.webkit_finder import WebKitFinder
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.port import config as port_config
 from webkitpy.port import driver
-from webkitpy.port import http_lock
 from webkitpy.port import image_diff
 from webkitpy.port import server_process
 from webkitpy.port.factory import PortFactory
 from webkitpy.layout_tests.servers import apache_http_server
 from webkitpy.layout_tests.servers import http_server
+from webkitpy.layout_tests.servers import web_platform_test_server
 from webkitpy.layout_tests.servers import websocket_server
 
 _log = logging.getLogger(__name__)
@@ -79,6 +79,8 @@ class Port(object):
 
     ALL_BUILD_TYPES = ('debug', 'release')
 
+    DEFAULT_ARCHITECTURE = 'x86'
+
     @classmethod
     def determine_full_port_name(cls, host, options, port_name):
         """Return a fully-specified port name that can be used to construct objects."""
@@ -97,12 +99,19 @@ class Port(object):
 
         # These are default values that should be overridden in a subclasses.
         self._version = ''
-        self._architecture = 'x86'
+
+        # FIXME: This can be removed once default architectures for GTK and EFL EWS bots are set.
+        self.did_override_architecture = False
 
         # FIXME: Ideally we'd have a package-wide way to get a
         # well-formed options object that had all of the necessary
         # options defined on it.
         self._options = options or optparse.Values()
+
+        if self.get_option('architecture'):
+            self.did_override_architecture = True
+        else:
+            self.set_option('architecture', self.DEFAULT_ARCHITECTURE)
 
         if self._name and '-wk2' in self._name:
             self._options.webkit_test_runner = True
@@ -117,9 +126,9 @@ class Port(object):
         self._helper = None
         self._http_server = None
         self._websocket_server = None
+        self._web_platform_test_server = None
         self._image_differ = None
         self._server_process_constructor = server_process.ServerProcess  # overridable for testing
-        self._http_lock = None  # FIXME: Why does this live on the port object?
 
         if not hasattr(options, 'configuration') or not options.configuration:
             self.set_option_default('configuration', self.default_configuration())
@@ -129,10 +138,19 @@ class Port(object):
         self._root_was_set = hasattr(options, 'root') and options.root
         self._jhbuild_wrapper = []
 
+    def architecture(self):
+        return self.get_option('architecture')
+
+    def set_architecture(self, arch):
+        self.did_override_architecture = True
+        self.set_option('architecture', arch)
+
     def additional_drt_flag(self):
         return []
 
     def supports_per_test_timeout(self):
+        # FIXME: Make per-test timeouts unconditional once all ports' DumpRenderTrees support that.
+        # Windows DumpRenderTree may be the only one remaining to be fixed at this time.
         return False
 
     def default_pixel_tests(self):
@@ -140,11 +158,7 @@ class Port(object):
         return False
 
     def default_timeout_ms(self):
-        if self.get_option('webkit_test_runner'):
-            # Add some more time to WebKitTestRunner because it needs to syncronise the state
-            # with the web process and we want to detect if there is a problem with that in the driver.
-            return 80 * 1000
-        return 35 * 1000
+        return 30 * 1000
 
     def driver_stop_timeout(self):
         """ Returns the amount of time in seconds to wait before killing the process in driver.stop()."""
@@ -158,10 +172,6 @@ class Port(object):
     def default_child_processes(self):
         """Return the number of DumpRenderTree instances to use for this port."""
         return self._executive.cpu_count()
-
-    def default_max_locked_shards(self):
-        """Return the number of "locked" shards to run in parallel (like the http tests)."""
-        return 1
 
     def worker_startup_delay_secs(self):
         # FIXME: If we start workers up too quickly, DumpRenderTree appears
@@ -430,10 +440,6 @@ class Port(object):
         if platform_dir:
             return self._filesystem.join(platform_dir, baseline_filename)
 
-        actual_test_name = self.lookup_virtual_test_base(test_name)
-        if actual_test_name:
-            return self.expected_filename(actual_test_name, suffix)
-
         if return_default:
             return self._filesystem.join(self.layout_tests_dir(), baseline_filename)
         return None
@@ -520,9 +526,7 @@ class Port(object):
     def tests(self, paths):
         """Return the list of tests found. Both generic and platform-specific tests matching paths should be returned."""
         expanded_paths = self._expanded_paths(paths)
-        tests = self._real_tests(expanded_paths)
-        tests.extend(self._virtual_tests(expanded_paths, self.populated_virtual_test_suites()))
-        return tests
+        return self._real_tests(expanded_paths)
 
     def _expanded_paths(self, paths):
         expanded_paths = []
@@ -605,19 +609,13 @@ class Port(object):
     def test_isfile(self, test_name):
         """Return True if the test name refers to a directory of tests."""
         # Used by test_expectations.py to apply rules to whole directories.
-        if self._filesystem.isfile(self.abspath_for_test(test_name)):
-            return True
-        base = self.lookup_virtual_test_base(test_name)
-        return base and self._filesystem.isfile(self.abspath_for_test(base))
+        return self._filesystem.isfile(self.abspath_for_test(test_name))
 
     @memoized
     def test_isdir(self, test_name):
         """Return True if the test name refers to a directory of tests."""
         # Used by test_expectations.py to apply rules to whole directories.
-        if self._filesystem.isdir(self.abspath_for_test(test_name)):
-            return True
-        base = self.lookup_virtual_test_base(test_name)
-        return base and self._filesystem.isdir(self.abspath_for_test(base))
+        return self._filesystem.isdir(self.abspath_for_test(test_name))
 
     @memoized
     def test_exists(self, test_name):
@@ -701,7 +699,24 @@ class Port(object):
 
     @memoized
     def skipped_perf_tests(self):
-        return self._expectations_from_skipped_files([self.perf_tests_dir()])
+        filename = self._filesystem.join(self.perf_tests_dir(), "Skipped")
+        if not self._filesystem.exists(filename):
+            _log.debug("Skipped does not exist: %s" % filename)
+            return []
+
+        skipped_file_contents = self._filesystem.read_text_file(filename)
+        tests_to_skip = []
+        for line_number, line in enumerate(skipped_file_contents.split('\n')):
+            match = re.match(r'^\s*(\[(?P<platforms>[\w ]*?)\])?\s*(?P<test>[\w\-\/\.]+?)?\s*(?P<comment>\#.*)?$', line)
+            if not match:
+                _log.error("Syntax error at line %d in %s: %s" % (line_number + 1, filename, line))
+            else:
+                platform_names = filter(lambda token: token, match.group('platforms').lower().split(' ')) if match.group('platforms') else []
+                test_name = match.group('test')
+                if test_name and (not platform_names or self.port_name in platform_names or self._name in platform_names):
+                    tests_to_skip.append(test_name)
+
+        return tests_to_skip
 
     def skips_perf_test(self, test_name):
         for test_or_category in self.skipped_perf_tests():
@@ -729,9 +744,6 @@ class Port(object):
         This is used to help identify the exact port when parsing test
         expectations, determining search paths, and logging information."""
         return self._version
-
-    def architecture(self):
-        return self._architecture
 
     def get_option(self, name, default_value=None):
         return getattr(self._options, name, default_value)
@@ -784,6 +796,9 @@ class Port(object):
 
     def perf_results_directory(self):
         return self._build_path()
+
+    def python_unittest_results_directory(self):
+        return self._build_path('python-unittest-results')
 
     def default_results_directory(self):
         """Absolute path to the default place to store the test results."""
@@ -874,16 +889,16 @@ class Port(object):
         storage, it should override this method."""
         pass
 
-    def start_http_server(self, additional_dirs=None, number_of_servers=None):
+    def start_http_server(self, additional_dirs=None):
         """Start a web server. Raise an error if it can't start or is already running.
 
         Ports can stub this out if they don't need a web server to be running."""
         assert not self._http_server, 'Already running an http server.'
 
         if self._uses_apache():
-            server = apache_http_server.LayoutTestApacheHttpd(self, self.results_directory(), additional_dirs=additional_dirs, number_of_servers=number_of_servers)
+            server = apache_http_server.LayoutTestApacheHttpd(self, self.results_directory(), additional_dirs=additional_dirs)
         else:
-            server = http_server.Lighttpd(self, self.results_directory(), additional_dirs=additional_dirs, number_of_servers=number_of_servers)
+            server = http_server.Lighttpd(self, self.results_directory(), additional_dirs=additional_dirs)
 
         server.start()
         self._http_server = server
@@ -898,16 +913,24 @@ class Port(object):
         server.start()
         self._websocket_server = server
 
+    def start_web_platform_test_server(self, additional_dirs=None, number_of_servers=None):
+        assert not self._web_platform_test_server, 'Already running a Web Platform Test server.'
+
+        self._web_platform_test_server = web_platform_test_server.WebPlatformTestServer(self, "wptwk", self.results_directory())
+        self._web_platform_test_server.start()
+
+    def web_platform_test_server_doc_root(self):
+        return web_platform_test_server.doc_root(self) + self.TEST_PATH_SEPARATOR
+
+    def web_platform_test_server_base_url(self):
+        return web_platform_test_server.base_url(self)
+
     def http_server_supports_ipv6(self):
         # Cygwin is the only platform to still use Apache 1.3, which only supports IPV4.
         # Once it moves to Apache 2, we can drop this method altogether.
         if self.host.platform.is_cygwin():
             return False
         return True
-
-    def acquire_http_lock(self):
-        self._http_lock = http_lock.HttpLock(None, filesystem=self._filesystem, executive=self._executive)
-        self._http_lock.wait_for_httpd_lock()
 
     def stop_helper(self):
         """Shut down the test helper if it is running. Do nothing if
@@ -927,9 +950,10 @@ class Port(object):
             self._websocket_server.stop()
             self._websocket_server = None
 
-    def release_http_lock(self):
-        if self._http_lock:
-            self._http_lock.cleanup_http_lock()
+    def stop_web_platform_test_server(self):
+        if self._web_platform_test_server:
+            self._web_platform_test_server.stop()
+            self._web_platform_test_server = None
 
     def exit_code_from_summarized_results(self, unexpected_results):
         """Given summarized results, compute the exit code to be returned by new-run-webkit-tests.
@@ -945,7 +969,7 @@ class Port(object):
     def test_configuration(self):
         """Returns the current TestConfiguration for the port."""
         if not self._test_configuration:
-            self._test_configuration = TestConfiguration(self._version, self._architecture, self._options.configuration.lower())
+            self._test_configuration = TestConfiguration(self._version, self.architecture(), self._options.configuration.lower())
         return self._test_configuration
 
     # FIXME: Belongs on a Platform object.
@@ -1083,8 +1107,8 @@ class Port(object):
 
     # We pass sys_platform into this method to make it easy to unit test.
     def _apache_config_file_name_for_platform(self, sys_platform):
-        if sys_platform == 'cygwin':
-            return 'cygwin-httpd.conf'  # CYGWIN is the only platform to still use Apache 1.3.
+        if sys_platform == 'cygwin' or sys_platform == 'win32':
+            return 'apache' + self._apache_version() + '-httpd-win.conf'
         if sys_platform.startswith('linux'):
             if self._is_redhat_based():
                 return 'fedora-httpd-' + self._apache_version() + '.conf'
@@ -1205,51 +1229,9 @@ class Port(object):
     def sample_process(self, name, pid):
         pass
 
-    def virtual_test_suites(self):
-        return []
-
     def find_system_pid(self, name, pid):
         # This is only overridden on Windows
         return pid
-
-    @memoized
-    def populated_virtual_test_suites(self):
-        suites = self.virtual_test_suites()
-
-        # Sanity-check the suites to make sure they don't point to other suites.
-        suite_dirs = [suite.name for suite in suites]
-        for suite in suites:
-            assert suite.base not in suite_dirs
-
-        for suite in suites:
-            base_tests = self._real_tests([suite.base])
-            suite.tests = {}
-            for test in base_tests:
-                suite.tests[test.replace(suite.base, suite.name, 1)] = test
-        return suites
-
-    def _virtual_tests(self, paths, suites):
-        virtual_tests = list()
-        for suite in suites:
-            if paths:
-                for test in suite.tests:
-                    if any(test.startswith(p) for p in paths):
-                        virtual_tests.append(test)
-            else:
-                virtual_tests.extend(suite.tests.keys())
-        return virtual_tests
-
-    def lookup_virtual_test_base(self, test_name):
-        for suite in self.populated_virtual_test_suites():
-            if test_name.startswith(suite.name):
-                return test_name.replace(suite.name, suite.base, 1)
-        return None
-
-    def lookup_virtual_test_args(self, test_name):
-        for suite in self.populated_virtual_test_suites():
-            if test_name.startswith(suite.name):
-                return suite.args
-        return []
 
     def should_run_as_pixel_test(self, test_input):
         if not self._options.pixel_tests:
@@ -1264,7 +1246,10 @@ class Port(object):
         return True
 
     def _should_use_jhbuild(self):
-        return os.path.exists(self.path_from_webkit_base('WebKitBuild', 'Dependencies'))
+        suffix = ""
+        if self.port_name:
+            suffix = self.port_name.upper()
+        return os.path.exists(self.path_from_webkit_base('WebKitBuild', 'Dependencies%s' % suffix))
 
     # FIXME: Eventually we should standarize port naming, and make this method smart enough
     # to use for all port configurations (including architectures, graphics types, etc).
@@ -1400,13 +1385,3 @@ class Port(object):
     def test_expectations_file_position(self):
         # By default baseline search path schema is i.e. port-wk2 -> wk2 -> port -> generic, so port expectations file is at second to last position.
         return 1
-
-class VirtualTestSuite(object):
-    def __init__(self, name, base, args, tests=None):
-        self.name = name
-        self.base = base
-        self.args = args
-        self.tests = tests or set()
-
-    def __repr__(self):
-        return "VirtualTestSuite('%s', '%s', %s)" % (self.name, self.base, self.args)

@@ -137,7 +137,15 @@ extern NSString *WebActionOriginalURLKey; // NSURL
     documents come in one navigation, with each replacing the last. In
     this case, conent policy will be checked for each one.
 */
+@protocol WebPolicyDelegate <NSObject>
+
+@optional
+
+#ifndef WK_ENABLE_FORMAL_DELEGATE_PROTOCOLS
+@end
+
 @interface NSObject (WebPolicyDelegate)
+#endif
 
 /*!
    @method webView:decidePolicyForNavigationAction:request:frame:decisionListener:

@@ -27,9 +27,12 @@
 #define MainFrame_h
 
 #include "Frame.h"
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
+class DiagnosticLoggingClient;
+class PageConfiguration;
 class PageOverlayController;
 class ScrollLatchingState;
 class ServicesOverlayController;
@@ -37,7 +40,7 @@ class WheelEventDeltaTracker;
 
 class MainFrame final : public Frame {
 public:
-    static RefPtr<MainFrame> create(Page&, FrameLoaderClient&);
+    static RefPtr<MainFrame> create(Page&, PageConfiguration&);
 
     virtual ~MainFrame();
 
@@ -52,25 +55,30 @@ public:
     ServicesOverlayController& servicesOverlayController() { return *m_servicesOverlayController; }
 #endif // ENABLE(SERVICE_CONTROLS) || ENABLE(TELEPHONE_NUMBER_DETECTION)
 
-    ScrollLatchingState* latchingState() { return m_latchingState.get(); }
+    ScrollLatchingState* latchingState();
+    void pushNewLatchingState();
+    void popLatchingState();
     void resetLatchingState();
 #endif // PLATFORM(MAC)
 
+    DiagnosticLoggingClient& diagnosticLoggingClient() const;
+
 private:
-    MainFrame(Page&, FrameLoaderClient&);
+    MainFrame(Page&, PageConfiguration&);
 
     void dropChildren();
 
     unsigned m_selfOnlyRefCount;
 
 #if PLATFORM(MAC)
-    std::unique_ptr<ScrollLatchingState> m_latchingState;
+    Vector<ScrollLatchingState> m_latchingState;
 #if ENABLE(SERVICE_CONTROLS) || ENABLE(TELEPHONE_NUMBER_DETECTION)
     std::unique_ptr<ServicesOverlayController> m_servicesOverlayController;
 #endif
 #endif
     std::unique_ptr<WheelEventDeltaTracker> m_recentWheelEventDeltaTracker;
     std::unique_ptr<PageOverlayController> m_pageOverlayController;
+    DiagnosticLoggingClient* m_diagnosticLoggingClient;
 };
 
 inline bool Frame::isMainFrame() const

@@ -88,7 +88,7 @@ Usage: $programName [options] [options to pass to build system]
   --debug                           Compile with Debug configuration
   --release                         Compile with Release configuration
   --sdk=<sdk>                       Use a specific Xcode SDK (iOS and Mac only)
-  --device                          Use the current iphoneos.internal SDK (iOS only)
+  --device                          Use "iphoneos.internal" SDK if installed, else "iphoneos" SDK (iOS only)
   --simulator                       Use the current iphonesimulator SDK (iOS only)
   --coverage                        Enable code coverage support (Mac only)
   --analyze                         Enable static anaylsis (iOS and Mac only)
@@ -195,7 +195,7 @@ if (isAppleMacWebKit()) {
     } else {
         my @copyLibrariesArgs = (
             "perl", "Tools/Scripts/copy-webkitlibraries-to-product-directory",
-            "--sdk", xcodeSDK(), "--llvm", "--prefer-system-llvm",
+            "--sdk", xcodeSDK(), "--wksi", "--llvm", "--prefer-system-llvm",
             "--llvm-subdirectory", "internal-llvm", productDir(),
             "--llvm-prefix", "/usr/local"
         );

@@ -205,9 +205,8 @@ bool KeyframeAnimation::hasAnimationForProperty(CSSPropertyID property) const
 
 bool KeyframeAnimation::startAnimation(double timeOffset)
 {
-    if (m_object && m_object->isComposited()) {
-        return toRenderBoxModelObject(m_object)->startAnimation(timeOffset, m_animation.get(), m_keyframes);
-    }
+    if (m_object && m_object->isComposited())
+        return downcast<RenderBoxModelObject>(*m_object).startAnimation(timeOffset, m_animation.get(), m_keyframes);
     return false;
 }
 
@@ -217,7 +216,7 @@ void KeyframeAnimation::pauseAnimation(double timeOffset)
         return;
 
     if (m_object->isComposited())
-        toRenderBoxModelObject(m_object)->animationPaused(timeOffset, m_keyframes.animationName());
+        downcast<RenderBoxModelObject>(*m_object).animationPaused(timeOffset, m_keyframes.animationName());
 
     // Restore the original (unanimated) style
     if (!paused())
@@ -230,7 +229,7 @@ void KeyframeAnimation::endAnimation()
         return;
 
     if (m_object->isComposited())
-        toRenderBoxModelObject(m_object)->animationFinished(m_keyframes.animationName());
+        downcast<RenderBoxModelObject>(*m_object).animationFinished(m_keyframes.animationName());
 
     // Restore the original (unanimated) style
     if (!paused())
@@ -244,17 +243,17 @@ bool KeyframeAnimation::shouldSendEventForListener(Document::ListenerType listen
 
 void KeyframeAnimation::onAnimationStart(double elapsedTime)
 {
-    sendAnimationEvent(eventNames().webkitAnimationStartEvent, elapsedTime);
+    sendAnimationEvent(eventNames().animationstartEvent, elapsedTime);
 }
 
 void KeyframeAnimation::onAnimationIteration(double elapsedTime)
 {
-    sendAnimationEvent(eventNames().webkitAnimationIterationEvent, elapsedTime);
+    sendAnimationEvent(eventNames().animationiterationEvent, elapsedTime);
 }
 
 void KeyframeAnimation::onAnimationEnd(double elapsedTime)
 {
-    sendAnimationEvent(eventNames().webkitAnimationEndEvent, elapsedTime);
+    sendAnimationEvent(eventNames().animationendEvent, elapsedTime);
     // End the animation if we don't fill forwards. Forward filling
     // animations are ended properly in the class destructor.
     if (!m_animation->fillsForwards())
@@ -264,12 +263,12 @@ void KeyframeAnimation::onAnimationEnd(double elapsedTime)
 bool KeyframeAnimation::sendAnimationEvent(const AtomicString& eventType, double elapsedTime)
 {
     Document::ListenerType listenerType;
-    if (eventType == eventNames().webkitAnimationIterationEvent)
+    if (eventType == eventNames().webkitAnimationIterationEvent || eventType == eventNames().animationiterationEvent)
         listenerType = Document::ANIMATIONITERATION_LISTENER;
-    else if (eventType == eventNames().webkitAnimationEndEvent)
+    else if (eventType == eventNames().webkitAnimationEndEvent || eventType == eventNames().animationendEvent)
         listenerType = Document::ANIMATIONEND_LISTENER;
     else {
-        ASSERT(eventType == eventNames().webkitAnimationStartEvent);
+        ASSERT(eventType == eventNames().webkitAnimationStartEvent || eventType == eventNames().animationstartEvent);
         if (m_startEventDispatched)
             return false;
         m_startEventDispatched = true;
@@ -288,7 +287,7 @@ bool KeyframeAnimation::sendAnimationEvent(const AtomicString& eventType, double
         m_compositeAnimation->animationController()->addEventToDispatch(element, eventType, m_keyframes.animationName(), elapsedTime);
 
         // Restore the original (unanimated) style
-        if (eventType == eventNames().webkitAnimationEndEvent && element->renderer())
+        if ((eventType == eventNames().webkitAnimationEndEvent || eventType == eventNames().animationendEvent) && element->renderer())
             setNeedsStyleRecalc(element.get());
 
         return true; // Did dispatch an event
@@ -363,7 +362,11 @@ void KeyframeAnimation::checkForMatchingFilterFunctionLists()
 {
     m_filterFunctionListsMatch = false;
 
+#if ENABLE(FILTERS_LEVEL_2)
+    if (m_keyframes.size() < 2 || (!m_keyframes.containsProperty(CSSPropertyWebkitFilter) && !m_keyframes.containsProperty(CSSPropertyWebkitBackdropFilter)))
+#else
     if (m_keyframes.size() < 2 || !m_keyframes.containsProperty(CSSPropertyWebkitFilter))
+#endif
         return;
 
     // Empty filters match anything, so find the first non-empty entry as the reference

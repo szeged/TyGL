@@ -104,6 +104,7 @@ private:
     virtual void seek(const MediaTime&) override;
     
     void setRate(float);
+    virtual double rate() const override;
     void setVolume(float);
     void setPreservesPitch(bool);
 
@@ -118,7 +119,7 @@ private:
     std::unique_ptr<PlatformTimeRanges> buffered() const;
     MediaTime maxMediaTimeSeekable() const;
     bool didLoadingProgress() const;
-    unsigned totalBytes() const;
+    unsigned long long totalBytes() const;
     
     void setVisible(bool);
     void setSize(const IntSize&);
@@ -134,6 +135,8 @@ private:
 
     bool hasSingleSecurityOrigin() const;
     MediaPlayer::MovieLoadType movieLoadType() const;
+
+    virtual bool canSaveMediaData() const override;
 
     void createQTMovie(const String& url);
     void createQTMovie(NSURL *, NSDictionary *movieAttributes);
@@ -156,7 +159,7 @@ private:
     void updateStates();
     void doSeek();
     void cancelSeek();
-    void seekTimerFired(Timer<MediaPlayerPrivateQTKit>&);
+    void seekTimerFired();
     MediaTime maxMediaTimeLoaded() const;
     void disableUnsupportedTracks();
     
@@ -173,6 +176,7 @@ private:
     NSMutableDictionary* commonMovieAttributes();
 
     virtual String engineDescription() const { return "QTKit"; }
+    virtual long platformErrorCode() const;
 
     MediaPlayer* m_player;
     RetainPtr<QTMovie> m_qtMovie;
@@ -180,7 +184,7 @@ private:
     RetainPtr<WebCoreMovieObserver> m_objcObserver;
     String m_movieURL;
     MediaTime m_seekTo;
-    Timer<MediaPlayerPrivateQTKit> m_seekTimer;
+    Timer m_seekTimer;
     MediaPlayer::NetworkState m_networkState;
     MediaPlayer::ReadyState m_readyState;
     IntRect m_rect;

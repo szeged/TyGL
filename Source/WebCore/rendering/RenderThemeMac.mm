@@ -44,6 +44,7 @@
 #import "LocalCurrentGraphicsContext.h"
 #import "LocalizedStrings.h"
 #import "MediaControlElements.h"
+#import "NSSharingServicePickerSPI.h"
 #import "Page.h"
 #import "PaintInfo.h"
 #import "RenderLayer.h"
@@ -87,14 +88,6 @@
 #import <AppKit/AppKitDefines_Private.h>
 #else
 #define APPKIT_PRIVATE_CLASS
-#endif
-
-#if __has_include(<AppKit/NSSharingService_Private.h>)
-#import <AppKit/NSSharingService_Private.h>
-#else
-typedef enum {
-    NSSharingServicePickerStyleRollover = 1
-} NSSharingServicePickerStyle;
 #endif
 
 #if __has_include(<AppKit/NSServicesRolloverButtonCell.h>)
@@ -345,65 +338,41 @@ static FontWeight toFontWeight(NSInteger appKitFontWeight)
     return fontWeights[appKitFontWeight - 1];
 }
 
-void RenderThemeMac::systemFont(CSSValueID cssValueId, FontDescription& fontDescription) const
+void RenderThemeMac::updateCachedSystemFontDescription(CSSValueID cssValueId, FontDescription& fontDescription) const
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(FontDescription, systemFont, ());
-    DEPRECATED_DEFINE_STATIC_LOCAL(FontDescription, smallSystemFont, ());
-    DEPRECATED_DEFINE_STATIC_LOCAL(FontDescription, menuFont, ());
-    DEPRECATED_DEFINE_STATIC_LOCAL(FontDescription, labelFont, ());
-    DEPRECATED_DEFINE_STATIC_LOCAL(FontDescription, miniControlFont, ());
-    DEPRECATED_DEFINE_STATIC_LOCAL(FontDescription, smallControlFont, ());
-    DEPRECATED_DEFINE_STATIC_LOCAL(FontDescription, controlFont, ());
-
-    FontDescription* cachedDesc;
-    NSFont* font = nil;
+    NSFont* font;
     switch (cssValueId) {
         case CSSValueSmallCaption:
-            cachedDesc = &smallSystemFont;
-            if (!smallSystemFont.isAbsoluteSize())
-                font = [NSFont systemFontOfSize:[NSFont smallSystemFontSize]];
+            font = [NSFont systemFontOfSize:[NSFont smallSystemFontSize]];
             break;
         case CSSValueMenu:
-            cachedDesc = &menuFont;
-            if (!menuFont.isAbsoluteSize())
-                font = [NSFont menuFontOfSize:[NSFont systemFontSize]];
+            font = [NSFont menuFontOfSize:[NSFont systemFontSize]];
             break;
         case CSSValueStatusBar:
-            cachedDesc = &labelFont;
-            if (!labelFont.isAbsoluteSize())
-                font = [NSFont labelFontOfSize:[NSFont labelFontSize]];
+            font = [NSFont labelFontOfSize:[NSFont labelFontSize]];
             break;
         case CSSValueWebkitMiniControl:
-            cachedDesc = &miniControlFont;
-            if (!miniControlFont.isAbsoluteSize())
-                font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSMiniControlSize]];
+            font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSMiniControlSize]];
             break;
         case CSSValueWebkitSmallControl:
-            cachedDesc = &smallControlFont;
-            if (!smallControlFont.isAbsoluteSize())
-                font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSSmallControlSize]];
+            font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSSmallControlSize]];
             break;
         case CSSValueWebkitControl:
-            cachedDesc = &controlFont;
-            if (!controlFont.isAbsoluteSize())
-                font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSRegularControlSize]];
+            font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSRegularControlSize]];
             break;
         default:
-            cachedDesc = &systemFont;
-            if (!systemFont.isAbsoluteSize())
-                font = [NSFont systemFontOfSize:[NSFont systemFontSize]];
+            font = [NSFont systemFontOfSize:[NSFont systemFontSize]];
     }
 
-    if (font) {
-        NSFontManager *fontManager = [NSFontManager sharedFontManager];
-        cachedDesc->setIsAbsoluteSize(true);
-        cachedDesc->setGenericFamily(FontDescription::NoFamily);
-        cachedDesc->setOneFamily([font webCoreFamilyName]);
-        cachedDesc->setSpecifiedSize([font pointSize]);
-        cachedDesc->setWeight(toFontWeight([fontManager weightOfFont:font]));
-        cachedDesc->setItalic([fontManager traitsOfFont:font] & NSItalicFontMask);
-    }
-    fontDescription = *cachedDesc;
+    if (!font)
+        return;
+
+    NSFontManager *fontManager = [NSFontManager sharedFontManager];
+    fontDescription.setIsAbsoluteSize(true);
+    fontDescription.setOneFamily([font webCoreFamilyName]);
+    fontDescription.setSpecifiedSize([font pointSize]);
+    fontDescription.setWeight(toFontWeight([fontManager weightOfFont:font]));
+    fontDescription.setIsItalic([fontManager traitsOfFont:font] & NSItalicFontMask);
 }
 
 static RGBA32 convertNSColorToColor(NSColor *color)
@@ -681,7 +650,8 @@ FloatRect RenderThemeMac::convertToPaintingRect(const RenderObject& inputRendere
     const RenderObject* renderer = &partRenderer;
     while (renderer && renderer != &inputRenderer) {
         RenderElement* containingRenderer = renderer->container();
-        offsetFromInputRenderer -= roundedIntSize(renderer->offsetFromContainer(containingRenderer, LayoutPoint()));
+        ASSERT(containingRenderer);
+        offsetFromInputRenderer -= roundedIntSize(renderer->offsetFromContainer(*containingRenderer, LayoutPoint()));
         renderer = containingRenderer;
     }
     // If the input renderer was not a container, something went wrong
@@ -814,7 +784,6 @@ void RenderThemeMac::setFontFromControlSize(StyleResolver&, RenderStyle& style, 
 {
     FontDescription fontDescription;
     fontDescription.setIsAbsoluteSize(true);
-    fontDescription.setGenericFamily(FontDescription::SerifFamily);
 
     NSFont* font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:controlSize]];
     fontDescription.setOneFamily([font webCoreFamilyName]);
@@ -825,7 +794,7 @@ void RenderThemeMac::setFontFromControlSize(StyleResolver&, RenderStyle& style, 
     style.setLineHeight(RenderStyle::initialLineHeight());
 
     if (style.setFontDescription(fontDescription))
-        style.font().update(0);
+        style.fontCascade().update(0);
 }
 
 NSControlSize RenderThemeMac::controlSizeForSystemFont(RenderStyle& style) const
@@ -966,12 +935,12 @@ IntSize RenderThemeMac::meterSizeForBounds(const RenderMeter& renderMeter, const
 
 bool RenderThemeMac::paintMeter(const RenderObject& renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    if (!renderObject.isMeter())
+    if (!is<RenderMeter>(renderObject))
         return true;
 
     LocalCurrentGraphicsContext localContext(paintInfo.context);
 
-    NSLevelIndicatorCell* cell = levelIndicatorFor(toRenderMeter(renderObject));
+    NSLevelIndicatorCell* cell = levelIndicatorFor(downcast<RenderMeter>(renderObject));
     GraphicsContextStateSaver stateSaver(*paintInfo.context);
 
     [cell drawWithFrame:rect inView:documentViewFor(renderObject)];
@@ -1114,13 +1083,13 @@ void RenderThemeMac::adjustProgressBarStyle(StyleResolver&, RenderStyle&, Elemen
 
 bool RenderThemeMac::paintProgressBar(const RenderObject& renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    if (!renderObject.isProgress())
+    if (!is<RenderProgress>(renderObject))
         return true;
 
     IntRect inflatedRect = progressBarRectForBounds(renderObject, rect);
     NSControlSize controlSize = controlSizeForFont(renderObject.style());
 
-    const RenderProgress& renderProgress = *toRenderProgress(&renderObject);
+    const auto& renderProgress = downcast<RenderProgress>(renderObject);
     HIThemeTrackDrawInfo trackInfo;
     trackInfo.version = 0;
     if (controlSize == NSRegularControlSize)
@@ -1863,7 +1832,7 @@ bool RenderThemeMac::paintSnapshottedPluginOverlay(const RenderObject& renderer,
         return true;
 
     HTMLPlugInElement& plugInElement = downcast<HTMLPlugInElement>(*parent);
-    if (!plugInElement.isPlugInImageElement())
+    if (!is<HTMLPlugInImageElement>(plugInElement))
         return true;
 
     HTMLPlugInImageElement& plugInImageElement = downcast<HTMLPlugInImageElement>(plugInElement);
@@ -1872,27 +1841,27 @@ bool RenderThemeMac::paintSnapshottedPluginOverlay(const RenderObject& renderer,
     if (!snapshot)
         return true;
 
-    RenderSnapshottedPlugIn* plugInRenderer = toRenderSnapshottedPlugIn(plugInImageElement.renderer());
-    FloatPoint snapshotAbsPos = plugInRenderer->localToAbsolute();
-    snapshotAbsPos.move(plugInRenderer->borderLeft() + plugInRenderer->paddingLeft(), plugInRenderer->borderTop() + plugInRenderer->paddingTop());
+    RenderSnapshottedPlugIn& plugInRenderer = downcast<RenderSnapshottedPlugIn>(*plugInImageElement.renderer());
+    FloatPoint snapshotAbsPos = plugInRenderer.localToAbsolute();
+    snapshotAbsPos.move(plugInRenderer.borderLeft() + plugInRenderer.paddingLeft(), plugInRenderer.borderTop() + plugInRenderer.paddingTop());
 
     // We could draw the snapshot with that coordinates, but we need to make sure there
     // isn't a composited layer between us and the plugInRenderer.
-    for (auto* renderBox = &downcast<RenderBox>(renderer); renderBox != plugInRenderer; renderBox = renderBox->parentBox()) {
+    for (auto* renderBox = &downcast<RenderBox>(renderer); renderBox != &plugInRenderer; renderBox = renderBox->parentBox()) {
         if (renderBox->hasLayer() && renderBox->layer() && renderBox->layer()->isComposited()) {
             snapshotAbsPos = -renderBox->location();
             break;
         }
     }
 
-    LayoutSize pluginSize(plugInRenderer->contentWidth(), plugInRenderer->contentHeight());
+    LayoutSize pluginSize(plugInRenderer.contentWidth(), plugInRenderer.contentHeight());
     LayoutRect pluginRect(snapshotAbsPos, pluginSize);
     IntRect alignedPluginRect = snappedIntRect(pluginRect);
 
     if (alignedPluginRect.width() <= 0 || alignedPluginRect.height() <= 0)
         return true;
 
-    context->drawImage(snapshot, plugInRenderer->style().colorSpace(), alignedPluginRect, CompositeSourceOver);
+    context->drawImage(snapshot, plugInRenderer.style().colorSpace(), alignedPluginRect, CompositeSourceOver);
     return false;
 }
 
@@ -2005,7 +1974,7 @@ NSTextFieldCell* RenderThemeMac::textField() const
     return m_textField.get();
 }
 
-String RenderThemeMac::fileListNameForWidth(const FileList* fileList, const Font& font, int width, bool multipleFilesAllowed) const
+String RenderThemeMac::fileListNameForWidth(const FileList* fileList, const FontCascade& font, int width, bool multipleFilesAllowed) const
 {
     if (width <= 0)
         return String();

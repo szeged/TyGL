@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -155,7 +155,7 @@ public:
                 switch (node->op()) {
                 case NativeCall:
                 case NativeConstruct: {
-                    int numArgs = m_node->numChildren();
+                    int numArgs = node->numChildren();
                     if (numArgs > maxNumberOfArguments)
                         maxNumberOfArguments = numArgs;
                     break;
@@ -306,30 +306,34 @@ private:
                 break;
         }
     }
-    
+
+    void safelyInvalidateAfterTermination()
+    {
+        if (verboseCompilationEnabled())
+            dataLog("Bailing.\n");
+        crash();
+
+        // Invalidate dominated blocks. Under normal circumstances we would expect
+        // them to be invalidated already. But you can have the CFA become more
+        // precise over time because the structures of objects change on the main
+        // thread. Failing to do this would result in weird crashes due to a value
+        // being used but not defined. Race conditions FTW!
+        for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
+            BasicBlock* target = m_graph.block(blockIndex);
+            if (!target)
+                continue;
+            if (m_graph.m_dominators.dominates(m_highBlock, target)) {
+                if (verboseCompilationEnabled())
+                    dataLog("Block ", *target, " will bail also.\n");
+                target->cfaHasVisited = false;
+            }
+        }
+    }
+
     bool compileNode(unsigned nodeIndex)
     {
         if (!m_state.isValid()) {
-            if (verboseCompilationEnabled())
-                dataLog("Bailing.\n");
-            crash(m_highBlock->index, m_node->index());
-            
-            // Invalidate dominated blocks. Under normal circumstances we would expect
-            // them to be invalidated already. But you can have the CFA become more
-            // precise over time because the structures of objects change on the main
-            // thread. Failing to do this would result in weird crashes due to a value
-            // being used but not defined. Race conditions FTW!
-            for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
-                BasicBlock* target = m_graph.block(blockIndex);
-                if (!target)
-                    continue;
-                if (m_graph.m_dominators.dominates(m_highBlock, target)) {
-                    if (verboseCompilationEnabled())
-                        dataLog("Block ", *target, " will bail also.\n");
-                    target->cfaHasVisited = false;
-                }
-            }
-            
+            safelyInvalidateAfterTermination();
             return false;
         }
         
@@ -592,9 +596,6 @@ private:
         case GetScope:
             compileGetScope();
             break;
-        case GetMyScope:
-            compileGetMyScope();
-            break;
         case SkipScope:
             compileSkipScope();
             break;
@@ -752,7 +753,12 @@ private:
             DFG_CRASH(m_graph, m_node, "Unrecognized node in FTL backend");
             break;
         }
-        
+
+        if (!m_state.isValid()) {
+            safelyInvalidateAfterTermination();
+            return false;
+        }
+
         m_availabilityCalculator.executeNode(m_node);
         m_interpreter.executeEffects(nodeIndex);
         
@@ -1991,16 +1997,15 @@ private:
         
         CodeOrigin codeOrigin = m_node->origin.semantic;
         
-        LValue zeroBasedIndex = lowInt32(m_node->child1());
-        LValue oneBasedIndex = m_out.add(zeroBasedIndex, m_out.int32One);
+        LValue index = lowInt32(m_node->child1());
         
         LValue limit;
         if (codeOrigin.inlineCallFrame)
-            limit = m_out.constInt32(codeOrigin.inlineCallFrame->arguments.size());
+            limit = m_out.constInt32(codeOrigin.inlineCallFrame->arguments.size() - 1);
         else
-            limit = m_out.load32(payloadFor(JSStack::ArgumentCount));
+            limit = m_out.sub(m_out.load32(payloadFor(JSStack::ArgumentCount)), m_out.int32One);
         
-        speculate(Uncountable, noValue(), 0, m_out.aboveOrEqual(oneBasedIndex, limit));
+        speculate(Uncountable, noValue(), 0, m_out.aboveOrEqual(index, limit));
         
         SymbolTable* symbolTable = m_graph.baselineCodeBlockFor(codeOrigin)->symbolTable();
         if (symbolTable->slowArguments()) {
@@ -2011,13 +2016,22 @@ private:
         }
         
         TypedPointer base;
-        if (codeOrigin.inlineCallFrame)
+        if (codeOrigin.inlineCallFrame) {
+            if (codeOrigin.inlineCallFrame->arguments.size() <= 1) {
+                // We should have already exited due to the bounds check, above. Just tell the
+                // compiler that anything dominated by this instruction is not reachable, so
+                // that we don't waste time generating such code. This will also plant some
+                // kind of crashing instruction so that if by some fluke the bounds check didn't
+                // work, we'll crash in an easy-to-see way.
+                didAlreadyTerminate();
+                return;
+            }
             base = addressFor(codeOrigin.inlineCallFrame->arguments[1].virtualRegister());
-        else
+        } else
             base = addressFor(virtualRegisterForArgument(1));
         
         LValue pointer = m_out.baseIndex(
-            base.value(), m_out.zeroExt(zeroBasedIndex, m_out.intPtr), ScaleEight);
+            base.value(), m_out.zeroExt(index, m_out.intPtr), ScaleEight);
         setJSValue(m_out.load64(TypedPointer(m_heaps.variables.atAnyIndex(), pointer)));
     }
 
@@ -3424,12 +3438,6 @@ private:
         setJSValue(m_out.loadPtr(lowCell(m_node->child1()), m_heaps.JSFunction_scope));
     }
     
-    void compileGetMyScope()
-    {
-        setJSValue(m_out.loadPtr(addressFor(
-            m_node->origin.semantic.stackOffset() + JSStack::ScopeChain)));
-    }
-    
     void compileSkipScope()
     {
         setJSValue(m_out.loadPtr(lowCell(m_node->child1()), m_heaps.JSScope_next));
@@ -3636,10 +3644,8 @@ private:
         if ((notInlinable = !callee))
             callee = m_out.operation(function);
 
-        JSScope* scope = knownFunction->scopeUnchecked();
         m_out.storePtr(m_callFrame, m_execStorage, m_heaps.CallFrame_callerFrame);
         m_out.storePtr(constNull(m_out.intPtr), addressFor(m_execStorage, JSStack::CodeBlock));
-        m_out.storePtr(weakPointer(scope), addressFor(m_execStorage, JSStack::ScopeChain));
         m_out.storePtr(weakPointer(knownFunction), addressFor(m_execStorage, JSStack::Callee));
 
         m_out.store64(m_out.constInt64(numArgs), addressFor(m_execStorage, JSStack::ArgumentCount));
@@ -3687,7 +3693,6 @@ private:
         arguments.append(m_out.constInt32(1 + JSStack::CallFrameHeaderSize - JSStack::CallerFrameAndPCSize + numArgs));
         arguments.append(jsCallee); // callee -> %rax
         arguments.append(getUndef(m_out.int64)); // code block
-        arguments.append(getUndef(m_out.int64)); // scope chain
         arguments.append(jsCallee); // callee -> stack
         arguments.append(m_out.constInt64(numArgs)); // argument count and zeros for the tag
         if (dummyThisArgument)
@@ -4468,9 +4473,13 @@ private:
         
         ASSERT(isX86() || isARM64());
 
+#if PLATFORM(EFL)
+        const CString actualPath = toCString(bundlePath().data(), "/runtime/", path.data());
+#else
         const CString actualPath = toCString(bundlePath().data(), 
             isX86() ? "/Resources/Runtime/x86_64/" : "/Resources/Runtime/arm64/",
             path.data());
+#endif
 
         char* outMsg;
         
@@ -4492,7 +4501,7 @@ private:
         }
 
         disposeMemoryBuffer(memBuf);
-        
+
         if (LValue function = getNamedFunction(m_ftlState.module, symbol.data())) {
             if (!isInlinableSize(function)) {
                 m_ftlState.symbolTable.remove(symbol);
@@ -5425,6 +5434,11 @@ private:
     void terminate(ExitKind kind)
     {
         speculate(kind, noValue(), nullptr, m_out.booleanTrue);
+        didAlreadyTerminate();
+    }
+    
+    void didAlreadyTerminate()
+    {
         m_state.setIsValid(false);
     }
     
@@ -6564,7 +6578,7 @@ private:
             if (Options::validateFTLOSRExitLiveness()) {
                 DFG_ASSERT(
                     m_graph, m_node,
-                    !(availability.isDead() && m_graph.isLiveInBytecode(VirtualRegister(operand), codeOrigin)));
+                    (!(availability.isDead() && m_graph.isLiveInBytecode(VirtualRegister(operand), codeOrigin))) || m_graph.m_plan.mode == FTLForOSREntryMode);
             }
             
             exit.m_values[i] = exitValueForAvailability(arguments, map, availability);
@@ -6626,6 +6640,7 @@ private:
         }
         
         DFG_CRASH(m_graph, m_node, "Invalid flush format");
+        return ExitValue::dead();
     }
     
     ExitValue exitValueForNode(
@@ -6698,6 +6713,7 @@ private:
             return exitArgument(arguments, ValueFormatDouble, value.value());
 
         DFG_CRASH(m_graph, m_node, toCString("Cannot find value for node: ", node).data());
+        return ExitValue::dead();
     }
     
     ExitValue exitArgument(ExitArgumentList& arguments, ValueFormat format, LValue value)
@@ -6886,6 +6902,10 @@ private:
         return addressFor(operand, TagOffset);
     }
     
+    void crash()
+    {
+        crash(m_highBlock->index, m_node->index());
+    }
     void crash(BlockIndex blockIndex, unsigned nodeIndex)
     {
 #if ASSERT_DISABLED

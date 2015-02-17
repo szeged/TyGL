@@ -27,7 +27,6 @@
 #include "CopiedSpaceInlines.h"
 #include "CopyVisitorInlines.h"
 #include "DFGWorklist.h"
-#include "DelayedReleaseScope.h"
 #include "EdenGCActivityCallback.h"
 #include "FullGCActivityCallback.h"
 #include "GCActivityCallback.h"
@@ -35,6 +34,7 @@
 #include "HeapIterationScope.h"
 #include "HeapRootVisitor.h"
 #include "HeapStatistics.h"
+#include "HeapVerifier.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
 #include "JSGlobalObject.h"
@@ -254,7 +254,7 @@ struct CountIfGlobalObject : MarkedBlock::CountFunctor {
 
 class RecordType {
 public:
-    typedef PassOwnPtr<TypeCountSet> ReturnType;
+    typedef std::unique_ptr<TypeCountSet> ReturnType;
 
     RecordType();
     void operator()(JSCell*);
@@ -262,11 +262,11 @@ public:
 
 private:
     const char* typeName(JSCell*);
-    OwnPtr<TypeCountSet> m_typeCountSet;
+    std::unique_ptr<TypeCountSet> m_typeCountSet;
 };
 
 inline RecordType::RecordType()
-    : m_typeCountSet(adoptPtr(new TypeCountSet))
+    : m_typeCountSet(std::make_unique<TypeCountSet>())
 {
 }
 
@@ -283,9 +283,9 @@ inline void RecordType::operator()(JSCell* cell)
     m_typeCountSet->add(typeName(cell));
 }
 
-inline PassOwnPtr<TypeCountSet> RecordType::returnValue()
+inline std::unique_ptr<TypeCountSet> RecordType::returnValue()
 {
-    return m_typeCountSet.release();
+    return WTF::move(m_typeCountSet);
 }
 
 } // anonymous namespace
@@ -316,7 +316,6 @@ Heap::Heap(VM* vm, HeapType heapType)
     , m_slotVisitor(m_sharedData)
     , m_copyVisitor(m_sharedData)
     , m_handleSet(vm)
-    , m_codeBlocks(m_blockAllocator)
     , m_isSafeToCollect(false)
     , m_writeBarrierBuffer(256)
     , m_vm(vm)
@@ -331,10 +330,19 @@ Heap::Heap(VM* vm, HeapType heapType)
 #else
     , m_edenActivityCallback(m_fullActivityCallback)
 #endif
-    , m_sweeper(IncrementalSweeper::create(this))
+#if USE(CF)
+    , m_sweeper(std::make_unique<IncrementalSweeper>(this, CFRunLoopGetCurrent()))
+#else
+    , m_sweeper(std::make_unique<IncrementalSweeper>(this->vm()))
+#endif
     , m_deferralDepth(0)
+#if USE(CF)
+    , m_delayedReleaseRecursionCount(0)
+#endif
 {
     m_storageSpace.init();
+    if (Options::verifyHeap())
+        m_verifier = std::make_unique<HeapVerifier>(this, Options::numberOfGCCyclesToRecordForVerification());
 }
 
 Heap::~Heap()
@@ -354,6 +362,20 @@ void Heap::lastChanceToFinalize()
     RELEASE_ASSERT(m_operationInProgress == NoOperation);
 
     m_objectSpace.lastChanceToFinalize();
+    releaseDelayedReleasedObjects();
+}
+
+void Heap::releaseDelayedReleasedObjects()
+{
+#if USE(CF)
+    if (!m_delayedReleaseRecursionCount++) {
+        while (!m_delayedReleaseObjects.isEmpty()) {
+            RetainPtr<CFTypeRef> objectToRelease = m_delayedReleaseObjects.takeLast();
+            objectToRelease.clear();
+        }
+    }
+    m_delayedReleaseRecursionCount--;
+#endif
 }
 
 void Heap::reportExtraMemoryCostSlowCase(size_t cost)
@@ -498,8 +520,9 @@ void Heap::markRoots(double gcStartTime)
     // We gather conservative roots before clearing mark bits because conservative
     // gathering uses the mark bits to determine whether a reference is valid.
     void* dummy;
+    ALLOCATE_AND_GET_REGISTER_STATE(registers);
     ConservativeRoots conservativeRoots(&m_objectSpace.blocks(), &m_storageSpace);
-    gatherStackRoots(conservativeRoots, &dummy);
+    gatherStackRoots(conservativeRoots, &dummy, registers);
     gatherJSStackRoots(conservativeRoots);
     gatherScratchBufferRoots(conservativeRoots);
 
@@ -539,6 +562,7 @@ void Heap::markRoots(double gcStartTime)
 
 void Heap::copyBackingStores()
 {
+    GCPHASE(CopyBackingStores);
     if (m_operationInProgress == EdenCollection)
         m_storageSpace.startedCopying<EdenCollection>();
     else {
@@ -559,11 +583,11 @@ void Heap::copyBackingStores()
         m_storageSpace.doneCopying();
 }
 
-void Heap::gatherStackRoots(ConservativeRoots& roots, void** dummy)
+void Heap::gatherStackRoots(ConservativeRoots& roots, void** dummy, MachineThreads::RegisterState& registers)
 {
     GCPHASE(GatherStackRoots);
     m_jitStubRoutines.clearMarks();
-    m_machineThreads.gatherConservativeRoots(roots, m_jitStubRoutines, m_codeBlocks, dummy);
+    m_machineThreads.gatherConservativeRoots(roots, m_jitStubRoutines, m_codeBlocks, dummy, registers);
 }
 
 void Heap::gatherJSStackRoots(ConservativeRoots& roots)
@@ -603,11 +627,12 @@ void Heap::visitExternalRememberedSet()
 void Heap::visitSmallStrings()
 {
     GCPHASE(VisitSmallStrings);
-    m_vm->smallStrings.visitStrongReferences(m_slotVisitor);
+    if (!m_vm->smallStrings.needsToBeVisited(m_operationInProgress))
+        return;
 
+    m_vm->smallStrings.visitStrongReferences(m_slotVisitor);
     if (Options::logGC() == GCLogging::Verbose)
         dataLog("Small strings:\n", m_slotVisitor);
-
     m_slotVisitor.donateAndDrain();
 }
 
@@ -658,7 +683,6 @@ void Heap::visitProtectedObjects(HeapRootVisitor& heapRootVisitor)
 void Heap::visitTempSortVectors(HeapRootVisitor& heapRootVisitor)
 {
     GCPHASE(VisitTempSortVectors);
-    typedef Vector<Vector<ValueStringPair, 0, UnsafeVectorOverflow>*> VectorOfValueStringVectors;
 
     for (auto* vector : m_tempSortingVectors) {
         for (auto& valueStringPair : *vector) {
@@ -861,12 +885,12 @@ size_t Heap::protectedObjectCount()
     return forEachProtectedCell<Count>();
 }
 
-PassOwnPtr<TypeCountSet> Heap::protectedObjectTypeCounts()
+std::unique_ptr<TypeCountSet> Heap::protectedObjectTypeCounts()
 {
     return forEachProtectedCell<RecordType>();
 }
 
-PassOwnPtr<TypeCountSet> Heap::objectTypeCounts()
+std::unique_ptr<TypeCountSet> Heap::objectTypeCounts()
 {
     HeapIterationScope iterationScope(*this);
     return m_objectSpace.forEachLiveCell<RecordType>(iterationScope);
@@ -895,7 +919,7 @@ void Heap::deleteAllCompiledCode()
     }
 #endif // ENABLE(DFG_JIT)
 
-    for (ExecutableBase* current = m_compiledCode.head(); current; current = current->next()) {
+    for (ExecutableBase* current : m_compiledCode) {
         if (!current->isFunctionExecutable())
             continue;
         static_cast<FunctionExecutable*>(current)->clearCodeIfNotCompiling();
@@ -908,7 +932,7 @@ void Heap::deleteAllCompiledCode()
 
 void Heap::deleteAllUnlinkedFunctionCode()
 {
-    for (ExecutableBase* current = m_compiledCode.head(); current; current = current->next()) {
+    for (ExecutableBase* current : m_compiledCode) {
         if (!current->isFunctionExecutable())
             continue;
         static_cast<FunctionExecutable*>(current)->clearUnlinkedCodeForRecompilationIfNotCompiling();
@@ -918,16 +942,16 @@ void Heap::deleteAllUnlinkedFunctionCode()
 void Heap::clearUnmarkedExecutables()
 {
     GCPHASE(ClearUnmarkedExecutables);
-    ExecutableBase* next;
-    for (ExecutableBase* current = m_compiledCode.head(); current; current = next) {
-        next = current->next();
+    for (unsigned i = m_compiledCode.size(); i--;) {
+        ExecutableBase* current = m_compiledCode[i];
         if (isMarked(current))
             continue;
 
         // We do this because executable memory is limited on some platforms and because
         // CodeBlock requires eager finalization.
         ExecutableBase::clearCodeVirtual(current);
-        m_compiledCode.remove(current);
+        std::swap(m_compiledCode[i], m_compiledCode.last());
+        m_compiledCode.removeLast();
     }
 }
 
@@ -958,7 +982,6 @@ void Heap::collectAllGarbage()
     collect(FullCollection);
 
     SamplingRegion samplingRegion("Garbage Collection: Sweeping");
-    DelayedReleaseScope delayedReleaseScope(m_objectSpace);
     m_objectSpace.sweep();
     m_objectSpace.shrink();
 }
@@ -982,12 +1005,6 @@ void Heap::collect(HeapOperation collectionType)
     if (vm()->typeProfiler()) {
         DeferGCForAWhile awhile(*this);
         vm()->typeProfilerLog()->processLogEntries(ASCIILiteral("GC"));
-        vm()->invalidateTypeSetCache();
-    }
-    
-    if (vm()->callEdgeLog) {
-        DeferGCForAWhile awhile(*this);
-        vm()->callEdgeLog->processLog();
     }
     
     RELEASE_ASSERT(!m_deferralDepth);
@@ -1002,6 +1019,14 @@ void Heap::collect(HeapOperation collectionType)
     GCPHASE(Collect);
 
     double gcStartTime = WTF::monotonicallyIncreasingTime();
+    if (m_verifier) {
+        // Verify that live objects from the last GC cycle haven't been corrupted by
+        // mutators before we begin this new GC cycle.
+        m_verifier->verify(HeapVerifier::Phase::BeforeGC);
+
+        m_verifier->initializeGCCycle();
+        m_verifier->gatherLiveObjects(HeapVerifier::Phase::BeforeMarking);
+    }
 
     deleteOldCode(gcStartTime);
     flushOldStructureIDTables();
@@ -1010,7 +1035,14 @@ void Heap::collect(HeapOperation collectionType)
 
     markRoots(gcStartTime);
 
+    if (m_verifier) {
+        m_verifier->gatherLiveObjects(HeapVerifier::Phase::AfterMarking);
+        m_verifier->verify(HeapVerifier::Phase::AfterMarking);
+    }
     JAVASCRIPTCORE_GC_MARKED();
+
+    if (vm()->typeProfiler())
+        vm()->typeProfiler()->invalidateTypeSetCache();
 
     reapWeakHandles();
     sweepArrayBuffers();
@@ -1029,6 +1061,11 @@ void Heap::collect(HeapOperation collectionType)
     updateAllocationLimits();
     didFinishCollection(gcStartTime);
     resumeCompilerThreads();
+
+    if (m_verifier) {
+        m_verifier->trimDeadObjects();
+        m_verifier->verify(HeapVerifier::Phase::AfterGC);
+    }
 
     if (Options::logGC()) {
         double after = currentTimeMS();
@@ -1280,9 +1317,9 @@ GCActivityCallback* Heap::edenActivityCallback()
     return m_edenActivityCallback.get();
 }
 
-void Heap::setIncrementalSweeper(PassOwnPtr<IncrementalSweeper> sweeper)
+void Heap::setIncrementalSweeper(std::unique_ptr<IncrementalSweeper> sweeper)
 {
-    m_sweeper = sweeper;
+    m_sweeper = WTF::move(sweeper);
 }
 
 IncrementalSweeper* Heap::sweeper()
@@ -1356,7 +1393,6 @@ void Heap::zombifyDeadObjects()
     // Sweep now because destructors will crash once we're zombified.
     {
         SamplingRegion samplingRegion("Garbage Collection: Sweeping");
-        DelayedReleaseScope delayedReleaseScope(m_objectSpace);
         m_objectSpace.zombifySweep();
     }
     HeapIterationScope iterationScope(*this);

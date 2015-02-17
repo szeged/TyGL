@@ -46,7 +46,7 @@ class StyleResolver;
 class CSSFilterImageValue : public CSSImageGeneratorValue {
     friend class FilterSubimageObserverProxy;
 public:
-    static PassRef<CSSFilterImageValue> create(PassRef<CSSValue> imageValue, PassRef<CSSValue> filterValue)
+    static Ref<CSSFilterImageValue> create(Ref<CSSValue>&& imageValue, Ref<CSSValue>&& filterValue)
     {
         return adoptRef(*new CSSFilterImageValue(WTF::move(imageValue), WTF::move(filterValue)));
     }
@@ -62,7 +62,7 @@ public:
     bool isPending() const;
     bool knownToBeOpaque(const RenderElement*) const;
 
-    void loadSubimages(CachedResourceLoader*);
+    void loadSubimages(CachedResourceLoader&);
 
     bool hasFailedOrCanceledSubresources() const;
 
@@ -88,7 +88,7 @@ private:
     {
     }
 
-    class FilterSubimageObserverProxy : public CachedImageClient {
+    class FilterSubimageObserverProxy final : public CachedImageClient {
     public:
         FilterSubimageObserverProxy(CSSFilterImageValue* ownerValue)
             : m_ownerValue(ownerValue)
@@ -97,7 +97,7 @@ private:
         }
 
         virtual ~FilterSubimageObserverProxy() { }
-        virtual void imageChanged(CachedImage*, const IntRect* = 0) override;
+        virtual void imageChanged(CachedImage*, const IntRect* = nullptr) override;
         void setReady(bool ready) { m_ready = ready; }
     private:
         CSSFilterImageValue* m_ownerValue;

@@ -40,15 +40,15 @@ using namespace HTMLNames;
 
 inline HTMLSourceElement::HTMLSourceElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
-    , m_errorEventTimer(this, &HTMLSourceElement::errorEventTimerFired)
+    , m_errorEventTimer(*this, &HTMLSourceElement::errorEventTimerFired)
 {
     LOG(Media, "HTMLSourceElement::HTMLSourceElement - %p", this);
     ASSERT(hasTagName(sourceTag));
 }
 
-PassRefPtr<HTMLSourceElement> HTMLSourceElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLSourceElement> HTMLSourceElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLSourceElement(tagName, document));
+    return adoptRef(*new HTMLSourceElement(tagName, document));
 }
 
 Node::InsertionNotificationRequest HTMLSourceElement::insertedInto(ContainerNode& insertionPoint)
@@ -110,7 +110,7 @@ void HTMLSourceElement::cancelPendingErrorEvent()
     m_errorEventTimer.stop();
 }
 
-void HTMLSourceElement::errorEventTimerFired(Timer<HTMLSourceElement>&)
+void HTMLSourceElement::errorEventTimerFired()
 {
     LOG(Media, "HTMLSourceElement::errorEventTimerFired - %p", this);
     dispatchEvent(Event::create(eventNames().errorEvent, false, true));

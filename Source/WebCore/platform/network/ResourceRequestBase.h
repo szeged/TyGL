@@ -124,8 +124,8 @@ namespace WebCore {
         bool allowCookies() const;
         void setAllowCookies(bool allowCookies);
 
-        ResourceLoadPriority priority() const;
-        void setPriority(ResourceLoadPriority);
+        WEBCORE_EXPORT ResourceLoadPriority priority() const;
+        WEBCORE_EXPORT void setPriority(ResourceLoadPriority);
 
         bool isConditional() const;
         void makeUnconditional();
@@ -143,11 +143,9 @@ namespace WebCore {
         bool reportRawHeaders() const { return m_reportRawHeaders; }
         void setReportRawHeaders(bool reportRawHeaders) { m_reportRawHeaders = reportRawHeaders; }
 
-#if ENABLE(INSPECTOR)
         // Whether this request should be hidden from the Inspector.
         bool hiddenFromInspector() const { return m_hiddenFromInspector; }
         void setHiddenFromInspector(bool hiddenFromInspector) { m_hiddenFromInspector = hiddenFromInspector; }
-#endif
 
 #if !PLATFORM(COCOA)
         bool encodingRequiresPlatformData() const { return true; }
@@ -175,9 +173,7 @@ namespace WebCore {
             , m_reportUploadProgress(false)
             , m_reportLoadTiming(false)
             , m_reportRawHeaders(false)
-#if ENABLE(INSPECTOR)
             , m_hiddenFromInspector(false)
-#endif
             , m_priority(ResourceLoadPriorityLow)
         {
         }
@@ -199,9 +195,7 @@ namespace WebCore {
             , m_reportUploadProgress(false)
             , m_reportLoadTiming(false)
             , m_reportRawHeaders(false)
-#if ENABLE(INSPECTOR)
             , m_hiddenFromInspector(false)
-#endif
             , m_priority(ResourceLoadPriorityLow)
         {
         }
@@ -220,18 +214,16 @@ namespace WebCore {
         Vector<String> m_responseContentDispositionEncodingFallbackArray;
         RefPtr<FormData> m_httpBody;
         unsigned m_cachePolicy : 3;
-        bool m_allowCookies : 1;
-        mutable bool m_resourceRequestUpdated : 1;
-        mutable bool m_platformRequestUpdated : 1;
-        mutable bool m_resourceRequestBodyUpdated : 1;
-        mutable bool m_platformRequestBodyUpdated : 1;
-        bool m_reportUploadProgress : 1;
-        bool m_reportLoadTiming : 1;
-        bool m_reportRawHeaders : 1;
-#if ENABLE(INSPECTOR)
-        bool m_hiddenFromInspector : 1;
-#endif
-        ResourceLoadPriority m_priority : 4; // not unsigned because ResourceLoadPriority has negative values
+        unsigned m_allowCookies : 1;
+        mutable unsigned m_resourceRequestUpdated : 1;
+        mutable unsigned m_platformRequestUpdated : 1;
+        mutable unsigned m_resourceRequestBodyUpdated : 1;
+        mutable unsigned m_platformRequestBodyUpdated : 1;
+        unsigned m_reportUploadProgress : 1;
+        unsigned m_reportLoadTiming : 1;
+        unsigned m_reportRawHeaders : 1;
+        unsigned m_hiddenFromInspector : 1;
+        unsigned m_priority : 4;
 
     private:
         const ResourceRequest& asResourceRequest() const;

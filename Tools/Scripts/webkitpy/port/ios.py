@@ -1,4 +1,4 @@
-# Copyright (C) 2014 Apple Inc. All rights reserved.
+# Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,14 +31,45 @@ import subprocess
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.common.system.crashlogs import CrashLogs
 from webkitpy.common.system.executive import ScriptError
+from webkitpy.port.apple import ApplePort
 from webkitpy.port import driver, image_diff
 from webkitpy.port.base import Port
 from webkitpy.port.leakdetector import LeakDetector
 from webkitpy.port import config as port_config
-from webkitpy.xcode import simulator
+from webkitpy.xcode.simulator import Simulator
 
 
 _log = logging.getLogger(__name__)
+
+
+class IOSPort(ApplePort):
+    port_name = "ios"
+
+    ARCHITECTURES = ['armv7', 'armv7s', 'arm64']
+    DEFAULT_ARCHITECTURE = 'armv7'
+    VERSION_FALLBACK_ORDER = ['ios-7', 'ios-8', 'ios-9']
+
+    @classmethod
+    def determine_full_port_name(cls, host, options, port_name):
+        if port_name == cls.port_name:
+            iphoneos_sdk_version = host.platform.xcode_sdk_version('iphoneos')
+            if not iphoneos_sdk_version:
+                raise Exception("Please install the iOS SDK.")
+            major_version_number = iphoneos_sdk_version.split('.')[0]
+            port_name = port_name + '-' + major_version_number
+        return port_name
+
+    def __init__(self, *args, **kwargs):
+        super(IOSPort, self).__init__(*args, **kwargs)
+
+        self._testing_device = None
+
+    # Despite their names, these flags do not actually get passed all the way down to webkit-build.
+    def _build_driver_flags(self):
+        return ['--sdk', 'iphoneos'] + (['ARCHS=%s' % self.architecture()] if self.architecture() else [])
+
+    def operating_system(self):
+        return 'ios'
 
 
 class IOSSimulatorPort(Port):
@@ -46,27 +77,20 @@ class IOSSimulatorPort(Port):
 
     FUTURE_VERSION = 'future'
 
-    VERSION_FALLBACK_ORDER = ['ios-simulator', 'mac']
-
     ARCHITECTURES = ['x86_64', 'x86']
+
+    DEFAULT_ARCHITECTURE = 'x86_64'
 
     relay_name = 'LayoutTestRelay'
 
     def __init__(self, *args, **kwargs):
         super(IOSSimulatorPort, self).__init__(*args, **kwargs)
 
-        self._architecture = self.get_option('architecture')
-
-        if not self._architecture:
-            self._architecture = 'x86_64'
-
         self._leak_detector = LeakDetector(self)
         if self.get_option("leaks"):
             # DumpRenderTree slows down noticably if we run more than about 1000 tests in a batch
             # with MallocStackLogging enabled.
             self.set_option_default("batch_size", 1000)
-        mac_config = port_config.Config(self._executive, self._filesystem, 'mac')
-        self._mac_build_directory = mac_config.build_directory(self.get_option('configuration'))
 
         self._testing_device = None
 
@@ -79,7 +103,8 @@ class IOSSimulatorPort(Port):
 
     @property
     def relay_path(self):
-        return self._filesystem.join(self._mac_build_directory, self.relay_name)
+        mac_config = port_config.Config(self._executive, self._filesystem, 'mac')
+        return self._filesystem.join(mac_config.build_directory(self.get_option('configuration')), self.relay_name)
 
     def default_timeout_ms(self):
         if self.get_option('guard_malloc'):
@@ -142,15 +167,11 @@ class IOSSimulatorPort(Port):
         return driver.IOSSimulatorDriver
 
     def default_baseline_search_path(self):
-        name = self._name.replace('-wk2', '')
-        wk_version = [] if self.get_option('webkit_test_runner') else ['mac-wk1']
-        if name.endswith(self.FUTURE_VERSION):
-            fallback_names = wk_version + [self.port_name]
-        else:
-            fallback_names = self.VERSION_FALLBACK_ORDER[self.VERSION_FALLBACK_ORDER.index(name):-1] + wk_version + [self.port_name]
-        # FIXME: mac-wk2 should appear at the same place as mac-wk1.
         if self.get_option('webkit_test_runner'):
-            fallback_names = [self._wk2_port_name(), 'wk2'] + fallback_names
+            fallback_names = [self._wk2_port_name(), 'wk2'] + [self.port_name]
+        else:
+            fallback_names = [self.port_name + '-wk1'] + [self.port_name]
+
         return map(self._webkit_baseline_path, fallback_names)
 
     def _port_specific_expectations_files(self):
@@ -158,10 +179,12 @@ class IOSSimulatorPort(Port):
 
     def setup_test_run(self):
         self._executive.run_command(['osascript', '-e', 'tell application "iOS Simulator" to quit'])
-        time.sleep(2)
+        device_udid = self.testing_device.udid
+        Simulator.wait_until_device_is_in_state(device_udid, Simulator.DeviceState.SHUTDOWN)
         self._executive.run_command([
             'open', '-a', os.path.join(self.developer_dir, 'Applications', 'iOS Simulator.app'),
-            '--args', '-CurrentDeviceUDID', self.testing_device.udid])
+            '--args', '-CurrentDeviceUDID', device_udid])
+        Simulator.wait_until_device_is_in_state(device_udid, Simulator.DeviceState.BOOTED)
 
     def clean_up_test_run(self):
         super(IOSSimulatorPort, self).clean_up_test_run()
@@ -203,8 +226,8 @@ class IOSSimulatorPort(Port):
             return
         total_bytes_string, unique_leaks = self._leak_detector.count_total_bytes_and_unique_leaks(leaks_files)
         total_leaks = self._leak_detector.count_total_leaks(leaks_files)
-        _log.info("%s total leaks found for a total of %s!" % (total_leaks, total_bytes_string))
-        _log.info("%s unique leaks found!" % unique_leaks)
+        _log.info("%s total leaks found for a total of %s." % (total_leaks, total_bytes_string))
+        _log.info("%s unique leaks found." % unique_leaks)
 
     def _path_to_webcore_library(self):
         return self._build_path('WebCore.framework/Versions/A/WebCore')
@@ -216,33 +239,36 @@ class IOSSimulatorPort(Port):
         self._executive.popen([self.path_to_script('run-safari')] + self._arguments_for_configuration() + ['--no-saved-state', '-NSOpen', results_filename],
             cwd=self.webkit_base(), stdout=file(os.devnull), stderr=file(os.devnull))
 
-    def acquire_http_lock(self):
-        pass
-
-    def release_http_lock(self):
-        pass
-
     def sample_file_path(self, name, pid):
         return self._filesystem.join(self.results_directory(), "{0}-{1}-sample.txt".format(name, pid))
+
+    SUBPROCESS_CRASH_REGEX = re.compile('#CRASHED - (?P<subprocess_name>\S+) \(pid (?P<subprocess_pid>\d+)\)')
 
     def _get_crash_log(self, name, pid, stdout, stderr, newer_than, time_fn=time.time, sleep_fn=time.sleep, wait_for_log=True):
         time_fn = time_fn or time.time
         sleep_fn = sleep_fn or time.sleep
+
+        # FIXME: We should collect the actual crash log for DumpRenderTree.app because it includes more
+        # information (e.g. exception codes) than is available in the stack trace written to standard error.
+        stderr_lines = []
+        crashed_subprocess_name_and_pid = None  # e.g. ('DumpRenderTree.app', 1234)
+        for line in (stderr or '').splitlines():
+            if not crashed_subprocess_name_and_pid:
+                match = self.SUBPROCESS_CRASH_REGEX.match(line)
+                if match:
+                    crashed_subprocess_name_and_pid = (match.group('subprocess_name'), int(match.group('subprocess_pid')))
+                    continue
+            stderr_lines.append(line)
+
+        if crashed_subprocess_name_and_pid:
+            return self._get_crash_log(crashed_subprocess_name_and_pid[0], crashed_subprocess_name_and_pid[1], stdout,
+                '\n'.join(stderr_lines), newer_than, time_fn, sleep_fn, wait_for_log)
+
+        # LayoutTestRelay crashed
+        _log.debug('looking for crash log for %s:%s' % (name, str(pid)))
         crash_log = ''
         crash_logs = CrashLogs(self.host)
         now = time_fn()
-
-        crash_prefix = 'CRASH: '
-        stderr_lines = []
-        crash_lines = []
-        for line in (stderr or '').splitlines():
-            crash_lines.append(line) if line.startswith(crash_prefix) else stderr_lines.append(line)
-
-        for crash_line in crash_lines:
-            identifier, pid = crash_line[len(crash_prefix):].split(' ')
-            return self._get_crash_log(identifier, int(pid), stdout, '\n'.join(stderr_lines), newer_than, time_fn, sleep_fn, wait_for_log)
-
-        _log.debug('looking for crash log for %s:%s' % (name, str(pid)))
         deadline = now + 5 * int(self.get_option('child_processes', 1))
         while not crash_log and now <= deadline:
             crash_log = crash_logs.find_newest_log(name, pid, include_errors=True, newer_than=newer_than)
@@ -263,12 +289,8 @@ class IOSSimulatorPort(Port):
 
         device_type = self.get_option('device_type')
         runtime = self.get_option('runtime')
-        self._testing_device = simulator.Simulator().testing_device(device_type, runtime)
+        self._testing_device = Simulator().lookup_or_create_device(device_type.name + ' WebKit Tester', device_type, runtime)
         return self.testing_device
-
-    def simulator_path(self, udid):
-        if udid:
-            return os.path.realpath(os.path.expanduser(os.path.join('~/Library/Developer/CoreSimulator/Devices', udid)))
 
     def look_for_new_crash_logs(self, crashed_processes, start_time):
         crash_logs = {}

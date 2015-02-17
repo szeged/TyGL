@@ -44,9 +44,9 @@ inline HTMLTableCellElement::HTMLTableCellElement(const QualifiedName& tagName, 
 {
 }
 
-PassRefPtr<HTMLTableCellElement> HTMLTableCellElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLTableCellElement> HTMLTableCellElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLTableCellElement(tagName, document));
+    return adoptRef(*new HTMLTableCellElement(tagName, document));
 }
 
 int HTMLTableCellElement::colSpan() const
@@ -105,11 +105,11 @@ void HTMLTableCellElement::collectStyleForPresentationAttribute(const QualifiedN
 void HTMLTableCellElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == rowspanAttr) {
-        if (renderer() && renderer()->isTableCell())
-            toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
+        if (is<RenderTableCell>(renderer()))
+            downcast<RenderTableCell>(*renderer()).colSpanOrRowSpanChanged();
     } else if (name == colspanAttr) {
-        if (renderer() && renderer()->isTableCell())
-            toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
+        if (is<RenderTableCell>(renderer()))
+            downcast<RenderTableCell>(*renderer()).colSpanOrRowSpanChanged();
     } else
         HTMLTablePartElement::parseAttribute(name, value);
 }
@@ -165,12 +165,12 @@ void HTMLTableCellElement::addSubresourceAttributeURLs(ListHashSet<URL>& urls) c
 
 HTMLTableCellElement* HTMLTableCellElement::cellAbove() const
 {
-    auto cellRenderer = renderer();
-    if (!cellRenderer || !cellRenderer->isTableCell())
+    auto* cellRenderer = renderer();
+    if (!is<RenderTableCell>(cellRenderer))
         return nullptr;
 
-    auto tableCellRenderer = toRenderTableCell(cellRenderer);
-    auto cellAboveRenderer = tableCellRenderer->table()->cellAbove(tableCellRenderer);
+    auto& tableCellRenderer = downcast<RenderTableCell>(*cellRenderer);
+    auto* cellAboveRenderer = tableCellRenderer.table()->cellAbove(&tableCellRenderer);
     if (!cellAboveRenderer)
         return nullptr;
 

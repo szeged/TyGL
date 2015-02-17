@@ -44,8 +44,8 @@ enum SkipEmptySectionsValue { DoNotSkipEmptySections, SkipEmptySections };
 
 class RenderTable : public RenderBlock {
 public:
-    RenderTable(Element&, PassRef<RenderStyle>);
-    RenderTable(Document&, PassRef<RenderStyle>);
+    RenderTable(Element&, Ref<RenderStyle>&&);
+    RenderTable(Document&, Ref<RenderStyle>&&);
     virtual ~RenderTable();
 
     // Per CSS 3 writing-mode: "The first and second values of the 'border-spacing' property represent spacing between columns
@@ -275,7 +275,9 @@ public:
     LayoutUnit offsetLeftForColumn(const RenderTableCol&) const;
     LayoutUnit offsetWidthForColumn(const RenderTableCol&) const;
     LayoutUnit offsetHeightForColumn(const RenderTableCol&) const;
-
+    
+    virtual void markForPaginationRelayoutIfNeeded() override final;
+    
 protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override final;
     virtual void simplifiedNormalFlowLayout() override final;
@@ -380,8 +382,6 @@ inline RenderTableSection* RenderTable::topSection() const
         return m_firstBody;
     return m_foot;
 }
-
-RENDER_OBJECT_TYPE_CASTS(RenderTable, isTable())
 
 } // namespace WebCore
 

@@ -62,7 +62,7 @@ class GraphicsContext;
 
 class RenderSVGResourceFilter final : public RenderSVGResourceContainer {
 public:
-    RenderSVGResourceFilter(SVGFilterElement&, PassRef<RenderStyle>);
+    RenderSVGResourceFilter(SVGFilterElement&, Ref<RenderStyle>&&);
     virtual ~RenderSVGResourceFilter();
 
     SVGFilterElement& filterElement() const { return downcast<SVGFilterElement>(RenderSVGResourceContainer::element()); }
@@ -82,8 +82,7 @@ public:
 
     void primitiveAttributeChanged(RenderObject*, const QualifiedName&);
 
-    virtual RenderSVGResourceType resourceType() const { return s_resourceType; }
-    static RenderSVGResourceType s_resourceType;
+    virtual RenderSVGResourceType resourceType() const override { return FilterResourceType; }
 
     FloatRect drawingRegion(RenderObject*) const;
 private:
@@ -97,10 +96,11 @@ private:
     HashMap<RenderObject*, std::unique_ptr<FilterData>> m_filter;
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderSVGResourceFilter, isSVGResourceFilter())
-
 } // namespace WebCore
 
-SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderSVGResourceFilter, isSVGResourceFilter())
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::RenderSVGResourceFilter)
+    static bool isType(const WebCore::RenderObject& renderer) { return renderer.isSVGResourceFilter(); }
+    static bool isType(const WebCore::RenderSVGResource& resource) { return resource.resourceType() == WebCore::FilterResourceType; }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // RenderSVGResourceFilter_h

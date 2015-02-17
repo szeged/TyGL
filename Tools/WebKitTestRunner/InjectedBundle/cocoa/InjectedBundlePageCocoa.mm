@@ -27,9 +27,11 @@
 #import "InjectedBundlePage.h"
 
 #import "CrashReporterInfo.h"
+#import "InjectedBundle.h"
 #import <WebKit/WKBundleFrame.h>
 #import <WebKit/WKBundlePagePrivate.h>
 #import <WebKit/WKURLCF.h>
+#import <WebKit/WKURLResponseNS.h>
 
 namespace WTR {
 
@@ -40,12 +42,17 @@ void InjectedBundlePage::platformDidStartProvisionalLoadForFrame(WKBundleFrameRe
     if (!WKBundleFrameIsMainFrame(frame))
         return;
 
-    WKRetainPtr<WKURLRef> mainFrameURL = adoptWK(WKBundleFrameCopyProvisionalURL(frame));
-    setCrashReportApplicationSpecificInformationToURL(mainFrameURL.get());
+    setCrashReportApplicationSpecificInformationToURL(InjectedBundle::singleton().testRunner()->testURL());
 
 #if PLATFORM(IOS)
     WKBundlePageSetUseTestingViewportConfiguration(page(), true);
 #endif
+}
+
+String InjectedBundlePage::platformResponseMimeType(WKURLResponseRef response)
+{
+    RetainPtr<NSURLResponse> nsURLResponse = adoptNS(WKURLResponseCopyNSURLResponse(response));
+    return [nsURLResponse.get() MIMEType];
 }
 
 } // namespace WTR

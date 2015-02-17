@@ -33,6 +33,7 @@
 #import <wtf/RetainPtr.h>
 
 OBJC_CLASS WKContentView;
+OBJC_CLASS WKView;
 OBJC_CLASS WKWebView;
 OBJC_CLASS WKEditorUndoTargetObjC;
 
@@ -45,6 +46,7 @@ class PageClientImpl : public PageClient
     {
 public:
     PageClientImpl(WKContentView *, WKWebView *);
+    PageClientImpl(WKContentView *, WKView *);
     virtual ~PageClientImpl();
     
 private:
@@ -67,7 +69,7 @@ private:
     virtual void pageClosed() override;
     virtual void preferencesDidChange() override;
     virtual void toolTipChanged(const String&, const String&) override;
-    virtual bool decidePolicyForGeolocationPermissionRequest(WebFrameProxy&, WebSecurityOrigin&, GeolocationPermissionRequestProxy&) override;
+    virtual bool decidePolicyForGeolocationPermissionRequest(WebFrameProxy&, API::SecurityOrigin&, GeolocationPermissionRequestProxy&) override;
     virtual void didCommitLoadForMainFrame(const String& mimeType, bool useCustomContentProvider) override;
     virtual void handleDownloadRequest(DownloadProxy*) override;
     virtual void setCursor(const WebCore::Cursor&) override;
@@ -96,7 +98,8 @@ private:
 #endif
     virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
     virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
-    virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut, bool animate) override;
+    virtual void setTextIndicator(PassRefPtr<WebCore::TextIndicator>, bool fadeOut) override;
+    virtual void setTextIndicatorAnimationProgress(float) override;
 
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) override;
     virtual void exitAcceleratedCompositingMode() override;
@@ -128,11 +131,9 @@ private:
 
     virtual bool handleRunOpenPanel(WebPageProxy*, WebFrameProxy*, WebOpenPanelParameters*, WebOpenPanelResultListenerProxy*) override;
     virtual void didChangeViewportMetaTagWidth(float) override;
-    virtual void setUsesMinimalUI(bool) override;
     virtual double minimumZoomScale() const override;
     virtual WebCore::FloatSize contentsSize() const override;
 
-#if ENABLE(INSPECTOR)
     virtual void showInspectorHighlight(const WebCore::Highlight&) override;
     virtual void hideInspectorHighlight() override;
 
@@ -141,7 +142,6 @@ private:
 
     virtual void enableInspectorNodeSearch() override;
     virtual void disableInspectorNodeSearch() override;
-#endif
 
     virtual void zoomToRect(WebCore::FloatRect, double minimumScale, double maximumScale) override;
     virtual void overflowScrollViewWillStartPanGesture() override;
@@ -181,6 +181,7 @@ private:
 
     WKContentView *m_contentView;
     WKWebView *m_webView;
+    WKView *m_wkView;
     RetainPtr<WKEditorUndoTargetObjC> m_undoTarget;
 };
 } // namespace WebKit

@@ -48,11 +48,11 @@
 #include "JSLexicalEnvironment.h"
 #include "VM.h"
 #include "JSNameScope.h"
-#include "NameInstance.h"
 #include "ObjectConstructor.h"
 #include "JSCInlines.h"
 #include "Repatch.h"
 #include "StringConstructor.h"
+#include "Symbol.h"
 #include "TypeProfilerLog.h"
 #include "TypedArrayInlines.h"
 #include <wtf/InlineASM.h>
@@ -110,25 +110,15 @@ ALWAYS_INLINE static void JIT_OPERATION operationPutByValInternal(ExecState* exe
         }
     }
 
-    if (isName(property)) {
-        PutPropertySlot slot(baseValue, strict);
-        if (direct) {
-            RELEASE_ASSERT(baseValue.isObject());
-            asObject(baseValue)->putDirect(*vm, jsCast<NameInstance*>(property.asCell())->privateName(), value, slot);
-        } else
-            baseValue.put(exec, jsCast<NameInstance*>(property.asCell())->privateName(), value, slot);
-        return;
-    }
-
     // Don't put to an object if toString throws an exception.
-    Identifier ident = property.toString(exec)->toIdentifier(exec);
+    PropertyName propertyName = property.toPropertyKey(exec);
     if (!vm->exception()) {
         PutPropertySlot slot(baseValue, strict);
         if (direct) {
             RELEASE_ASSERT(baseValue.isObject());
-            asObject(baseValue)->putDirect(*vm, jsCast<NameInstance*>(property.asCell())->privateName(), value, slot);
+            asObject(baseValue)->putDirect(*vm, propertyName, value, slot);
         } else
-            baseValue.put(exec, ident, value, slot);
+            baseValue.put(exec, propertyName, value, slot);
     }
 }
 
@@ -306,11 +296,8 @@ EncodedJSValue JIT_OPERATION operationGetByVal(ExecState* exec, EncodedJSValue e
         }
     }
 
-    if (isName(property))
-        return JSValue::encode(baseValue.get(exec, jsCast<NameInstance*>(property.asCell())->privateName()));
-
-    Identifier ident = property.toString(exec)->toIdentifier(exec);
-    return JSValue::encode(baseValue.get(exec, ident));
+    PropertyName propertyName = property.toPropertyKey(exec);
+    return JSValue::encode(baseValue.get(exec, propertyName));
 }
 
 EncodedJSValue JIT_OPERATION operationGetByValCell(ExecState* exec, JSCell* base, EncodedJSValue encodedProperty)
@@ -337,11 +324,8 @@ EncodedJSValue JIT_OPERATION operationGetByValCell(ExecState* exec, JSCell* base
         }
     }
 
-    if (isName(property))
-        return JSValue::encode(JSValue(base).get(exec, jsCast<NameInstance*>(property.asCell())->privateName()));
-
-    Identifier ident = property.toString(exec)->toIdentifier(exec);
-    return JSValue::encode(JSValue(base).get(exec, ident));
+    PropertyName propertyName = property.toPropertyKey(exec);
+    return JSValue::encode(JSValue(base).get(exec, propertyName));
 }
 
 ALWAYS_INLINE EncodedJSValue getByValCellInt(ExecState* exec, JSCell* base, int32_t index)
@@ -774,12 +758,6 @@ JSCell* JIT_OPERATION operationCreateInlinedArguments(
     return result;
 }
 
-JSCell* JIT_OPERATION operationCreateInlinedArgumentsDuringOSRExit(ExecState* exec, InlineCallFrame* inlineCallFrame)
-{
-    DeferGCForAWhile(exec->vm().heap);
-    return operationCreateInlinedArguments(exec, inlineCallFrame);
-}
-
 void JIT_OPERATION operationTearOffInlinedArguments(
     ExecState* exec, JSCell* argumentsCell, JSCell* activationCell, InlineCallFrame* inlineCallFrame)
 {
@@ -796,8 +774,10 @@ EncodedJSValue JIT_OPERATION operationGetArgumentByVal(ExecState* exec, int32_t 
     
     // If there are no arguments, and we're accessing out of bounds, then we have to create the
     // arguments in case someone has installed a getter on a numeric property.
-    if (!argumentsValue)
-        exec->uncheckedR(argumentsRegister) = argumentsValue = Arguments::create(exec->vm(), exec);
+    if (!argumentsValue) {
+        JSLexicalEnvironment* lexicalEnvironment = exec->lexicalEnvironmentOrNullptr();
+        exec->uncheckedR(argumentsRegister) = argumentsValue = Arguments::create(exec->vm(), exec, lexicalEnvironment);
+    }
     
     return JSValue::encode(argumentsValue.get(exec, index));
 }
@@ -820,12 +800,12 @@ EncodedJSValue JIT_OPERATION operationGetInlinedArgumentByVal(
     return JSValue::encode(argumentsValue.get(exec, index));
 }
 
-JSCell* JIT_OPERATION operationNewFunctionNoCheck(ExecState* exec, JSCell* functionExecutable)
+JSCell* JIT_OPERATION operationNewFunctionNoCheck(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
 {
     ASSERT(functionExecutable->inherits(FunctionExecutable::info()));
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
-    return JSFunction::create(vm, static_cast<FunctionExecutable*>(functionExecutable), exec->scope());
+    return JSFunction::create(vm, static_cast<FunctionExecutable*>(functionExecutable), scope);
 }
 
 size_t JIT_OPERATION operationIsObject(ExecState* exec, EncodedJSValue value)
@@ -1223,6 +1203,11 @@ void JIT_OPERATION triggerTierUpNow(ExecState* exec)
     DeferGC deferGC(vm->heap);
     CodeBlock* codeBlock = exec->codeBlock();
     
+    if (codeBlock->jitType() != JITCode::DFGJIT) {
+        dataLog("Unexpected code block in DFG->FTL tier-up: ", *codeBlock, "\n");
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+    
     JITCode* jitCode = codeBlock->jitCode()->dfg();
     
     if (Options::verboseOSR()) {
@@ -1241,6 +1226,11 @@ char* JIT_OPERATION triggerOSREntryNow(
     NativeCallFrameTracer tracer(vm, exec);
     DeferGC deferGC(vm->heap);
     CodeBlock* codeBlock = exec->codeBlock();
+    
+    if (codeBlock->jitType() != JITCode::DFGJIT) {
+        dataLog("Unexpected code block in DFG->FTL tier-up: ", *codeBlock, "\n");
+        RELEASE_ASSERT_NOT_REACHED();
+    }
     
     JITCode* jitCode = codeBlock->jitCode()->dfg();
     

@@ -28,7 +28,7 @@
 #include "config.h"
 #include "InspectorReplayAgent.h"
 
-#if ENABLE(INSPECTOR) && ENABLE(WEB_REPLAY)
+#if ENABLE(WEB_REPLAY)
 
 #include "DocumentLoader.h"
 #include "Event.h"
@@ -37,7 +37,7 @@
 #include "FunctorInputCursor.h"
 #include "InspectorController.h"
 #include "InspectorPageAgent.h"
-#include "InspectorWebProtocolTypes.h"
+#include <inspector/InspectorProtocolObjects.h>
 #include "InstrumentingAgents.h"
 #include "Logging.h"
 #include "Page.h"
@@ -54,40 +54,36 @@ using namespace Inspector;
 
 namespace WebCore {
 
-static PassRefPtr<Inspector::Protocol::Replay::ReplayPosition> buildInspectorObjectForPosition(const ReplayPosition& position)
+static Ref<Inspector::Protocol::Replay::ReplayPosition> buildInspectorObjectForPosition(const ReplayPosition& position)
 {
-    RefPtr<Inspector::Protocol::Replay::ReplayPosition> positionObject = Inspector::Protocol::Replay::ReplayPosition::create()
+    return Inspector::Protocol::Replay::ReplayPosition::create()
         .setSegmentOffset(position.segmentOffset)
-        .setInputOffset(position.inputOffset);
-
-    return positionObject.release();
+        .setInputOffset(position.inputOffset)
+        .release();
 }
 
-static PassRefPtr<Inspector::Protocol::Replay::ReplayInput> buildInspectorObjectForInput(const NondeterministicInputBase& input, size_t offset)
+static Ref<Inspector::Protocol::Replay::ReplayInput> buildInspectorObjectForInput(const NondeterministicInputBase& input, size_t offset)
 {
     EncodedValue encodedInput = EncodingTraits<NondeterministicInputBase>::encodeValue(input);
-    RefPtr<Inspector::Protocol::Replay::ReplayInput> inputObject = Inspector::Protocol::Replay::ReplayInput::create()
+    return Inspector::Protocol::Replay::ReplayInput::create()
         .setType(input.type())
         .setOffset(offset)
-        .setData(encodedInput.asObject());
-
-    return inputObject.release();
+        .setData(encodedInput.asObject())
+        .release();
 }
 
-static PassRefPtr<Inspector::Protocol::Replay::ReplaySession> buildInspectorObjectForSession(PassRefPtr<ReplaySession> prpSession)
+static Ref<Inspector::Protocol::Replay::ReplaySession> buildInspectorObjectForSession(RefPtr<ReplaySession>&& session)
 {
-    RefPtr<ReplaySession> session = prpSession;
-    RefPtr<Inspector::Protocol::Array<SegmentIdentifier>> segments = Inspector::Protocol::Array<SegmentIdentifier>::create();
+    auto segments = Inspector::Protocol::Array<SegmentIdentifier>::create();
 
     for (auto it = session->begin(); it != session->end(); ++it)
         segments->addItem((*it)->identifier());
 
-    RefPtr<Inspector::Protocol::Replay::ReplaySession> sessionObject = Inspector::Protocol::Replay::ReplaySession::create()
+    return Inspector::Protocol::Replay::ReplaySession::create()
         .setId(session->identifier())
         .setTimestamp(session->timestamp())
-        .setSegments(segments.release());
-
-    return sessionObject.release();
+        .setSegments(WTF::move(segments))
+        .release();
 }
 
 static Inspector::Protocol::Replay::SessionState buildInspectorObjectForSessionState(WebCore::SessionState sessionState)
@@ -111,7 +107,7 @@ static Inspector::Protocol::Replay::SegmentState buildInspectorObjectForSegmentS
 
 class SerializeInputToJSONFunctor {
 public:
-    typedef PassRefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInput>> ReturnType;
+    typedef RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInput>> ReturnType;
 
     SerializeInputToJSONFunctor()
         : m_inputs(Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInput>::create()) { }
@@ -122,38 +118,36 @@ public:
         LOG(WebReplay, "%-25s Writing %5zu: %s\n", "[SerializeInput]", index, input->type().ascii().data());
 
         if (RefPtr<Inspector::Protocol::Replay::ReplayInput> serializedInput = buildInspectorObjectForInput(*input, index))
-            m_inputs->addItem(serializedInput.release());
+            m_inputs->addItem(WTF::move(serializedInput));
     }
 
-    ReturnType returnValue() { return m_inputs.release(); }
+    ReturnType returnValue() { return WTF::move(m_inputs); }
 private:
     RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInput>> m_inputs;
 };
 
-static PassRefPtr<Inspector::Protocol::Replay::SessionSegment> buildInspectorObjectForSegment(PassRefPtr<ReplaySessionSegment> prpSegment)
+static Ref<Inspector::Protocol::Replay::SessionSegment> buildInspectorObjectForSegment(RefPtr<ReplaySessionSegment>&& segment)
 {
-    RefPtr<ReplaySessionSegment> segment = prpSegment;
-    RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInputQueue>> queuesObject = Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInputQueue>::create();
+    auto queuesObject = Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInputQueue>::create();
 
     for (size_t i = 0; i < static_cast<size_t>(InputQueue::Count); i++) {
         SerializeInputToJSONFunctor collector;
         InputQueue queue = static_cast<InputQueue>(i);
-        RefPtr<FunctorInputCursor> functorCursor = FunctorInputCursor::create(segment);
+        RefPtr<FunctorInputCursor> functorCursor = FunctorInputCursor::create(segment.copyRef());
         RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInput>> queueInputs = functorCursor->forEachInputInQueue(queue, collector);
 
-        RefPtr<Inspector::Protocol::Replay::ReplayInputQueue> queueObject = Inspector::Protocol::Replay::ReplayInputQueue::create()
+        auto queueObject = Inspector::Protocol::Replay::ReplayInputQueue::create()
             .setType(EncodingTraits<InputQueue>::encodeValue(queue).convertTo<String>())
-            .setInputs(queueInputs);
-
-        queuesObject->addItem(queueObject.release());
+            .setInputs(queueInputs)
+            .release();
+        queuesObject->addItem(WTF::move(queueObject));
     }
 
-    RefPtr<Inspector::Protocol::Replay::SessionSegment> segmentObject = Inspector::Protocol::Replay::SessionSegment::create()
+    return Inspector::Protocol::Replay::SessionSegment::create()
         .setId(segment->identifier())
         .setTimestamp(segment->timestamp())
-        .setQueues(queuesObject.release());
-
-    return segmentObject.release();
+        .setQueues(WTF::move(queuesObject))
+        .release();
 }
 
 InspectorReplayAgent::InspectorReplayAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent)
@@ -208,7 +202,7 @@ void InspectorReplayAgent::frameNavigated(DocumentLoader* loader)
         m_page.replayController().frameNavigated(loader);
 }
 
-void InspectorReplayAgent::frameDetached(Frame* frame)
+void InspectorReplayAgent::frameDetached(Frame& frame)
 {
     if (sessionState() != WebCore::SessionState::Inactive)
         m_page.replayController().frameDetached(frame);
@@ -220,10 +214,8 @@ void InspectorReplayAgent::willDispatchEvent(const Event& event, Frame* frame)
         m_page.replayController().willDispatchEvent(event, frame);
 }
 
-void InspectorReplayAgent::sessionCreated(PassRefPtr<ReplaySession> prpSession)
+void InspectorReplayAgent::sessionCreated(RefPtr<ReplaySession>&& session)
 {
-    RefPtr<ReplaySession> session = prpSession;
-
     auto result = m_sessionsMap.add(session->identifier(), session);
     // Can't have two sessions with same identifier.
     ASSERT_UNUSED(result, result.isNewEntry);
@@ -231,25 +223,21 @@ void InspectorReplayAgent::sessionCreated(PassRefPtr<ReplaySession> prpSession)
     m_frontendDispatcher->sessionCreated(session->identifier());
 }
 
-void InspectorReplayAgent::sessionModified(PassRefPtr<ReplaySession> session)
+void InspectorReplayAgent::sessionModified(RefPtr<ReplaySession>&& session)
 {
     m_frontendDispatcher->sessionModified(session->identifier());
 }
 
-void InspectorReplayAgent::sessionLoaded(PassRefPtr<ReplaySession> prpSession)
+void InspectorReplayAgent::sessionLoaded(RefPtr<ReplaySession>&& session)
 {
-    RefPtr<ReplaySession> session = prpSession;
-
     // In case we didn't know about the loaded session, add here.
     m_sessionsMap.add(session->identifier(), session);
 
     m_frontendDispatcher->sessionLoaded(session->identifier());
 }
 
-void InspectorReplayAgent::segmentCreated(PassRefPtr<ReplaySessionSegment> prpSegment)
+void InspectorReplayAgent::segmentCreated(RefPtr<ReplaySessionSegment>&& segment)
 {
-    RefPtr<ReplaySessionSegment> segment = prpSegment;
-
     auto result = m_segmentsMap.add(segment->identifier(), segment);
     // Can't have two segments with the same identifier.
     ASSERT_UNUSED(result, result.isNewEntry);
@@ -257,17 +245,15 @@ void InspectorReplayAgent::segmentCreated(PassRefPtr<ReplaySessionSegment> prpSe
     m_frontendDispatcher->segmentCreated(segment->identifier());
 }
 
-void InspectorReplayAgent::segmentCompleted(PassRefPtr<ReplaySessionSegment> segment)
+void InspectorReplayAgent::segmentCompleted(RefPtr<ReplaySessionSegment>&& segment)
 {
     m_frontendDispatcher->segmentCompleted(segment->identifier());
 }
 
-void InspectorReplayAgent::segmentLoaded(PassRefPtr<ReplaySessionSegment> prpSegment)
+void InspectorReplayAgent::segmentLoaded(RefPtr<ReplaySessionSegment>&& segment)
 {
-    RefPtr<ReplaySessionSegment> segment = prpSegment;
-
     // In case we didn't know about the loaded segment, add here.
-    m_segmentsMap.add(segment->identifier(), segment);
+    m_segmentsMap.add(segment->identifier(), segment.copyRef());
 
     m_frontendDispatcher->segmentLoaded(segment->identifier());
 }
@@ -337,7 +323,7 @@ void InspectorReplayAgent::stopCapturing(ErrorString& errorString)
     m_page.replayController().stopCapturing();
 }
 
-void InspectorReplayAgent::replayToPosition(ErrorString& errorString, const RefPtr<InspectorObject>& positionObject, bool fastReplay)
+void InspectorReplayAgent::replayToPosition(ErrorString& errorString, const RefPtr<InspectorObject>&& positionObject, bool fastReplay)
 {
     ReplayPosition position;
     if (!positionObject->getInteger(ASCIILiteral("segmentOffset"), position.segmentOffset)) {
@@ -390,7 +376,7 @@ void InspectorReplayAgent::cancelPlayback(ErrorString& errorString)
 
 void InspectorReplayAgent::switchSession(ErrorString& errorString, Inspector::Protocol::Replay::SessionIdentifier identifier)
 {
-    ASSERT(identifier > 0);
+    ASSERT_ARG(identifier, identifier > 0);
 
     if (sessionState() != WebCore::SessionState::Inactive) {
         errorString = ASCIILiteral("Can't switch sessions unless the session is neither capturing or replaying.");
@@ -401,14 +387,14 @@ void InspectorReplayAgent::switchSession(ErrorString& errorString, Inspector::Pr
     if (!session)
         return;
 
-    m_page.replayController().switchSession(session);
+    m_page.replayController().switchSession(WTF::move(session));
 }
 
 void InspectorReplayAgent::insertSessionSegment(ErrorString& errorString, Inspector::Protocol::Replay::SessionIdentifier sessionIdentifier, SegmentIdentifier segmentIdentifier, int segmentIndex)
 {
-    ASSERT(sessionIdentifier > 0);
-    ASSERT(segmentIdentifier > 0);
-    ASSERT(segmentIndex >= 0);
+    ASSERT_ARG(sessionIdentifier, sessionIdentifier > 0);
+    ASSERT_ARG(segmentIdentifier, segmentIdentifier > 0);
+    ASSERT_ARG(segmentIndex, segmentIndex >= 0);
 
     RefPtr<ReplaySession> session = findSession(errorString, sessionIdentifier);
     RefPtr<ReplaySessionSegment> segment = findSegment(errorString, segmentIdentifier);
@@ -426,14 +412,14 @@ void InspectorReplayAgent::insertSessionSegment(ErrorString& errorString, Inspec
         return;
     }
 
-    session->insertSegment(segmentIndex, segment);
-    sessionModified(session);
+    session->insertSegment(segmentIndex, WTF::move(segment));
+    sessionModified(WTF::move(session));
 }
 
 void InspectorReplayAgent::removeSessionSegment(ErrorString& errorString, Inspector::Protocol::Replay::SessionIdentifier identifier, int segmentIndex)
 {
-    ASSERT(identifier > 0);
-    ASSERT(segmentIndex >= 0);
+    ASSERT_ARG(identifier, identifier > 0);
+    ASSERT_ARG(segmentIndex, segmentIndex >= 0);
 
     RefPtr<ReplaySession> session = findSession(errorString, identifier);
 
@@ -451,12 +437,12 @@ void InspectorReplayAgent::removeSessionSegment(ErrorString& errorString, Inspec
     }
 
     session->removeSegment(segmentIndex);
-    sessionModified(session);
+    sessionModified(WTF::move(session));
 }
 
-PassRefPtr<ReplaySession> InspectorReplayAgent::findSession(ErrorString& errorString, SessionIdentifier identifier)
+RefPtr<ReplaySession> InspectorReplayAgent::findSession(ErrorString& errorString, SessionIdentifier identifier)
 {
-    ASSERT(identifier > 0);
+    ASSERT_ARG(identifier, identifier > 0);
 
     auto it = m_sessionsMap.find(identifier);
     if (it == m_sessionsMap.end()) {
@@ -467,9 +453,9 @@ PassRefPtr<ReplaySession> InspectorReplayAgent::findSession(ErrorString& errorSt
     return it->value;
 }
 
-PassRefPtr<ReplaySessionSegment> InspectorReplayAgent::findSegment(ErrorString& errorString, SegmentIdentifier identifier)
+RefPtr<ReplaySessionSegment> InspectorReplayAgent::findSegment(ErrorString& errorString, SegmentIdentifier identifier)
 {
-    ASSERT(identifier > 0);
+    ASSERT_ARG(identifier, identifier > 0);
 
     auto it = m_segmentsMap.find(identifier);
     if (it == m_segmentsMap.end()) {
@@ -507,7 +493,7 @@ void InspectorReplayAgent::getSessionData(ErrorString& errorString, Inspector::P
         return;
     }
 
-    serializedObject = buildInspectorObjectForSession(session);
+    serializedObject = buildInspectorObjectForSession(WTF::move(session));
 }
 
 void InspectorReplayAgent::getSegmentData(ErrorString& errorString, Inspector::Protocol::Replay::SegmentIdentifier identifier, RefPtr<Inspector::Protocol::Replay::SessionSegment>& serializedObject)
@@ -518,9 +504,9 @@ void InspectorReplayAgent::getSegmentData(ErrorString& errorString, Inspector::P
         return;
     }
 
-    serializedObject = buildInspectorObjectForSegment(segment);
+    serializedObject = buildInspectorObjectForSegment(WTF::move(segment));
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(INSPECTOR) && ENABLE(WEB_REPLAY)
+#endif // ENABLE(WEB_REPLAY)

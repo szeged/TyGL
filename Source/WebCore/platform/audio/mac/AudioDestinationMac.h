@@ -51,13 +51,13 @@ private:
     static OSStatus inputProc(void* userData, AudioUnitRenderActionFlags*, const AudioTimeStamp*, UInt32 busNumber, UInt32 numberOfFrames, AudioBufferList* ioData);
 
     OSStatus render(UInt32 numberOfFrames, AudioBufferList* ioData);
+    void setIsPlaying(bool);
 
     virtual MediaSession::MediaType mediaType() const override { return MediaSession::WebAudio; }
     virtual MediaSession::MediaType presentationType() const { return MediaSession::WebAudio; }
     virtual bool canReceiveRemoteControlCommands() const override { return false; }
     virtual void didReceiveRemoteControlCommand(MediaSession::RemoteControlCommandType) override { }
     virtual bool overrideBackgroundPlaybackRestriction() const override { return false; }
-    virtual bool hasMediaCharacteristics(MediaSession::MediaCharacteristics characteristics) const override { return characteristics == MediaSession::MediaCharacteristicAudible; }
 
     virtual void start() override;
     virtual void stop() override;

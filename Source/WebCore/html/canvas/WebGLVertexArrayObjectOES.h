@@ -33,7 +33,7 @@
 
 namespace WebCore {
 
-class WebGLVertexArrayObjectOES : public WebGLContextObject {
+class WebGLVertexArrayObjectOES final : public WebGLContextObject {
 public:
     enum VaoType {
         VaoTypeDefault,
@@ -42,7 +42,7 @@ public:
     
     virtual ~WebGLVertexArrayObjectOES();
 
-    static PassRefPtr<WebGLVertexArrayObjectOES> create(WebGLRenderingContext*, VaoType);
+    static PassRefPtr<WebGLVertexArrayObjectOES> create(WebGLRenderingContextBase*, VaoType);
     
     // Cached values for vertex attrib range checks
     struct VertexAttribState {
@@ -89,11 +89,9 @@ public:
     void setVertexAttribDivisor(GC3Duint index, GC3Duint divisor);
 
 private:
-    WebGLVertexArrayObjectOES(WebGLRenderingContext*, VaoType);
+    WebGLVertexArrayObjectOES(WebGLRenderingContextBase*, VaoType);
 
     virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject) override;
-
-    virtual bool isVertexArray() const { return true; }
     
     VaoType m_type;
     bool m_hasEverBeenBound;

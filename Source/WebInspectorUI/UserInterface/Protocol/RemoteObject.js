@@ -28,7 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.RemoteObject = function(objectId, type, subtype, value, description)
+WebInspector.RemoteObject = function(objectId, type, subtype, value, description, preview)
 {
     this._type = type;
     this._subtype = subtype;
@@ -36,7 +36,8 @@ WebInspector.RemoteObject = function(objectId, type, subtype, value, description
         // handle
         this._objectId = objectId;
         this._description = description;
-        this._hasChildren = true;
+        this._hasChildren = type !== "symbol";
+        this._preview = preview;
     } else {
         // Primitive or null object.
         console.assert(type !== "object" || value === null);
@@ -49,11 +50,6 @@ WebInspector.RemoteObject = function(objectId, type, subtype, value, description
 WebInspector.RemoteObject.fromPrimitiveValue = function(value)
 {
     return new WebInspector.RemoteObject(undefined, typeof value, undefined, value);
-};
-
-WebInspector.RemoteObject.fromLocalObject = function(value)
-{
-    return new WebInspector.LocalJSONObject(value);
 };
 
 WebInspector.RemoteObject.resolveNode = function(node, objectGroup, callback)
@@ -75,7 +71,7 @@ WebInspector.RemoteObject.fromPayload = function(payload)
 {
     console.assert(typeof payload === "object", "Remote object payload should only be an object");
 
-    return new WebInspector.RemoteObject(payload.objectId, payload.type, payload.subtype, payload.value, payload.description);
+    return new WebInspector.RemoteObject(payload.objectId, payload.type, payload.subtype, payload.value, payload.description, payload.preview);
 };
 
 WebInspector.RemoteObject.type = function(remoteObject)
@@ -116,19 +112,29 @@ WebInspector.RemoteObject.prototype = {
         return this._hasChildren;
     },
 
+    get preview()
+    {
+        return this._preview;
+    },
+
     getOwnProperties: function(callback)
     {
-        this._getProperties(true, callback);
+        this._getProperties(true, false, callback);
+    },
+
+    getOwnAndGetterProperties: function(callback)
+    {
+        this._getProperties(false, true, callback);
     },
 
     getAllProperties: function(callback)
     {
-        this._getProperties(false, callback);
+        this._getProperties(false, false, callback);
     },
 
-    _getProperties: function(ownProperties, callback)
+    _getProperties: function(ownProperties, ownAndGetterProperties, callback)
     {
-        if (!this._objectId) {
+        if (!this._objectId || this._isSymbol()) {
             callback([]);
             return;
         }
@@ -152,12 +158,37 @@ WebInspector.RemoteObject.prototype = {
             }
             callback(result);
         }
-        RuntimeAgent.getProperties(this._objectId, ownProperties, remoteObjectBinder);
+
+        // COMPATIBILITY (iOS 8): RuntimeAgent.getProperties did not support ownerAndGetterProperties.
+        // Here we do our best to reimplement it by getting all properties and reducing them down.
+        if (ownAndGetterProperties && !RuntimeAgent.getProperties.supports("ownAndGetterProperties")) {
+            RuntimeAgent.getProperties(this._objectId, function(error, allProperties) {
+                var ownOrGetterPropertiesList = [];
+                if (allProperties) {
+                    for (var property of allProperties) {
+                        if (property.isOwn || property.get || property.name === "__proto__") {
+                            // Own property or getter property in prototype chain.
+                            ownOrGetterPropertiesList.push(property);
+                        } else if (property.value && property.name !== property.name.toUpperCase()) {
+                            var type = property.value.type;
+                            if (type && type !== "function" && property.name !== "constructor") {
+                                // Possible native binding getter property converted to a value. Also, no CONSTANT name style and not "constructor".
+                                ownOrGetterPropertiesList.push(property);
+                            }
+                        }
+                    }
+                }
+                remoteObjectBinder(error, ownOrGetterPropertiesList);
+            }); 
+            return;
+        }
+
+        RuntimeAgent.getProperties(this._objectId, ownProperties, ownAndGetterProperties, remoteObjectBinder);
     },
 
     setPropertyValue: function(name, value, callback)
     {
-        if (!this._objectId) {
+        if (!this._objectId || this._isSymbol()) {
             callback("Can't set a property of non-object.");
             return;
         }
@@ -190,6 +221,47 @@ WebInspector.RemoteObject.prototype = {
             }
             callback();
         }
+    },
+
+    _isSymbol: function()
+    {
+        return this.type === "symbol";
+    },
+
+    isCollectionType: function()
+    {
+        return this.subtype === "map" || this.subtype === "set" || this.subtype === "weakmap";
+    },
+
+    isWeakCollection: function()
+    {
+        return this.subtype === "weakmap";
+    },
+
+    getCollectionEntries: function(start, numberToFetch, callback)
+    {
+        start = typeof start === "number" ? start : 0;
+        numberToFetch = typeof numberToFetch === "number" ? numberToFetch : 100;
+
+        console.assert(start >= 0);
+        console.assert(numberToFetch >= 0);
+        console.assert(this.isCollectionType());
+
+        // WeakMaps are not ordered. We should never send a non-zero start.
+        console.assert((this.subtype === "weakmap" && start === 0) || this.subtype !== "weakmap");
+
+        var objectGroup = this.isWeakCollection() ? this._weakCollectionObjectGroup() : "";
+
+        RuntimeAgent.getCollectionEntries(this._objectId, objectGroup, start, numberToFetch, function(error, entries) {
+            callback(entries);
+        });
+    },
+
+    releaseWeakCollectionEntries: function()
+    {
+        console.assert(this.isWeakCollection());
+
+        RuntimeAgent.releaseObjectGroup(this._weakCollectionObjectGroup());
     },
 
     pushNodeToFrontend: function(callback)
@@ -234,6 +306,13 @@ WebInspector.RemoteObject.prototype = {
         if (!matches)
             return 0;
         return parseInt(matches[1], 10);
+    },
+
+    // Private
+
+    _weakCollectionObjectGroup: function()
+    {
+        return JSON.stringify(this._objectId) + "-WeakMap";
     }
 };
 
@@ -250,117 +329,4 @@ WebInspector.RemoteObjectProperty = function(name, value, descriptor)
 WebInspector.RemoteObjectProperty.fromPrimitiveValue = function(name, value)
 {
     return new WebInspector.RemoteObjectProperty(name, WebInspector.RemoteObject.fromPrimitiveValue(value));
-};
-
-// The below is a wrapper around a local object that provides an interface comaptible
-// with RemoteObject, to be used by the UI code (primarily ObjectPropertiesSection).
-// Note that only JSON-compliant objects are currently supported, as there's no provision
-// for traversing prototypes, extracting class names via constuctor, handling properties
-// or functions.
-
-WebInspector.LocalJSONObject = function(value)
-{
-    this._value = value;
-};
-
-WebInspector.LocalJSONObject.prototype = {
-    get description()
-    {
-        if (this._cachedDescription)
-            return this._cachedDescription;
-
-        if (this.type === "object") {
-            switch (this.subtype) {
-            case "array":
-                function formatArrayItem(property)
-                {
-                    return property.value.description;
-                }
-                this._cachedDescription = this._concatenate("[", "]", formatArrayItem);
-                break;
-            case "null":
-                this._cachedDescription = "null";
-                break;
-            default:
-                function formatObjectItem(property)
-                {
-                    return property.name + ":" + property.value.description;
-                }
-                this._cachedDescription = this._concatenate("{", "}", formatObjectItem);
-            }
-        } else
-            this._cachedDescription = String(this._value);
-
-        return this._cachedDescription;
-    },
-
-    _concatenate: function(prefix, suffix, formatProperty)
-    {
-        const previewChars = 100;
-
-        var buffer = prefix;
-        var children = this._children();
-        for (var i = 0; i < children.length; ++i) {
-            var itemDescription = formatProperty(children[i]);
-            if (buffer.length + itemDescription.length > previewChars) {
-                buffer += ",\u2026";
-                break;
-            }
-            if (i)
-                buffer += ", ";
-            buffer += itemDescription;
-        }
-        buffer += suffix;
-        return buffer;
-    },
-
-    get type()
-    {
-        return typeof this._value;
-    },
-
-    get subtype()
-    {
-        if (this._value === null)
-            return "null";
-
-        if (this._value instanceof Array)
-            return "array";
-
-        return undefined;
-    },
-
-    get hasChildren()
-    {
-        return typeof this._value === "object" && this._value !== null && !isEmptyObject(this._value);
-    },
-
-    getOwnProperties: function(callback)
-    {
-        callback(this._children());
-    },
-
-    getAllProperties: function(callback)
-    {
-        callback(this._children());
-    },
-
-    _children: function()
-    {
-        if (!this.hasChildren)
-            return [];
-
-        function buildProperty(propName)
-        {
-            return new WebInspector.RemoteObjectProperty(propName, new WebInspector.LocalJSONObject(this._value[propName]));
-        }
-        if (!this._cachedChildren)
-            this._cachedChildren = Object.keys(this._value || {}).map(buildProperty, this);
-        return this._cachedChildren;
-    },
-
-    isError: function()
-    {
-        return false;
-    }
 };

@@ -27,6 +27,7 @@
 #import <WebKit/WKFoundation.h>
 
 #if WK_API_ENABLED
+#if PLATFORM(MAC) // No downloading on iOS
 
 #import "PlatformUtilities.h"
 #import "Test.h"
@@ -91,10 +92,6 @@ static NSURL *sourceURL = [[NSBundle mainBundle] URLForResource:@"simple" withEx
 
 - (void)_downloadDidFinish:(_WKDownload *)download
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1080
-    // Work around <rdar://problem/7611450> NSURLDownload calls didReceiveDataOfLength: delegate method too many times
-    _receivedContentLength /= 2;
-#endif
     EXPECT_EQ(_download, download);
     EXPECT_TRUE(_expectedContentLength == NSURLResponseUnknownLength || static_cast<uint64_t>(_expectedContentLength) == _receivedContentLength);
     EXPECT_TRUE([[NSFileManager defaultManager] contentsEqualAtPath:_destinationPath andPath:[sourceURL path]]);
@@ -268,4 +265,5 @@ TEST(_WKDownload, OriginatingWebView)
     TestWebKitAPI::Util::run(&isDone);
 }
 
+#endif
 #endif

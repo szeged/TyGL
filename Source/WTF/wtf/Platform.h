@@ -80,16 +80,19 @@
 #endif
 #endif
 
-/* CPU(MIPS) - MIPS 32-bit */
-/* Note: Only O32 ABI is tested, so we enable it for O32 ABI for now.  */
-#if (defined(mips) || defined(__mips__) || defined(MIPS) || defined(_MIPS_)) \
-    && defined(_ABIO32)
+/* CPU(MIPS) - MIPS 32-bit and 64-bit */
+#if (defined(mips) || defined(__mips__) || defined(MIPS) || defined(_MIPS_) || defined(__mips64))
+#if defined(_MIPS_SIM_ABI64) && (_MIPS_SIM == _MIPS_SIM_ABI64)
+#define WTF_CPU_MIPS64 1
+#define WTF_MIPS_ARCH __mips64
+#else
 #define WTF_CPU_MIPS 1
+#define WTF_MIPS_ARCH __mips
+#endif
 #if defined(__MIPSEB__)
 #define WTF_CPU_BIG_ENDIAN 1
 #endif
 #define WTF_MIPS_PIC (defined __PIC__)
-#define WTF_MIPS_ARCH __mips
 #define WTF_MIPS_ISA(v) (defined WTF_MIPS_ARCH && WTF_MIPS_ARCH == v)
 #define WTF_MIPS_ISA_AT_LEAST(v) (defined WTF_MIPS_ARCH && WTF_MIPS_ARCH >= v)
 #define WTF_MIPS_ARCH_REV __mips_isa_rev
@@ -315,7 +318,7 @@
 #endif
 
 #if CPU(ARM_NEON)
-// All NEON intrinsics usage can be disabled by this macro.
+/* All NEON intrinsics usage can be disabled by this macro. */
 #define HAVE_ARM_NEON_INTRINSICS 1
 #endif
 
@@ -452,6 +455,11 @@
 #endif
 #endif
 
+/* PLATFORM(APPLETV) */
+#if defined(TARGET_OS_TV) && TARGET_OS_TV
+#define WTF_PLATFORM_APPLETV 1
+#endif
+
 /* Graphics engines */
 
 /* USE(CG) and PLATFORM(CI) */
@@ -462,8 +470,10 @@
 #define WTF_USE_CA 1
 #endif
 
-#if PLATFORM(GTK)
+#if PLATFORM(GTK) || PLATFORM(EFL)
+#if !USE(TYGL)
 #define WTF_USE_CAIRO 1
+#endif
 #define WTF_USE_GLIB 1
 #define WTF_USE_FREETYPE 1
 #define WTF_USE_HARFBUZZ 1
@@ -483,6 +493,7 @@
 #define WTF_USE_NETWORK_CFDATA_ARRAY_CALLBACK 1
 #define ENABLE_USER_MESSAGE_HANDLERS 1
 #define HAVE_OUT_OF_PROCESS_LAYER_HOSTING 1
+#define HAVE_DTRACE 1
 
 #endif
 
@@ -507,7 +518,6 @@
 
 #if PLATFORM(IOS)
 
-#define DONT_FINALIZE_ON_MAIN_THREAD 1
 #define HAVE_READLINE 1
 #if USE(APPLE_INTERNAL_SDK)
 #define WTF_USE_CFNETWORK 1
@@ -639,6 +649,7 @@
     || CPU(ALPHA) \
     || CPU(ARM64) \
     || CPU(S390X) \
+    || CPU(MIPS64) \
     || CPU(PPC64) \
     || CPU(PPC64LE)
 #define WTF_USE_JSVALUE64 1
@@ -697,7 +708,7 @@
 #define WTF_USE_ARM64_DISASSEMBLER 1
 #endif
 
-#if !defined(WTF_USE_ARMV7_DISASSEMBLER) && ENABLE(JIT) && (PLATFORM(IOS) || PLATFORM(GTK)) && CPU(ARM_THUMB2)
+#if !defined(WTF_USE_ARMV7_DISASSEMBLER) && ENABLE(JIT) && CPU(ARM_THUMB2)
 #define WTF_USE_ARMV7_DISASSEMBLER 1
 #endif
 
@@ -707,7 +718,7 @@
 
 #if !defined(ENABLE_DFG_JIT) && ENABLE(JIT)
 /* Enable the DFG JIT on X86 and X86_64. */
-#if (CPU(X86) || CPU(X86_64)) && (OS(DARWIN) || OS(LINUX) || OS(FREEBSD) || OS(WINDOWS))
+#if (CPU(X86) || CPU(X86_64)) && (OS(DARWIN) || OS(LINUX) || OS(FREEBSD) || OS(WINDOWS) || OS(HURD))
 #define ENABLE_DFG_JIT 1
 #endif
 /* Enable the DFG JIT on ARMv7.  Only tested on iOS and Qt/GTK+ Linux. */
@@ -742,15 +753,16 @@
 #define ENABLE_FTL_JIT 0
 #endif
 
-#define ENABLE_FTL_NATIVE_CALL_INLINING 0
-
 #if !defined(ENABLE_FTL_NATIVE_CALL_INLINING)
-#if COMPILER(CLANG)
-#define ENABLE_FTL_NATIVE_CALL_INLINING 1
-#else
 #define ENABLE_FTL_NATIVE_CALL_INLINING 0
-#endif // COMPILER(CLANG)
-#endif // !defined(ENABLE_FTL_NATIVE_CALL_INLINING)
+#endif
+
+/* Used to make GCC's optimization not throw away a symbol that we would need for native inlining */
+#if ENABLE(FTL_NATIVE_CALL_INLINING) && COMPILER(GCC) && !COMPILER(CLANG)
+#define ATTR_USED __attribute__ ((used))
+#else
+#define ATTR_USED
+#endif
 
 /* Generational collector for JSC */
 #if !defined(ENABLE_GGC)
@@ -758,8 +770,8 @@
 #define ENABLE_GGC 1
 #else
 #define ENABLE_GGC 0
-#endif // CPU(X86_64)
-#endif // !defined(ENABLE_GGC)
+#endif /* CPU(X86_64) || CPU(X86) || CPU(ARM64) || CPU(ARM) */
+#endif /* !defined(ENABLE_GGC) */
 
 /* Counts uses of write barriers using sampling counters. Be sure to also
    set ENABLE_SAMPLING_COUNTERS to 1. */
@@ -836,6 +848,12 @@
 #undef ENABLE_ASSEMBLER
 #define ENABLE_ASSEMBLER 1
 #endif
+#endif
+
+#if ENABLE(JIT)
+/* Enable the following if you want to use the MacroAssembler::probe() facility
+   to do JIT debugging. */
+#define ENABLE_MASM_PROBE 0
 #endif
 
 /* Pick which allocator to use; we only need an executable allocator if the assembler is compiled in.
@@ -961,7 +979,7 @@
 #define WTF_USE_AVFOUNDATION 1
 #endif
 
-#if (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 60000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080)
+#if (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 60000) || PLATFORM(MAC)
 #define WTF_USE_COREMEDIA 1
 #define HAVE_AVFOUNDATION_VIDEO_OUTPUT 1
 #endif
@@ -975,11 +993,11 @@
 #define HAVE_MEDIA_ACCESSIBILITY_FRAMEWORK 1
 #endif
 
-#if (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 60000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
+#if (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 60000) || PLATFORM(MAC)
 #define HAVE_AVFOUNDATION_LOADER_DELEGATE 1
 #endif
 
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+#if PLATFORM(MAC)
 #define WTF_USE_VIDEOTOOLBOX 1
 #endif
 
@@ -1049,6 +1067,7 @@
 #if PLATFORM(GTK) || PLATFORM(EFL)
 #undef ENABLE_OPENTYPE_VERTICAL
 #define ENABLE_OPENTYPE_VERTICAL 1
+#define ENABLE_CSS3_TEXT_DECORATION_SKIP_INK 1
 #endif
 
 #if PLATFORM(COCOA)
@@ -1062,7 +1081,7 @@
 #define _HAS_EXCEPTIONS 1
 #endif
 
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if PLATFORM(MAC)
 #define HAVE_NS_ACTIVITY 1
 #endif
 
@@ -1081,8 +1100,12 @@
 #define TARGET_OS_IPHONE 0
 #endif
 
-#if PLATFORM(IOS) || (PLATFORM(COCOA) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
+#if PLATFORM(COCOA)
 #define WTF_USE_MEDIATOOLBOX 1
+#endif
+
+#if PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
+#define ENABLE_VIDEO_PRESENTATION_MODE 1
 #endif
 
 #endif /* WTF_Platform_h */

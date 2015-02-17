@@ -141,6 +141,11 @@ public:
         std::swap(m_ptr, other.m_ptr);
     }
 
+    T leakRef() WARN_UNUSED_RETURN
+    {
+        return std::exchange(m_ptr, nullptr);
+    }
+
     friend OSObjectPtr adoptOSObject<T>(T);
 
 private:

@@ -24,6 +24,7 @@
 
 #include "Document.h"
 #include "HTMLElement.h"
+#include "HTMLWBRElement.h"
 #include "InlineElementBox.h"
 #include "LogicalSelectionOffsetCaches.h"
 #include "RenderBlock.h"
@@ -39,11 +40,11 @@ namespace WebCore {
 
 static const int invalidLineHeight = -1;
 
-RenderLineBreak::RenderLineBreak(HTMLElement& element, PassRef<RenderStyle> style)
+RenderLineBreak::RenderLineBreak(HTMLElement& element, Ref<RenderStyle>&& style)
     : RenderBoxModelObject(element, WTF::move(style), 0)
     , m_inlineBoxWrapper(nullptr)
     , m_cachedLineHeight(invalidLineHeight)
-    , m_isWBR(element.hasTagName(HTMLNames::wbrTag))
+    , m_isWBR(is<HTMLWBRElement>(element))
 {
     setIsLineBreak();
 }

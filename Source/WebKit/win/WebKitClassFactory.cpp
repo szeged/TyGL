@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007 Apple Inc.  All rights reserved.
+ * Copyright (C) 2006, 2007, 2014 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,15 +23,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#include "config.h"
 #include "WebKitDLL.h"
 #include "WebKitClassFactory.h"
 
 #include "CFDictionaryPropertyBag.h"
 #include "ForEachCoClass.h"
+#include "WebApplicationCache.h"
 #include "WebArchive.h"
 #include "WebCache.h"
-#include "WebCookieManager.h"
 #include "WebCoreStatistics.h"
 #include "WebDatabaseManager.h"
 #include "WebDownload.h"
@@ -43,6 +42,7 @@
 #include "WebIconDatabase.h"
 #include "WebJavaScriptCollector.h"
 #include "WebKit.h"
+#include "WebKitMessageLoop.h"
 #include "WebKitStatistics.h"
 #include "WebMutableURLRequest.h"
 #include "WebNotificationCenter.h"

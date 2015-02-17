@@ -53,7 +53,7 @@ public:
     virtual bool requiresLayer() const override
     {
         return isRoot() || isPositioned() || createsGroup() || hasClipPath() || hasOverflowClip()
-            || hasTransform() || hasHiddenBackface() || hasReflection() || style().specifiesColumns()
+            || hasTransformRelatedProperty() || hasHiddenBackface() || hasReflection() || style().specifiesColumns()
             || !style().hasAutoZIndex();
     }
 
@@ -175,6 +175,9 @@ public:
     // Bounds of the outline box in absolute coords. Respects transforms
     virtual LayoutRect outlineBoundsForRepaint(const RenderLayerModelObject* /*repaintContainer*/, const RenderGeometryMap*) const override final;
     virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) override;
+    
+    virtual FloatRect repaintRectInLocalCoordinates() const override { return borderBoxRect(); }
+    virtual FloatRect objectBoundingBox() const override { return borderBoxRect(); }
 
     // Use this with caution! No type checking is done!
     RenderBox* previousSiblingBox() const;
@@ -335,7 +338,7 @@ public:
     void clearOverrideContainingBlockContentLogicalHeight();
 #endif
 
-    virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const override;
+    virtual LayoutSize offsetFromContainer(RenderElement&, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const override;
     
     LayoutUnit adjustBorderBoxLogicalWidthForBoxSizing(LayoutUnit width) const;
     LayoutUnit adjustBorderBoxLogicalHeightForBoxSizing(LayoutUnit height) const;
@@ -492,6 +495,7 @@ public:
     virtual void paintObject(PaintInfo&, const LayoutPoint&) { ASSERT_NOT_REACHED(); }
     virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&);
     virtual void paintMask(PaintInfo&, const LayoutPoint&);
+    virtual void paintClippingMask(PaintInfo&, const LayoutPoint&);
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) override;
 
     // Called when a positioned object moves but doesn't necessarily change size.  A simplified layout is attempted
@@ -612,14 +616,14 @@ public:
     virtual bool needsLayoutAfterRegionRangeChange() const { return false; }
 
 protected:
-    RenderBox(Element&, PassRef<RenderStyle>, unsigned baseTypeFlags);
-    RenderBox(Document&, PassRef<RenderStyle>, unsigned baseTypeFlags);
-
-    virtual void willBeDestroyed() override;
+    RenderBox(Element&, Ref<RenderStyle>&&, unsigned baseTypeFlags);
+    RenderBox(Document&, Ref<RenderStyle>&&, unsigned baseTypeFlags);
 
     virtual void styleWillChange(StyleDifference, const RenderStyle& newStyle) override;
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
     virtual void updateFromStyle() override;
+
+    bool createsNewFormattingContext() const;
 
     // Returns false if it could not cheaply compute the extent (e.g. fixed background), in which case the returned rect may be incorrect.
     bool getBackgroundPaintedExtent(LayoutRect&) const;
@@ -653,6 +657,10 @@ protected:
 private:
 #if ENABLE(CSS_SHAPES)
     void updateShapeOutsideInfoAfterStyleChange(const RenderStyle&, const RenderStyle* oldStyle);
+#endif
+
+#if ENABLE(CSS_GRID_LAYOUT)
+    bool isGridItem() const { return parent() && parent()->isRenderGrid(); }
 #endif
 
     bool scrollLayer(ScrollDirection, ScrollGranularity, float multiplier, Element** stopElement);
@@ -723,31 +731,29 @@ private:
     static bool s_hadOverflowClip;
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderBox, isBox())
-
 inline RenderBox* RenderBox::previousSiblingBox() const
 {
-    return toRenderBox(previousSibling());
+    return downcast<RenderBox>(previousSibling());
 }
 
 inline RenderBox* RenderBox::nextSiblingBox() const
 { 
-    return toRenderBox(nextSibling());
+    return downcast<RenderBox>(nextSibling());
 }
 
 inline RenderBox* RenderBox::parentBox() const
 {
-    return toRenderBox(parent());
+    return downcast<RenderBox>(parent());
 }
 
 inline RenderBox* RenderBox::firstChildBox() const
 {
-    return toRenderBox(firstChild());
+    return downcast<RenderBox>(firstChild());
 }
 
 inline RenderBox* RenderBox::lastChildBox() const
 {
-    return toRenderBox(lastChild());
+    return downcast<RenderBox>(lastChild());
 }
 
 inline void RenderBox::setInlineBoxWrapper(InlineElementBox* boxWrapper)

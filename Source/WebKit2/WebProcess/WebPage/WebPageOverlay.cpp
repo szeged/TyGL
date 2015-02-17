@@ -30,24 +30,43 @@
 #include "WebPage.h"
 #include <WebCore/GraphicsLayer.h>
 #include <WebCore/PageOverlay.h>
+#include <wtf/NeverDestroyed.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<WebPageOverlay> WebPageOverlay::create(WebPageOverlay::Client& client, PageOverlay::OverlayType overlayType)
+static HashMap<PageOverlay*, WebPageOverlay*>& overlayMap()
 {
-    return adoptRef(new WebPageOverlay(client, overlayType));
+    static NeverDestroyed<HashMap<PageOverlay*, WebPageOverlay*>> map;
+    return map;
 }
 
-WebPageOverlay::WebPageOverlay(WebPageOverlay::Client& client, PageOverlay::OverlayType overlayType)
-    : m_overlay(PageOverlay::create(*this, overlayType))
-    , m_client(client)
+PassRefPtr<WebPageOverlay> WebPageOverlay::create(std::unique_ptr<WebPageOverlay::Client> client, PageOverlay::OverlayType overlayType)
 {
+    return adoptRef(new WebPageOverlay(WTF::move(client), overlayType));
+}
+
+WebPageOverlay::WebPageOverlay(std::unique_ptr<WebPageOverlay::Client> client, PageOverlay::OverlayType overlayType)
+    : m_overlay(PageOverlay::create(*this, overlayType))
+    , m_client(WTF::move(client))
+{
+    ASSERT(m_client);
+    overlayMap().add(m_overlay.get(), this);
 }
 
 WebPageOverlay::~WebPageOverlay()
 {
+    if (!m_overlay)
+        return;
+
+    overlayMap().remove(m_overlay.get());
+    m_overlay = nullptr;
+}
+
+WebPageOverlay* WebPageOverlay::fromCoreOverlay(PageOverlay& overlay)
+{
+    return overlayMap().get(&overlay);
 }
 
 void WebPageOverlay::setNeedsDisplay(const IntRect& dirtyRect)
@@ -67,47 +86,74 @@ void WebPageOverlay::clear()
 
 void WebPageOverlay::pageOverlayDestroyed(PageOverlay&)
 {
-    m_client.pageOverlayDestroyed(*this);
+    if (m_overlay) {
+        overlayMap().remove(m_overlay.get());
+        m_overlay = nullptr;
+    }
+
+    m_client->pageOverlayDestroyed(*this);
 }
 
 void WebPageOverlay::willMoveToPage(PageOverlay&, Page* page)
 {
-    m_client.willMoveToPage(*this, page ? WebPage::fromCorePage(page) : nullptr);
+    m_client->willMoveToPage(*this, page ? WebPage::fromCorePage(page) : nullptr);
 }
 
 void WebPageOverlay::didMoveToPage(PageOverlay&, Page* page)
 {
-    m_client.didMoveToPage(*this, page ? WebPage::fromCorePage(page) : nullptr);
+    m_client->didMoveToPage(*this, page ? WebPage::fromCorePage(page) : nullptr);
 }
 
 void WebPageOverlay::drawRect(PageOverlay&, GraphicsContext& context, const IntRect& dirtyRect)
 {
-    m_client.drawRect(*this, context, dirtyRect);
+    m_client->drawRect(*this, context, dirtyRect);
 }
 
 bool WebPageOverlay::mouseEvent(PageOverlay&, const PlatformMouseEvent& event)
 {
-    return m_client.mouseEvent(*this, event);
+    return m_client->mouseEvent(*this, event);
 }
 
 void WebPageOverlay::didScrollFrame(PageOverlay&, Frame& frame)
 {
-    m_client.didScrollFrame(*this, WebFrame::fromCoreFrame(frame));
+    m_client->didScrollFrame(*this, WebFrame::fromCoreFrame(frame));
 }
+
+#if PLATFORM(MAC)
+DDActionContext *WebPageOverlay::actionContextForResultAtPoint(FloatPoint location, RefPtr<WebCore::Range>& rangeHandle)
+{
+    return m_client->actionContextForResultAtPoint(*this, location, rangeHandle);
+}
+
+void WebPageOverlay::dataDetectorsDidPresentUI()
+{
+    m_client->dataDetectorsDidPresentUI(*this);
+}
+
+void WebPageOverlay::dataDetectorsDidChangeUI()
+{
+    m_client->dataDetectorsDidChangeUI(*this);
+}
+
+void WebPageOverlay::dataDetectorsDidHideUI()
+{
+    m_client->dataDetectorsDidHideUI(*this);
+}
+#endif // PLATFORM(MAC)
 
 bool WebPageOverlay::copyAccessibilityAttributeStringValueForPoint(PageOverlay&, String attribute, FloatPoint parameter, String& value)
 {
-    return m_client.copyAccessibilityAttributeStringValueForPoint(*this, attribute, parameter, value);
+    return m_client->copyAccessibilityAttributeStringValueForPoint(*this, attribute, parameter, value);
 }
 
 bool WebPageOverlay::copyAccessibilityAttributeBoolValueForPoint(PageOverlay&, String attribute, FloatPoint parameter, bool& value)
 {
-    return m_client.copyAccessibilityAttributeBoolValueForPoint(*this, attribute, parameter, value);
+    return m_client->copyAccessibilityAttributeBoolValueForPoint(*this, attribute, parameter, value);
 }
 
 Vector<String> WebPageOverlay::copyAccessibilityAttributeNames(PageOverlay&, bool parameterizedNames)
 {
-    return m_client.copyAccessibilityAttributeNames(*this, parameterizedNames);
+    return m_client->copyAccessibilityAttributeNames(*this, parameterizedNames);
 }
 
 } // namespace WebKit

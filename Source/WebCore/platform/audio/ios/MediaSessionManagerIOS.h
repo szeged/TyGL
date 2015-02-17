@@ -57,9 +57,10 @@ private:
 
 #if ENABLE(IOS_AIRPLAY)
     virtual bool hasWirelessTargetsAvailable() override;
-    virtual void startMonitoringAirPlayRoutes() override;
-    virtual void stopMonitoringAirPlayRoutes() override;
+    virtual void configureWireLessTargetMonitoring() override;
 #endif
+
+    virtual bool sessionCanLoadMedia(const MediaSession&) const override;
 
     MediaSessionManageriOS();
     RetainPtr<WebMediaSessionHelper> m_objcObserver;

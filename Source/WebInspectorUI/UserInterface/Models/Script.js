@@ -58,6 +58,7 @@ WebInspector.Script._nextUniqueDisplayNameNumber = 1;
 
 WebInspector.Script.prototype = {
     constructor: WebInspector.Script,
+    __proto__: WebInspector.SourceCode.prototype,
 
     // Public
 
@@ -110,22 +111,15 @@ WebInspector.Script.prototype = {
         return this._scriptSyntaxTree;
     },
 
-    canRequestContentFromBackend: function()
-    {
-        // We can request content if we have an id.
-        return !!this._id;
-    },
-
-    requestContentFromBackend: function(callback)
+    requestContentFromBackend: function()
     {
         if (!this._id) {
             // There is no identifier to request content with. Return false to cause the
             // pending callbacks to get null content.
-            return false;
+            return Promise.reject(new Error("There is no identifier to request content with."));
         }
 
-        DebuggerAgent.getScriptSource(this._id, callback);
-        return true;
+        return DebuggerAgent.getScriptSource.promise(this._id);
     },
 
     saveIdentityToCookie: function(cookie)
@@ -155,8 +149,10 @@ WebInspector.Script.prototype = {
             return;
         }
 
-        this.requestContent(function(error, sourceText) {
-            makeSyntaxTreeAndCallCallback(error ? null : sourceText);
+        this.requestContent().then(function(parameters) {
+            makeSyntaxTreeAndCallCallback(parameters.content);
+        }).catch(function(error) {
+            makeSyntaxTreeAndCallCallback(null);
         });
     },
 
@@ -217,5 +213,3 @@ WebInspector.Script.prototype = {
         this._scriptSyntaxTree = new WebInspector.ScriptSyntaxTree(sourceText, this);
     }
 };
-
-WebInspector.Script.prototype.__proto__ = WebInspector.SourceCode.prototype;

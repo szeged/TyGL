@@ -28,27 +28,14 @@
 
 #if ENABLE(NETWORK_PROCESS)
 
+#import "NetworkCache.h"
 #import "NetworkProcessCreationParameters.h"
 #import "NetworkResourceLoader.h"
 #import "SandboxExtension.h"
+#import <WebCore/CFNetworkSPI.h>
 #import <mach/host_info.h>
 #import <mach/mach.h>
 #import <mach/mach_error.h>
-
-typedef const struct _CFURLCache* CFURLCacheRef;
-extern "C" CFURLCacheRef CFURLCacheCopySharedURLCache();
-extern "C" void _CFURLCachePurgeMemoryCache(CFURLCacheRef);
-extern "C" void CFURLConnectionInvalidateConnectionCache();
-
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-extern "C" void _CFURLCacheSetMinSizeForVMCachedResource(CFURLCacheRef, CFIndex);
-#endif
-
-#if PLATFORM(IOS)
-@interface NSURLCache (WKDetails)
--(id)_initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity relativePath:(NSString *)path;
-@end
-#endif
 
 namespace WebKit {
 
@@ -67,8 +54,22 @@ void NetworkProcess::platformInitializeNetworkProcessCocoa(const NetworkProcessC
 #endif
     m_diskCacheDirectory = parameters.diskCacheDirectory;
 
+    // FIXME: Most of what this function does for cache size gets immediately overridden by setCacheModel().
+    // - memory cache size passed from UI process is always ignored;
+    // - disk cache size passed from UI process is effectively a minimum size.
+    // One non-obvious constraint is that we need to use -setSharedURLCache: even in testing mode, to prevent creating a default one on disk later, when some other code touches the cache.
+
+    ASSERT(!m_diskCacheIsDisabledForTesting || !parameters.nsURLCacheDiskCapacity);
+
     if (!m_diskCacheDirectory.isNull()) {
         SandboxExtension::consumePermanently(parameters.diskCacheDirectoryExtensionHandle);
+#if ENABLE(NETWORK_CACHE)
+        if (parameters.shouldEnableNetworkCache && NetworkCache::singleton().initialize(m_diskCacheDirectory)) {
+            RetainPtr<NSURLCache> urlCache(adoptNS([[NSURLCache alloc] initWithMemoryCapacity:0 diskCapacity:0 diskPath:nil]));
+            [NSURLCache setSharedURLCache:urlCache.get()];
+            return;
+        }
+#endif
 #if PLATFORM(IOS)
         [NSURLCache setSharedURLCache:adoptNS([[NSURLCache alloc]
             _initWithMemoryCapacity:parameters.nsURLCacheMemoryCapacity
@@ -82,13 +83,11 @@ void NetworkProcess::platformInitializeNetworkProcessCocoa(const NetworkProcessC
 #endif
     }
 
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     RetainPtr<CFURLCacheRef> cache = adoptCF(CFURLCacheCopySharedURLCache());
     if (!cache)
         return;
 
     _CFURLCacheSetMinSizeForVMCachedResource(cache.get(), NetworkResourceLoader::fileBackedResourceMinimumSize());
-#endif
 }
 
 static uint64_t memorySize()
@@ -134,10 +133,42 @@ void NetworkProcess::platformSetCacheModel(CacheModel cacheModel)
         cacheTotalCapacity, cacheMinDeadCapacity, cacheMaxDeadCapacity, deadDecodedDataDeletionInterval,
         pageCacheCapacity, urlCacheMemoryCapacity, urlCacheDiskCapacity);
 
-
+#if ENABLE(NETWORK_CACHE)
+    auto& networkCache = NetworkCache::singleton();
+    if (networkCache.isEnabled()) {
+        networkCache.setMaximumSize(urlCacheDiskCapacity);
+        return;
+    }
+#endif
     NSURLCache *nsurlCache = [NSURLCache sharedURLCache];
     [nsurlCache setMemoryCapacity:urlCacheMemoryCapacity];
-    [nsurlCache setDiskCapacity:std::max<unsigned long>(urlCacheDiskCapacity, [nsurlCache diskCapacity])]; // Don't shrink a big disk cache, since that would cause churn.
+    if (!m_diskCacheIsDisabledForTesting)
+        [nsurlCache setDiskCapacity:std::max<unsigned long>(urlCacheDiskCapacity, [nsurlCache diskCapacity])]; // Don't shrink a big disk cache, since that would cause churn.
+}
+
+void NetworkProcess::clearDiskCache(std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler)
+{
+#if ENABLE(NETWORK_CACHE)
+    NetworkCache::singleton().clear();
+#endif
+
+    if (!m_clearCacheDispatchGroup)
+        m_clearCacheDispatchGroup = dispatch_group_create();
+
+    dispatch_group_async(m_clearCacheDispatchGroup, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), [modifiedSince, completionHandler] {
+        NSURLCache *cache = [NSURLCache sharedURLCache];
+
+#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+        NSTimeInterval timeInterval = std::chrono::duration_cast<std::chrono::duration<double>>(modifiedSince.time_since_epoch()).count();
+        NSDate *date = [NSDate dateWithTimeIntervalSince1970:timeInterval];
+        [cache removeCachedResponsesSinceDate:date];
+#else
+        [cache removeAllCachedResponses];
+#endif
+        dispatch_async(dispatch_get_main_queue(), [completionHandler] {
+            completionHandler();
+        });
+    });
 }
 
 }

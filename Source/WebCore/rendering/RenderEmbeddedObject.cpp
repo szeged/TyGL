@@ -29,7 +29,7 @@
 #include "ChromeClient.h"
 #include "Cursor.h"
 #include "EventHandler.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "FontSelector.h"
 #include "Frame.h"
 #include "FrameLoaderClient.h"
@@ -96,7 +96,7 @@ static const Color& unavailablePluginBorderColor()
     return standard;
 }
 
-RenderEmbeddedObject::RenderEmbeddedObject(HTMLFrameOwnerElement& element, PassRef<RenderStyle> style)
+RenderEmbeddedObject::RenderEmbeddedObject(HTMLFrameOwnerElement& element, Ref<RenderStyle>&& style)
     : RenderWidget(element, WTF::move(style))
     , m_isPluginUnavailable(false)
     , m_isUnavailablePluginIndicatorHidden(false)
@@ -112,7 +112,7 @@ RenderEmbeddedObject::~RenderEmbeddedObject()
     view().frameView().removeEmbeddedObjectToUpdate(*this);
 }
 
-RenderPtr<RenderEmbeddedObject> RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, PassRef<RenderStyle> style)
+RenderPtr<RenderEmbeddedObject> RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, Ref<RenderStyle>&& style)
 {
     auto renderer = createRenderer<RenderEmbeddedObject>(applet, WTF::move(style));
     renderer->setInline(true);
@@ -298,7 +298,7 @@ void RenderEmbeddedObject::paintReplaced(PaintInfo& paintInfo, const LayoutPoint
     FloatRect indicatorRect;
     FloatRect replacementTextRect;
     FloatRect arrowRect;
-    Font font;
+    FontCascade font;
     TextRun run("");
     float textWidth;
     if (!getReplacementTextGeometry(paintOffset, contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth))
@@ -342,12 +342,14 @@ void RenderEmbeddedObject::paintReplaced(PaintInfo& paintInfo, const LayoutPoint
 
 void RenderEmbeddedObject::setUnavailablePluginIndicatorIsHidden(bool hidden)
 {
-    m_isUnavailablePluginIndicatorHidden = hidden;
+    if (m_isUnavailablePluginIndicatorHidden == hidden)
+        return;
 
+    m_isUnavailablePluginIndicatorHidden = hidden;
     repaint();
 }
 
-bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumulatedOffset, FloatRect& contentRect, FloatRect& indicatorRect, FloatRect& replacementTextRect, FloatRect& arrowRect, Font& font, TextRun& run, float& textWidth) const
+bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumulatedOffset, FloatRect& contentRect, FloatRect& indicatorRect, FloatRect& replacementTextRect, FloatRect& arrowRect, FontCascade& font, TextRun& run, float& textWidth) const
 {
     bool includesArrow = shouldUnavailablePluginMessageBeButton(document(), m_pluginUnavailabilityReason);
 
@@ -359,7 +361,7 @@ bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumul
     fontDescription.setWeight(FontWeightBold);
     fontDescription.setRenderingMode(frame().settings().fontRenderingMode());
     fontDescription.setComputedSize(12);
-    font = Font(fontDescription, 0, 0);
+    font = FontCascade(fontDescription, 0, 0);
     font.update(0);
 
     run = TextRun(m_unavailablePluginReplacementText);
@@ -389,7 +391,7 @@ LayoutRect RenderEmbeddedObject::unavailablePluginIndicatorBounds(const LayoutPo
     FloatRect indicatorRect;
     FloatRect replacementTextRect;
     FloatRect arrowRect;
-    Font font;
+    FontCascade font;
     TextRun run("", 0);
     float textWidth;
     if (getReplacementTextGeometry(accumulatedOffset, contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth))
@@ -511,12 +513,9 @@ void RenderEmbeddedObject::layout()
     if (!child)
         return;
 
-    RenderBox* childBox = toRenderBox(child);
+    auto& childBox = downcast<RenderBox>(*child);
 
-    if (!childBox)
-        return;
-
-    if (newSize == oldSize && !childBox->needsLayout())
+    if (newSize == oldSize && !childBox.needsLayout())
         return;
     
     // When calling layout() on a child node, a parent must either push a LayoutStateMaintainter, or
@@ -524,11 +523,11 @@ void RenderEmbeddedObject::layout()
     // and this method will be called many times per second during playback, use a LayoutStateMaintainer:
     LayoutStateMaintainer statePusher(view(), *this, locationOffset(), hasTransform() || hasReflection() || style().isFlippedBlocksWritingMode());
     
-    childBox->setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
-    childBox->style().setHeight(Length(newSize.height(), Fixed));
-    childBox->style().setWidth(Length(newSize.width(), Fixed));
-    childBox->setNeedsLayout(MarkOnlyThis);
-    childBox->layout();
+    childBox.setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
+    childBox.style().setHeight(Length(newSize.height(), Fixed));
+    childBox.style().setWidth(Length(newSize.width(), Fixed));
+    childBox.setNeedsLayout(MarkOnlyThis);
+    childBox.layout();
     clearChildNeedsLayout();
     
     statePusher.pop();
@@ -583,7 +582,7 @@ bool RenderEmbeddedObject::isInUnavailablePluginIndicator(const FloatPoint& poin
     FloatRect indicatorRect;
     FloatRect replacementTextRect;
     FloatRect arrowRect;
-    Font font;
+    FontCascade font;
     TextRun run("");
     float textWidth;
     return getReplacementTextGeometry(IntPoint(), contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth)

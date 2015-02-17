@@ -31,14 +31,14 @@ namespace WebCore {
 
 class HTMLDocument : public Document, public CachedResourceClient {
 public:
-    static PassRefPtr<HTMLDocument> create(Frame* frame, const URL& url)
+    static Ref<HTMLDocument> create(Frame* frame, const URL& url)
     {
-        return adoptRef(new HTMLDocument(frame, url, HTMLDocumentClass));
+        return adoptRef(*new HTMLDocument(frame, url, HTMLDocumentClass));
     }
 
-    static PassRefPtr<HTMLDocument> createSynthesizedDocument(Frame* frame, const URL& url)
+    static Ref<HTMLDocument> createSynthesizedDocument(Frame* frame, const URL& url)
     {
-        return adoptRef(new HTMLDocument(frame, url, HTMLDocumentClass, Synthesized));
+        return adoptRef(*new HTMLDocument(frame, url, HTMLDocumentClass, Synthesized));
     }
 
     virtual ~HTMLDocument();
@@ -46,8 +46,8 @@ public:
     int width();
     int height();
 
-    String dir();
-    void setDir(const String&);
+    const AtomicString& dir() const;
+    void setDir(const AtomicString&);
 
     String designMode() const;
     void setDesignMode(const String&);
@@ -86,12 +86,11 @@ protected:
     HTMLDocument(Frame*, const URL&, DocumentClassFlags = 0, unsigned constructionFlags = 0);
 
 private:
-    virtual PassRefPtr<Element> createElement(const AtomicString& tagName, ExceptionCode&) override;
+    virtual RefPtr<Element> createElement(const AtomicString& tagName, ExceptionCode&) override;
 
     virtual bool isFrameSet() const override;
-    virtual PassRefPtr<DocumentParser> createParser() override;
-
-    virtual PassRefPtr<Document> cloneDocumentWithoutChildren() const override final;
+    virtual Ref<DocumentParser> createParser() override;
+    virtual Ref<Document> cloneDocumentWithoutChildren() const override final;
 
     DocumentOrderedMap m_documentNamedItem;
     DocumentOrderedMap m_windowNamedItem;

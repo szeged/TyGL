@@ -26,10 +26,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "WebInspector.h"
-
-#if ENABLE(INSPECTOR)
 
 #include "WebInspectorClient.h"
 #include "WebKitDLL.h"
@@ -275,5 +272,3 @@ HRESULT STDMETHODCALLTYPE WebInspector::setTimelineProfilingEnabled(BOOL enabled
     frontendClient()->setTimelineProfilingEnabled(enabled);
     return S_OK;
 }
-
-#endif // ENABLE(INSPECTOR)

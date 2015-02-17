@@ -67,6 +67,7 @@ SOFT_LINK_POINTER(QTKit, QTMovieHasVideoAttribute, NSString *)
 SOFT_LINK_POINTER(QTKit, QTMovieHasAudioAttribute, NSString *)
 SOFT_LINK_POINTER(QTKit, QTMovieIsActiveAttribute, NSString *)
 SOFT_LINK_POINTER(QTKit, QTMovieLoadStateAttribute, NSString *)
+SOFT_LINK_POINTER(QTKit, QTMovieLoadStateErrorAttribute, NSString *)
 SOFT_LINK_POINTER(QTKit, QTMovieLoadStateDidChangeNotification, NSString *)
 SOFT_LINK_POINTER(QTKit, QTMovieNaturalSizeAttribute, NSString *)
 SOFT_LINK_POINTER(QTKit, QTMovieCurrentSizeAttribute, NSString *)
@@ -111,6 +112,7 @@ SOFT_LINK_POINTER_OPTIONAL(QTKit, QTSecurityPolicyNoRemoteToLocalSiteAttribute, 
 #define QTMovieHasAudioAttribute getQTMovieHasAudioAttribute()
 #define QTMovieIsActiveAttribute getQTMovieIsActiveAttribute()
 #define QTMovieLoadStateAttribute getQTMovieLoadStateAttribute()
+#define QTMovieLoadStateErrorAttribute getQTMovieLoadStateErrorAttribute()
 #define QTMovieLoadStateDidChangeNotification getQTMovieLoadStateDidChangeNotification()
 #define QTMovieNaturalSizeAttribute getQTMovieNaturalSizeAttribute()
 #define QTMovieCurrentSizeAttribute getQTMovieCurrentSizeAttribute()
@@ -181,7 +183,7 @@ MediaPlayerPrivateQTKit::MediaPlayerPrivateQTKit(MediaPlayer* player)
     : m_player(player)
     , m_objcObserver(adoptNS([[WebCoreMovieObserver alloc] initWithCallback:this]))
     , m_seekTo(MediaTime::invalidTime())
-    , m_seekTimer(this, &MediaPlayerPrivateQTKit::seekTimerFired)
+    , m_seekTimer(*this, &MediaPlayerPrivateQTKit::seekTimerFired)
     , m_networkState(MediaPlayer::Empty)
     , m_readyState(MediaPlayer::HaveNothing)
     , m_rect()
@@ -327,7 +329,7 @@ void MediaPlayerPrivateQTKit::createQTMovie(NSURL *url, NSDictionary *movieAttri
         return;
     
     NSError *error = nil;
-    m_qtMovie = adoptNS([[QTMovie alloc] initWithAttributes:movieAttributes error:&error]);
+    m_qtMovie = adoptNS([allocQTMovieInstance() initWithAttributes:movieAttributes error:&error]);
     
     if (!m_qtMovie)
         return;
@@ -423,7 +425,7 @@ void MediaPlayerPrivateQTKit::createQTMovieLayer()
     ASSERT(supportsAcceleratedRendering());
     
     if (!m_qtVideoLayer) {
-        m_qtVideoLayer = adoptNS([[QTMovieLayer alloc] init]);
+        m_qtVideoLayer = adoptNS([allocQTMovieLayerInstance() init]);
         if (!m_qtVideoLayer)
             return;
 
@@ -676,7 +678,7 @@ void MediaPlayerPrivateQTKit::cancelSeek()
     m_seekTimer.stop();
 }
 
-void MediaPlayerPrivateQTKit::seekTimerFired(Timer<MediaPlayerPrivateQTKit>&)
+void MediaPlayerPrivateQTKit::seekTimerFired()
 {        
     if (!metaDataAvailable() || !seeking() || currentMediaTime() == m_seekTo) {
         cancelSeek();
@@ -790,6 +792,11 @@ void MediaPlayerPrivateQTKit::setRate(float rate)
         [m_qtMovie.get() setRate:rate];
 }
 
+double MediaPlayerPrivateQTKit::rate() const
+{
+    return m_qtMovie ? [m_qtMovie rate] : 0;
+}
+
 void MediaPlayerPrivateQTKit::setPreservesPitch(bool preservesPitch)
 {
     LOG(Media, "MediaPlayerPrivateQTKit::setPreservesPitch(%p) - preservesPitch %d", this, (int)preservesPitch);
@@ -871,11 +878,11 @@ bool MediaPlayerPrivateQTKit::didLoadingProgress() const
     return didLoadingProgress;
 }
 
-unsigned MediaPlayerPrivateQTKit::totalBytes() const
+unsigned long long MediaPlayerPrivateQTKit::totalBytes() const
 {
     if (!metaDataAvailable())
         return 0;
-    return [[m_qtMovie.get() attributeForKey:QTMovieDataSizeAttribute] intValue];
+    return [[m_qtMovie.get() attributeForKey:QTMovieDataSizeAttribute] longLongValue];
 }
 
 void MediaPlayerPrivateQTKit::cancelLoad()
@@ -1051,6 +1058,18 @@ void MediaPlayerPrivateQTKit::updateStates()
     }
 
     LOG(Media, "MediaPlayerPrivateQTKit::updateStates(%p) - exiting with networkState = %i, readyState = %i", this, static_cast<int>(m_networkState), static_cast<int>(m_readyState));
+}
+
+long MediaPlayerPrivateQTKit::platformErrorCode() const
+{
+    if (!m_qtMovie)
+        return 0;
+
+    NSError* error = (NSError*)[m_qtMovie attributeForKey:QTMovieLoadStateErrorAttribute];
+    if (!error || ![error isKindOfClass:[NSError class]])
+        return 0;
+
+    return [error code];
 }
 
 void MediaPlayerPrivateQTKit::loadStateChanged()
@@ -1240,7 +1259,7 @@ static void addFileTypesToCache(NSArray * fileTypes, HashSet<String> &cache)
             Vector<String> typesForExtension = MIMETypeRegistry::getMediaMIMETypesForExtension(ext);
             unsigned count = typesForExtension.size();
             for (unsigned ndx = 0; ndx < count; ++ndx) {
-                String& type = typesForExtension[ndx];
+                String type = typesForExtension[ndx].lower();
 
                 if (shouldRejectMIMEType(type))
                     continue;
@@ -1501,6 +1520,27 @@ void MediaPlayerPrivateQTKit::setPrivateBrowsingMode(bool privateBrowsing)
     if (!m_qtMovie)
         return;
     [m_qtMovie.get() setAttribute:[NSNumber numberWithBool:!privateBrowsing] forKey:@"QTMovieAllowPersistentCacheAttribute"];
+}
+
+bool MediaPlayerPrivateQTKit::canSaveMediaData() const
+{
+    URL url;
+
+    if (durationMediaTime().isPositiveInfinite())
+        return false;
+
+    if (m_qtMovie)
+        url = URL(wkQTMovieResolvedURL(m_qtMovie.get()));
+    else
+        url = URL(ParsedURLString, m_movieURL);
+
+    if (url.isLocalFile())
+        return true;
+
+    if (url.protocolIsInHTTPFamily())
+        return true;
+    
+    return false;
 }
 
 } // namespace WebCore

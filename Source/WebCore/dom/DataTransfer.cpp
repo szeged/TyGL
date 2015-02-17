@@ -55,9 +55,9 @@ private:
 
 #endif
 
-DataTransfer::DataTransfer(DataTransferAccessPolicy policy, PassOwnPtr<Pasteboard> pasteboard, Type type, bool forFileDrag)
+DataTransfer::DataTransfer(DataTransferAccessPolicy policy, std::unique_ptr<Pasteboard> pasteboard, Type type, bool forFileDrag)
     : m_policy(policy)
-    , m_pasteboard(pasteboard)
+    , m_pasteboard(WTF::move(pasteboard))
 #if ENABLE(DRAG_SUPPORT)
     , m_forDrag(type != CopyAndPaste)
     , m_forFileDrag(forFileDrag)
@@ -72,9 +72,9 @@ DataTransfer::DataTransfer(DataTransferAccessPolicy policy, PassOwnPtr<Pasteboar
 #endif
 }
 
-PassRefPtr<DataTransfer> DataTransfer::createForCopyAndPaste(DataTransferAccessPolicy policy)
+Ref<DataTransfer> DataTransfer::createForCopyAndPaste(DataTransferAccessPolicy policy)
 {
-    return adoptRef(new DataTransfer(policy, policy == DataTransferAccessPolicy::Writable ? Pasteboard::createPrivate() : Pasteboard::createForCopyAndPaste()));
+    return adoptRef(*new DataTransfer(policy, policy == DataTransferAccessPolicy::Writable ? Pasteboard::createPrivate() : Pasteboard::createForCopyAndPaste()));
 }
 
 DataTransfer::~DataTransfer()
@@ -229,14 +229,14 @@ void DataTransfer::setDragImage(Element*, int, int)
 
 #else
 
-PassRefPtr<DataTransfer> DataTransfer::createForDragAndDrop()
+Ref<DataTransfer> DataTransfer::createForDragAndDrop()
 {
-    return adoptRef(new DataTransfer(DataTransferAccessPolicy::Writable, Pasteboard::createForDragAndDrop(), DragAndDrop));
+    return adoptRef(*new DataTransfer(DataTransferAccessPolicy::Writable, Pasteboard::createForDragAndDrop(), DragAndDrop));
 }
 
-PassRefPtr<DataTransfer> DataTransfer::createForDragAndDrop(DataTransferAccessPolicy policy, const DragData& dragData)
+Ref<DataTransfer> DataTransfer::createForDragAndDrop(DataTransferAccessPolicy policy, const DragData& dragData)
 {
-    return adoptRef(new DataTransfer(policy, Pasteboard::createForDragAndDrop(dragData), DragAndDrop, dragData.containsFiles()));
+    return adoptRef(*new DataTransfer(policy, Pasteboard::createForDragAndDrop(dragData), DragAndDrop, dragData.containsFiles()));
 }
 
 bool DataTransfer::canSetDragImage() const

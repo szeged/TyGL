@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2004, 2005, 2006, 2007, 2008 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2004, 2005, 2006, 2007 Rob Buis <buis@kde.org>
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -34,17 +35,16 @@ namespace WebCore {
 
 class CachedSVGDocument;
 class SVGElementInstance;
+class SVGGElement;
 
 class SVGUseElement final : public SVGGraphicsElement,
                             public SVGExternalResourcesRequired,
                             public SVGURIReference,
                             public CachedSVGDocumentClient {
 public:
-    static PassRefPtr<SVGUseElement> create(const QualifiedName&, Document&, bool wasInsertedByParser);
+    static Ref<SVGUseElement> create(const QualifiedName&, Document&, bool wasInsertedByParser);
     virtual ~SVGUseElement();
 
-    SVGElementInstance* instanceRoot();
-    SVGElementInstance* animatedInstanceRoot() const;
     SVGElementInstance* instanceForShadowTreeElement(Node*) const;
     void invalidateShadowTree();
     void invalidateDependentShadowTrees();
@@ -69,11 +69,11 @@ private:
 
     virtual void willAttachRenderers() override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
     virtual void toClipPath(Path&) override;
 
     void clearResourceReferences();
-    void buildShadowAndInstanceTree(SVGElement* target);
+    void buildShadowAndInstanceTree(SVGElement& target);
     void detachInstance();
 
     virtual bool haveLoadedRequiredResources() override { return SVGExternalResourcesRequired::haveLoadedRequiredResources(); }
@@ -85,18 +85,18 @@ private:
     void buildInstanceTree(SVGElement* target, SVGElementInstance* targetInstance, bool& foundCycle, bool foundUse);
     bool hasCycleUseReferencing(SVGUseElement*, SVGElementInstance* targetInstance, SVGElement*& newTarget);
 
-    // Shadow tree handling
-    void buildShadowTree(SVGElement* target, SVGElementInstance* targetInstance);
-
-    void expandUseElementsInShadowTree(Node* element);
-    void expandSymbolElementsInShadowTree(Node* element);
+    // Shadow tree handling.
+    void buildShadowTree(SVGElement& target);
+    void expandUseElementsInShadowTree();
+    void expandSymbolElementsInShadowTree();
+    SVGElement* shadowTreeTargetClone() const;
+    void transferEventListenersToShadowTree();
+    void transferAttributesToShadowTreeReplacement(SVGGElement&) const;
+    void transferSizeAttributesToShadowTreeTargetClone(SVGElement&) const;
 
     // "Tree connector" 
     void associateInstancesWithShadowTreeElements(Node* target, SVGElementInstance* targetInstance);
     SVGElementInstance* instanceForShadowTreeElement(Node* element, SVGElementInstance* instance) const;
-
-    void transferUseAttributesToReplacedElement(SVGElement* from, SVGElement* to) const;
-    void transferEventListenersToShadowTree(SVGElementInstance* target);
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGUseElement)
         DECLARE_ANIMATED_LENGTH(X, x)
@@ -118,14 +118,14 @@ private:
     virtual void setHaveFiredLoadEvent(bool haveFiredLoadEvent) override { m_haveFiredLoadEvent = haveFiredLoadEvent; }
     virtual bool isParserInserted() const override { return m_wasInsertedByParser; }
     virtual bool haveFiredLoadEvent() const override { return m_haveFiredLoadEvent; }
-    virtual Timer<SVGElement>* svgLoadEventTimer() override { return &m_svgLoadEventTimer; }
+    virtual Timer* svgLoadEventTimer() override { return &m_svgLoadEventTimer; }
 
     bool m_wasInsertedByParser;
     bool m_haveFiredLoadEvent;
     bool m_needsShadowTreeRecreation;
     RefPtr<SVGElementInstance> m_targetElementInstance;
     CachedResourceHandle<CachedSVGDocument> m_cachedDocument;
-    Timer<SVGElement> m_svgLoadEventTimer;
+    Timer m_svgLoadEventTimer;
 };
 
 }

@@ -28,16 +28,22 @@
 #include "WKBundleFramePrivate.h"
 
 #include "APIArray.h"
+#include "APISecurityOrigin.h"
 #include "InjectedBundleHitTestResult.h"
+#include "InjectedBundleNodeHandle.h"
+#include "InjectedBundleRangeHandle.h"
+#include "InjectedBundleScriptWorld.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WKData.h"
 #include "WebFrame.h"
-#include "WebSecurityOrigin.h"
+#include "WebPage.h"
 #include <WebCore/Document.h>
+#include <WebCore/FocusController.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameLoader.h>
 #include <WebCore/FrameView.h>
+#include <WebCore/Page.h>
 
 using namespace WebCore;
 using namespace WebKit;
@@ -269,4 +275,13 @@ WKSecurityOriginRef WKBundleFrameCopySecurityOrigin(WKBundleFrameRef frameRef)
         return 0;
 
     return toCopiedAPI(coreFrame->document()->securityOrigin());
+}
+
+void WKBundleFrameFocus(WKBundleFrameRef frameRef)
+{
+    Frame* coreFrame = toImpl(frameRef)->coreFrame();
+    if (!coreFrame)
+        return;
+
+    coreFrame->page()->focusController().setFocusedFrame(coreFrame);
 }

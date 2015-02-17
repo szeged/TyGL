@@ -26,10 +26,8 @@
 #ifndef InspectorConsoleAgent_h
 #define InspectorConsoleAgent_h
 
-#if ENABLE(INSPECTOR)
-
-#include "InspectorJSBackendDispatchers.h"
-#include "InspectorJSFrontendDispatchers.h"
+#include "InspectorBackendDispatchers.h"
+#include "InspectorFrontendDispatchers.h"
 #include "inspector/InspectorAgentBase.h"
 #include "runtime/ConsoleTypes.h"
 #include <wtf/Forward.h>
@@ -63,17 +61,15 @@ public:
     virtual void enable(ErrorString&) override;
     virtual void disable(ErrorString&) override;
     virtual void clearMessages(ErrorString&) override;
-    virtual void setMonitoringXHREnabled(ErrorString&, bool enabled) = 0;
-    virtual void addInspectedNode(ErrorString&, int nodeId) = 0;
+    virtual void setMonitoringXHREnabled(ErrorString&, bool enabled) override = 0;
+    virtual void addInspectedNode(ErrorString&, int nodeId) override = 0;
 
     virtual bool isWorkerAgent() const = 0;
 
     bool enabled() const { return m_enabled; }
     void reset();
 
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, JSC::ExecState*, PassRefPtr<ScriptArguments>, unsigned long requestIdentifier = 0);
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, const String& scriptID, unsigned lineNumber, unsigned columnNumber, JSC::ExecState* = nullptr, unsigned long requestIdentifier = 0);
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptCallStack>, unsigned long requestIdentifier = 0);
+    void addMessageToConsole(std::unique_ptr<ConsoleMessage>);
 
     Vector<unsigned> consoleMessageArgumentCounts() const;
 
@@ -96,7 +92,5 @@ protected:
 };
 
 } // namespace Inspector
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(InspectorConsoleAgent_h)

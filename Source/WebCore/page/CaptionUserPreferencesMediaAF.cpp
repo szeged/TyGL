@@ -29,9 +29,6 @@
 
 #include "CaptionUserPreferencesMediaAF.h"
 
-#if HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
-#include "CoreText/CoreText.h"
-#endif
 #include "FloatConversion.h"
 #include "HTMLMediaElement.h"
 #include "URL.h"
@@ -52,6 +49,7 @@
 #endif
 
 #if HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+#include <CoreText/CoreText.h>
 #include <MediaAccessibility/MediaAccessibility.h>
 #endif
 
@@ -141,6 +139,7 @@ static void userCaptionPreferencesChangedNotificationCallback(CFNotificationCent
 CaptionUserPreferencesMediaAF::CaptionUserPreferencesMediaAF(PageGroup& group)
     : CaptionUserPreferences(group)
 #if HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+    , m_updateStyleSheetTimer(*this, &CaptionUserPreferencesMediaAF::updateTimerFired)
     , m_listeningForPreferenceChanges(false)
 #endif
 {
@@ -223,6 +222,11 @@ bool CaptionUserPreferencesMediaAF::userPrefersSubtitles() const
     return !(captioningMediaCharacteristics && CFArrayGetCount(captioningMediaCharacteristics.get()));
 }
 
+void CaptionUserPreferencesMediaAF::updateTimerFired()
+{
+    updateCaptionStyleSheetOveride();
+}
+
 void CaptionUserPreferencesMediaAF::setInterestedInCaptionPreferenceChanges()
 {
     if (!MediaAccessibilityLibrary())
@@ -236,7 +240,11 @@ void CaptionUserPreferencesMediaAF::setInterestedInCaptionPreferenceChanges()
         CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), this, userCaptionPreferencesChangedNotificationCallback, kMAXCaptionAppearanceSettingsChangedNotification, 0, CFNotificationSuspensionBehaviorCoalesce);
     }
 
-    updateCaptionStyleSheetOveride();
+    // Generating and registering the caption stylesheet can be expensive and this method is called indirectly when the parser creates an audio or
+    // video element, so do it after a brief pause.
+    if (m_updateStyleSheetTimer.isActive())
+        m_updateStyleSheetTimer.stop();
+    m_updateStyleSheetTimer.startOneShot(0);
 }
 
 void CaptionUserPreferencesMediaAF::captionPreferencesChanged()
@@ -704,7 +712,7 @@ int CaptionUserPreferencesMediaAF::textTrackSelectionScore(TextTrack* track, HTM
     int trackScore = 0;
 
     if (userPrefersCaptions()) {
-        // When the user prefers accessiblity tracks, rank is SDH, then CC, then subtitles.
+        // When the user prefers accessibility tracks, rank is SDH, then CC, then subtitles.
         if (track->kind() == track->subtitlesKeyword())
             trackScore = 1;
         else if (track->isClosedCaptions())

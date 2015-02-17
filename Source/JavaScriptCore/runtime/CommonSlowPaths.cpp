@@ -221,7 +221,10 @@ SLOW_PATH_DECL(slow_path_get_callee)
 SLOW_PATH_DECL(slow_path_create_arguments)
 {
     BEGIN();
-    JSValue arguments = JSValue(Arguments::create(vm, exec));
+    int lexicalEnvironmentReg = pc[2].u.operand;
+    JSLexicalEnvironment* lexicalEnvironment = VirtualRegister(lexicalEnvironmentReg).isValid() ?
+        exec->uncheckedR(lexicalEnvironmentReg).lexicalEnvironment() : nullptr;
+    JSValue arguments = JSValue(Arguments::create(vm, exec, lexicalEnvironment));
     CHECK_EXCEPTION();
     exec->uncheckedR(pc[1].u.operand) = arguments;
     exec->uncheckedR(unmodifiedArgumentsRegister(VirtualRegister(pc[1].u.operand)).offset()) = arguments;
@@ -483,11 +486,9 @@ SLOW_PATH_DECL(slow_path_del_by_val)
     uint32_t i;
     if (subscript.getUInt32(i))
         couldDelete = baseObject->methodTable()->deletePropertyByIndex(baseObject, exec, i);
-    else if (isName(subscript))
-        couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, jsCast<NameInstance*>(subscript.asCell())->privateName());
     else {
         CHECK_EXCEPTION();
-        Identifier property = subscript.toString(exec)->toIdentifier(exec);
+        PropertyName property = subscript.toPropertyKey(exec);
         CHECK_EXCEPTION();
         couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, property);
     }
@@ -569,10 +570,10 @@ SLOW_PATH_DECL(slow_path_has_generic_property)
 SLOW_PATH_DECL(slow_path_get_direct_pname)
 {
     BEGIN();
-    JSValue baseValue = OP(2).jsValue();
+    JSValue baseValue = OP_C(2).jsValue();
     JSValue property = OP(3).jsValue();
     ASSERT(property.isString());
-    RETURN(baseValue.get(exec, property.toString(exec)->toIdentifier(exec)));
+    RETURN(baseValue.get(exec, property.toPropertyKey(exec)));
 }
 
 SLOW_PATH_DECL(slow_path_get_structure_property_enumerator)
@@ -617,12 +618,10 @@ SLOW_PATH_DECL(slow_path_to_index_string)
     RETURN(jsString(exec, Identifier::from(exec, OP(2).jsValue().asUInt32()).string()));
 }
 
-SLOW_PATH_DECL(slow_path_profile_type)
+SLOW_PATH_DECL(slow_path_profile_type_clear_log)
 {
     BEGIN();
-    TypeLocation* location = pc[2].u.location;
-    JSValue val = OP_C(1).jsValue();
-    vm.typeProfilerLog()->recordTypeInformationForLocation(val, location);
+    vm.typeProfilerLog()->processLogEntries(ASCIILiteral("LLInt log full."));
     END();
 }
 

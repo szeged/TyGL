@@ -31,12 +31,12 @@ class HitTestRequest;
 class HitTestResult;
 class InlineTextBox;
 class RenderLineBoxList;
-class SimpleFontData;
+class Font;
 class VerticalPositionCache;
 
 struct GlyphOverflow;
 
-typedef HashMap<const InlineTextBox*, std::pair<Vector<const SimpleFontData*>, GlyphOverflow>> GlyphOverflowAndFallbackFontsMap;
+typedef HashMap<const InlineTextBox*, std::pair<Vector<const Font*>, GlyphOverflow>> GlyphOverflowAndFallbackFontsMap;
 
 class InlineFlowBox : public InlineBox {
 public:
@@ -75,7 +75,7 @@ public:
     virtual const char* boxName() const override;
 #endif
 
-    RenderBoxModelObject& renderer() const { return toRenderBoxModelObject(InlineBox::renderer()); }
+    RenderBoxModelObject& renderer() const { return downcast<RenderBoxModelObject>(InlineBox::renderer()); }
     const RenderStyle& lineStyle() const { return isFirstLine() ? renderer().firstLineStyle() : renderer().style(); }
 
     InlineFlowBox* prevLineBox() const { return m_prevLineBox; }
@@ -291,6 +291,8 @@ public:
             parent()->clearDescendantsHaveSameLineHeightAndBaseline();
     }
 
+    void computeReplacedAndTextLineTopAndBottom(LayoutUnit& lineTop, LayoutUnit& lineBottom) const;
+    
 private:
     virtual bool isInlineFlowBox() const override final { return true; }
     void boxModelObject() const = delete;
@@ -344,8 +346,6 @@ private:
 #endif
 };
 
-INLINE_BOX_OBJECT_TYPE_CASTS(InlineFlowBox, isInlineFlowBox())
-
 #ifdef NDEBUG
 
 inline void InlineFlowBox::checkConsistency() const
@@ -363,6 +363,8 @@ inline void InlineFlowBox::setHasBadChildList()
 #endif
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_INLINE_BOX(InlineFlowBox, isInlineFlowBox())
 
 #ifndef NDEBUG
 // Outside the WebCore namespace for ease of invocation from gdb.

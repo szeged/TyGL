@@ -45,9 +45,9 @@ inline MathMLTextElement::MathMLTextElement(const QualifiedName& tagName, Docume
     setHasCustomStyleResolveCallbacks();
 }
 
-PassRefPtr<MathMLTextElement> MathMLTextElement::create(const QualifiedName& tagName, Document& document)
+Ref<MathMLTextElement> MathMLTextElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new MathMLTextElement(tagName, document));
+    return adoptRef(*new MathMLTextElement(tagName, document));
 }
 
 void MathMLTextElement::didAttachRenderers()
@@ -64,7 +64,18 @@ void MathMLTextElement::childrenChanged(const ChildChange& change)
         downcast<RenderMathMLToken>(*renderer()).updateTokenContent();
 }
 
-RenderPtr<RenderElement> MathMLTextElement::createElementRenderer(PassRef<RenderStyle> style)
+void MathMLTextElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
+{
+    if (name == stretchyAttr) {
+        if (is<RenderMathMLOperator>(renderer()))
+            downcast<RenderMathMLOperator>(*renderer()).setOperatorFlagAndScheduleLayoutIfNeeded(MathMLOperatorDictionary::Stretchy, value);
+        return;
+    }
+
+    MathMLElement::parseAttribute(name, value);
+}
+
+RenderPtr<RenderElement> MathMLTextElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     if (hasTagName(MathMLNames::moTag))
         return createRenderer<RenderMathMLOperator>(*this, WTF::move(style));

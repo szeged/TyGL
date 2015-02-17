@@ -117,7 +117,8 @@ inline bool SelectorDataList::selectorMatches(const SelectorData& selectorData, 
     SelectorChecker selectorChecker(element.document());
     SelectorChecker::CheckingContext selectorCheckingContext(SelectorChecker::Mode::QueryingRules);
     selectorCheckingContext.scope = rootNode.isDocumentNode() ? nullptr : &rootNode;
-    return selectorChecker.match(selectorData.selector, &element, selectorCheckingContext);
+    unsigned ignoredSpecificity;
+    return selectorChecker.match(selectorData.selector, &element, selectorCheckingContext, ignoredSpecificity);
 }
 
 inline Element* SelectorDataList::selectorClosest(const SelectorData& selectorData, Element& element, const ContainerNode& rootNode) const
@@ -126,7 +127,8 @@ inline Element* SelectorDataList::selectorClosest(const SelectorData& selectorDa
     SelectorChecker::CheckingContext selectorCheckingContext(SelectorChecker::Mode::QueryingRules);
     selectorCheckingContext.scope = rootNode.isDocumentNode() ? nullptr : &rootNode;
     Element* currentNode = &element;
-    if (!selectorChecker.match(selectorData.selector, currentNode, selectorCheckingContext))
+    unsigned ignoredSpecificity;
+    if (!selectorChecker.match(selectorData.selector, currentNode, selectorCheckingContext, ignoredSpecificity))
         return nullptr;
     return currentNode;
 }
@@ -280,14 +282,32 @@ static ContainerNode& filterRootById(ContainerNode& rootNode, const CSSSelector&
 }
 #endif
 
-template <typename SelectorQueryTrait>
-static inline void elementsForLocalName(const ContainerNode& rootNode, const AtomicString& localName, typename SelectorQueryTrait::OutputType& output)
+static ALWAYS_INLINE bool localNameMatches(const Element& element, const AtomicString& localName, const AtomicString& lowercaseLocalName)
 {
-    for (auto& element : elementDescendants(const_cast<ContainerNode&>(rootNode))) {
-        if (element.tagQName().localName() == localName) {
-            SelectorQueryTrait::appendOutputForElement(output, &element);
-            if (SelectorQueryTrait::shouldOnlyMatchFirstElement)
+    if (element.isHTMLElement() && element.document().isHTMLDocument())
+        return element.localName() == lowercaseLocalName;
+    return element.localName() == localName;
+
+}
+
+template <typename SelectorQueryTrait>
+static inline void elementsForLocalName(const ContainerNode& rootNode, const AtomicString& localName, const AtomicString& lowercaseLocalName, typename SelectorQueryTrait::OutputType& output)
+{
+    if (localName == lowercaseLocalName) {
+        for (auto& element : elementDescendants(const_cast<ContainerNode&>(rootNode))) {
+            if (element.tagQName().localName() == localName) {
+                SelectorQueryTrait::appendOutputForElement(output, &element);
+                if (SelectorQueryTrait::shouldOnlyMatchFirstElement)
                 return;
+            }
+        }
+    } else {
+        for (auto& element : elementDescendants(const_cast<ContainerNode&>(rootNode))) {
+            if (localNameMatches(element, localName, lowercaseLocalName)) {
+                SelectorQueryTrait::appendOutputForElement(output, &element);
+                if (SelectorQueryTrait::shouldOnlyMatchFirstElement)
+                return;
+            }
         }
     }
 }
@@ -311,12 +331,13 @@ ALWAYS_INLINE void SelectorDataList::executeSingleTagNameSelectorData(const Cont
 
     const QualifiedName& tagQualifiedName = selectorData.selector->tagQName();
     const AtomicString& selectorLocalName = tagQualifiedName.localName();
+    const AtomicString& selectorLowercaseLocalName = selectorData.selector->tagLowercaseLocalName();
     const AtomicString& selectorNamespaceURI = tagQualifiedName.namespaceURI();
 
     if (selectorNamespaceURI == starAtom) {
         if (selectorLocalName != starAtom) {
             // Common case: name defined, selectorNamespaceURI is a wildcard.
-            elementsForLocalName<SelectorQueryTrait>(rootNode, selectorLocalName, output);
+            elementsForLocalName<SelectorQueryTrait>(rootNode, selectorLocalName, selectorLowercaseLocalName, output);
         } else {
             // Other fairly common case: both are wildcards.
             anyElement<SelectorQueryTrait>(rootNode, output);
@@ -324,7 +345,7 @@ ALWAYS_INLINE void SelectorDataList::executeSingleTagNameSelectorData(const Cont
     } else {
         // Fallback: NamespaceURI is set, selectorLocalName may be starAtom.
         for (auto& element : elementDescendants(const_cast<ContainerNode&>(rootNode))) {
-            if (element.namespaceURI() == selectorNamespaceURI && (selectorLocalName == starAtom || element.tagQName().localName() == selectorLocalName)) {
+            if (element.namespaceURI() == selectorNamespaceURI && localNameMatches(element, selectorLocalName, selectorLowercaseLocalName)) {
                 SelectorQueryTrait::appendOutputForElement(output, &element);
                 if (SelectorQueryTrait::shouldOnlyMatchFirstElement)
                     return;
@@ -381,7 +402,7 @@ ALWAYS_INLINE void SelectorDataList::executeSingleMultiSelectorData(const Contai
 
 #if ENABLE(CSS_SELECTOR_JIT)
 template <typename SelectorQueryTrait>
-ALWAYS_INLINE void SelectorDataList::executeCompiledSimpleSelectorChecker(const ContainerNode& searchRootNode, SelectorCompiler::SimpleSelectorChecker selectorChecker, typename SelectorQueryTrait::OutputType& output, const SelectorData& selectorData) const
+ALWAYS_INLINE void SelectorDataList::executeCompiledSimpleSelectorChecker(const ContainerNode& searchRootNode, SelectorCompiler::QuerySelectorSimpleSelectorChecker selectorChecker, typename SelectorQueryTrait::OutputType& output, const SelectorData& selectorData) const
 {
     for (auto& element : elementDescendants(const_cast<ContainerNode&>(searchRootNode))) {
 #if CSS_SELECTOR_JIT_PROFILING
@@ -398,7 +419,7 @@ ALWAYS_INLINE void SelectorDataList::executeCompiledSimpleSelectorChecker(const 
 }
 
 template <typename SelectorQueryTrait>
-ALWAYS_INLINE void SelectorDataList::executeCompiledSelectorCheckerWithCheckingContext(const ContainerNode& rootNode, const ContainerNode& searchRootNode, SelectorCompiler::SelectorCheckerWithCheckingContext selectorChecker, typename SelectorQueryTrait::OutputType& output, const SelectorData& selectorData) const
+ALWAYS_INLINE void SelectorDataList::executeCompiledSelectorCheckerWithCheckingContext(const ContainerNode& rootNode, const ContainerNode& searchRootNode, SelectorCompiler::QuerySelectorSelectorCheckerWithCheckingContext selectorChecker, typename SelectorQueryTrait::OutputType& output, const SelectorData& selectorData) const
 {
     SelectorChecker::CheckingContext checkingContext(SelectorChecker::Mode::QueryingRules);
     checkingContext.scope = rootNode.isDocumentNode() ? nullptr : &rootNode;
@@ -431,11 +452,11 @@ ALWAYS_INLINE void SelectorDataList::executeCompiledSingleMultiSelectorData(cons
             bool matched = false;
             void* compiledSelectorChecker = m_selectors[i].compiledSelectorCodeRef.code().executableAddress();
             if (m_selectors[i].compilationStatus == SelectorCompilationStatus::SimpleSelectorChecker) {
-                SelectorCompiler::SimpleSelectorChecker selectorChecker = SelectorCompiler::simpleSelectorCheckerFunction(compiledSelectorChecker, m_selectors[i].compilationStatus);
+                SelectorCompiler::QuerySelectorSimpleSelectorChecker selectorChecker = SelectorCompiler::querySelectorSimpleSelectorCheckerFunction(compiledSelectorChecker, m_selectors[i].compilationStatus);
                 matched = selectorChecker(&element);
             } else {
                 ASSERT(m_selectors[i].compilationStatus == SelectorCompilationStatus::SelectorCheckerWithCheckingContext);
-                SelectorCompiler::SelectorCheckerWithCheckingContext selectorChecker = SelectorCompiler::selectorCheckerFunctionWithCheckingContext(compiledSelectorChecker, m_selectors[i].compilationStatus);
+                SelectorCompiler::QuerySelectorSelectorCheckerWithCheckingContext selectorChecker = SelectorCompiler::querySelectorSelectorCheckerFunctionWithCheckingContext(compiledSelectorChecker, m_selectors[i].compilationStatus);
                 matched = selectorChecker(&element, &checkingContext);
             }
             if (matched) {
@@ -524,11 +545,11 @@ ALWAYS_INLINE void SelectorDataList::execute(ContainerNode& rootNode, typename S
         const SelectorData& selectorData = m_selectors.first();
         void* compiledSelectorChecker = selectorData.compiledSelectorCodeRef.code().executableAddress();
         if (selectorData.compilationStatus == SelectorCompilationStatus::SimpleSelectorChecker) {
-            SelectorCompiler::SimpleSelectorChecker selectorChecker = SelectorCompiler::simpleSelectorCheckerFunction(compiledSelectorChecker, selectorData.compilationStatus);
+            SelectorCompiler::QuerySelectorSimpleSelectorChecker selectorChecker = SelectorCompiler::querySelectorSimpleSelectorCheckerFunction(compiledSelectorChecker, selectorData.compilationStatus);
             executeCompiledSimpleSelectorChecker<SelectorQueryTrait>(*searchRootNode, selectorChecker, output, selectorData);
         } else {
             ASSERT(selectorData.compilationStatus == SelectorCompilationStatus::SelectorCheckerWithCheckingContext);
-            SelectorCompiler::SelectorCheckerWithCheckingContext selectorChecker = SelectorCompiler::selectorCheckerFunctionWithCheckingContext(compiledSelectorChecker, selectorData.compilationStatus);
+            SelectorCompiler::QuerySelectorSelectorCheckerWithCheckingContext selectorChecker = SelectorCompiler::querySelectorSelectorCheckerFunctionWithCheckingContext(compiledSelectorChecker, selectorData.compilationStatus);
             executeCompiledSelectorCheckerWithCheckingContext<SelectorQueryTrait>(rootNode, *searchRootNode, selectorChecker, output, selectorData);
         }
         break;
@@ -582,7 +603,7 @@ ALWAYS_INLINE void SelectorDataList::execute(ContainerNode& rootNode, typename S
 }
 
 SelectorQuery::SelectorQuery(CSSSelectorList&& selectorList)
-    : m_selectorList(selectorList)
+    : m_selectorList(WTF::move(selectorList))
     , m_selectors(m_selectorList)
 {
 }

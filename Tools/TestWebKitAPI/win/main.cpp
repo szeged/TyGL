@@ -38,9 +38,6 @@
 #endif
 
 #pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='" PROCESSORARCHITECTURE "' publicKeyToken='6595b64144ccf1df' language='*'\"")
-#if defined(_MSC_VER) && (_MSC_VER >= 1600)
-#pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.VC80.CRT' version='8.0.50727.6195' processorArchitecture='" PROCESSORARCHITECTURE "' publicKeyToken='1fc8b3b9a1e18e3b' language='*'\"")
-#endif
 
 int main(int argc, char** argv)
 {
@@ -53,7 +50,7 @@ int main(int argc, char** argv)
     // FIXME: Remove this line once <http://webkit.org/b/32867> is fixed.
     ::OleInitialize(0);
 
-    bool passed = TestWebKitAPI::TestsController::shared().run(argc, argv);
+    bool passed = TestWebKitAPI::TestsController::singleton().run(argc, argv);
 
     return passed ? EXIT_SUCCESS : EXIT_FAILURE;
 }

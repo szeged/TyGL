@@ -37,6 +37,7 @@
 namespace WebCore {
 
 class HTMLLinkElement;
+class RelList;
 class URL;
 
 template<typename T> class EventSender;
@@ -44,7 +45,7 @@ typedef EventSender<HTMLLinkElement> LinkEventSender;
 
 class HTMLLinkElement final : public HTMLElement, public CachedStyleSheetClient, public LinkLoaderClient {
 public:
-    static PassRefPtr<HTMLLinkElement> create(const QualifiedName&, Document&, bool createdByParser);
+    static Ref<HTMLLinkElement> create(const QualifiedName&, Document&, bool createdByParser);
     virtual ~HTMLLinkElement();
 
     URL href() const;
@@ -66,10 +67,12 @@ public:
     bool isDisabled() const { return m_disabledState == Disabled; }
     bool isEnabledViaScript() const { return m_disabledState == EnabledViaScript; }
     void setSizes(const String&);
-    DOMSettableTokenList* sizes() const;
+    DOMSettableTokenList& sizes() { return m_sizes.get(); }
 
     void dispatchPendingEvent(LinkEventSender*);
     static void dispatchPendingLoadEvents();
+
+    DOMTokenList& relList();
 
 private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
@@ -97,7 +100,9 @@ private:
 
     virtual bool isURLAttribute(const Attribute&) const override;
 
-private:
+    virtual void defaultEventHandler(Event*) override;
+    void handleClick(Event&);
+
     HTMLLinkElement(const QualifiedName&, Document&, bool createdByParser);
 
     virtual void addSubresourceAttributeURLs(ListHashSet<URL>&) const override;
@@ -125,7 +130,7 @@ private:
 
     String m_type;
     String m_media;
-    RefPtr<DOMSettableTokenList> m_sizes;
+    Ref<DOMSettableTokenList> m_sizes;
     DisabledState m_disabledState;
     LinkRelAttribute m_relAttribute;
     bool m_loading;
@@ -135,6 +140,8 @@ private:
     bool m_loadedSheet;
 
     PendingSheetType m_pendingSheetType;
+
+    std::unique_ptr<RelList> m_relList;
 };
 
 } //namespace

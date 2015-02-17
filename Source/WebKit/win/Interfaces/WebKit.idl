@@ -70,11 +70,11 @@ import "AccessibleApplication.idl";
 #include "DOMPrivate.idl"
 #include "DOMRange.idl"
 #include "DOMWindow.idl"
+#include "IWebApplicationCache.idl"
 #include "IWebArchive.idl"
 #include "IWebBackForwardList.idl"
 #include "IWebBackForwardListPrivate.idl"
 #include "IWebCache.idl"
-#include "IWebCookieManager.idl"
 #include "IWebCoreStatistics.idl"
 #include "IWebDataSource.idl"
 #include "IWebDatabaseManager.idl"
@@ -139,6 +139,7 @@ import "AccessibleApplication.idl";
 #include "IWebView.idl"
 #include "IWebViewPrivate.idl"
 #include "IWebWorkersPrivate.idl"
+#include "WebKitMessageLoop.idl"
 
 #define __TYPELIB_VERSION__ __BUILD_NUMBER_MAJOR__##.##__BUILD_NUMBER_MINOR__
 
@@ -194,6 +195,11 @@ library WebKit
     [uuid(6be190e9-1725-4e4a-88db-6a9fe242c9e5)]
     coclass WebHistoryItem {
         [default] interface IWebHistoryItem;
+    }
+
+    [uuid(1119E970-4b13-4b9a-a049-41096104b689)]
+    coclass WebApplicationCache {
+        [default] interface IWebApplicationCache;
     }
 
     [uuid(f71071fd-a51b-4b69-9eb6-44374405e80c)]
@@ -266,11 +272,6 @@ library WebKit
         [default] interface IWebCoreStatistics;
     }
 
-    [uuid(3F35F332-BB2B-49b3-AEDD-27B317687E07)]
-    coclass WebCookieManager{
-        [default] interface IWebCookieManager;
-    }
-
     [uuid(0967AAFF-2FFE-4fcc-81F3-3FF2A9C6DCE2)]
     coclass WebWorkersPrivate{
         [default] interface IWebWorkersPrivate;
@@ -295,4 +296,14 @@ library WebKit
     coclass WebUserContentURLPattern {
         [default] interface IWebUserContentURLPattern;
     }
+
+    [uuid(6eb8d98f-2723-4472-88d3-5936f9d6e631)]
+    coclass WebSecurityOrigin {
+        [default] interface IWebSecurityOrigin;
+    };
+
+    [uuid(21799291-0067-4593-993E-467877FDA58B)]
+    coclass WebKitMessageLoop {
+        [default] interface IWebKitMessageLoop;
+    };
 }

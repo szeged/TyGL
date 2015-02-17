@@ -32,11 +32,11 @@ namespace WebCore {
 
 class FloatPoint;
 class FloatRect;
-class Font;
+class FontCascade;
 class GraphicsContext;
 class GlyphBuffer;
 class GlyphToPathTranslator;
-class SimpleFontData;
+class Font;
 
 struct GlyphData;
 struct WidthIterator;
@@ -197,11 +197,11 @@ public:
         virtual ~RenderingContext() { }
 
 #if ENABLE(SVG_FONTS)
-        virtual GlyphData glyphDataForCharacter(const Font&, WidthIterator&, UChar32 character, bool mirror, int currentCharacter, unsigned& advanceLength, String& normalizedSpacesStringCache) = 0;
-        virtual void drawSVGGlyphs(GraphicsContext*, const SimpleFontData*, const GlyphBuffer&, int from, int to, const FloatPoint&) const = 0;
-        virtual float floatWidthUsingSVGFont(const Font&, const TextRun&, int& charsConsumed, String& glyphName) const = 0;
-        virtual bool applySVGKerning(const SimpleFontData*, WidthIterator&, GlyphBuffer*, int from) const = 0;
-        virtual std::unique_ptr<GlyphToPathTranslator> createGlyphToPathTranslator(const SimpleFontData&, const TextRun*, const GlyphBuffer&, int from, int numGlyphs, const FloatPoint&) const = 0;
+        virtual GlyphData glyphDataForCharacter(const FontCascade&, WidthIterator&, UChar32 character, bool mirror, int currentCharacter, unsigned& advanceLength, String& normalizedSpacesStringCache) = 0;
+        virtual void drawSVGGlyphs(GraphicsContext*, const Font*, const GlyphBuffer&, int from, int to, const FloatPoint&) const = 0;
+        virtual float floatWidthUsingSVGFont(const FontCascade&, const TextRun&, int& charsConsumed, String& glyphName) const = 0;
+        virtual bool applySVGKerning(const Font*, WidthIterator&, GlyphBuffer*, int from) const = 0;
+        virtual std::unique_ptr<GlyphToPathTranslator> createGlyphToPathTranslator(const Font&, const TextRun*, const GlyphBuffer&, int from, int numGlyphs, const FloatPoint&) const = 0;
 #endif
     };
 
@@ -212,7 +212,7 @@ public:
     WEBCORE_EXPORT static bool allowsRoundingHacks();
 
 private:
-    static bool s_allowsRoundingHacks;
+    WEBCORE_EXPORT static bool s_allowsRoundingHacks;
     
     RefPtr<RenderingContext> m_renderingContext;
 

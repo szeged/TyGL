@@ -366,7 +366,8 @@ enum FeatureToAnimate {
         break;
     }
 
-    _scrollbar->invalidate();
+    if (!_scrollbar->supportsUpdateOnSecondaryThread())
+        _scrollbar->invalidate();
 }
 
 - (void)invalidate
@@ -640,11 +641,11 @@ PassOwnPtr<ScrollAnimator> ScrollAnimator::create(ScrollableArea* scrollableArea
 
 ScrollAnimatorMac::ScrollAnimatorMac(ScrollableArea* scrollableArea)
     : ScrollAnimator(scrollableArea)
-    , m_initialScrollbarPaintTimer(this, &ScrollAnimatorMac::initialScrollbarPaintTimerFired)
-    , m_sendContentAreaScrolledTimer(this, &ScrollAnimatorMac::sendContentAreaScrolledTimerFired)
+    , m_initialScrollbarPaintTimer(*this, &ScrollAnimatorMac::initialScrollbarPaintTimerFired)
+    , m_sendContentAreaScrolledTimer(*this, &ScrollAnimatorMac::sendContentAreaScrolledTimerFired)
 #if ENABLE(RUBBER_BANDING)
     , m_scrollElasticityController(this)
-    , m_snapRubberBandTimer(this, &ScrollAnimatorMac::snapRubberBandTimerFired)
+    , m_snapRubberBandTimer(*this, &ScrollAnimatorMac::snapRubberBandTimerFired)
 #endif
     , m_haveScrolledSincePageLoad(false)
     , m_needsScrollerStyleUpdate(false)
@@ -1151,6 +1152,21 @@ bool ScrollAnimatorMac::isAlreadyPinnedInDirectionOfGesture(const PlatformWheelE
     return false;
 }
 
+#if ENABLE(CSS_SCROLL_SNAP)
+static bool gestureShouldBeginSnap(const PlatformWheelEvent& wheelEvent, const Vector<LayoutUnit>* snapOffsets)
+{
+    if (!snapOffsets)
+        return false;
+    
+    if ((wheelEvent.phase() != PlatformWheelEventPhaseEnded)
+        && !(wheelEvent.phase() == PlatformWheelEventPhaseNone && wheelEvent.momentumPhase() == PlatformWheelEventPhaseEnded)) {
+        return false;
+    }
+
+    return true;
+}
+#endif
+
 bool ScrollAnimatorMac::allowsVerticalStretching(const PlatformWheelEvent& wheelEvent)
 {
     switch (m_scrollableArea->verticalScrollElasticity()) {
@@ -1159,6 +1175,10 @@ bool ScrollAnimatorMac::allowsVerticalStretching(const PlatformWheelEvent& wheel
         Scrollbar* vScroller = m_scrollableArea->verticalScrollbar();
         bool scrollbarsAllowStretching = ((vScroller && vScroller->enabled()) || (!hScroller || !hScroller->enabled()));
         bool eventPreventsStretching = m_scrollableArea->hasScrollableOrRubberbandableAncestor() && newGestureIsStarting(wheelEvent) && isAlreadyPinnedInDirectionOfGesture(wheelEvent, ScrollEventAxis::Vertical);
+#if ENABLE(CSS_SCROLL_SNAP)
+        if (!eventPreventsStretching)
+            eventPreventsStretching = gestureShouldBeginSnap(wheelEvent, m_scrollableArea->verticalSnapOffsets());
+#endif
         return scrollbarsAllowStretching && !eventPreventsStretching;
     }
     case ScrollElasticityNone:
@@ -1179,6 +1199,10 @@ bool ScrollAnimatorMac::allowsHorizontalStretching(const PlatformWheelEvent& whe
         Scrollbar* vScroller = m_scrollableArea->verticalScrollbar();
         bool scrollbarsAllowStretching = ((hScroller && hScroller->enabled()) || (!vScroller || !vScroller->enabled()));
         bool eventPreventsStretching = m_scrollableArea->hasScrollableOrRubberbandableAncestor() && newGestureIsStarting(wheelEvent) && isAlreadyPinnedInDirectionOfGesture(wheelEvent, ScrollEventAxis::Horizontal);
+#if ENABLE(CSS_SCROLL_SNAP)
+        if (!eventPreventsStretching)
+            eventPreventsStretching = gestureShouldBeginSnap(wheelEvent, m_scrollableArea->horizontalSnapOffsets());
+#endif
         return scrollbarsAllowStretching && !eventPreventsStretching;
     }
     case ScrollElasticityNone:
@@ -1257,7 +1281,7 @@ void ScrollAnimatorMac::stopSnapRubberbandTimer()
     m_snapRubberBandTimer.stop();
 }
 
-void ScrollAnimatorMac::snapRubberBandTimerFired(Timer<ScrollAnimatorMac>&)
+void ScrollAnimatorMac::snapRubberBandTimerFired()
 {
     m_scrollElasticityController.snapRubberBandTimerFired();
 }
@@ -1338,7 +1362,7 @@ void ScrollAnimatorMac::stopScrollbarPaintTimer()
     m_initialScrollbarPaintTimer.stop();
 }
 
-void ScrollAnimatorMac::initialScrollbarPaintTimerFired(Timer<ScrollAnimatorMac>&)
+void ScrollAnimatorMac::initialScrollbarPaintTimerFired()
 {
     // To force the scrollbars to flash, we have to call hide first. Otherwise, the ScrollbarPainterController
     // might think that the scrollbars are already showing and bail early.
@@ -1362,7 +1386,7 @@ void ScrollAnimatorMac::sendContentAreaScrolled(const FloatSize& delta)
         [m_scrollbarPainterController contentAreaScrolled];
 }
 
-void ScrollAnimatorMac::sendContentAreaScrolledTimerFired(Timer<ScrollAnimatorMac>&)
+void ScrollAnimatorMac::sendContentAreaScrolledTimerFired()
 {
     sendContentAreaScrolled(m_contentAreaScrolledTimerScrollDelta);
     m_contentAreaScrolledTimerScrollDelta = FloatSize();

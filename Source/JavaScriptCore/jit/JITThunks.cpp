@@ -36,7 +36,7 @@
 namespace JSC {
 
 JITThunks::JITThunks()
-    : m_hostFunctionStubMap(adoptPtr(new HostFunctionStubMap))
+    : m_hostFunctionStubMap(std::make_unique<HostFunctionStubMap>())
 {
 }
 
@@ -96,16 +96,15 @@ NativeExecutable* JITThunks::hostFunctionStub(VM* vm, NativeFunction function, N
 NativeExecutable* JITThunks::hostFunctionStub(VM* vm, NativeFunction function, ThunkGenerator generator, Intrinsic intrinsic)
 {
     ASSERT(!isCompilationThread());    
+    ASSERT(vm->canUseJIT());
 
     if (NativeExecutable* nativeExecutable = m_hostFunctionStubMap->get(std::make_pair(function, &callHostFunctionAsConstructor)))
         return nativeExecutable;
 
     RefPtr<JITCode> forCall;
     if (generator) {
-        if (vm->canUseJIT()) {
-            MacroAssemblerCodeRef entry = generator(vm);
-            forCall = adoptRef(new DirectJITCode(entry, entry.code(), JITCode::HostCallThunk));
-        }
+        MacroAssemblerCodeRef entry = generator(vm);
+        forCall = adoptRef(new DirectJITCode(entry, entry.code(), JITCode::HostCallThunk));
     } else
         forCall = adoptRef(new NativeJITCode(JIT::compileCTINativeCall(vm, function), JITCode::HostCallThunk));
     
@@ -118,7 +117,7 @@ NativeExecutable* JITThunks::hostFunctionStub(VM* vm, NativeFunction function, T
 
 void JITThunks::clearHostFunctionStubs()
 {
-    m_hostFunctionStubMap.clear();
+    m_hostFunctionStubMap = nullptr;
 }
 
 } // namespace JSC

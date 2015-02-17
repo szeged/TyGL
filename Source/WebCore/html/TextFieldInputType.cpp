@@ -51,6 +51,7 @@
 #include "TextControlInnerElements.h"
 #include "TextEvent.h"
 #include "TextIterator.h"
+#include "TextNodeTraversal.h"
 #include "WheelEvent.h"
 
 namespace WebCore {
@@ -84,6 +85,18 @@ bool TextFieldInputType::isMouseFocusable() const
 
 bool TextFieldInputType::isTextField() const
 {
+    return true;
+}
+
+bool TextFieldInputType::isEmptyValue() const
+{
+    TextControlInnerTextElement* innerText = innerTextElement();
+    ASSERT(innerText);
+
+    for (Text* text = TextNodeTraversal::firstWithin(*innerText); text; text = TextNodeTraversal::next(*text, innerText)) {
+        if (text->length())
+            return false;
+    }
     return true;
 }
 
@@ -177,21 +190,21 @@ void TextFieldInputType::forwardEvent(Event* event)
         || event->type() == eventNames().blurEvent
         || event->type() == eventNames().focusEvent)
     {
-        element().document().updateStyleIfNeededForNode(element());
+        element().document().updateStyleIfNeeded();
 
         if (element().renderer()) {
-            RenderTextControlSingleLine* renderTextControl = toRenderTextControlSingleLine(element().renderer());
+            RenderTextControlSingleLine& renderTextControl = downcast<RenderTextControlSingleLine>(*element().renderer());
             if (event->type() == eventNames().blurEvent) {
                 if (RenderTextControlInnerBlock* innerTextRenderer = innerTextElement()->renderer()) {
                     if (RenderLayer* innerLayer = innerTextRenderer->layer()) {
-                        IntSize scrollOffset(!renderTextControl->style().isLeftToRightDirection() ? innerLayer->scrollWidth() : 0, 0);
+                        IntSize scrollOffset(!renderTextControl.style().isLeftToRightDirection() ? innerLayer->scrollWidth() : 0, 0);
                         innerLayer->scrollToOffset(scrollOffset, RenderLayer::ScrollOffsetClamped);
                     }
                 }
 
-                renderTextControl->capsLockStateMayHaveChanged();
+                renderTextControl.capsLockStateMayHaveChanged();
             } else if (event->type() == eventNames().focusEvent)
-                renderTextControl->capsLockStateMayHaveChanged();
+                renderTextControl.capsLockStateMayHaveChanged();
 
             element().forwardEvent(event);
         }
@@ -210,7 +223,7 @@ bool TextFieldInputType::shouldSubmitImplicitly(Event* event)
         || InputType::shouldSubmitImplicitly(event);
 }
 
-RenderPtr<RenderElement> TextFieldInputType::createInputRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> TextFieldInputType::createInputRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderTextControlSingleLine>(element(), WTF::move(style));
 }
@@ -242,6 +255,7 @@ void TextFieldInputType::createShadowSubtree()
     m_innerText = TextControlInnerTextElement::create(document);
     if (!createsContainer) {
         element().userAgentShadowRoot()->appendChild(m_innerText, IGNORE_EXCEPTION);
+        updatePlaceholderText();
         return;
     }
 
@@ -253,6 +267,8 @@ void TextFieldInputType::createShadowSubtree()
     m_innerBlock = TextControlInnerElement::create(document);
     m_innerBlock->appendChild(m_innerText, IGNORE_EXCEPTION);
     m_container->appendChild(m_innerBlock, IGNORE_EXCEPTION);
+
+    updatePlaceholderText();
 
     if (shouldHaveSpinButton) {
         m_innerSpinButton = SpinButtonElement::create(document, *this);
@@ -368,7 +384,10 @@ void TextFieldInputType::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent* 
     unsigned selectionLength = 0;
     if (element().focused()) {
         ASSERT(enclosingTextFormControl(element().document().frame()->selection().selection().start()) == &element());
-        selectionLength = numGraphemeClusters(innerText.substring(element().selectionStart(), element().selectionEnd()));
+        int selectionStart = element().selectionStart();
+        ASSERT(selectionStart <= element().selectionEnd());
+        int selectionCodeUnitCount = element().selectionEnd() - selectionStart;
+        selectionLength = selectionCodeUnitCount ? numGraphemeClusters(innerText.substring(selectionStart, selectionCodeUnitCount)) : 0;
     }
     ASSERT(oldLength >= selectionLength);
 

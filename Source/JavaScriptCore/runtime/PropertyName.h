@@ -93,7 +93,7 @@ public:
         : m_impl(static_cast<AtomicStringImpl*>(propertyName.uid()))
     {
         ASSERT(m_impl);
-        ASSERT(m_impl->isEmptyUnique());
+        ASSERT(m_impl->isUnique());
         ASSERT(m_impl->isAtomic());
     }
 
@@ -104,7 +104,7 @@ public:
 
     AtomicStringImpl* publicName() const
     {
-        return m_impl->isEmptyUnique() ? nullptr : m_impl;
+        return m_impl->isUnique() ? nullptr : m_impl;
     }
 
     static const uint32_t NotAnIndex = UINT_MAX;
@@ -139,6 +139,11 @@ inline bool operator==(const Identifier& a, PropertyName b)
 inline bool operator==(PropertyName a, PropertyName b)
 {
     return a.uid() == b.uid();
+}
+
+inline bool operator==(PropertyName a, const char* b)
+{
+    return equal(a.uid(), b);
 }
 
 inline bool operator!=(PropertyName a, const Identifier& b)

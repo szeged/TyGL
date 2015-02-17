@@ -86,13 +86,13 @@ RemoteLayerTreeTransaction::LayerProperties::LayerProperties()
     , timeOffset(0)
     , speed(1)
     , contentsScale(1)
+    , cornerRadius(0)
     , borderWidth(0)
     , opacity(1)
     , backgroundColor(Color::transparent)
     , borderColor(Color::black)
     , edgeAntialiasingMask(kCALayerLeftEdge | kCALayerRightEdge | kCALayerBottomEdge | kCALayerTopEdge)
     , customAppearance(GraphicsLayer::NoCustomAppearance)
-    , customBehavior(GraphicsLayer::NoCustomBehavior)
     , minificationFilter(PlatformCALayer::FilterType::Linear)
     , magnificationFilter(PlatformCALayer::FilterType::Linear)
     , blendMode(BlendModeNormal)
@@ -120,13 +120,13 @@ RemoteLayerTreeTransaction::LayerProperties::LayerProperties(const LayerProperti
     , timeOffset(other.timeOffset)
     , speed(other.speed)
     , contentsScale(other.contentsScale)
+    , cornerRadius(other.cornerRadius)
     , borderWidth(other.borderWidth)
     , opacity(other.opacity)
     , backgroundColor(other.backgroundColor)
     , borderColor(other.borderColor)
     , edgeAntialiasingMask(other.edgeAntialiasingMask)
     , customAppearance(other.customAppearance)
-    , customBehavior(other.customBehavior)
     , minificationFilter(other.minificationFilter)
     , magnificationFilter(other.magnificationFilter)
     , blendMode(other.blendMode)
@@ -218,6 +218,12 @@ void RemoteLayerTreeTransaction::LayerProperties::encode(IPC::ArgumentEncoder& e
     if (changedProperties & ContentsScaleChanged)
         encoder << contentsScale;
 
+    if (changedProperties & CornerRadiusChanged)
+        encoder << cornerRadius;
+
+    if (changedProperties & ShapeRoundedRectChanged)
+        encoder << *shapeRoundedRect;
+
     if (changedProperties & MinificationFilterChanged)
         encoder.encodeEnum(minificationFilter);
 
@@ -248,9 +254,6 @@ void RemoteLayerTreeTransaction::LayerProperties::encode(IPC::ArgumentEncoder& e
 
     if (changedProperties & CustomAppearanceChanged)
         encoder.encodeEnum(customAppearance);
-
-    if (changedProperties & CustomBehaviorChanged)
-        encoder.encodeEnum(customBehavior);
 }
 
 bool RemoteLayerTreeTransaction::LayerProperties::decode(IPC::ArgumentDecoder& decoder, LayerProperties& result)
@@ -377,6 +380,19 @@ bool RemoteLayerTreeTransaction::LayerProperties::decode(IPC::ArgumentDecoder& d
             return false;
     }
 
+    if (result.changedProperties & CornerRadiusChanged) {
+        if (!decoder.decode(result.cornerRadius))
+            return false;
+    }
+
+    if (result.changedProperties & ShapeRoundedRectChanged) {
+        FloatRoundedRect roundedRect;
+        if (!decoder.decode(roundedRect))
+            return false;
+        
+        result.shapeRoundedRect = std::make_unique<FloatRoundedRect>(roundedRect);
+    }
+
     if (result.changedProperties & MinificationFilterChanged) {
         if (!decoder.decodeEnum(result.minificationFilter))
             return false;
@@ -433,15 +449,17 @@ bool RemoteLayerTreeTransaction::LayerProperties::decode(IPC::ArgumentDecoder& d
             return false;
     }
 
-    if (result.changedProperties & CustomBehaviorChanged) {
-        if (!decoder.decodeEnum(result.customBehavior))
-            return false;
-    }
-
     return true;
 }
 
 RemoteLayerTreeTransaction::RemoteLayerTreeTransaction()
+    : m_pageScaleFactor(1)
+    , m_minimumScaleFactor(1)
+    , m_maximumScaleFactor(1)
+    , m_renderTreeSize(0)
+    , m_transactionID(0)
+    , m_scaleWasSetByUIProcess(false)
+    , m_allowsUserScaling(false)
 {
 }
 
@@ -466,6 +484,9 @@ void RemoteLayerTreeTransaction::encode(IPC::ArgumentEncoder& encoder) const
     encoder << m_layerIDsWithNewlyUnreachableBackingStore;
 
     encoder << m_contentsSize;
+#if PLATFORM(MAC)
+    encoder << m_scrollPosition;
+#endif
     encoder << m_pageExtendedBackgroundColor;
     encoder << m_pageScaleFactor;
     encoder << m_minimumScaleFactor;
@@ -527,6 +548,11 @@ bool RemoteLayerTreeTransaction::decode(IPC::ArgumentDecoder& decoder, RemoteLay
 
     if (!decoder.decode(result.m_contentsSize))
         return false;
+
+#if PLATFORM(MAC)
+    if (!decoder.decode(result.m_scrollPosition))
+        return false;
+#endif
     
     if (!decoder.decode(result.m_pageExtendedBackgroundColor))
         return false;
@@ -599,6 +625,7 @@ public:
 
     RemoteLayerTreeTextStream& operator<<(const TransformationMatrix&);
     RemoteLayerTreeTextStream& operator<<(PlatformCALayer::FilterType);
+    RemoteLayerTreeTextStream& operator<<(const FloatRoundedRect&);
     RemoteLayerTreeTextStream& operator<<(FloatPoint3D);
     RemoteLayerTreeTextStream& operator<<(Color);
     RemoteLayerTreeTextStream& operator<<(FloatRect);
@@ -651,6 +678,25 @@ RemoteLayerTreeTextStream& RemoteLayerTreeTextStream::operator<<(const Transform
     return ts;
 }
 
+RemoteLayerTreeTextStream& RemoteLayerTreeTextStream::operator<<(const FloatRoundedRect& roundedRect)
+{
+    RemoteLayerTreeTextStream& ts = *this;
+    ts << roundedRect.rect().x() << " " << roundedRect.rect().y() << " " << roundedRect.rect().width() << " " << roundedRect.rect().height() << "\n";
+
+    ts.increaseIndent();
+    ts.writeIndent();
+    ts << "topLeft=" << roundedRect.topLeftCorner().width() << " " << roundedRect.topLeftCorner().height() << "\n";
+    ts.writeIndent();
+    ts << "topRight=" << roundedRect.topRightCorner().width() << " " << roundedRect.topRightCorner().height() << "\n";
+    ts.writeIndent();
+    ts << "bottomLeft=" << roundedRect.bottomLeftCorner().width() << " " << roundedRect.bottomLeftCorner().height() << "\n";
+    ts.writeIndent();
+    ts << "bottomRight=" << roundedRect.bottomRightCorner().width() << " " << roundedRect.bottomRightCorner().height();
+    ts.decreaseIndent();
+
+    return ts;
+}
+
 RemoteLayerTreeTextStream& RemoteLayerTreeTextStream::operator<<(PlatformCALayer::FilterType filterType)
 {
     RemoteLayerTreeTextStream& ts = *this;
@@ -694,52 +740,52 @@ RemoteLayerTreeTextStream& RemoteLayerTreeTextStream::operator<<(const FilterOpe
         ts << "reference";
         break;
     case FilterOperation::GRAYSCALE: {
-        const BasicColorMatrixFilterOperation& colorMatrixFilter = toBasicColorMatrixFilterOperation(filter);
+        const auto& colorMatrixFilter = downcast<BasicColorMatrixFilterOperation>(filter);
         ts << "grayscale(" << colorMatrixFilter.amount() << ")";
         break;
     }
     case FilterOperation::SEPIA: {
-        const BasicColorMatrixFilterOperation& colorMatrixFilter = toBasicColorMatrixFilterOperation(filter);
+        const auto& colorMatrixFilter = downcast<BasicColorMatrixFilterOperation>(filter);
         ts << "sepia(" << colorMatrixFilter.amount() << ")";
         break;
     }
     case FilterOperation::SATURATE: {
-        const BasicColorMatrixFilterOperation& colorMatrixFilter = toBasicColorMatrixFilterOperation(filter);
+        const auto& colorMatrixFilter = downcast<BasicColorMatrixFilterOperation>(filter);
         ts << "saturate(" << colorMatrixFilter.amount() << ")";
         break;
     }
     case FilterOperation::HUE_ROTATE: {
-        const BasicColorMatrixFilterOperation& colorMatrixFilter = toBasicColorMatrixFilterOperation(filter);
+        const auto& colorMatrixFilter = downcast<BasicColorMatrixFilterOperation>(filter);
         ts << "hue-rotate(" << colorMatrixFilter.amount() << ")";
         break;
     }
     case FilterOperation::INVERT: {
-        const BasicComponentTransferFilterOperation& componentTransferFilter = toBasicComponentTransferFilterOperation(filter);
+        const auto& componentTransferFilter = downcast<BasicComponentTransferFilterOperation>(filter);
         ts << "invert(" << componentTransferFilter.amount() << ")";
         break;
     }
     case FilterOperation::OPACITY: {
-        const BasicComponentTransferFilterOperation& componentTransferFilter = toBasicComponentTransferFilterOperation(filter);
+        const auto& componentTransferFilter = downcast<BasicComponentTransferFilterOperation>(filter);
         ts << "opacity(" << componentTransferFilter.amount() << ")";
         break;
     }
     case FilterOperation::BRIGHTNESS: {
-        const BasicComponentTransferFilterOperation& componentTransferFilter = toBasicComponentTransferFilterOperation(filter);
+        const auto& componentTransferFilter = downcast<BasicComponentTransferFilterOperation>(filter);
         ts << "brightness(" << componentTransferFilter.amount() << ")";
         break;
     }
     case FilterOperation::CONTRAST: {
-        const BasicComponentTransferFilterOperation& componentTransferFilter = toBasicComponentTransferFilterOperation(filter);
+        const auto& componentTransferFilter = downcast<BasicComponentTransferFilterOperation>(filter);
         ts << "contrast(" << componentTransferFilter.amount() << ")";
         break;
     }
     case FilterOperation::BLUR: {
-        const BlurFilterOperation& blurFilter = toBlurFilterOperation(filter);
+        const auto& blurFilter = downcast<BlurFilterOperation>(filter);
         ts << "blur(" << floatValueForLength(blurFilter.stdDeviation(), 0) << ")";
         break;
     }
     case FilterOperation::DROP_SHADOW: {
-        const DropShadowFilterOperation& dropShadowFilter = toDropShadowFilterOperation(filter);
+        const auto& dropShadowFilter = downcast<DropShadowFilterOperation>(filter);
         ts << "drop-shadow(" << dropShadowFilter.x() << " " << dropShadowFilter.y() << " " << dropShadowFilter.location() << " ";
         ts << dropShadowFilter.color() << ")";
         break;
@@ -748,7 +794,7 @@ RemoteLayerTreeTextStream& RemoteLayerTreeTextStream::operator<<(const FilterOpe
         ts << "passthrough";
         break;
     case FilterOperation::DEFAULT: {
-        const DefaultFilterOperation& defaultFilter = toDefaultFilterOperation(filter);
+        const auto& defaultFilter = downcast<DefaultFilterOperation>(filter);
         ts << "default type=" << (int)defaultFilter.representedType();
         break;
     }
@@ -779,6 +825,7 @@ RemoteLayerTreeTextStream& RemoteLayerTreeTextStream::operator<<(BlendMode blend
     case BlendModeSaturation: ts << "saturation"; break;
     case BlendModeColor: ts << "color"; break;
     case BlendModeLuminosity: ts << "luminosity"; break;
+    case BlendModePlusDarker: ts << "plus-darker"; break;
     }
     return ts;
 }
@@ -1083,6 +1130,12 @@ static void dumpChangedLayers(RemoteLayerTreeTextStream& ts, const RemoteLayerTr
         if (layerProperties.changedProperties & RemoteLayerTreeTransaction::ContentsScaleChanged)
             dumpProperty(ts, "contentsScale", layerProperties.contentsScale);
 
+        if (layerProperties.changedProperties & RemoteLayerTreeTransaction::CornerRadiusChanged)
+            dumpProperty(ts, "cornerRadius", layerProperties.cornerRadius);
+
+        if (layerProperties.changedProperties & RemoteLayerTreeTransaction::ShapeRoundedRectChanged)
+            dumpProperty(ts, "shapeRect", layerProperties.shapeRoundedRect ? *layerProperties.shapeRoundedRect : FloatRoundedRect());
+
         if (layerProperties.changedProperties & RemoteLayerTreeTransaction::MinificationFilterChanged)
             dumpProperty(ts, "minificationFilter", layerProperties.minificationFilter);
 
@@ -1121,9 +1174,6 @@ static void dumpChangedLayers(RemoteLayerTreeTextStream& ts, const RemoteLayerTr
 
         if (layerProperties.changedProperties & RemoteLayerTreeTransaction::CustomAppearanceChanged)
             dumpProperty(ts, "customAppearance", layerProperties.customAppearance);
-
-        if (layerProperties.changedProperties & RemoteLayerTreeTransaction::CustomBehaviorChanged)
-            dumpProperty(ts, "customBehavior", layerProperties.customBehavior);
 
         ts << ")";
 
@@ -1180,11 +1230,20 @@ CString RemoteLayerTreeTransaction::description() const
             case PlatformCALayer::LayerTypeRootLayer:
                 ts << "root-layer";
                 break;
+            case PlatformCALayer::LayerTypeBackdropLayer:
+                ts << "backdrop-layer";
+                break;
             case PlatformCALayer::LayerTypeAVPlayerLayer:
                 ts << "av-player-layer (context-id " << createdLayer.hostingContextID << ")";
                 break;
             case PlatformCALayer::LayerTypeWebGLLayer:
                 ts << "web-gl-layer (context-id " << createdLayer.hostingContextID << ")";
+                break;
+            case PlatformCALayer::LayerTypeShapeLayer:
+                ts << "shape-layer";
+                break;
+            case PlatformCALayer::LayerTypeScrollingLayer:
+                ts << "scrolling-layer";
                 break;
             case PlatformCALayer::LayerTypeCustom:
                 ts << "custom-layer (context-id " << createdLayer.hostingContextID << ")";

@@ -54,7 +54,7 @@
 
 #if ENABLE(WEBGL)    
 #include "WebGLContextAttributes.h"
-#include "WebGLRenderingContext.h"
+#include "WebGLRenderingContextBase.h"
 #endif
 
 namespace WebCore {
@@ -86,14 +86,14 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document& doc
     ASSERT(hasTagName(canvasTag));
 }
 
-PassRefPtr<HTMLCanvasElement> HTMLCanvasElement::create(Document& document)
+Ref<HTMLCanvasElement> HTMLCanvasElement::create(Document& document)
 {
-    return adoptRef(new HTMLCanvasElement(canvasTag, document));
+    return adoptRef(*new HTMLCanvasElement(canvasTag, document));
 }
 
-PassRefPtr<HTMLCanvasElement> HTMLCanvasElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLCanvasElement> HTMLCanvasElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLCanvasElement(tagName, document));
+    return adoptRef(*new HTMLCanvasElement(tagName, document));
 }
 
 HTMLCanvasElement::~HTMLCanvasElement()
@@ -111,7 +111,7 @@ void HTMLCanvasElement::parseAttribute(const QualifiedName& name, const AtomicSt
     HTMLElement::parseAttribute(name, value);
 }
 
-RenderPtr<RenderElement> HTMLCanvasElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLCanvasElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     Frame* frame = document().frame();
     if (frame && frame->script().canExecuteScripts(NotAboutToExecuteScript)) {
@@ -212,7 +212,7 @@ CanvasRenderingContext* HTMLCanvasElement::getContext(const String& type, Canvas
             if (m_context && !m_context->is3d())
                 return nullptr;
             if (!m_context) {
-                m_context = WebGLRenderingContext::create(this, static_cast<WebGLContextAttributes*>(attrs));
+                m_context = WebGLRenderingContextBase::create(this, static_cast<WebGLContextAttributes*>(attrs), type);
                 if (m_context) {
                     // Need to make sure a RenderLayer and compositing layer get created for the Canvas
                     setNeedsStyleRecalc(SyntheticStyleChange);
@@ -255,7 +255,7 @@ bool HTMLCanvasElement::is2dType(const String& type)
 bool HTMLCanvasElement::is3dType(const String& type)
 {
     // Retain support for the legacy "webkit-3d" name.
-    return type == "webgl" || type == "experimental-webgl" || type == "webkit-3d";
+    return type == "webgl" || type == "experimental-webgl" || type == "webkit-3d" || type == "experimental-webgl2";
 }
 #endif
 
@@ -279,6 +279,9 @@ void HTMLCanvasElement::didDraw(const FloatRect& rect)
 
 void HTMLCanvasElement::notifyObserversCanvasChanged(const FloatRect& rect)
 {
+    // Choke point for canvas drawing; notify DOMTimer of the event.
+    DOMTimer::scriptDidCauseElementRepaint(*this);
+
     for (auto it = m_observers.begin(), end = m_observers.end(); it != end; ++it)
         (*it)->canvasChanged(*this, rect);
 }
@@ -324,13 +327,13 @@ void HTMLCanvasElement::reset()
 
 #if ENABLE(WEBGL)
     if (is3D() && oldSize != size())
-        static_cast<WebGLRenderingContext*>(m_context.get())->reshape(width(), height());
+        static_cast<WebGLRenderingContextBase*>(m_context.get())->reshape(width(), height());
 #endif
 
     if (auto renderer = this->renderer()) {
         if (m_rendererIsCanvas) {
             if (oldSize != size()) {
-                toRenderHTMLCanvas(renderer)->canvasSizeChanged();
+                downcast<RenderHTMLCanvas>(*renderer).canvasSizeChanged();
                 if (renderBox() && renderBox()->hasAcceleratedCompositing())
                     renderBox()->contentChanged(CanvasChanged);
             }
@@ -391,7 +394,7 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const LayoutRect& r, boo
 
 #if ENABLE(WEBGL)    
     if (is3D())
-        static_cast<WebGLRenderingContext*>(m_context.get())->markLayerComposited();
+        static_cast<WebGLRenderingContextBase*>(m_context.get())->markLayerComposited();
 #endif
 }
 
@@ -466,13 +469,13 @@ String HTMLCanvasElement::toDataURL(const String& mimeType, const double* qualit
     return buffer()->toDataURL(encodingMimeType, quality);
 }
 
-PassRefPtr<ImageData> HTMLCanvasElement::getImageData()
+RefPtr<ImageData> HTMLCanvasElement::getImageData()
 {
 #if ENABLE(WEBGL)
     if (!is3D())
         return nullptr;
 
-    WebGLRenderingContext* ctx = static_cast<WebGLRenderingContext*>(m_context.get());
+    WebGLRenderingContextBase* ctx = static_cast<WebGLRenderingContextBase*>(m_context.get());
 
     return ctx->paintRenderingResultsToImageData();
 #else

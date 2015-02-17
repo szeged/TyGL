@@ -41,6 +41,7 @@
 #include "JSMainThreadExecState.h"
 #include "SegmentedString.h"
 #include "DocumentParser.h"
+#include <interpreter/StackVisitor.h>
 #include <runtime/Error.h>
 #include <runtime/JSCell.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -55,6 +56,32 @@ bool JSHTMLDocument::canGetItemsForName(ExecState*, HTMLDocument* document, Prop
 {
     AtomicStringImpl* atomicPropertyName = propertyName.publicName();
     return atomicPropertyName && document->hasDocumentNamedItem(*atomicPropertyName);
+}
+
+bool JSHTMLDocument::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+{
+    JSHTMLDocument* thisObject = jsCast<JSHTMLDocument*>(object);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
+
+    if (propertyName == "open") {
+        if (Base::getOwnPropertySlot(thisObject, exec, propertyName, slot))
+            return true;
+
+        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsHTMLDocumentPrototypeFunctionOpen, 2>);
+        return true;
+    }
+
+    if (canGetItemsForName(exec, &thisObject->impl(), propertyName)) {
+        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, thisObject->nameGetter);
+        return true;
+    }
+
+    if (const HashTableValue* entry = JSHTMLDocument::info()->staticPropHashTable->entry(propertyName)) {
+        slot.setCacheableCustom(thisObject, entry->attributes(), entry->propertyGetter());
+        return true;
+    }
+
+    return Base::getOwnPropertySlot(thisObject, exec, propertyName, slot);
 }
 
 EncodedJSValue JSHTMLDocument::nameGetter(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName propertyName)
@@ -99,6 +126,17 @@ void JSHTMLDocument::setAll(ExecState* exec, JSValue value)
     putDirect(exec->vm(), Identifier(exec, "all"), value);
 }
 
+static Document* findCallingDocument(ExecState* exec)
+{
+    CallerFunctor functor;
+    exec->iterate(functor);
+    CallFrame* callerFrame = functor.callerFrame();
+    if (!callerFrame)
+        return nullptr;
+
+    return asJSDOMWindow(functor.callerFrame()->lexicalGlobalObject())->impl().document();
+}
+
 // Custom functions
 
 JSValue JSHTMLDocument::open(ExecState* exec)
@@ -130,8 +168,9 @@ JSValue JSHTMLDocument::open(ExecState* exec)
 
 enum NewlineRequirement { DoNotAddNewline, DoAddNewline };
 
-static inline void documentWrite(ExecState* exec, HTMLDocument* document, NewlineRequirement addNewline)
+static inline void documentWrite(ExecState* exec, JSHTMLDocument* thisDocument, NewlineRequirement addNewline)
 {
+    HTMLDocument* document = &thisDocument->impl();
     // DOM only specifies single string argument, but browsers allow multiple or no arguments.
 
     size_t size = exec->argumentCount();
@@ -151,19 +190,19 @@ static inline void documentWrite(ExecState* exec, HTMLDocument* document, Newlin
     if (addNewline)
         segmentedString.append(SegmentedString(String(&newlineCharacter, 1)));
 
-    Document* activeDocument = asJSDOMWindow(exec->lexicalGlobalObject())->impl().document();
+    Document* activeDocument = findCallingDocument(exec);
     document->write(segmentedString, activeDocument);
 }
 
 JSValue JSHTMLDocument::write(ExecState* exec)
 {
-    documentWrite(exec, &impl(), DoNotAddNewline);
+    documentWrite(exec, this, DoNotAddNewline);
     return jsUndefined();
 }
 
 JSValue JSHTMLDocument::writeln(ExecState* exec)
 {
-    documentWrite(exec, &impl(), DoAddNewline);
+    documentWrite(exec, this, DoAddNewline);
     return jsUndefined();
 }
 

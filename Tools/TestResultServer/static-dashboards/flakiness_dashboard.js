@@ -43,16 +43,16 @@ var PLATFORMS = {
             'MAC': {
                 expectationsDirectory: 'mac',
                 subPlatforms: {
-                    'MOUNTAINLION': {
-                        subPlatforms: {
-                            'WK1': { fallbackPlatforms: ['APPLE_MAC_MOUNTAINLION', 'APPLE_MAC'] },
-                            'WK2': { fallbackPlatforms: ['APPLE_MAC_MOUNTAINLION', 'APPLE_MAC', 'WK2'], expectationsDirectory: 'mac-wk2'}
-                        }
-                    },
                     'MAVERICKS': {
                         subPlatforms: {
                             'WK1': { fallbackPlatforms: ['APPLE_MAC_MAVERICKS', 'APPLE_MAC'] },
                             'WK2': { fallbackPlatforms: ['APPLE_MAC_MAVERICKS', 'APPLE_MAC', 'WK2'], expectationsDirectory: 'mac-wk2'}
+                        }
+                    },
+                    'YOSEMITE': {
+                        subPlatforms: {
+                            'WK1': { fallbackPlatforms: ['APPLE_MAC_YOSEMITE', 'APPLE_MAC'] },
+                            'WK2': { fallbackPlatforms: ['APPLE_MAC_YOSEMITE', 'APPLE_MAC', 'WK2'], expectationsDirectory: 'mac-wk2'}
                         }
                     },
                 }
@@ -348,10 +348,10 @@ function determineBuilderPlatform(builderNameUpperCase)
     if (string.contains(builderNameUpperCase, 'WIN XP'))
         return 'APPLE_WIN_XP';
 
+    if (string.contains(builderNameUpperCase, 'YOSEMITE'))
+        return determineWKPlatform(builderNameUpperCase, 'APPLE_YOSEMITE');
     if (string.contains(builderNameUpperCase, 'MAVERICKS'))
         return determineWKPlatform(builderNameUpperCase, 'APPLE_MAVERICKS');
-    if (string.contains(builderNameUpperCase, 'MOUNTAINLION'))
-        return determineWKPlatform(builderNameUpperCase, 'APPLE_MAC_MOUNTAINLION');
     if (string.contains(builderNameUpperCase, 'LION'))
         return determineWKPlatform(builderNameUpperCase, 'APPLE_MAC_LION');
     if (string.contains(builderNameUpperCase, 'GTK LINUX'))
@@ -691,6 +691,8 @@ function getParsedExpectations(data)
             'SnowLeopard': 'SNOWLEOPARD',
             'Lion': 'LION',
             'MountainLion': 'MOUNTAINLION',
+            'Mavericks': 'MAVERICKS',
+            'Yosemite': 'YOSEMITE',
             'Win7': 'WIN7',
             'XP': 'XP',
             'Vista': 'VISTA',

@@ -51,9 +51,9 @@ AccessibilityTableRow::~AccessibilityTableRow()
 {
 }
 
-PassRefPtr<AccessibilityTableRow> AccessibilityTableRow::create(RenderObject* renderer)
+Ref<AccessibilityTableRow> AccessibilityTableRow::create(RenderObject* renderer)
 {
-    return adoptRef(new AccessibilityTableRow(renderer));
+    return adoptRef(*new AccessibilityTableRow(renderer));
 }
 
 AccessibilityRole AccessibilityTableRow::determineAccessibilityRole()
@@ -61,11 +61,8 @@ AccessibilityRole AccessibilityTableRow::determineAccessibilityRole()
     if (!isTableRow())
         return AccessibilityRenderObject::determineAccessibilityRole();
 
-    m_ariaRole = determineAriaRoleAttribute();
-
-    AccessibilityRole ariaRole = ariaRoleAttribute();
-    if (ariaRole != UnknownRole)
-        return ariaRole;
+    if ((m_ariaRole = determineAriaRoleAttribute()) != UnknownRole)
+        return m_ariaRole;
 
     return RowRole;
 }
@@ -73,10 +70,7 @@ AccessibilityRole AccessibilityTableRow::determineAccessibilityRole()
 bool AccessibilityTableRow::isTableRow() const
 {
     AccessibilityObject* table = parentTable();
-    if (!table || !table->isAccessibilityTable())
-        return false;
-    
-    return true;
+    return is<AccessibilityTable>(table)  && downcast<AccessibilityTable>(*table).isExposableThroughAccessibility();
 }
     
 AccessibilityObject* AccessibilityTableRow::observableObject() const
@@ -106,8 +100,12 @@ AccessibilityTable* AccessibilityTableRow::parentTable() const
     for (AccessibilityObject* parent = parentObject(); parent; parent = parent->parentObject()) {
         // If this is a table object, but not an accessibility table, we should stop because we don't want to
         // choose another ancestor table as this row's table.
-        if (parent->isTable())
-            return parent->isAccessibilityTable() ? toAccessibilityTable(parent) : 0;
+        if (is<AccessibilityTable>(*parent)) {
+            auto& parentTable = downcast<AccessibilityTable>(*parent);
+            if (parentTable.isExposableThroughAccessibility())
+                return &parentTable;
+            break;
+        }
     }
     
     return nullptr;
@@ -124,10 +122,10 @@ AccessibilityObject* AccessibilityTableRow::headerObject()
     
     // check the first element in the row to see if it is a TH element
     AccessibilityObject* cell = rowChildren[0].get();
-    if (!cell->isTableCell())
+    if (!is<AccessibilityTableCell>(*cell))
         return nullptr;
     
-    RenderObject* cellRenderer = toAccessibilityTableCell(cell)->renderer();
+    RenderObject* cellRenderer = downcast<AccessibilityTableCell>(*cell).renderer();
     if (!cellRenderer)
         return nullptr;
     

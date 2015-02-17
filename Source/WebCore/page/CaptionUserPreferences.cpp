@@ -35,6 +35,8 @@
 #include "Settings.h"
 #include "TextTrackList.h"
 #include "UserContentController.h"
+#include "UserContentTypes.h"
+#include "UserStyleSheet.h"
 #include "UserStyleSheetTypes.h"
 
 namespace WebCore {
@@ -42,7 +44,7 @@ namespace WebCore {
 CaptionUserPreferences::CaptionUserPreferences(PageGroup& group)
     : m_pageGroup(group)
     , m_displayMode(ForcedOnly)
-    , m_timer(this, &CaptionUserPreferences::timerFired)
+    , m_timer(*this, &CaptionUserPreferences::timerFired)
     , m_testingMode(false)
     , m_havePreferences(false)
 {
@@ -52,7 +54,7 @@ CaptionUserPreferences::~CaptionUserPreferences()
 {
 }
 
-void CaptionUserPreferences::timerFired(Timer<CaptionUserPreferences>&)
+void CaptionUserPreferences::timerFired()
 {
     captionPreferencesChanged();
 }

@@ -58,9 +58,9 @@ HTMLFrameSetElement::HTMLFrameSetElement(const QualifiedName& tagName, Document&
     setHasCustomStyleResolveCallbacks();
 }
 
-PassRefPtr<HTMLFrameSetElement> HTMLFrameSetElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLFrameSetElement> HTMLFrameSetElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLFrameSetElement(tagName, document));
+    return adoptRef(*new HTMLFrameSetElement(tagName, document));
 }
 
 bool HTMLFrameSetElement::isPresentationAttribute(const QualifiedName& name) const
@@ -155,7 +155,7 @@ bool HTMLFrameSetElement::rendererIsNeeded(const RenderStyle& style)
     return style.isStyleAvailable();
 }
 
-RenderPtr<RenderElement> HTMLFrameSetElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLFrameSetElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     if (style.get().hasContent())
         return RenderElement::createFor(*this, WTF::move(style));
@@ -190,8 +190,8 @@ void HTMLFrameSetElement::willAttachRenderers()
 void HTMLFrameSetElement::defaultEventHandler(Event* event)
 {
     ASSERT(event);
-    if (is<MouseEvent>(*event) && !m_noresize && renderer() && renderer()->isFrameSet()) {
-        if (toRenderFrameSet(renderer())->userResize(downcast<MouseEvent>(event))) {
+    if (is<MouseEvent>(*event) && !m_noresize && is<RenderFrameSet>(renderer())) {
+        if (downcast<RenderFrameSet>(*renderer()).userResize(downcast<MouseEvent>(event))) {
             event->setDefaultHandled();
             return;
         }

@@ -36,6 +36,7 @@
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "ContentSecurityPolicy.h"
+#include "DiagnosticLoggingClient.h"
 #include "DiagnosticLoggingKeys.h"
 #include "Frame.h"
 #include "FrameLoader.h"
@@ -46,6 +47,7 @@
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "MIMETypeRegistry.h"
+#include "MainFrame.h"
 #include "Page.h"
 #include "PluginData.h"
 #include "PluginDocument.h"
@@ -178,7 +180,7 @@ static String findPluginMIMETypeFromURL(Page* page, const String& url)
 
 static void logPluginRequest(Page* page, const String& mimeType, const String& url, bool success)
 {
-    if (!page || !page->settings().diagnosticLoggingEnabled())
+    if (!page)
         return;
 
     String newMIMEType = mimeType;
@@ -192,14 +194,14 @@ static void logPluginRequest(Page* page, const String& mimeType, const String& u
     String pluginFile = page->pluginData().pluginFileForMimeType(newMIMEType);
     String description = !pluginFile ? newMIMEType : pluginFile;
 
-    ChromeClient& chromeClient = page->chrome().client();
-    chromeClient.logDiagnosticMessage(success ? DiagnosticLoggingKeys::pluginLoadedKey() : DiagnosticLoggingKeys::pluginLoadingFailedKey(), description, DiagnosticLoggingKeys::noopKey());
+    DiagnosticLoggingClient& diagnosticLoggingClient = page->mainFrame().diagnosticLoggingClient();
+    diagnosticLoggingClient.logDiagnosticMessage(success ? DiagnosticLoggingKeys::pluginLoadedKey() : DiagnosticLoggingKeys::pluginLoadingFailedKey(), description);
 
     if (!page->hasSeenAnyPlugin())
-        chromeClient.logDiagnosticMessage(DiagnosticLoggingKeys::pageContainsAtLeastOnePluginKey(), emptyString(), DiagnosticLoggingKeys::noopKey());
-    
+        diagnosticLoggingClient.logDiagnosticMessage(DiagnosticLoggingKeys::pageContainsAtLeastOnePluginKey(), emptyString());
+
     if (!page->hasSeenPlugin(description))
-        chromeClient.logDiagnosticMessage(DiagnosticLoggingKeys::pageContainsPluginKey(), description, DiagnosticLoggingKeys::noopKey());
+        diagnosticLoggingClient.logDiagnosticMessage(DiagnosticLoggingKeys::pageContainsPluginKey(), description);
 
     page->sawPlugin(description);
 }
@@ -328,10 +330,10 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement& ownerElement, const U
     // FIXME: Can we remove this entirely? m_isComplete normally gets set to false when a load is committed.
     frame->loader().started();
    
-    RenderObject* renderer = ownerElement.renderer();
+    auto* renderer = ownerElement.renderer();
     FrameView* view = frame->view();
-    if (renderer && renderer->isWidget() && view)
-        toRenderWidget(renderer)->setWidget(view);
+    if (is<RenderWidget>(renderer) && view)
+        downcast<RenderWidget>(*renderer).setWidget(view);
     
     m_frame.loader().checkCallImplicitClose();
     

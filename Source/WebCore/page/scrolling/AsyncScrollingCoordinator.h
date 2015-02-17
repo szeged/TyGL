@@ -48,7 +48,7 @@ class ScrollingStateTree;
 // allowing asynchronous scrolling (in another thread or process).
 class AsyncScrollingCoordinator : public ScrollingCoordinator {
 public:
-    static PassRefPtr<AsyncScrollingCoordinator> create(Page*);
+    static Ref<AsyncScrollingCoordinator> create(Page*);
     WEBCORE_EXPORT virtual ~AsyncScrollingCoordinator();
 
     ScrollingTree* scrollingTree() const { return m_scrollingTree.get(); }
@@ -88,8 +88,8 @@ private:
     
     WEBCORE_EXPORT virtual void updateViewportConstrainedNode(ScrollingNodeID, const ViewportConstraints&, GraphicsLayer*) override;
     
-    WEBCORE_EXPORT virtual void updateFrameScrollingNode(ScrollingNodeID, GraphicsLayer* scrollLayer, GraphicsLayer* scrolledContentsLayer, GraphicsLayer* counterScrollingLayer, GraphicsLayer* insetClipLayer, const ScrollingGeometry* = nullptr);
-    WEBCORE_EXPORT virtual void updateOverflowScrollingNode(ScrollingNodeID, GraphicsLayer* scrollLayer, GraphicsLayer* scrolledContentsLayer, const ScrollingGeometry* = nullptr);
+    WEBCORE_EXPORT virtual void updateFrameScrollingNode(ScrollingNodeID, GraphicsLayer* scrollLayer, GraphicsLayer* scrolledContentsLayer, GraphicsLayer* counterScrollingLayer, GraphicsLayer* insetClipLayer, const ScrollingGeometry* = nullptr) override;
+    WEBCORE_EXPORT virtual void updateOverflowScrollingNode(ScrollingNodeID, GraphicsLayer* scrollLayer, GraphicsLayer* scrolledContentsLayer, const ScrollingGeometry* = nullptr) override;
     
     virtual bool isRubberBandInProgress() const override;
     virtual void setScrollPinningBehavior(ScrollPinningBehavior) override;
@@ -105,11 +105,11 @@ private:
     void ensureRootStateNodeForFrameView(FrameView*);
     void updateMainFrameScrollLayerPosition();
 
-    void updateScrollPositionAfterAsyncScrollTimerFired(Timer<AsyncScrollingCoordinator>*);
+    void updateScrollPositionAfterAsyncScrollTimerFired();
     
     FrameView* frameViewForScrollingNode(ScrollingNodeID) const;
 
-    Timer<AsyncScrollingCoordinator> m_updateNodeScrollPositionTimer;
+    Timer m_updateNodeScrollPositionTimer;
 
     struct ScheduledScrollUpdate {
         ScheduledScrollUpdate()
@@ -140,7 +140,7 @@ private:
 
     ScheduledScrollUpdate m_scheduledScrollUpdate;
 
-    OwnPtr<ScrollingStateTree> m_scrollingStateTree;
+    std::unique_ptr<ScrollingStateTree> m_scrollingStateTree;
     RefPtr<ScrollingTree> m_scrollingTree;
 };
 

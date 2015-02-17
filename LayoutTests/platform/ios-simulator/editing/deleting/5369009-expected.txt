@@ -19,3 +19,4 @@ layer at (0,0) size 800x600
           RenderInline {SPAN} at (0,0) size 45x19
             RenderText {#text} at (35,0) size 45x19
               text run at (35,0) width 45: "World"
+caret: position 5 of child 0 {#text} of child 1 {DIV} of child 2 {DIV} of body

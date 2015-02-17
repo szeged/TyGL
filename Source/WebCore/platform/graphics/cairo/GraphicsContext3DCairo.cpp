@@ -26,9 +26,11 @@
  */
 
 #include "config.h"
-#include "GraphicsContext3D.h"
+
+#if USE(CAIRO)
 
 #if USE(3D_GRAPHICS)
+#include "GraphicsContext3D.h"
 
 #include "CairoUtilities.h"
 #include "GraphicsContext3DPrivate.h"
@@ -37,13 +39,8 @@
 #include "NotImplemented.h"
 #include "PlatformContextCairo.h"
 #include "RefPtrCairo.h"
+#include <GLSLANG/ShaderLang.h>
 #include <cairo.h>
-
-#if PLATFORM(WIN)
-#include "GLSLANG/ShaderLang.h"
-#else
-#include "ShaderLang.h"
-#endif
 
 #if USE(OPENGL_ES_2)
 #include "Extensions3DOpenGLES.h"
@@ -312,3 +309,5 @@ PlatformLayer* GraphicsContext3D::platformLayer() const
 } // namespace WebCore
 
 #endif // USE(3D_GRAPHICS)
+
+#endif // USE(CAIRO)

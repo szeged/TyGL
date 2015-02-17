@@ -28,11 +28,6 @@
 
 #import "WebFrameLoaderClient.h"
 
-// Terrible hack; lets us get at the WebFrame private structure.
-#define private public
-#import "WebFrame.h"
-#undef private
-
 #import "DOMElementInternal.h"
 #import "DOMHTMLFormElementInternal.h"
 #import "WebBackForwardList.h"
@@ -109,6 +104,7 @@
 #import <WebCore/MIMETypeRegistry.h>
 #import <WebCore/MainFrame.h>
 #import <WebCore/MouseEvent.h>
+#import <WebCore/NSURLDownloadSPI.h>
 #import <WebCore/NSURLFileTypeMappingsSPI.h>
 #import <WebCore/Page.h>
 #import <WebCore/PluginViewBase.h>
@@ -149,8 +145,8 @@
 #endif
 
 #if USE(QUICK_LOOK)
-#import <Foundation/NSFileManager_NSURLExtras.h>
 #import <WebCore/FileSystemIOS.h>
+#import <WebCore/NSFileManagerSPI.h>
 #import <WebCore/QuickLook.h>
 #import <WebCore/RuntimeApplicationChecksIOS.h>
 #endif
@@ -347,9 +343,7 @@ void WebFrameLoaderClient::dispatchWillSendRequest(DocumentLoader* loader, unsig
     NSURLRequest *currentURLRequest = request.nsURLRequest(UpdateHTTPBody);
     NSURLRequest *newURLRequest = currentURLRequest;
     ResourceLoadPriority priority = request.priority();
-#if ENABLE(INSPECTOR)
     bool isHiddenFromInspector = request.hiddenFromInspector();
-#endif
 #if PLATFORM(IOS)
     bool isMainResourceRequest = request.deprecatedIsMainResourceRequest();
     if (implementations->webThreadWillSendRequestFunc) {
@@ -361,9 +355,7 @@ void WebFrameLoaderClient::dispatchWillSendRequest(DocumentLoader* loader, unsig
 
     if (newURLRequest != currentURLRequest)
         request = newURLRequest;
-#if ENABLE(INSPECTOR)
     request.setHiddenFromInspector(isHiddenFromInspector);
-#endif
 #if PLATFORM(IOS)
     request.deprecatedSetMainResourceRequest(isMainResourceRequest);
 #endif
@@ -850,7 +842,7 @@ Frame* WebFrameLoaderClient::dispatchCreatePage(const NavigationAction&)
     
 #if USE(PLUGIN_HOST_PROCESS) && ENABLE(NETSCAPE_PLUGIN_API)
     if (newWebView)
-        WebKit::NetscapePluginHostManager::shared().didCreateWindow();
+        WebKit::NetscapePluginHostManager::singleton().didCreateWindow();
 #endif
         
     return core([newWebView mainFrame]);
@@ -1428,9 +1420,9 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     bool isMainFrame = coreFrame->isMainFrame();
     if (isMainFrame && coreFrame->view())
         coreFrame->view()->setParentVisible(false);
-    coreFrame->setView(0);
+    coreFrame->setView(nullptr);
     RefPtr<FrameView> coreView = FrameView::create(*coreFrame);
-    coreFrame->setView(coreView);
+    coreFrame->setView(coreView.copyRef());
 
     [m_webFrame.get() _updateBackgroundAndUpdatesWhileOffscreen];
     [m_webFrame->_private->webFrameView _install];
@@ -1962,8 +1954,8 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize& size, HTMLP
     if (pluginPackage) {
         if (WKShouldBlockPlugin([pluginPackage bundleIdentifier], [pluginPackage bundleVersion])) {
             errorCode = WebKitErrorBlockedPlugInVersion;
-            if (element->renderer()->isEmbeddedObject())
-                toRenderEmbeddedObject(element->renderer())->setPluginUnavailabilityReason(RenderEmbeddedObject::InsecurePluginVersion);
+            if (is<RenderEmbeddedObject>(*element->renderer()))
+                downcast<RenderEmbeddedObject>(*element->renderer()).setPluginUnavailabilityReason(RenderEmbeddedObject::InsecurePluginVersion);
         } else {
             if ([pluginPackage isKindOfClass:[WebPluginPackage class]])
                 view = pluginView(m_webFrame.get(), (WebPluginPackage *)pluginPackage, attributeKeys, kit(paramValues), baseURL, kit(element), loadManually);
@@ -2067,8 +2059,8 @@ PassRefPtr<Widget> WebFrameLoaderClient::createJavaAppletWidget(const IntSize& s
     if (pluginPackage) {
         if (WKShouldBlockPlugin([pluginPackage bundleIdentifier], [pluginPackage bundleVersion])) {
             errorCode = WebKitErrorBlockedPlugInVersion;
-            if (element->renderer()->isEmbeddedObject())
-                toRenderEmbeddedObject(element->renderer())->setPluginUnavailabilityReason(RenderEmbeddedObject::InsecurePluginVersion);
+            if (is<RenderEmbeddedObject>(*element->renderer()))
+                downcast<RenderEmbeddedObject>(*element->renderer()).setPluginUnavailabilityReason(RenderEmbeddedObject::InsecurePluginVersion);
         } else {
 #if ENABLE(NETSCAPE_PLUGIN_API)
             if ([pluginPackage isKindOfClass:[WebNetscapePluginPackage class]]) {

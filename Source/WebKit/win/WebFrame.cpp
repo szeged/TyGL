@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2009, 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2009, 2011, 2013-2014 Apple Inc. All rights reserved.
  * Copyright (C) Research In Motion Limited 2009. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#include "config.h"
 #include "WebKitDLL.h"
 #include "WebFrame.h"
 
@@ -33,6 +32,8 @@
 #include "DOMCoreClasses.h"
 #include "HTMLFrameOwnerElement.h"
 #include "MarshallingHelpers.h"
+#include "PluginDatabase.h"
+#include "PluginView.h"
 #include "WebActionPropertyBag.h"
 #include "WebChromeClient.h"
 #include "WebDataSource.h"
@@ -86,8 +87,6 @@
 #include <WebCore/Page.h>
 #include <WebCore/PlatformKeyboardEvent.h>
 #include <WebCore/PluginData.h>
-#include <WebCore/PluginDatabase.h>
-#include <WebCore/PluginView.h>
 #include <WebCore/PolicyChecker.h>
 #include <WebCore/PrintContext.h>
 #include <WebCore/ResourceHandle.h>
@@ -794,7 +793,7 @@ public:
             *pCeltFetched = 0;
         if (!rgVar)
             return E_POINTER;
-        VariantInit(rgVar);
+        ::VariantInit(rgVar);
         if (!celt || celt > 1)
             return S_FALSE;
         if (!m_frame || !m_curChild)
@@ -1181,7 +1180,7 @@ HRESULT WebFrame::pauseAnimation(BSTR animationName, IDOMNode* node, double seco
     if (!domNode)
         return E_FAIL;
 
-    *animationWasRunning = frame->animation().pauseAnimationAtTime(toRenderElement(domNode->node()->renderer()), String(animationName, SysStringLen(animationName)), secondsFromNow);
+    *animationWasRunning = frame->animation().pauseAnimationAtTime(downcast<RenderElement>(domNode->node()->renderer()), String(animationName, SysStringLen(animationName)), secondsFromNow);
     return S_OK;
 }
 
@@ -1200,7 +1199,7 @@ HRESULT WebFrame::pauseTransition(BSTR propertyName, IDOMNode* node, double seco
     if (!domNode)
         return E_FAIL;
 
-    *transitionWasRunning = frame->animation().pauseTransitionAtTime(toRenderElement(domNode->node()->renderer()), String(propertyName, SysStringLen(propertyName)), secondsFromNow);
+    *transitionWasRunning = frame->animation().pauseTransitionAtTime(downcast<RenderElement>(domNode->node()->renderer()), String(propertyName, SysStringLen(propertyName)), secondsFromNow);
     return S_OK;
 }
 
@@ -2097,3 +2096,13 @@ void WebFrame::updateBackground()
     coreFrame->view()->updateBackgroundRecursively(backgroundColor, webView()->transparent());
 }
 
+HRESULT WebFrame::isMainFrame(BOOL* value)
+{
+    if (!value)
+        return E_POINTER;
+
+    Frame* coreFrame = core(this);
+    *value = coreFrame->isMainFrame();
+
+    return S_OK;
+}

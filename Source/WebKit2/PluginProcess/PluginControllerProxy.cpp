@@ -41,6 +41,7 @@
 #include "WebCoreArgumentCoders.h"
 #include "WebProcessConnection.h"
 #include <WebCore/GraphicsContext.h>
+#include <WebCore/HTTPHeaderMap.h>
 #include <WebCore/IdentifierRep.h>
 #include <WebCore/NotImplemented.h>
 #include <wtf/TemporaryChange.h>
@@ -59,6 +60,7 @@ PluginControllerProxy::PluginControllerProxy(WebProcessConnection* connection, c
     , m_pluginInstanceID(creationParameters.pluginInstanceID)
     , m_userAgent(creationParameters.userAgent)
     , m_isPrivateBrowsingEnabled(creationParameters.isPrivateBrowsingEnabled)
+    , m_isMuted(creationParameters.isMuted)
     , m_isAcceleratedCompositingEnabled(creationParameters.isAcceleratedCompositingEnabled)
     , m_isInitializing(false)
     , m_isVisible(false)
@@ -107,7 +109,7 @@ bool PluginControllerProxy::initialize(const PluginCreationParameters& creationP
     ASSERT(!m_isInitializing);
     m_isInitializing = true; // Cannot use TemporaryChange here, because this object can be deleted before the function returns.
 
-    m_plugin = NetscapePlugin::create(PluginProcess::shared().netscapePluginModule());
+    m_plugin = NetscapePlugin::create(PluginProcess::singleton().netscapePluginModule());
     if (!m_plugin) {
         // This will delete the plug-in controller proxy object.
         m_connection->removePluginControllerProxy(this, 0);
@@ -307,6 +309,11 @@ bool PluginControllerProxy::evaluate(NPObject* npObject, const String& scriptStr
 
     *result = m_connection->npRemoteObjectMap()->npVariantDataToNPVariant(resultData, m_plugin.get());
     return true;
+}
+
+void PluginControllerProxy::setPluginIsPlayingAudio(bool pluginIsPlayingAudio)
+{
+    m_connection->connection()->send(Messages::PluginProxy::SetPluginIsPlayingAudio(pluginIsPlayingAudio), m_pluginInstanceID);
 }
 
 void PluginControllerProxy::setStatusbarText(const String& statusbarText)
@@ -629,6 +636,15 @@ void PluginControllerProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEn
     m_isPrivateBrowsingEnabled = isPrivateBrowsingEnabled;
 
     m_plugin->privateBrowsingStateChanged(isPrivateBrowsingEnabled);
+}
+
+void PluginControllerProxy::mutedStateChanged(bool isMuted)
+{
+    if (m_isMuted == isMuted)
+        return;
+    
+    m_isMuted = isMuted;
+    m_plugin->mutedStateChanged(isMuted);
 }
 
 void PluginControllerProxy::getFormValue(bool& returnValue, String& formValue)

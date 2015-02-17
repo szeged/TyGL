@@ -27,10 +27,14 @@
 #import "WebProcess.h"
 
 #import "CustomProtocolManager.h"
+#import "ObjCObjectGraph.h"
 #import "SandboxExtension.h"
 #import "SandboxInitializationParameters.h"
 #import "SecItemShim.h"
+#import "WKBrowsingContextHandleInternal.h"
 #import "WKFullKeyboardAccessWatcher.h"
+#import "WKTypeRefWrapper.h"
+#import "WKWebProcessPlugInBrowserContextControllerInternal.h"
 #import "WebFrame.h"
 #import "WebInspector.h"
 #import "WebPage.h"
@@ -38,8 +42,9 @@
 #import "WebProcessProxyMessages.h"
 #import <JavaScriptCore/Options.h>
 #import <WebCore/AXObjectCache.h>
+#import <WebCore/CFNetworkSPI.h>
 #import <WebCore/FileSystem.h>
-#import <WebCore/Font.h>
+#import <WebCore/FontCascade.h>
 #import <WebCore/LocalizedStrings.h>
 #import <WebCore/MemoryCache.h>
 #import <WebCore/MemoryPressureHandler.h>
@@ -55,12 +60,6 @@
 #import <stdio.h>
 
 #define ENABLE_MANUAL_WEBPROCESS_SANDBOXING !PLATFORM(IOS)
-
-#if PLATFORM(IOS)
-@interface NSURLCache (WKDetails)
--(id)_initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity relativePath:(NSString *)path;
-@end
-#endif
 
 using namespace WebCore;
 
@@ -105,23 +104,24 @@ void WebProcess::platformSetCacheModel(CacheModel cacheModel)
     unsigned cacheMinDeadCapacity = 0;
     unsigned cacheMaxDeadCapacity = 0;
     auto deadDecodedDataDeletionInterval = std::chrono::seconds { 0 };
-    unsigned pageCacheCapacity = 0;
+    unsigned pageCacheSize = 0;
     unsigned long urlCacheMemoryCapacity = 0;
     unsigned long urlCacheDiskCapacity = 0;
 
     calculateCacheSizes(cacheModel, memSize, diskFreeSize,
         cacheTotalCapacity, cacheMinDeadCapacity, cacheMaxDeadCapacity, deadDecodedDataDeletionInterval,
-        pageCacheCapacity, urlCacheMemoryCapacity, urlCacheDiskCapacity);
+        pageCacheSize, urlCacheMemoryCapacity, urlCacheDiskCapacity);
 
-
-    memoryCache()->setCapacities(cacheMinDeadCapacity, cacheMaxDeadCapacity, cacheTotalCapacity);
-    memoryCache()->setDeadDecodedDataDeletionInterval(deadDecodedDataDeletionInterval);
-    pageCache()->setCapacity(pageCacheCapacity);
+    auto& memoryCache = MemoryCache::singleton();
+    memoryCache.setCapacities(cacheMinDeadCapacity, cacheMaxDeadCapacity, cacheTotalCapacity);
+    memoryCache.setDeadDecodedDataDeletionInterval(deadDecodedDataDeletionInterval);
+    PageCache::singleton().setMaxSize(pageCacheSize);
 
     NSURLCache *nsurlCache = [NSURLCache sharedURLCache];
 
     [nsurlCache setMemoryCapacity:urlCacheMemoryCapacity];
-    [nsurlCache setDiskCapacity:std::max<unsigned long>(urlCacheDiskCapacity, [nsurlCache diskCapacity])]; // Don't shrink a big disk cache, since that would cause churn.
+    if (!m_diskCacheIsDisabledForTesting)
+        [nsurlCache setDiskCapacity:std::max<unsigned long>(urlCacheDiskCapacity, [nsurlCache diskCapacity])]; // Don't shrink a big disk cache, since that would cause churn.
 }
 
 void WebProcess::platformClearResourceCaches(ResourceCachesToClear cachesToClear)
@@ -144,7 +144,7 @@ void WebProcess::platformClearResourceCaches(ResourceCachesToClear cachesToClear
 #if USE(APPKIT)
 static id NSApplicationAccessibilityFocusedUIElement(NSApplication*, SEL)
 {
-    WebPage* page = WebProcess::shared().focusedWebPage();
+    WebPage* page = WebProcess::singleton().focusedWebPage();
     if (!page || !page->accessibilityRemoteObject())
         return 0;
 
@@ -152,13 +152,14 @@ static id NSApplicationAccessibilityFocusedUIElement(NSApplication*, SEL)
 }
 #endif
 
-void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters& parameters, IPC::MessageDecoder&)
+void WebProcess::platformInitializeWebProcess(WebProcessCreationParameters&& parameters)
 {
 #if ENABLE(SANDBOX_EXTENSIONS)
     SandboxExtension::consumePermanently(parameters.uiProcessBundleResourcePathExtensionHandle);
     SandboxExtension::consumePermanently(parameters.webSQLDatabaseDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.applicationCacheDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.diskCacheDirectoryExtensionHandle);
+    SandboxExtension::consumePermanently(parameters.mediaKeyStorageDirectoryExtensionHandle);
 #if PLATFORM(IOS)
     SandboxExtension::consumePermanently(parameters.cookieStorageDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.openGLCacheDirectoryExtensionHandle);
@@ -166,6 +167,13 @@ void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters
     SandboxExtension::consumePermanently(parameters.hstsDatabasePathExtensionHandle);
 #endif
 #endif
+
+    // FIXME: Most of what this function does for cache size gets immediately overridden by setCacheModel().
+    // - memory cache size passed from UI process is always ignored;
+    // - disk cache size passed from UI process is effectively a minimum size.
+    // One non-obvious constraint is that we need to use -setSharedURLCache: even in testing mode, to prevent creating a default one on disk later, when some other code touches the cache.
+
+    ASSERT(!m_diskCacheIsDisabledForTesting || !parameters.nsURLCacheDiskCapacity);
 
 #if PLATFORM(IOS)
     if (!parameters.uiProcessBundleIdentifier.isNull()) {
@@ -183,10 +191,9 @@ void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters
     }
 #endif
 
-    m_compositingRenderServerPort = parameters.acceleratedCompositingPort.port();
+    m_compositingRenderServerPort = WTF::move(parameters.acceleratedCompositingPort);
     m_presenterApplicationPid = parameters.presenterApplicationPid;
-    m_shouldForceScreenFontSubstitution = parameters.shouldForceScreenFontSubstitution;
-    Font::setDefaultTypesettingFeatures(parameters.shouldEnableKerningAndLigaturesByDefault ? Kerning | Ligatures : 0);
+    FontCascade::setDefaultTypesettingFeatures(parameters.shouldEnableKerningAndLigaturesByDefault ? Kerning | Ligatures : 0);
 
     MemoryPressureHandler::ReliefLogger::setLoggingEnabled(parameters.shouldEnableMemoryPressureReliefLogging);
 
@@ -219,7 +226,7 @@ void WebProcess::platformInitializeProcess(const ChildProcessInitializationParam
     WKAXRegisterRemoteApp();
 
 #if ENABLE(SEC_ITEM_SHIM)
-    SecItemShim::shared().initialize(this);
+    SecItemShim::singleton().initialize(this);
 #endif
 }
 
@@ -260,7 +267,7 @@ void WebProcess::initializeSandbox(const ChildProcessInitializationParameters& p
 
 void WebProcess::updateActivePages()
 {
-#if USE(APPKIT) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if USE(APPKIT)
     RetainPtr<CFMutableArrayRef> activePageURLs = adoptCF(CFArrayCreateMutable(0, 0, &kCFTypeArrayCallBacks));
     for (const auto& iter: m_pageMap) {
         WebPage* page = iter.value.get();
@@ -284,6 +291,80 @@ void WebProcess::updateActivePages()
     }
     WKSetApplicationInformationItem(CFSTR("LSActivePageUserVisibleOriginsKey"), activePageURLs.get());
 #endif
+}
+
+RefPtr<ObjCObjectGraph> WebProcess::transformHandlesToObjects(ObjCObjectGraph& objectGraph)
+{
+    struct Transformer final : ObjCObjectGraph::Transformer {
+        Transformer(WebProcess& webProcess)
+            : m_webProcess(webProcess)
+        {
+        }
+
+        virtual bool shouldTransformObject(id object) const override
+        {
+#if WK_API_ENABLED
+            if (dynamic_objc_cast<WKBrowsingContextHandle>(object))
+                return true;
+
+            if (dynamic_objc_cast<WKTypeRefWrapper>(object))
+                return true;
+#endif
+            return false;
+        }
+
+        virtual RetainPtr<id> transformObject(id object) const override
+        {
+#if WK_API_ENABLED
+            if (auto* handle = dynamic_objc_cast<WKBrowsingContextHandle>(object)) {
+                if (auto* webPage = m_webProcess.webPage(handle._pageID))
+                    return wrapper(*webPage);
+
+                return [NSNull null];
+            }
+
+            if (auto* wrapper = dynamic_objc_cast<WKTypeRefWrapper>(object))
+                return adoptNS([[WKTypeRefWrapper alloc] initWithObject:toAPI(m_webProcess.transformHandlesToObjects(toImpl(wrapper.object)).get())]);
+#endif
+            return object;
+        }
+
+        WebProcess& m_webProcess;
+    };
+
+    return ObjCObjectGraph::create(ObjCObjectGraph::transform(objectGraph.rootObject(), Transformer(*this)).get());
+}
+
+RefPtr<ObjCObjectGraph> WebProcess::transformObjectsToHandles(ObjCObjectGraph& objectGraph)
+{
+    struct Transformer final : ObjCObjectGraph::Transformer {
+        virtual bool shouldTransformObject(id object) const override
+        {
+#if WK_API_ENABLED
+            if (dynamic_objc_cast<WKWebProcessPlugInBrowserContextController>(object))
+                return true;
+
+            if (dynamic_objc_cast<WKTypeRefWrapper>(object))
+                return true;
+#endif
+
+            return false;
+        }
+
+        virtual RetainPtr<id> transformObject(id object) const override
+        {
+#if WK_API_ENABLED
+            if (auto* controller = dynamic_objc_cast<WKWebProcessPlugInBrowserContextController>(object))
+                return controller.handle;
+
+            if (auto* wrapper = dynamic_objc_cast<WKTypeRefWrapper>(object))
+                return adoptNS([[WKTypeRefWrapper alloc] initWithObject:toAPI(transformObjectsToHandles(toImpl(wrapper.object)).get())]);
+#endif
+            return object;
+        }
+    };
+
+    return ObjCObjectGraph::create(ObjCObjectGraph::transform(objectGraph.rootObject(), Transformer()).get());
 }
 
 } // namespace WebKit

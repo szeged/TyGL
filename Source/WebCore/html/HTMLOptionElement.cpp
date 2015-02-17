@@ -57,17 +57,17 @@ HTMLOptionElement::HTMLOptionElement(const QualifiedName& tagName, Document& doc
     setHasCustomStyleResolveCallbacks();
 }
 
-PassRefPtr<HTMLOptionElement> HTMLOptionElement::create(Document& document)
+Ref<HTMLOptionElement> HTMLOptionElement::create(Document& document)
 {
-    return adoptRef(new HTMLOptionElement(optionTag, document));
+    return adoptRef(*new HTMLOptionElement(optionTag, document));
 }
 
-PassRefPtr<HTMLOptionElement> HTMLOptionElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLOptionElement> HTMLOptionElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLOptionElement(tagName, document));
+    return adoptRef(*new HTMLOptionElement(tagName, document));
 }
 
-PassRefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document& document, const String& data, const String& value,
+RefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document& document, const String& data, const String& value,
         bool defaultSelected, bool selected, ExceptionCode& ec)
 {
     RefPtr<HTMLOptionElement> element = adoptRef(new HTMLOptionElement(optionTag, document));
@@ -182,7 +182,7 @@ void HTMLOptionElement::parseAttribute(const QualifiedName& name, const AtomicSt
         bool oldDisabled = m_disabled;
         m_disabled = !value.isNull();
         if (oldDisabled != m_disabled) {
-            didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
+            setNeedsStyleRecalc();
             if (renderer() && renderer()->style().hasAppearance())
                 renderer()->theme().stateChanged(*renderer(), ControlStates::EnabledState);
         }
@@ -235,7 +235,7 @@ void HTMLOptionElement::setSelectedState(bool selected)
         return;
 
     m_isSelected = selected;
-    didAffectSelector(AffectedSelectorChecked);
+    setNeedsStyleRecalc();
 
     if (HTMLSelectElement* select = ownerSelectElement())
         select->invalidateSelectedItems();
@@ -342,9 +342,9 @@ String HTMLOptionElement::collectOptionInnerText() const
             text.append(node->nodeValue());
         // Text nodes inside script elements are not part of the option text.
         if (is<Element>(*node) && toScriptElementIfPossible(downcast<Element>(node)))
-            node = NodeTraversal::nextSkippingChildren(node, this);
+            node = NodeTraversal::nextSkippingChildren(*node, this);
         else
-            node = NodeTraversal::next(node, this);
+            node = NodeTraversal::next(*node, this);
     }
     return text.toString();
 }

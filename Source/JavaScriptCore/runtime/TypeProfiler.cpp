@@ -26,20 +26,25 @@
 #include "config.h"
 #include "TypeProfiler.h"
 
-#include "InspectorJSProtocolTypes.h"
+#include "InspectorProtocolObjects.h"
 #include "TypeLocation.h"
 
 namespace JSC {
 
 static const bool verbose = false;
 
-void TypeProfiler::logTypesForTypeLocation(TypeLocation* location)
+TypeProfiler::TypeProfiler()
+    : m_nextUniqueVariableID(1)
+{ 
+}
+
+void TypeProfiler::logTypesForTypeLocation(TypeLocation* location, VM& vm)
 {
     TypeProfilerSearchDescriptor descriptor = location->m_globalVariableID == TypeProfilerReturnStatement ? TypeProfilerSearchDescriptorFunctionReturn : TypeProfilerSearchDescriptorNormal;
 
     dataLogF("[Start, End]::[%u, %u]\n", location->m_divotStart, location->m_divotEnd);
 
-    if (findLocation(location->m_divotStart, location->m_sourceID, descriptor))
+    if (findLocation(location->m_divotStart, location->m_sourceID, descriptor, vm))
         dataLog("\t\t[Entry IS in System]\n");
     else
         dataLog("\t\t[Entry IS NOT in system]\n");
@@ -65,13 +70,13 @@ void TypeProfiler::insertNewLocation(TypeLocation* location)
     bucket.append(location);
 }
 
-String TypeProfiler::typeInformationForExpressionAtOffset(TypeProfilerSearchDescriptor descriptor, unsigned offset, intptr_t sourceID)
+String TypeProfiler::typeInformationForExpressionAtOffset(TypeProfilerSearchDescriptor descriptor, unsigned offset, intptr_t sourceID, VM& vm)
 {
     // This returns a JSON string representing an Object with the following properties:
     //     globalTypeSet: 'JSON<TypeSet> | null'
     //     instructionTypeSet: 'JSON<TypeSet>'
 
-    TypeLocation* location = findLocation(offset, sourceID, descriptor);
+    TypeLocation* location = findLocation(offset, sourceID, descriptor, vm);
     ASSERT(location);
 
     StringBuilder json;  
@@ -101,17 +106,18 @@ String TypeProfiler::typeInformationForExpressionAtOffset(TypeProfilerSearchDesc
     return json.toString();
 }
 
-TypeLocation* TypeProfiler::findLocation(unsigned divot, intptr_t sourceID, TypeProfilerSearchDescriptor descriptor)
+TypeLocation* TypeProfiler::findLocation(unsigned divot, intptr_t sourceID, TypeProfilerSearchDescriptor descriptor, VM& vm)
 {
     QueryKey queryKey(sourceID, divot);
     auto iter = m_queryCache.find(queryKey);
     if (iter != m_queryCache.end())
         return iter->value;
 
-    if (!m_functionHasExecutedCache.hasExecutedAtOffset(sourceID, divot))
+    if (!vm.functionHasExecutedCache()->hasExecutedAtOffset(sourceID, divot))
         return nullptr;
 
-    ASSERT(m_bucketMap.contains(sourceID));
+    if (!m_bucketMap.contains(sourceID))
+        return nullptr;
 
     Vector<TypeLocation*>& bucket = m_bucketMap.find(sourceID)->value;
     TypeLocation* bestMatch = nullptr;
@@ -134,6 +140,29 @@ TypeLocation* TypeProfiler::findLocation(unsigned divot, intptr_t sourceID, Type
     // FIXME: BestMatch should never be null past this point. This doesn't hold currently because we ignore var assignments when code contains eval/With (VarInjection). 
     // https://bugs.webkit.org/show_bug.cgi?id=135184
     return bestMatch;
+}
+
+TypeLocation* TypeProfiler::nextTypeLocation() 
+{ 
+    return m_typeLocationInfo.add(); 
+}
+
+void TypeProfiler::invalidateTypeSetCache()
+{
+    for (Bag<TypeLocation>::iterator iter = m_typeLocationInfo.begin(); !!iter; ++iter) {
+        TypeLocation* location = *iter;
+        location->m_instructionTypeSet->invalidateCache();
+        if (location->m_globalTypeSet)
+            location->m_globalTypeSet->invalidateCache();
+    }
+}
+
+void TypeProfiler::dumpTypeProfilerData(VM& vm)
+{
+    for (Bag<TypeLocation>::iterator iter = m_typeLocationInfo.begin(); !!iter; ++iter) {
+        TypeLocation* location = *iter;
+        logTypesForTypeLocation(location, vm);
+    }
 }
 
 } // namespace JSC

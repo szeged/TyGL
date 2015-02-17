@@ -32,7 +32,7 @@ class HTMLSelectElement;
 
 class HTMLOptGroupElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLOptGroupElement> create(const QualifiedName&, Document&);
+    static Ref<HTMLOptGroupElement> create(const QualifiedName&, Document&);
 
     virtual bool isDisabledFormControl() const override;
     HTMLSelectElement* ownerSelectElement() const;
@@ -42,7 +42,7 @@ public:
 private:
     HTMLOptGroupElement(const QualifiedName&, Document&);
 
-    virtual const AtomicString& formControlType() const;
+    const AtomicString& formControlType() const;
     virtual bool isFocusable() const override;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }

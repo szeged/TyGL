@@ -48,6 +48,7 @@ my (
     $canvasPathSupport,
     $canvasProxySupport,
     $channelMessagingSupport,
+    $classSyntax,
     $cspNextSupport,
     $css3ConditionalRulesSupport,
     $css3TextSupport,
@@ -86,7 +87,6 @@ my (
     $inputTypeMonthSupport,
     $inputTypeTimeSupport,
     $inputTypeWeekSupport,
-    $inspectorSupport,
     $legacyNotificationsSupport,
     $legacyVendorPrefixSupport,
     $legacyWebAudioSupport,
@@ -117,8 +117,7 @@ my (
     $resourceTimingSupport,
     $scriptedSpeechSupport,
     $seccompFiltersSupport,
-    $sharedWorkersSupport,
-    $sqlDatabaseSupport,
+    $streamsAPISupport,
     $styleScopedSupport,
     $subtleCrypto,
     $suidLinuxSandbox,
@@ -128,7 +127,7 @@ my (
     $systemMallocSupport,
     $templateElementSupport,
     $textAutosizingSupport,
-    $tiledBackingStoreSupport,
+    $threadedCompositorSupport,
     $threadedHTMLParserSupport,
     $touchEventsSupport,
     $touchSliderSupport,
@@ -167,6 +166,9 @@ my @features = (
 
     { option => "channel-messaging", desc => "Toggle Channel Messaging support",
       define => "ENABLE_CHANNEL_MESSAGING", default => 1, value => \$channelMessagingSupport },
+
+    { option => "class-syntax", desc => "Toggle ES6 class syntax support",
+      define => "ENABLE_ES6_CLASS_SYNTAX", default => 0, value => \$classSyntax },
 
     { option => "csp-next", desc => "Toggle Content Security Policy 1.1 support",
       define => "ENABLE_CSP_NEXT", default => isGtk(), value => \$cspNextSupport },
@@ -276,9 +278,6 @@ my @features = (
     { option => "input-type-week", desc => "Toggle Input Type Week support",
       define => "ENABLE_INPUT_TYPE_WEEK", default => 0, value => \$inputTypeWeekSupport },
 
-    { option => "inspector", desc => "Toggle Inspector support",
-      define => "ENABLE_INSPECTOR", default => 1, value => \$inspectorSupport },
-
     { option => "legacy-notifications", desc => "Toggle Legacy Notifications support",
       define => "ENABLE_LEGACY_NOTIFICATIONS", default => 0, value => \$legacyNotificationsSupport },
 
@@ -328,7 +327,7 @@ my @features = (
       define => "ENABLE_NOSNIFF", default => isEfl(), value => \$nosniffSupport },
 
     { option => "notifications", desc => "Toggle Notifications support",
-      define => "ENABLE_NOTIFICATIONS", default => 0, value => \$notificationsSupport },
+      define => "ENABLE_NOTIFICATIONS", default => isGtk(), value => \$notificationsSupport },
 
     { option => "orientation-events", desc => "Toggle Orientation Events support",
       define => "ENABLE_ORIENTATION_EVENTS", default => isIOSWebKit(), value => \$orientationEventsSupport },
@@ -363,14 +362,11 @@ my @features = (
     { option => "scripted-speech", desc => "Toggle Scripted Speech support",
       define => "ENABLE_SCRIPTED_SPEECH", default => 0, value => \$scriptedSpeechSupport },
 
-    { option => "shared-workers", desc => "Toggle Shared Workers support",
-      define => "ENABLE_SHARED_WORKERS", default => (isAppleWebKit() || isGtk() || isEfl()), value => \$sharedWorkersSupport },
-
-    { option => "sql-database", desc => "Toggle SQL Database support",
-      define => "ENABLE_SQL_DATABASE", default => 1, value => \$sqlDatabaseSupport },
+    { option => "streams-api", desc => "Toggle Streams API support",
+      define => "ENABLE_STREAMS_API", default => 1, value => \$streamsAPISupport },
 
     { option => "subtle-crypto", desc => "Toggle WebCrypto Subtle-Crypto support",
-      define => "ENABLE_SUBTLE_CRYPTO", default => (isGtk() || isAppleMacWebKit() || isIOSWebKit()), value => \$subtleCrypto },
+      define => "ENABLE_SUBTLE_CRYPTO", default => (isGtk() || isEfl() || isAppleMacWebKit() || isIOSWebKit()), value => \$subtleCrypto },
 
     { option => "suid-linux-sandbox", desc => "Toggle suid sandbox for linux",
       define => "ENABLE_SUID_SANDBOX_LINUX", default => 0, value => \$suidLinuxSandbox },
@@ -383,6 +379,9 @@ my @features = (
 
     { option => "template-element", desc => "Toggle HTMLTemplateElement support",
       define => "ENABLE_TEMPLATE_ELEMENT", default => 1, value => \$templateElementSupport },
+
+    { option => "threaded-compositor", desc => "Toggle threaded compositor support",
+      define => "ENABLE_THREADED_COMPOSITOR", default => 0, value => \$threadedCompositorSupport },
 
     { option => "text-autosizing", desc => "Toggle Text Autosizing support",
       define => "ENABLE_TEXT_AUTOSIZING", default => 0, value => \$textAutosizingSupport },

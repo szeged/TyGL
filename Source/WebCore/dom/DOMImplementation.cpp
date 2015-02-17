@@ -47,6 +47,7 @@
 #include "SVGDocument.h"
 #include "SVGNames.h"
 #include "SecurityOrigin.h"
+#include "SecurityOriginPolicy.h"
 #include "Settings.h"
 #include "StyleSheetContents.h"
 #include "SubframeLoader.h"
@@ -194,7 +195,7 @@ bool DOMImplementation::hasFeature(const String& feature, const String& version)
     return true;
 }
 
-PassRefPtr<DocumentType> DOMImplementation::createDocumentType(const String& qualifiedName,
+RefPtr<DocumentType> DOMImplementation::createDocumentType(const String& qualifiedName,
     const String& publicId, const String& systemId, ExceptionCode& ec)
 {
     String prefix, localName;
@@ -209,7 +210,7 @@ DOMImplementation* DOMImplementation::getInterface(const String& /*feature*/)
     return 0;
 }
 
-PassRefPtr<Document> DOMImplementation::createDocument(const String& namespaceURI,
+RefPtr<Document> DOMImplementation::createDocument(const String& namespaceURI,
     const String& qualifiedName, DocumentType* doctype, ExceptionCode& ec)
 {
     RefPtr<Document> doc;
@@ -220,7 +221,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& namespaceUR
     else
         doc = Document::create(0, URL());
 
-    doc->setSecurityOrigin(m_document.securityOrigin());
+    doc->setSecurityOriginPolicy(m_document.securityOriginPolicy());
 
     RefPtr<Node> documentElement;
     if (!qualifiedName.isEmpty()) {
@@ -234,10 +235,10 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& namespaceUR
     if (documentElement)
         doc->appendChild(documentElement.release());
 
-    return doc.release();
+    return doc;
 }
 
-PassRefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, const String& media, ExceptionCode&)
+RefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, const String& media, ExceptionCode&)
 {
     // FIXME: Title should be set.
     // FIXME: Media could have wrong syntax, in which case we should generate an exception.
@@ -288,18 +289,18 @@ bool DOMImplementation::isTextMIMEType(const String& mimeType)
     return false;
 }
 
-PassRefPtr<HTMLDocument> DOMImplementation::createHTMLDocument(const String& title)
+RefPtr<HTMLDocument> DOMImplementation::createHTMLDocument(const String& title)
 {
     RefPtr<HTMLDocument> d = HTMLDocument::create(0, URL());
     d->open();
     d->write("<!doctype html><html><body></body></html>");
     if (!title.isNull())
         d->setTitle(title);
-    d->setSecurityOrigin(m_document.securityOrigin());
-    return d.release();
+    d->setSecurityOriginPolicy(m_document.securityOriginPolicy());
+    return d;
 }
 
-PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame* frame, const URL& url)
+RefPtr<Document> DOMImplementation::createDocument(const String& type, Frame* frame, const URL& url)
 {
     // Plugins cannot take HTML and XHTML from us, and we don't even need to initialize the plugin database for those.
     if (type == "text/html")

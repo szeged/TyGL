@@ -28,12 +28,9 @@
 #include "config.h"
 #include "DatabaseContext.h"
 
-#if ENABLE(SQL_DATABASE)
-
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "Database.h"
-#include "DatabaseBackendContext.h"
 #include "DatabaseManager.h"
 #include "DatabaseTask.h"
 #include "DatabaseThread.h"
@@ -147,12 +144,6 @@ void DatabaseContext::stop()
     stopDatabases();
 }
 
-PassRefPtr<DatabaseBackendContext> DatabaseContext::backend()
-{
-    DatabaseBackendContext* backend = static_cast<DatabaseBackendContext*>(this);
-    return backend;
-}
-
 DatabaseThread* DatabaseContext::databaseThread()
 {
     if (!m_databaseThread && !m_hasOpenDatabases) {
@@ -243,6 +234,14 @@ void DatabaseContext::databaseExceededQuota(const String& name, DatabaseDetails 
     DatabaseManager::manager().setQuota(m_scriptExecutionContext->securityOrigin(), defaultQuota);
 }
 
-} // namespace WebCore
+SecurityOrigin* DatabaseContext::securityOrigin() const
+{
+    return m_scriptExecutionContext->securityOrigin();
+}
 
-#endif // ENABLE(SQL_DATABASE)
+bool DatabaseContext::isContextThread() const
+{
+    return m_scriptExecutionContext->isContextThread();
+}
+
+} // namespace WebCore

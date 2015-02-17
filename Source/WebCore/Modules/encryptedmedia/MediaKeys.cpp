@@ -144,12 +144,12 @@ bool MediaKeys::isTypeSupported(const String& keySystem, const String& mimeType)
 
 void MediaKeys::setMediaElement(HTMLMediaElement* element)
 {
-    if (m_mediaElement)
+    if (m_mediaElement && m_mediaElement->player())
         m_mediaElement->player()->setCDMSession(nullptr);
 
     m_mediaElement = element;
 
-    if (m_mediaElement && !m_sessions.isEmpty())
+    if (m_mediaElement && m_mediaElement->player() && !m_sessions.isEmpty())
         m_mediaElement->player()->setCDMSession(m_sessions.last()->session());
 }
 
@@ -158,6 +158,22 @@ MediaPlayer* MediaKeys::cdmMediaPlayer(const CDM*) const
     if (m_mediaElement)
         return m_mediaElement->player();
     return 0;
+}
+
+void MediaKeys::keyAdded()
+{
+    if (m_mediaElement)
+        m_mediaElement->keyAdded();
+
+}
+
+RefPtr<ArrayBuffer> MediaKeys::cachedKeyForKeyId(const String& keyId) const
+{
+    for (auto& session : m_sessions) {
+        if (RefPtr<ArrayBuffer> key = session->cachedKeyForKeyId(keyId))
+            return key;
+    }
+    return nullptr;
 }
 
 }

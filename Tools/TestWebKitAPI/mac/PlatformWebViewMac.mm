@@ -26,8 +26,9 @@
 #import "config.h"
 #import "PlatformWebView.h"
 
-#import <WebKit/WKViewPrivate.h>
 #import <Carbon/Carbon.h>
+#import <WebKit/WKRetainPtr.h>
+#import <WebKit/WKViewPrivate.h>
 
 @interface ActiveOffscreenWindow : NSWindow
 @end
@@ -45,10 +46,10 @@
 
 namespace TestWebKitAPI {
 
-PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRef)
+void PlatformWebView::initialize(WKPageConfigurationRef configuration, Class wkViewSubclass)
 {
     NSRect rect = NSMakeRect(0, 0, 800, 600);
-    m_view = [[WKView alloc] initWithFrame:rect contextRef:contextRef pageGroupRef:pageGroupRef];
+    m_view = [[wkViewSubclass alloc] initWithFrame:rect configurationRef:configuration];
     [m_view setWindowOcclusionDetectionEnabled:NO];
 
     NSRect windowRect = NSOffsetRect(rect, -10000, [(NSScreen *)[[NSScreen screens] objectAtIndex:0] frame].size.height - rect.size.height + 10000);
@@ -58,6 +59,42 @@ PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGro
     [m_window orderBack:nil];
     [m_window setAutodisplay:NO];
     [m_window setReleasedWhenClosed:NO];
+}
+
+PlatformWebView::PlatformWebView(WKPageConfigurationRef configuration)
+{
+    initialize(configuration, [WKView class]);
+}
+
+PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRef)
+{
+    WKRetainPtr<WKPageConfigurationRef> configuration = adoptWK(WKPageConfigurationCreate());
+    
+    WKPageConfigurationSetContext(configuration.get(), contextRef);
+    WKPageConfigurationSetPageGroup(configuration.get(), pageGroupRef);
+    
+    initialize(configuration.get(), [WKView class]);
+}
+
+PlatformWebView::PlatformWebView(WKPageRef relatedPage)
+{
+    WKRetainPtr<WKPageConfigurationRef> configuration = adoptWK(WKPageConfigurationCreate());
+    
+    WKPageConfigurationSetContext(configuration.get(), WKPageGetContext(relatedPage));
+    WKPageConfigurationSetPageGroup(configuration.get(), WKPageGetPageGroup(relatedPage));
+    WKPageConfigurationSetRelatedPage(configuration.get(), relatedPage);
+
+    initialize(configuration.get(), [WKView class]);
+}
+
+PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRef, Class wkViewSubclass)
+{
+    WKRetainPtr<WKPageConfigurationRef> configuration = adoptWK(WKPageConfigurationCreate());
+    
+    WKPageConfigurationSetContext(configuration.get(), contextRef);
+    WKPageConfigurationSetPageGroup(configuration.get(), pageGroupRef);
+    
+    initialize(configuration.get(), wkViewSubclass);
 }
 
 PlatformWebView::~PlatformWebView()

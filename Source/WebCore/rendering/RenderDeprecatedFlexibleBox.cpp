@@ -25,7 +25,7 @@
 #include "config.h"
 #include "RenderDeprecatedFlexibleBox.h"
 
-#include "Font.h"
+#include "FontCascade.h"
 #include "LayoutRepainter.h"
 #include "RenderLayer.h"
 #include "RenderView.h"
@@ -117,7 +117,7 @@ private:
     int m_ordinalIteration;
 };
 
-RenderDeprecatedFlexibleBox::RenderDeprecatedFlexibleBox(Element& element, PassRef<RenderStyle> style)
+RenderDeprecatedFlexibleBox::RenderDeprecatedFlexibleBox(Element& element, Ref<RenderStyle>&& style)
     : RenderBlock(element, WTF::move(style), 0)
 {
     setChildrenInline(false); // All of our children must be block-level
@@ -423,8 +423,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
             // Compute the child's vertical margins.
             child->computeAndSetBlockDirectionMargins(this);
 
-            if (!child->needsLayout())
-                child->markForPaginationRelayoutIfNeeded();
+            child->markForPaginationRelayoutIfNeeded();
             
             // Apply the child's current layout delta.
             layoutChildIfNeededApplyingDelta(child, childLayoutDelta);
@@ -499,8 +498,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
             if (oldChildHeight != child->height())
                 child->setChildNeedsLayout(MarkOnlyThis);
 
-            if (!child->needsLayout())
-                child->markForPaginationRelayoutIfNeeded();
+            child->markForPaginationRelayoutIfNeeded();
 
             layoutChildIfNeededApplyingDelta(child, childLayoutDelta);
 
@@ -744,8 +742,7 @@ void RenderDeprecatedFlexibleBox::layoutVerticalBox(bool relayoutChildren)
             // Add in the child's marginTop to our height.
             setHeight(height() + child->marginTop());
 
-            if (!child->needsLayout())
-                child->markForPaginationRelayoutIfNeeded();
+            child->markForPaginationRelayoutIfNeeded();
 
             // Now do a layout.
             layoutChildIfNeededApplyingDelta(child, childLayoutDelta);
@@ -997,7 +994,7 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
         DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, ellipsisAndSpaceStr, (ellipsisAndSpace, 2));
         DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, ellipsisStr, (&horizontalEllipsis, 1));
         const RenderStyle& lineStyle = numVisibleLines == 1 ? firstLineStyle() : style();
-        const Font& font = lineStyle.font();
+        const FontCascade& font = lineStyle.fontCascade();
 
         // Get ellipsis width, and if the last child is an anchor, it will go after the ellipsis, so add in a space and the anchor width too
         LayoutUnit totalWidth;

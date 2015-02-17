@@ -36,7 +36,7 @@
 
 #include "AccessibilityObject.h"
 #include "Document.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "FrameView.h"
 #include "HTMLParserIdioms.h"
 #include "HostWindow.h"
@@ -130,14 +130,14 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
         result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_INDENT), buffer.get());
     }
 
-    String fontFamilyName = style->font().firstFamily();
+    String fontFamilyName = style->fontCascade().firstFamily();
     if (fontFamilyName.left(8) == "-webkit-")
         fontFamilyName = fontFamilyName.substring(8);
 
     result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_FAMILY_NAME), fontFamilyName.utf8().data());
 
     int fontWeight = -1;
-    switch (style->font().weight()) {
+    switch (style->fontCascade().weight()) {
     case FontWeight100:
         fontWeight = 100;
         break;
@@ -192,7 +192,7 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
 
     result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_UNDERLINE), (style->textDecoration() & TextDecorationUnderline) ? "single" : "none");
 
-    result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_STYLE), style->font().italic() ? "italic" : "normal");
+    result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_STYLE), style->fontCascade().italic() ? "italic" : "normal");
 
     result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_STRIKETHROUGH), (style->textDecoration() & TextDecorationLineThrough) ? "true" : "false");
 
@@ -270,8 +270,8 @@ static guint accessibilityObjectLength(const AccessibilityObject* object)
     // for those cases when it's needed to take it into account
     // separately (as in getAccessibilityObjectForOffset)
     RenderObject* renderer = object->renderer();
-    if (renderer && renderer->isListMarker()) {
-        RenderListMarker& marker = toRenderListMarker(*renderer);
+    if (is<RenderListMarker>(renderer)) {
+        auto& marker = downcast<RenderListMarker>(*renderer);
         return marker.text().length() + marker.suffix().length();
     }
 
@@ -318,7 +318,7 @@ static const AccessibilityObject* getAccessibilityObjectForOffset(const Accessib
     return result;
 }
 
-static AtkAttributeSet* getRunAttributesFromAccesibilityObject(const AccessibilityObject* element, gint offset, gint* startOffset, gint* endOffset)
+static AtkAttributeSet* getRunAttributesFromAccessibilityObject(const AccessibilityObject* element, gint offset, gint* startOffset, gint* endOffset)
 {
     const AccessibilityObject* child = getAccessibilityObjectForOffset(element, offset, startOffset, endOffset);
     if (!child) {
@@ -363,8 +363,8 @@ static int offsetAdjustmentForListItem(const AccessibilityObject* object)
     // We need to adjust the offsets for the list item marker in
     // Left-To-Right text, since we expose it together with the text.
     RenderObject* renderer = object->renderer();
-    if (renderer && renderer->isListItem() && renderer->style().direction() == LTR)
-        return toRenderListItem(renderer)->markerTextWithSuffix().length();
+    if (is<RenderListItem>(renderer) && renderer->style().direction() == LTR)
+        return downcast<RenderListItem>(*renderer).markerTextWithSuffix().length();
 
     return 0;
 }
@@ -495,8 +495,8 @@ static gchar* webkitAccessibleTextGetText(AtkText* text, gint startOffset, gint 
     int actualEndOffset = endOffset == -1 ? ret.length() : endOffset;
     if (coreObject->roleValue() == ListItemRole) {
         RenderObject* objRenderer = coreObject->renderer();
-        if (objRenderer && objRenderer->isListItem()) {
-            String markerText = toRenderListItem(objRenderer)->markerTextWithSuffix();
+        if (is<RenderListItem>(objRenderer)) {
+            String markerText = downcast<RenderListItem>(*objRenderer).markerTextWithSuffix();
             ret = objRenderer->style().direction() == LTR ? markerText + ret : ret + markerText;
             if (endOffset == -1)
                 actualEndOffset = ret.length() + markerText.length();
@@ -1055,7 +1055,7 @@ static AtkAttributeSet* webkitAccessibleTextGetRunAttributes(AtkText* text, gint
     if (offset == -1)
         offset = atk_text_get_caret_offset(text);
 
-    result = getRunAttributesFromAccesibilityObject(coreObject, offset, startOffset, endOffset);
+    result = getRunAttributesFromAccessibilityObject(coreObject, offset, startOffset, endOffset);
 
     if (*startOffset < 0) {
         *startOffset = offset;

@@ -63,15 +63,17 @@ public:
     virtual String accessLog() const { return emptyString(); }
     virtual String errorLog() const { return emptyString(); }
 #endif
+    virtual long platformErrorCode() const { return 0; }
 
     virtual void play() = 0;
     virtual void pause() = 0;    
     virtual void setShouldBufferData(bool) { }
 
     virtual bool supportsFullscreen() const { return false; }
-    virtual bool supportsSave() const { return false; }
     virtual bool supportsScanning() const { return false; }
     virtual bool requiresImmediateCompositing() const { return false; }
+
+    virtual bool canSaveMediaData() const { return false; }
 
     virtual IntSize naturalSize() const = 0;
 
@@ -100,6 +102,7 @@ public:
 
     virtual void setRate(float) { }
     virtual void setRateDouble(double rate) { setRate(rate); }
+    virtual double rate() const { return 0; }
 
     virtual void setPreservesPitch(bool) { }
 
@@ -130,6 +133,7 @@ public:
     virtual MediaTime minMediaTimeSeekable() const { return MediaTime::createWithDouble(minTimeSeekable()); }
     virtual std::unique_ptr<PlatformTimeRanges> buffered() const = 0;
 
+    virtual unsigned long long totalBytes() const { return 0; }
     virtual bool didLoadingProgress() const = 0;
 
     virtual void setSize(const IntSize&) = 0;
@@ -221,6 +225,7 @@ public:
 #if ENABLE(ENCRYPTED_MEDIA_V2)
     virtual std::unique_ptr<CDMSession> createSession(const String&) { return nullptr; }
     virtual void setCDMSession(CDMSession*) { }
+    virtual void keyAdded() { }
 #endif
 
 #if ENABLE(VIDEO_TRACK)
@@ -240,8 +245,16 @@ public:
 
     virtual String languageOfPrimaryAudioTrack() const { return emptyString(); }
 
-    virtual size_t extraMemoryCost() const { return 0; }
-    
+    virtual size_t extraMemoryCost() const
+    {
+        MediaTime duration = this->durationMediaTime();
+        if (!duration)
+            return 0;
+
+        unsigned long long extra = totalBytes() * buffered()->totalDuration().toDouble() / duration.toDouble();
+        return static_cast<unsigned>(extra);
+    }
+
     virtual unsigned long long fileSize() const { return 0; }
 
 #if ENABLE(MEDIA_SOURCE)

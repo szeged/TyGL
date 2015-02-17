@@ -107,7 +107,8 @@
                         r"|LayoutTests/platform/efl/",
         },
         "EFLWebKit2PublicAPI": {
-            "filename": r"Source/WebKit2/UIProcess/API/efl/"
+            "filename": r"Source/WebKit2/WebProcess/InjectedBundle/API/efl/"
+                        r"|Source/WebKit2/UIProcess/API/efl/"
                         r"|Source/WebKit2/UIProcess/API/C/efl/",
         },
         "EFLWebKit2PlatformSpecific": {
@@ -295,7 +296,8 @@
                         r"|LayoutTests/media/media-source/",
         },
         "MacAndIOSTextLayoutAndRendering": {
-            "filename": r"Source/WebCore/rendering/.*Inline.*Box\.(h|cpp)"
+            "filename": r"Source/WebCore/loader/cache/CachedFont\.(h|cpp)"
+                        r"|Source/WebCore/rendering/.*Inline.*Box\.(h|cpp)"
                         r"|Source/WebCore/rendering/InlineIterator\.h"
                         r"|Source/WebCore/rendering/InlineBlockLineLayout\.cpp"
                         r"|Source/WebCore/rendering/RenderCombineText\.(h|cpp)"
@@ -328,7 +330,7 @@
         "BindingsScripts": [ "dchris@gmail.com", "cgarcia@igalia.com" ],
         "Cairo": [ "dominik.rottsches@intel.com" ],
         "CMake": [ "rakuco@webkit.org", "gyuyoung.kim@webkit.org", "ryuan.choi@gmail.com", "sergio.correia@openbossa.org" ],
-        "CoordinatedGraphics" : [ "noam@webkit.org", "zeno@webkit.org", "cmarcelo@webkit.org", "luiz@webkit.org", "ryuan.choi@gmail.com", "sergio.correia@openbossa.org" ],
+        "CoordinatedGraphics" : [ "noam@webkit.org", "zeno@webkit.org", "cmarcelo@webkit.org", "luiz@webkit.org", "ryuan.choi@gmail.com", "sergio.correia@openbossa.org", "gyuyoung.kim@webkit.org" ],
         "ConsoleUsage" : [ "mkwst@chromium.org" ],
         "ContentSecurityPolicyFiles|ContentSecurityPolicyUsage" : [ "mkwst@chromium.org" ],
         "CoreAnimation" : [ "simon.fraser@apple.com" ],

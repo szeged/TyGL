@@ -64,6 +64,7 @@ class InbandMetadataTextTrackPrivateAVF;
 class InbandTextTrackPrivateAVFObjC;
 class AudioSourceProviderAVFObjC;
 class AudioTrackPrivateAVFObjC;
+class MediaSelectionGroupAVFObjC;
 class VideoTrackPrivateAVFObjC;
 
 class MediaPlayerPrivateAVFoundationObjC : public MediaPlayerPrivateAVFoundation {
@@ -90,6 +91,7 @@ public:
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
     RetainPtr<AVAssetResourceLoadingRequest> takeRequestForKeyURI(const String&);
+    virtual void keyAdded() override;
 #endif
 
     void playerItemStatusDidChange(int);
@@ -173,10 +175,11 @@ private:
     virtual void createAVAssetForURL(const String& url);
     virtual MediaPlayerPrivateAVFoundation::ItemStatus playerItemStatus() const;
     virtual MediaPlayerPrivateAVFoundation::AssetStatus assetStatus() const;
+    virtual long assetErrorCode() const;
 
     virtual void checkPlayability();
-    virtual void updateRate();
-    virtual float rate() const;
+    virtual void setRateDouble(double) override;
+    virtual double rate() const;
     virtual void seekToTime(const MediaTime&, const MediaTime& negativeTolerance, const MediaTime& positiveTolerance);
     virtual unsigned long long totalBytes() const;
     virtual std::unique_ptr<PlatformTimeRanges> platformBufferedTimeRanges() const;
@@ -244,7 +247,11 @@ private:
 
 #if HAVE(AVFOUNDATION_MEDIA_SELECTION_GROUP)
     void processMediaSelectionOptions();
+    bool hasLoadedMediaSelectionGroups();
+
     AVMediaSelectionGroup* safeMediaSelectionGroupForLegibleMedia();
+    AVMediaSelectionGroup* safeMediaSelectionGroupForAudibleMedia();
+    AVMediaSelectionGroup* safeMediaSelectionGroupForVisualMedia();
 #endif
 
 #if ENABLE(DATACUE_VALUE)
@@ -274,6 +281,8 @@ private:
 
     virtual double maxFastForwardRate() const override { return m_cachedCanPlayFastForward ? std::numeric_limits<double>::infinity() : 2.0; }
     virtual double minFastReverseRate() const override { return m_cachedCanPlayFastReverse ? -std::numeric_limits<double>::infinity() : 0.0; }
+
+    virtual URL resolvedURL() const override;
 
     WeakPtrFactory<MediaPlayerPrivateAVFoundationObjC> m_weakPtrFactory;
 
@@ -325,6 +334,10 @@ private:
 #if ENABLE(VIDEO_TRACK)
     Vector<RefPtr<AudioTrackPrivateAVFObjC>> m_audioTracks;
     Vector<RefPtr<VideoTrackPrivateAVFObjC>> m_videoTracks;
+#if HAVE(AVFOUNDATION_MEDIA_SELECTION_GROUP)
+    RefPtr<MediaSelectionGroupAVFObjC> m_audibleGroup;
+    RefPtr<MediaSelectionGroupAVFObjC> m_visualGroup;
+#endif
 #endif
 
     InbandTextTrackPrivateAVF* m_currentTextTrack;

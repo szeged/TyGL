@@ -26,7 +26,6 @@
 #include "config.h"
 #include "MarkedBlock.h"
 
-#include "DelayedReleaseScope.h"
 #include "IncrementalSweeper.h"
 #include "JSCell.h"
 #include "JSDestructibleObject.h"
@@ -102,7 +101,7 @@ MarkedBlock::FreeList MarkedBlock::specializedSweep()
     // We only want to discard the newlyAllocated bits if we're creating a FreeList,
     // otherwise we would lose information on what's currently alive.
     if (sweepMode == SweepToFreeList && m_newlyAllocated)
-        m_newlyAllocated.clear();
+        m_newlyAllocated = nullptr;
 
     m_state = ((sweepMode == SweepToFreeList) ? FreeListed : Marked);
     return FreeList(head, count * cellSize());
@@ -110,7 +109,6 @@ MarkedBlock::FreeList MarkedBlock::specializedSweep()
 
 MarkedBlock::FreeList MarkedBlock::sweep(SweepMode sweepMode)
 {
-    ASSERT(DelayedReleaseScope::isInEffectFor(heap()->m_objectSpace));
     HEAP_LOG_BLOCK_STATE_TRANSITION(this);
 
     m_weakSet.sweep();
@@ -190,7 +188,7 @@ void MarkedBlock::stopAllocating(const FreeList& freeList)
     // way to tell what's live vs dead. 
     
     ASSERT(!m_newlyAllocated);
-    m_newlyAllocated = adoptPtr(new WTF::Bitmap<atomsPerBlock>());
+    m_newlyAllocated = std::make_unique<WTF::Bitmap<atomsPerBlock>>();
 
     SetNewlyAllocatedFunctor functor(this);
     forEachCell(functor);

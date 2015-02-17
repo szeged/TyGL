@@ -30,14 +30,13 @@
 #include "ColorSpace.h"
 #include "DashArray.h"
 #include "FloatRect.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "Gradient.h"
 #include "Image.h"
 #include "ImageOrientation.h"
 #include "Path.h"
 #include "Pattern.h"
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
 
 #if USE(CG)
 typedef struct CGContext PlatformGraphicsContext;
@@ -71,7 +70,7 @@ namespace WebCore {
 
 #if USE(WINGDI)
     class SharedBitmap;
-    class SimpleFontData;
+    class Font;
     class GlyphBuffer;
 #endif
 
@@ -91,9 +90,6 @@ namespace WebCore {
     class GraphicsContext3D;
     class TextRun;
     class TransformationMatrix;
-#if PLATFORM(IOS)
-    struct BidiStatus;
-#endif
 
     enum TextDrawingMode {
         TextModeFill = 1 << 0,
@@ -135,9 +131,6 @@ namespace WebCore {
             , shadowColorSpace(ColorSpaceDeviceRGB)
             , compositeOperator(CompositeSourceOver)
             , blendMode(BlendModeNormal)
-#if PLATFORM(IOS)
-            , emojiDrawingEnabled(true)
-#endif
             , shouldAntialias(true)
             , shouldSmoothFonts(true)
             , shouldSubpixelQuantizeFonts(true)
@@ -179,9 +172,6 @@ namespace WebCore {
         CompositeOperator compositeOperator;
         BlendMode blendMode;
 
-#if PLATFORM(IOS)
-        bool emojiDrawingEnabled : 1;
-#endif
         bool shouldAntialias : 1;
         bool shouldSmoothFonts : 1;
         bool shouldSubpixelQuantizeFonts : 1;
@@ -240,10 +230,10 @@ namespace WebCore {
         ColorSpace strokeColorSpace() const;
         WEBCORE_EXPORT void setStrokeColor(const Color&, ColorSpace);
 
-        void setStrokePattern(PassRef<Pattern>);
+        void setStrokePattern(Ref<Pattern>&&);
         Pattern* strokePattern() const;
 
-        void setStrokeGradient(PassRef<Gradient>);
+        void setStrokeGradient(Ref<Gradient>&&);
         Gradient* strokeGradient() const;
 
         WindRule fillRule() const;
@@ -252,10 +242,10 @@ namespace WebCore {
         ColorSpace fillColorSpace() const;
         WEBCORE_EXPORT void setFillColor(const Color&, ColorSpace);
 
-        void setFillPattern(PassRef<Pattern>);
+        void setFillPattern(Ref<Pattern>&&);
         Pattern* fillPattern() const;
 
-        WEBCORE_EXPORT void setFillGradient(PassRef<Gradient>);
+        WEBCORE_EXPORT void setFillGradient(Ref<Gradient>&&);
         Gradient* fillGradient() const;
 
         void setShadowsIgnoreTransforms(bool);
@@ -335,7 +325,7 @@ namespace WebCore {
         void drawTiledImage(Image*, ColorSpace, const FloatRect& destination, const FloatRect& source, const FloatSize& tileScaleFactor,
             Image::TileRule, Image::TileRule, const ImagePaintingOptions& = ImagePaintingOptions());
 
-        void drawImageBuffer(ImageBuffer*, ColorSpace, const FloatPoint& destination, const ImagePaintingOptions& = ImagePaintingOptions());
+        WEBCORE_EXPORT void drawImageBuffer(ImageBuffer*, ColorSpace, const FloatPoint& destination, const ImagePaintingOptions& = ImagePaintingOptions());
         void drawImageBuffer(ImageBuffer*, ColorSpace, const FloatRect& destination, const ImagePaintingOptions& = ImagePaintingOptions());
         void drawImageBuffer(ImageBuffer*, ColorSpace, const FloatRect& destination, const FloatRect& source, const ImagePaintingOptions& = ImagePaintingOptions());
 
@@ -356,24 +346,12 @@ namespace WebCore {
 
         TextDrawingModeFlags textDrawingMode() const;
         void setTextDrawingMode(TextDrawingModeFlags);
-
-#if PLATFORM(IOS)
-        bool emojiDrawingEnabled();
-        WEBCORE_EXPORT void setEmojiDrawingEnabled(bool);
-#endif
         
-#if !PLATFORM(IOS)
-        void drawText(const Font&, const TextRun&, const FloatPoint&, int from = 0, int to = -1);
-#else
-        float drawText(const Font&, const TextRun&, const FloatPoint&, int from = 0, int to = -1);
-#endif
-        void drawGlyphs(const Font&, const SimpleFontData&, const GlyphBuffer&, int from, int numGlyphs, const FloatPoint&);
-        void drawEmphasisMarks(const Font&, const TextRun& , const AtomicString& mark, const FloatPoint&, int from = 0, int to = -1);
-#if !PLATFORM(IOS)
-        void drawBidiText(const Font&, const TextRun&, const FloatPoint&, Font::CustomFontNotReadyAction = Font::DoNotPaintIfFontNotReady);
-#else
-        WEBCORE_EXPORT float drawBidiText(const Font&, const TextRun&, const FloatPoint&, Font::CustomFontNotReadyAction = Font::DoNotPaintIfFontNotReady, BidiStatus* = 0, int length = -1);
-#endif
+        float drawText(const FontCascade&, const TextRun&, const FloatPoint&, int from = 0, int to = -1);
+        void drawGlyphs(const FontCascade&, const Font&, const GlyphBuffer&, int from, int numGlyphs, const FloatPoint&);
+        void drawEmphasisMarks(const FontCascade&, const TextRun& , const AtomicString& mark, const FloatPoint&, int from = 0, int to = -1);
+        void drawBidiText(const FontCascade&, const TextRun&, const FloatPoint&, FontCascade::CustomFontNotReadyAction = FontCascade::DoNotPaintIfFontNotReady);
+
         enum RoundingMode {
             RoundAllSides,
             RoundOriginAndDimensions
@@ -486,7 +464,7 @@ namespace WebCore {
         AffineTransform& affineTransform();
         void resetAffineTransform();
         void fillRect(const FloatRect&, const Gradient*);
-        void drawText(const SimpleFontData* fontData, const GlyphBuffer& glyphBuffer, int from, int numGlyphs, const FloatPoint& point);
+        void drawText(const Font*, const GlyphBuffer&, int from, int numGlyphs, const FloatPoint&);
         void drawFrameControl(const IntRect& rect, unsigned type, unsigned state);
         void drawFocusRect(const IntRect& rect);
         void paintTextField(const IntRect& rect, unsigned state);
@@ -528,7 +506,7 @@ namespace WebCore {
             DIBPixelData m_pixelData;
         };
 
-        PassOwnPtr<WindowsBitmap> createWindowsBitmap(const IntSize&);
+        std::unique_ptr<WindowsBitmap> createWindowsBitmap(const IntSize&);
         // The bitmap should be non-premultiplied.
         void drawWindowsBitmap(WindowsBitmap*, const IntPoint&);
 #endif

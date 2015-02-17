@@ -30,12 +30,10 @@
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
-#include "WebResourceBuffer.h"
 #include "WebResourceLoadScheduler.h"
 #include "WebResourceLoaderMessages.h"
 #include <WebCore/CachedResource.h>
 #include <WebCore/MemoryCache.h>
-#include <WebCore/ResourceBuffer.h>
 #include <WebCore/SessionID.h>
 #include <WebCore/SharedBuffer.h>
 
@@ -47,7 +45,7 @@ namespace WebKit {
 
 NetworkProcessConnection::NetworkProcessConnection(IPC::Connection::Identifier connectionIdentifier)
 {
-    m_connection = IPC::Connection::createClientConnection(connectionIdentifier, this, RunLoop::main());
+    m_connection = IPC::Connection::createClientConnection(connectionIdentifier, *this, RunLoop::main());
     m_connection->open();
 }
 
@@ -55,10 +53,10 @@ NetworkProcessConnection::~NetworkProcessConnection()
 {
 }
 
-void NetworkProcessConnection::didReceiveMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder)
+void NetworkProcessConnection::didReceiveMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
 {
     if (decoder.messageReceiverName() == Messages::WebResourceLoader::messageReceiverName()) {
-        if (WebResourceLoader* webResourceLoader = WebProcess::shared().webResourceLoadScheduler().webResourceLoaderForIdentifier(decoder.destinationID()))
+        if (WebResourceLoader* webResourceLoader = WebProcess::singleton().webResourceLoadScheduler().webResourceLoaderForIdentifier(decoder.destinationID()))
             webResourceLoader->didReceiveWebResourceLoaderMessage(connection, decoder);
         
         return;
@@ -67,25 +65,25 @@ void NetworkProcessConnection::didReceiveMessage(IPC::Connection* connection, IP
     didReceiveNetworkProcessConnectionMessage(connection, decoder);
 }
 
-void NetworkProcessConnection::didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&)
+void NetworkProcessConnection::didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&)
 {
     ASSERT_NOT_REACHED();
 }
 
-void NetworkProcessConnection::didClose(IPC::Connection*)
+void NetworkProcessConnection::didClose(IPC::Connection&)
 {
     // The NetworkProcess probably crashed.
-    WebProcess::shared().networkProcessConnectionClosed(this);
+    WebProcess::singleton().networkProcessConnectionClosed(this);
 }
 
-void NetworkProcessConnection::didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference, IPC::StringReference)
+void NetworkProcessConnection::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
 {
 }
 
 #if ENABLE(SHAREABLE_RESOURCE)
 void NetworkProcessConnection::didCacheResource(const ResourceRequest& request, const ShareableResource::Handle& handle, SessionID sessionID)
 {
-    CachedResource* resource = memoryCache()->resourceForRequest(request, sessionID);
+    CachedResource* resource = MemoryCache::singleton().resourceForRequest(request, sessionID);
     if (!resource)
         return;
     
@@ -95,7 +93,7 @@ void NetworkProcessConnection::didCacheResource(const ResourceRequest& request, 
         return;
     }
 
-    resource->tryReplaceEncodedData(buffer.release());
+    resource->tryReplaceEncodedData(*buffer);
 }
 #endif
 

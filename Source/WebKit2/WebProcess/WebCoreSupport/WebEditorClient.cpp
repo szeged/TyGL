@@ -76,14 +76,6 @@ bool WebEditorClient::shouldDeleteRange(Range* range)
     return result;
 }
 
-#if ENABLE(DELETION_UI)
-bool WebEditorClient::shouldShowDeleteInterface(HTMLElement*)
-{
-    notImplemented();
-    return false;
-}
-#endif
-
 bool WebEditorClient::smartInsertDeleteEnabled()
 {
     return m_page->isSmartInsertDeleteEnabled();
@@ -96,7 +88,7 @@ bool WebEditorClient::isSelectTrailingWhitespaceEnabled()
 
 bool WebEditorClient::isContinuousSpellCheckingEnabled()
 {
-    return WebProcess::shared().textCheckerState().isContinuousSpellCheckingEnabled;
+    return WebProcess::singleton().textCheckerState().isContinuousSpellCheckingEnabled;
 }
 
 void WebEditorClient::toggleContinuousSpellChecking()
@@ -106,7 +98,7 @@ void WebEditorClient::toggleContinuousSpellChecking()
 
 bool WebEditorClient::isGrammarCheckingEnabled()
 {
-    return WebProcess::shared().textCheckerState().isGrammarCheckingEnabled;
+    return WebProcess::singleton().textCheckerState().isGrammarCheckingEnabled;
 }
 
 void WebEditorClient::toggleGrammarChecking()
@@ -157,7 +149,7 @@ bool WebEditorClient::shouldChangeSelectedRange(Range* fromRange, Range* toRange
     
 bool WebEditorClient::shouldApplyStyle(StyleProperties* style, Range* range)
 {
-    Ref<MutableStyleProperties> mutableStyle(style->isMutable() ? static_cast<MutableStyleProperties&>(*style) : style->mutableCopy());
+    Ref<MutableStyleProperties> mutableStyle(style->isMutable() ? Ref<MutableStyleProperties>(static_cast<MutableStyleProperties&>(*style)) : style->mutableCopy());
     bool result = m_page->injectedBundleEditorClient().shouldApplyStyle(m_page, mutableStyle->ensureCSSStyleDeclaration(), range);
     notImplemented();
     return result;
@@ -196,6 +188,11 @@ void WebEditorClient::respondToChangedSelection(Frame* frame)
 #if PLATFORM(GTK)
     updateGlobalSelection(frame);
 #endif
+}
+
+void WebEditorClient::discardedComposition(Frame*)
+{
+    m_page->discardedComposition();
 }
 
 void WebEditorClient::didEndEditing()

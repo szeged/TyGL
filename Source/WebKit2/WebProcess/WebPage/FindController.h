@@ -68,6 +68,8 @@ public:
 
     void deviceScaleFactorDidChange();
 
+    void redraw();
+
 private:
     // PageOverlay::Client.
     virtual void pageOverlayDestroyed(WebCore::PageOverlay&);
@@ -77,7 +79,6 @@ private:
     virtual void drawRect(WebCore::PageOverlay&, WebCore::GraphicsContext&, const WebCore::IntRect& dirtyRect);
 
     Vector<WebCore::IntRect> rectsForTextMatches();
-    bool getFindIndicatorBitmapAndRect(WebCore::Frame&, ShareableBitmap::Handle&, WebCore::IntRect& selectionRect);
     bool updateFindIndicator(WebCore::Frame& selectedFrame, bool isShowingOverlay, bool shouldAnimate = true);
 
     void updateFindUIAfterPageScroll(bool found, const String&, FindOptions, unsigned maxMatchCount);

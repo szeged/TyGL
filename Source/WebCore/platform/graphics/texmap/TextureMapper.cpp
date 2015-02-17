@@ -54,10 +54,10 @@ public:
 
 private:
     void scheduleReleaseUnusedTextures();
-    void releaseUnusedTexturesTimerFired(Timer<BitmapTexturePool>*);
+    void releaseUnusedTexturesTimerFired();
 
     Vector<BitmapTexturePoolEntry> m_textures;
-    Timer<BitmapTexturePool> m_releaseUnusedTexturesTimer;
+    Timer m_releaseUnusedTexturesTimer;
 
     static const double s_releaseUnusedSecondsTolerance;
     static const double s_releaseUnusedTexturesTimerInterval;
@@ -67,7 +67,7 @@ const double BitmapTexturePool::s_releaseUnusedSecondsTolerance = 3;
 const double BitmapTexturePool::s_releaseUnusedTexturesTimerInterval = 0.5;
 
 BitmapTexturePool::BitmapTexturePool()
-    : m_releaseUnusedTexturesTimer(this, &BitmapTexturePool::releaseUnusedTexturesTimerFired)
+    : m_releaseUnusedTexturesTimer(*this, &BitmapTexturePool::releaseUnusedTexturesTimerFired)
 { }
 
 void BitmapTexturePool::scheduleReleaseUnusedTextures()
@@ -78,7 +78,7 @@ void BitmapTexturePool::scheduleReleaseUnusedTextures()
     m_releaseUnusedTexturesTimer.startOneShot(s_releaseUnusedTexturesTimerInterval);
 }
 
-void BitmapTexturePool::releaseUnusedTexturesTimerFired(Timer<BitmapTexturePool>*)
+void BitmapTexturePool::releaseUnusedTexturesTimerFired()
 {
     if (m_textures.isEmpty())
         return;
@@ -98,15 +98,13 @@ void BitmapTexturePool::releaseUnusedTexturesTimerFired(Timer<BitmapTexturePool>
 PassRefPtr<BitmapTexture> BitmapTexturePool::acquireTexture(const IntSize& size, TextureMapper* textureMapper)
 {
     BitmapTexturePoolEntry* selectedEntry = 0;
-    for (size_t i = 0; i < m_textures.size(); ++i) {
-        BitmapTexturePoolEntry* entry = &m_textures[i];
-
+    for (auto& entry : m_textures) {
         // If the surface has only one reference (the one in m_textures), we can safely reuse it.
-        if (entry->m_texture->refCount() > 1)
+        if (entry.m_texture->refCount() > 1)
             continue;
 
-        if (entry->m_texture->canReuseWith(size)) {
-            selectedEntry = entry;
+        if (entry.m_texture->canReuseWith(size)) {
+            selectedEntry = &entry;
             break;
         }
     }
@@ -125,7 +123,7 @@ PassRefPtr<BitmapTexture> TextureMapper::acquireTextureFromPool(const IntSize& s
 {
     RefPtr<BitmapTexture> selectedTexture = m_texturePool->acquireTexture(size, this);
     selectedTexture->reset(size, flags);
-    return selectedTexture;
+    return selectedTexture.release();
 }
 
 std::unique_ptr<TextureMapper> TextureMapper::create(AccelerationMode mode)

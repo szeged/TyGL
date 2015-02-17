@@ -35,19 +35,17 @@ if [[ -e $TIMESTAMP_PATH && $0 -nt $TIMESTAMP_PATH ]]; then
 fi
 
 function rewrite_headers () {
-    if [[ $PLATFORM_NAME == "iphonesimulator" || $PLATFORM_NAME == "iphoneos" ]]; then
-        IOS_VERSION=${IPHONEOS_DEPLOYMENT_TARGET/\./_}
-        OSX_VERSION="NA"
-    elif [[ $PLATFORM_NAME == "macosx" ]]; then
+    if [[ "${PLATFORM_NAME}" == "macosx" ]]; then
         OSX_VERSION=${MACOSX_DEPLOYMENT_TARGET/\./_}
         IOS_VERSION="NA"
     else
-        exit 1;
+        IOS_VERSION=${IPHONEOS_DEPLOYMENT_TARGET/\./_}
+        OSX_VERSION="NA"
     fi
 
     for HEADER_PATH in $1/*.h; do
         if [[ $HEADER_PATH -nt $TIMESTAMP_PATH ]]; then
-            sed -e s/WK_MAC_TBA/${OSX_VERSION}/ -e s/WK_IOS_TBA/${IOS_VERSION}/ -e s/^WK_CLASS_AVAILABLE/NS_CLASS_AVAILABLE/ -e s/WK_AVAILABLE/NS_AVAILABLE/ -e s/WK_DESIGNATED_INITIALIZER/NS_DESIGNATED_INITIALIZER/ -e s/WK_ENUM_AVAILABLE/NS_ENUM_AVAILABLE/ -e s/WK_UNAVAILABLE/NS_UNAVAILABLE/ ${HEADER_PATH} > ${TARGET_TEMP_DIR}/${HEADER_PATH##*/} || exit $_;
+            sed -e s/WK_MAC_TBA/${OSX_VERSION}/ -e s/WK_IOS_TBA/${IOS_VERSION}/ -e s/^WK_CLASS_AVAILABLE/NS_CLASS_AVAILABLE/ -e s/WK_AVAILABLE/NS_AVAILABLE/ -e s/WK_DEPRECATED/NS_DEPRECATED/ -e s/WK_DESIGNATED_INITIALIZER/NS_DESIGNATED_INITIALIZER/ -e s/WK_ENUM_AVAILABLE/NS_ENUM_AVAILABLE/ -e s/WK_UNAVAILABLE/NS_UNAVAILABLE/ ${HEADER_PATH} > ${TARGET_TEMP_DIR}/${HEADER_PATH##*/} || exit $_;
             mv ${TARGET_TEMP_DIR}/${HEADER_PATH##*/} $HEADER_PATH;
         fi
     done

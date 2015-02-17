@@ -109,6 +109,7 @@ static bool hasDoubleValue(CSSPrimitiveValue::UnitTypes type)
     case CSSPrimitiveValue::CSS_DEG:
     case CSSPrimitiveValue::CSS_RAD:
     case CSSPrimitiveValue::CSS_GRAD:
+    case CSSPrimitiveValue::CSS_TURN:
     case CSSPrimitiveValue::CSS_MS:
     case CSSPrimitiveValue::CSS_S:
     case CSSPrimitiveValue::CSS_HZ:
@@ -124,6 +125,7 @@ static bool hasDoubleValue(CSSPrimitiveValue::UnitTypes type)
         return true;
     case CSSPrimitiveValue::CSS_UNKNOWN:
     case CSSPrimitiveValue::CSS_STRING:
+    case CSSPrimitiveValue::CSS_FONT_FAMILY:
     case CSSPrimitiveValue::CSS_URI:
     case CSSPrimitiveValue::CSS_IDENT:
     case CSSPrimitiveValue::CSS_ATTR:
@@ -135,7 +137,6 @@ static bool hasDoubleValue(CSSPrimitiveValue::UnitTypes type)
     case CSSPrimitiveValue::CSS_PARSER_OPERATOR:
     case CSSPrimitiveValue::CSS_PARSER_HEXCOLOR:
     case CSSPrimitiveValue::CSS_PARSER_IDENTIFIER:
-    case CSSPrimitiveValue::CSS_TURN:
     case CSSPrimitiveValue::CSS_COUNTER_NAME:
     case CSSPrimitiveValue::CSS_SHAPE:
     case CSSPrimitiveValue::CSS_QUAD:
@@ -197,7 +198,7 @@ double CSSCalcValue::computeLengthPx(const CSSToLengthConversionData& conversion
 class CSSCalcPrimitiveValue final : public CSSCalcExpressionNode {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRef<CSSCalcPrimitiveValue> create(PassRefPtr<CSSPrimitiveValue> value, bool isInteger)
+    static Ref<CSSCalcPrimitiveValue> create(PassRefPtr<CSSPrimitiveValue> value, bool isInteger)
     {
         return adoptRef(*new CSSCalcPrimitiveValue(value, isInteger));
     }
@@ -242,6 +243,7 @@ private:
         case CalcOther:
             ASSERT_NOT_REACHED();
         }
+        ASSERT_NOT_REACHED();
         return nullptr;
     }
 
@@ -311,14 +313,13 @@ static CalculationCategory determineCategory(const CSSCalcExpressionNode& leftSi
 {
     CalculationCategory leftCategory = leftSide.category();
     CalculationCategory rightCategory = rightSide.category();
-
-    if (leftCategory == CalcOther || rightCategory == CalcOther)
-        return CalcOther;
+    ASSERT(leftCategory < CalcOther);
+    ASSERT(rightCategory < CalcOther);
 
     switch (op) {
     case CalcAdd:
     case CalcSubtract:
-        if (leftCategory < CalcAngle || rightCategory < CalcAngle)
+        if (leftCategory < CalcAngle && rightCategory < CalcAngle)
             return addSubtractResult[leftCategory][rightCategory];
         if (leftCategory == rightCategory)
             return leftCategory;
@@ -349,7 +350,8 @@ class CSSCalcBinaryOperation final : public CSSCalcExpressionNode {
 public:
     static PassRefPtr<CSSCalcBinaryOperation> create(CalcOperator op, PassRefPtr<CSSCalcExpressionNode> leftSide, PassRefPtr<CSSCalcExpressionNode> rightSide)
     {
-        ASSERT(leftSide->category() != CalcOther && rightSide->category() != CalcOther);
+        ASSERT(leftSide->category() < CalcOther);
+        ASSERT(rightSide->category() < CalcOther);
 
         CalculationCategory newCategory = determineCategory(*leftSide, *rightSide, op);
 
@@ -363,7 +365,8 @@ public:
     {
         CalculationCategory leftCategory = leftSide->category();
         CalculationCategory rightCategory = rightSide->category();
-        ASSERT(leftCategory != CalcOther && rightCategory != CalcOther);
+        ASSERT(leftCategory < CalcOther);
+        ASSERT(rightCategory < CalcOther);
 
         bool isInteger = isIntegerResult(op, *leftSide, *rightSide);
 

@@ -42,7 +42,7 @@ public:
     virtual String extraQuirksStyleSheet() override;
     virtual String extraPlugInsStyleSheet() override;
 
-    virtual void systemFont(WebCore::CSSValueID, FontDescription&) const override;
+    virtual void systemFont(WebCore::CSSValueID, FontDescription&) const; // FIXME: override.
 
     // Returns the repeat interval of the animation for the progress bar.
     virtual double animationRepeatIntervalForProgressBar(RenderProgress&) const override;
@@ -55,6 +55,8 @@ public:
 #endif
 
 protected:
+    virtual void updateCachedSystemFontDescription(CSSValueID systemFontID, FontDescription&) const override;
+
     // The platform selection color.
     virtual Color platformActiveSelectionBackgroundColor() const override;
     virtual Color platformInactiveSelectionBackgroundColor() const override;

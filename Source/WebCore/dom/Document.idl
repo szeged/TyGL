@@ -22,6 +22,7 @@
     Constructor,
     ConstructorCallWith=ScriptExecutionContext,
     CustomToJSObject,
+    JSCustomHeader,
     JSGenerateToNativeObject,
 ] interface Document : Node {
 
@@ -105,6 +106,8 @@
     [ObjCLegacyUnnamedParameters] CSSStyleDeclaration getOverrideStyle([Default=Undefined] optional Element element,
                                                         [Default=Undefined] optional DOMString pseudoElement);
 
+    readonly attribute DOMString contentType;
+
     // DOM Level 3 XPath (XPathEvaluator interface)
     [ObjCLegacyUnnamedParameters, RaisesException] XPathExpression createExpression([Default=Undefined] optional DOMString expression,
                                                     [Default=Undefined] optional XPathNSResolver resolver);
@@ -146,7 +149,7 @@
 
     [TreatNullAs=NullString, GetterRaisesException, SetterRaisesException] attribute DOMString cookie;
 
-    [SetterRaisesException] attribute HTMLElement body;
+    [SetterRaisesException, ImplementedAs=bodyOrFrameset] attribute HTMLElement body;
 
     readonly attribute HTMLHeadElement head;
     readonly attribute HTMLCollection images;

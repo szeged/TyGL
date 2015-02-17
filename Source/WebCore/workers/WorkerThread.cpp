@@ -39,11 +39,6 @@
 #include <wtf/Noncopyable.h>
 #include <wtf/text/WTFString.h>
 
-#if ENABLE(SQL_DATABASE)
-#include "DatabaseManager.h"
-#include "DatabaseTask.h"
-#endif
-
 #if PLATFORM(IOS)
 #include "FloatingPointEnvironment.h"
 #include "WebCoreThread.h"
@@ -80,11 +75,10 @@ unsigned WorkerThread::workerThreadCount()
 struct WorkerThreadStartupData {
     WTF_MAKE_NONCOPYABLE(WorkerThreadStartupData); WTF_MAKE_FAST_ALLOCATED;
 public:
-    WorkerThreadStartupData(const URL& scriptURL, const String& userAgent, const GroupSettings*, const String& sourceCode, WorkerThreadStartMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType, const SecurityOrigin* topOrigin);
+    WorkerThreadStartupData(const URL& scriptURL, const String& userAgent, const String& sourceCode, WorkerThreadStartMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType, const SecurityOrigin* topOrigin);
 
     URL m_scriptURL;
     String m_userAgent;
-    std::unique_ptr<GroupSettings> m_groupSettings;
     String m_sourceCode;
     WorkerThreadStartMode m_startMode;
     String m_contentSecurityPolicy;
@@ -92,29 +86,22 @@ public:
     RefPtr<SecurityOrigin> m_topOrigin;
 };
 
-WorkerThreadStartupData::WorkerThreadStartupData(const URL& scriptURL, const String& userAgent, const GroupSettings* settings, const String& sourceCode, WorkerThreadStartMode startMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType, const SecurityOrigin* topOrigin)
+WorkerThreadStartupData::WorkerThreadStartupData(const URL& scriptURL, const String& userAgent, const String& sourceCode, WorkerThreadStartMode startMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType, const SecurityOrigin* topOrigin)
     : m_scriptURL(scriptURL.copy())
     , m_userAgent(userAgent.isolatedCopy())
     , m_sourceCode(sourceCode.isolatedCopy())
     , m_startMode(startMode)
     , m_contentSecurityPolicy(contentSecurityPolicy.isolatedCopy())
     , m_contentSecurityPolicyType(contentSecurityPolicyType)
-    , m_topOrigin(topOrigin ? topOrigin->isolatedCopy() : 0)
+    , m_topOrigin(topOrigin ? &topOrigin->isolatedCopy().get() : nullptr)
 {
-    if (!settings)
-        return;
-
-    m_groupSettings = std::make_unique<GroupSettings>();
-    m_groupSettings->setLocalStorageQuotaBytes(settings->localStorageQuotaBytes());
-    m_groupSettings->setIndexedDBQuotaBytes(settings->indexedDBQuotaBytes());
-    m_groupSettings->setIndexedDBDatabasePath(settings->indexedDBDatabasePath().isolatedCopy());
 }
 
-WorkerThread::WorkerThread(const URL& scriptURL, const String& userAgent, const GroupSettings* settings, const String& sourceCode, WorkerLoaderProxy& workerLoaderProxy, WorkerReportingProxy& workerReportingProxy, WorkerThreadStartMode startMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType, const SecurityOrigin* topOrigin)
+WorkerThread::WorkerThread(const URL& scriptURL, const String& userAgent, const String& sourceCode, WorkerLoaderProxy& workerLoaderProxy, WorkerReportingProxy& workerReportingProxy, WorkerThreadStartMode startMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType, const SecurityOrigin* topOrigin)
     : m_threadID(0)
     , m_workerLoaderProxy(workerLoaderProxy)
     , m_workerReportingProxy(workerReportingProxy)
-    , m_startupData(std::make_unique<WorkerThreadStartupData>(scriptURL, userAgent, settings, sourceCode, startMode, contentSecurityPolicy, contentSecurityPolicyType, topOrigin))
+    , m_startupData(std::make_unique<WorkerThreadStartupData>(scriptURL, userAgent, sourceCode, startMode, contentSecurityPolicy, contentSecurityPolicyType, topOrigin))
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     , m_notificationClient(0)
 #endif
@@ -154,12 +141,12 @@ void WorkerThread::workerThread()
 {
     // Propagate the mainThread's fenv to workers.
 #if PLATFORM(IOS)
-    FloatingPointEnvironment::shared().propagateMainThreadEnvironment();
+    FloatingPointEnvironment::singleton().propagateMainThreadEnvironment();
 #endif
 
     {
         MutexLocker lock(m_threadCreationMutex);
-        m_workerGlobalScope = createWorkerGlobalScope(m_startupData->m_scriptURL, m_startupData->m_userAgent, WTF::move(m_startupData->m_groupSettings), m_startupData->m_contentSecurityPolicy, m_startupData->m_contentSecurityPolicyType, m_startupData->m_topOrigin.release());
+        m_workerGlobalScope = createWorkerGlobalScope(m_startupData->m_scriptURL, m_startupData->m_userAgent, m_startupData->m_contentSecurityPolicy, m_startupData->m_contentSecurityPolicyType, m_startupData->m_topOrigin.release());
 
         if (m_runLoop.terminated()) {
             // The worker was terminated before the thread had a chance to run. Since the context didn't exist yet,
@@ -169,9 +156,7 @@ void WorkerThread::workerThread()
     }
 
     WorkerScriptController* script = m_workerGlobalScope->script();
-#if ENABLE(INSPECTOR)
     InspectorInstrumentation::willEvaluateWorkerScript(workerGlobalScope(), m_startupData->m_startMode);
-#endif
     script->evaluate(ScriptSourceCode(m_startupData->m_sourceCode, m_startupData->m_scriptURL));
     // Free the startup data to cause its member variable deref's happen on the worker's thread (since
     // all ref/derefs of these objects are happening on the thread at this point). Note that
@@ -210,31 +195,15 @@ void WorkerThread::stop()
     if (m_workerGlobalScope) {
         m_workerGlobalScope->script()->scheduleExecutionTermination();
 
-#if ENABLE(SQL_DATABASE)
-        DatabaseManager::manager().interruptAllDatabasesForContext(m_workerGlobalScope.get());
-#endif
         m_runLoop.postTaskAndTerminate({ ScriptExecutionContext::Task::CleanupTask, [] (ScriptExecutionContext& context ) {
             WorkerGlobalScope& workerGlobalScope = downcast<WorkerGlobalScope>(context);
 
-#if ENABLE(SQL_DATABASE)
-            // FIXME: Should we stop the databases as part of stopActiveDOMObjects() below?
-            DatabaseTaskSynchronizer cleanupSync;
-            DatabaseManager::manager().stopDatabases(&workerGlobalScope, &cleanupSync);
-#endif
-
             workerGlobalScope.stopActiveDOMObjects();
-
             workerGlobalScope.notifyObserversOfStop();
 
             // Event listeners would keep DOMWrapperWorld objects alive for too long. Also, they have references to JS objects,
             // which become dangling once Heap is destroyed.
             workerGlobalScope.removeAllEventListeners();
-
-#if ENABLE(SQL_DATABASE)
-            // We wait for the database thread to clean up all its stuff so that we
-            // can do more stringent leak checks as we exit.
-            cleanupSync.waitForTaskCompletion();
-#endif
 
             // Stick a shutdown command at the end of the queue, so that we deal
             // with all the cleanup tasks the databases post first.
@@ -254,10 +223,11 @@ void WorkerThread::releaseFastMallocFreeMemoryInAllThreads()
 {
     std::lock_guard<std::mutex> lock(threadSetMutex());
 
-    for (auto* workerThread : workerThreads())
+    for (auto* workerThread : workerThreads()) {
         workerThread->runLoop().postTask([] (ScriptExecutionContext&) {
             WTF::releaseFastMallocFreeMemory();
         });
+    }
 }
 
 } // namespace WebCore

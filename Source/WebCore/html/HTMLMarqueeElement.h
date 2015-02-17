@@ -32,14 +32,14 @@ class RenderMarquee;
 
 class HTMLMarqueeElement final : public HTMLElement, private ActiveDOMObject {
 public:
-    static PassRefPtr<HTMLMarqueeElement> create(const QualifiedName&, Document&);
+    static Ref<HTMLMarqueeElement> create(const QualifiedName&, Document&);
 
     int minimumDelay() const;
 
     // DOM Functions
 
     void start();
-    void stop() override;
+    virtual void stop() override;
     
     int scrollAmount() const;
     void setScrollAmount(int, ExceptionCode&);
@@ -60,6 +60,7 @@ private:
     virtual bool canSuspend() const override;
     virtual void suspend(ReasonForSuspension) override;
     virtual void resume() override;
+    virtual const char* activeDOMObjectName() const override { return "HTMLMarqueeElement"; }
 
     RenderMarquee* renderMarquee() const;
 };

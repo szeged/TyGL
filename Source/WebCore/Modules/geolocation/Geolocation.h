@@ -51,15 +51,13 @@ class ScriptExecutionContext;
 class Geolocation : public ScriptWrappable, public RefCounted<Geolocation>, public ActiveDOMObject
 {
 public:
-    static PassRef<Geolocation> create(ScriptExecutionContext*);
+    static Ref<Geolocation> create(ScriptExecutionContext*);
     WEBCORE_EXPORT ~Geolocation();
 
-#if PLATFORM(IOS)
     virtual bool canSuspend() const override;
     virtual void suspend(ReasonForSuspension) override;
     virtual void resume() override;
     WEBCORE_EXPORT void resetAllGeolocationPermission();
-#endif // PLATFORM(IOS)
     Document* document() const;
     WEBCORE_EXPORT Frame* frame() const;
 
@@ -87,7 +85,7 @@ private:
 
     class GeoNotifier : public RefCounted<GeoNotifier> {
     public:
-        static PassRef<GeoNotifier> create(Geolocation* geolocation, PassRefPtr<PositionCallback> positionCallback, PassRefPtr<PositionErrorCallback> positionErrorCallback, PassRefPtr<PositionOptions> options) { return adoptRef(*new GeoNotifier(geolocation, positionCallback, positionErrorCallback, options)); }
+        static Ref<GeoNotifier> create(Geolocation* geolocation, PassRefPtr<PositionCallback> positionCallback, PassRefPtr<PositionErrorCallback> positionErrorCallback, PassRefPtr<PositionOptions> options) { return adoptRef(*new GeoNotifier(geolocation, positionCallback, positionErrorCallback, options)); }
 
         PositionOptions* options() const { return m_options.get(); };
         void setFatalError(PassRefPtr<PositionError>);
@@ -100,7 +98,7 @@ private:
 
         void startTimerIfNeeded();
         void stopTimer();
-        void timerFired(Timer<GeoNotifier>&);
+        void timerFired();
         bool hasZeroTimeout() const;
 
     private:
@@ -110,7 +108,7 @@ private:
         RefPtr<PositionCallback> m_successCallback;
         RefPtr<PositionErrorCallback> m_errorCallback;
         RefPtr<PositionOptions> m_options;
-        Timer<GeoNotifier> m_timer;
+        Timer m_timer;
         RefPtr<PositionError> m_fatalError;
         bool m_useCachedPosition;
     };
@@ -169,6 +167,8 @@ private:
     bool haveSuitableCachedPosition(PositionOptions*);
     void makeCachedPositionCallbacks();
 
+    virtual const char* activeDOMObjectName() const override { return "Geolocation"; }
+
     GeoNotifierSet m_oneShots;
     Watchers m_watchers;
     GeoNotifierSet m_pendingForPermissionNotifiers;
@@ -180,15 +180,13 @@ private:
         Yes,
         No
     } m_allowGeolocation;
-#if PLATFORM(IOS)
     bool m_isSuspended;
     bool m_resetOnResume;
     bool m_hasChangedPosition;
     RefPtr<PositionError> m_errorWaitingForResume;
 
-    void resumeTimerFired(Timer<Geolocation>&);
-    Timer<Geolocation> m_resumeTimer;
-#endif // PLATFORM(IOS)
+    void resumeTimerFired();
+    Timer m_resumeTimer;
 
     GeoNotifierSet m_requestsAwaitingCachedPosition;
 };

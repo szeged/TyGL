@@ -135,10 +135,10 @@ void WebPageProxy::setInputMethodState(bool enabled)
     webkitWebViewBaseSetInputMethodState(WEBKIT_WEB_VIEW_BASE(viewWidget()), enabled);
 }
 
-#if USE(TEXTURE_MAPPER_GL)
-void WebPageProxy::setAcceleratedCompositingWindowId(uint64_t nativeWindowId)
+#if HAVE(GTK_GESTURES)
+void WebPageProxy::getCenterForZoomGesture(const WebCore::IntPoint& centerInViewCoordinates, WebCore::IntPoint& center)
 {
-    process().send(Messages::WebPage::SetAcceleratedCompositingWindowId(nativeWindowId), m_pageID);
+    process().sendSync(Messages::WebPage::GetCenterForZoomGesture(centerInViewCoordinates), Messages::WebPage::GetCenterForZoomGesture::Reply(center), m_pageID);
 }
 #endif
 

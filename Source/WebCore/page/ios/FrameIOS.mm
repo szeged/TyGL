@@ -35,7 +35,6 @@
 #import "DOMNodeInternal.h"
 #import "DOMWindow.h"
 #import "Document.h"
-#import "DocumentMarker.h"
 #import "DocumentMarkerController.h"
 #import "Editor.h"
 #import "EditorClient.h"
@@ -63,6 +62,7 @@
 #import "RenderLayerCompositor.h"
 #import "RenderTextControl.h"
 #import "RenderView.h"
+#import "RenderedDocumentMarker.h"
 #import "TextBoundaries.h"
 #import "TextIterator.h"
 #import "VisiblePosition.h"
@@ -293,7 +293,7 @@ static Node* ancestorRespondingToScrollWheelEvents(const HitTestResult& hitTestR
         if (!renderer)
             continue;
 
-        if ((renderer->isTextField() || renderer->isTextArea()) && toRenderTextControl(renderer)->canScroll()) {
+        if ((renderer->isTextField() || renderer->isTextArea()) && downcast<RenderTextControl>(*renderer).canScroll()) {
             scrollingAncestor = node;
             continue;
         }
@@ -547,7 +547,7 @@ int Frame::preferredHeight() const
 
     document->updateLayout();
 
-    Node* body = document->body();
+    auto* body = document->bodyOrFrameset();
     if (!body)
         return 0;
 
@@ -744,11 +744,11 @@ NSArray *Frame::interpretationsForCurrentRoot() const
     if (!document())
         return nil;
 
-    Element* root = selection().selection().selectionType() == VisibleSelection::NoSelection ? document()->body() : selection().selection().rootEditableElement();
+    auto* root = selection().selection().selectionType() == VisibleSelection::NoSelection ? document()->bodyOrFrameset() : selection().selection().rootEditableElement();
     unsigned rootChildCount = root->countChildNodes();
     RefPtr<Range> rangeOfRootContents = Range::create(*document(), createLegacyEditingPosition(root, 0), createLegacyEditingPosition(root, rootChildCount));
 
-    Vector<DocumentMarker*> markersInRoot = document()->markers().markersInRange(rangeOfRootContents.get(), DocumentMarker::DictationPhraseWithAlternatives);
+    auto markersInRoot = document()->markers().markersInRange(rangeOfRootContents.get(), DocumentMarker::DictationPhraseWithAlternatives);
 
     // There are no phrases with alternatives, so there is just one interpretation.
     if (markersInRoot.isEmpty())
@@ -768,7 +768,7 @@ NSArray *Frame::interpretationsForCurrentRoot() const
     unsigned combinationsSoFar = 1;
 
     Node* pastLastNode = rangeOfRootContents->pastLastNode();
-    for (Node* node = rangeOfRootContents->firstNode(); node != pastLastNode; node = NodeTraversal::next(node)) {
+    for (Node* node = rangeOfRootContents->firstNode(); node != pastLastNode; node = NodeTraversal::next(*node)) {
         for (auto* marker : document()->markers().markersFor(node, DocumentMarker::MarkerTypes(DocumentMarker::DictationPhraseWithAlternatives))) {
             // First, add text that precede the marker.
             if (precedingTextStartPosition != createLegacyEditingPosition(node, marker->startOffset())) {
@@ -853,12 +853,12 @@ void Frame::overflowScrollPositionChangedForNode(const IntPoint& position, Node*
     if (!renderer || !renderer->hasLayer())
         return;
 
-    RenderLayer* layer = toRenderBoxModelObject(renderer)->layer();
+    RenderLayer& layer = *downcast<RenderBoxModelObject>(*renderer).layer();
 
-    layer->setIsUserScroll(isUserScroll);
-    layer->scrollToOffsetWithoutAnimation(position);
-    layer->setIsUserScroll(false);
-    layer->didEndScroll(); // FIXME: Should we always call this?
+    layer.setIsUserScroll(isUserScroll);
+    layer.scrollToOffsetWithoutAnimation(position);
+    layer.setIsUserScroll(false);
+    layer.didEndScroll(); // FIXME: Should we always call this?
 }
 
 void Frame::resetAllGeolocationPermission()

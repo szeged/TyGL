@@ -95,7 +95,6 @@ bool doesGC(Graph& graph, Node* node)
     case GetButterfly:
     case CheckArray:
     case GetScope:
-    case GetMyScope:
     case SkipScope:
     case GetClosureRegisters:
     case GetClosureVar:
@@ -119,12 +118,11 @@ bool doesGC(Graph& graph, Node* node)
     case Construct:
     case NativeCall:
     case NativeConstruct:
-    case ProfiledCall:
-    case ProfiledConstruct:
     case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
     case ProfileType:
+    case ProfileControlFlow:
     case CheckHasInstance:
     case InstanceOf:
     case IsUndefined:

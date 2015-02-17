@@ -36,7 +36,6 @@
 #include <WebCore/CoordinatedGraphicsState.h>
 #include <WebCore/FilterOperations.h>
 #include <WebCore/FloatPoint3D.h>
-#include <WebCore/GraphicsLayerAnimation.h>
 #include <WebCore/IdentityTransformOperation.h>
 #include <WebCore/IntPoint.h>
 #include <WebCore/Length.h>
@@ -47,6 +46,7 @@
 #include <WebCore/ScaleTransformOperation.h>
 #include <WebCore/SkewTransformOperation.h>
 #include <WebCore/SurfaceUpdateInfo.h>
+#include <WebCore/TextureMapperAnimation.h>
 #include <WebCore/TimingFunction.h>
 #include <WebCore/TransformationMatrix.h>
 #include <WebCore/TranslateTransformOperation.h>
@@ -64,30 +64,30 @@ void ArgumentCoder<WebCore::FilterOperations>::encode(ArgumentEncoder& encoder, 
 {
     encoder << static_cast<uint32_t>(filters.size());
     for (size_t i = 0; i < filters.size(); ++i) {
-        const FilterOperation* filter = filters.at(i);
-        FilterOperation::OperationType type = filter->type();
+        const FilterOperation& filter = *filters.at(i);
+        FilterOperation::OperationType type = filter.type();
         encoder.encodeEnum(type);
         switch (type) {
         case FilterOperation::GRAYSCALE:
         case FilterOperation::SEPIA:
         case FilterOperation::SATURATE:
         case FilterOperation::HUE_ROTATE:
-            encoder << static_cast<double>(toBasicColorMatrixFilterOperation(filter)->amount());
+            encoder << static_cast<double>(downcast<BasicColorMatrixFilterOperation>(filter).amount());
             break;
         case FilterOperation::INVERT:
         case FilterOperation::BRIGHTNESS:
         case FilterOperation::CONTRAST:
         case FilterOperation::OPACITY:
-            encoder << static_cast<double>(toBasicComponentTransferFilterOperation(filter)->amount());
+            encoder << static_cast<double>(downcast<BasicComponentTransferFilterOperation>(filter).amount());
             break;
         case FilterOperation::BLUR:
-            ArgumentCoder<Length>::encode(encoder, toBlurFilterOperation(filter)->stdDeviation());
+            ArgumentCoder<Length>::encode(encoder, downcast<BlurFilterOperation>(filter).stdDeviation());
             break;
         case FilterOperation::DROP_SHADOW: {
-            const DropShadowFilterOperation* shadow = toDropShadowFilterOperation(filter);
-            ArgumentCoder<IntPoint>::encode(encoder, shadow->location());
-            encoder << static_cast<int32_t>(shadow->stdDeviation());
-            ArgumentCoder<Color>::encode(encoder, shadow->color());
+            const DropShadowFilterOperation& shadow = downcast<DropShadowFilterOperation>(filter);
+            ArgumentCoder<IntPoint>::encode(encoder, shadow.location());
+            encoder << static_cast<int32_t>(shadow.stdDeviation());
+            ArgumentCoder<Color>::encode(encoder, shadow.color());
             break;
         }
         case FilterOperation::REFERENCE:
@@ -171,8 +171,7 @@ bool ArgumentCoder<WebCore::FilterOperations>::decode(ArgumentDecoder& decoder, 
 void ArgumentCoder<TransformOperations>::encode(ArgumentEncoder& encoder, const TransformOperations& transformOperations)
 {
     encoder << static_cast<uint32_t>(transformOperations.size());
-    for (size_t i = 0; i < transformOperations.size(); ++i) {
-        const TransformOperation* operation = transformOperations.at(i);
+    for (const auto& operation : transformOperations.operations()) {
         encoder.encodeEnum(operation->type());
 
         switch (operation->type()) {
@@ -180,43 +179,51 @@ void ArgumentCoder<TransformOperations>::encode(ArgumentEncoder& encoder, const 
         case TransformOperation::SCALE_Y:
         case TransformOperation::SCALE:
         case TransformOperation::SCALE_Z:
-        case TransformOperation::SCALE_3D:
-            encoder << toScaleTransformOperation(operation)->x();
-            encoder << toScaleTransformOperation(operation)->y();
-            encoder << toScaleTransformOperation(operation)->z();
+        case TransformOperation::SCALE_3D: {
+            const auto& scaleOperation = downcast<ScaleTransformOperation>(*operation);
+            encoder << scaleOperation.x();
+            encoder << scaleOperation.y();
+            encoder << scaleOperation.z();
             break;
+        }
         case TransformOperation::TRANSLATE_X:
         case TransformOperation::TRANSLATE_Y:
         case TransformOperation::TRANSLATE:
         case TransformOperation::TRANSLATE_Z:
-        case TransformOperation::TRANSLATE_3D:
-            ArgumentCoder<Length>::encode(encoder, toTranslateTransformOperation(operation)->x());
-            ArgumentCoder<Length>::encode(encoder, toTranslateTransformOperation(operation)->y());
-            ArgumentCoder<Length>::encode(encoder, toTranslateTransformOperation(operation)->z());
+        case TransformOperation::TRANSLATE_3D: {
+            const auto& translateOperation = downcast<TranslateTransformOperation>(*operation);
+            ArgumentCoder<Length>::encode(encoder, translateOperation.x());
+            ArgumentCoder<Length>::encode(encoder, translateOperation.y());
+            ArgumentCoder<Length>::encode(encoder, translateOperation.z());
             break;
+        }
         case TransformOperation::ROTATE:
         case TransformOperation::ROTATE_X:
         case TransformOperation::ROTATE_Y:
-        case TransformOperation::ROTATE_3D:
-            encoder << toRotateTransformOperation(operation)->x();
-            encoder << toRotateTransformOperation(operation)->y();
-            encoder << toRotateTransformOperation(operation)->z();
-            encoder << toRotateTransformOperation(operation)->angle();
+        case TransformOperation::ROTATE_3D: {
+            const auto& rotateOperation = downcast<RotateTransformOperation>(*operation);
+            encoder << rotateOperation.x();
+            encoder << rotateOperation.y();
+            encoder << rotateOperation.z();
+            encoder << rotateOperation.angle();
             break;
+        }
         case TransformOperation::SKEW_X:
         case TransformOperation::SKEW_Y:
-        case TransformOperation::SKEW:
-            encoder << toSkewTransformOperation(operation)->angleX();
-            encoder << toSkewTransformOperation(operation)->angleY();
+        case TransformOperation::SKEW: {
+            const auto& skewOperation = downcast<SkewTransformOperation>(*operation);
+            encoder << skewOperation.angleX();
+            encoder << skewOperation.angleY();
             break;
+        }
         case TransformOperation::MATRIX:
-            ArgumentCoder<TransformationMatrix>::encode(encoder, toMatrixTransformOperation(operation)->matrix());
+            ArgumentCoder<TransformationMatrix>::encode(encoder, downcast<MatrixTransformOperation>(*operation).matrix());
             break;
         case TransformOperation::MATRIX_3D:
-            ArgumentCoder<TransformationMatrix>::encode(encoder, toMatrix3DTransformOperation(operation)->matrix());
+            ArgumentCoder<TransformationMatrix>::encode(encoder, downcast<Matrix3DTransformOperation>(*operation).matrix());
             break;
         case TransformOperation::PERSPECTIVE:
-            ArgumentCoder<Length>::encode(encoder, toPerspectiveTransformOperation(operation)->perspective());
+            ArgumentCoder<Length>::encode(encoder, downcast<PerspectiveTransformOperation>(*operation).perspective());
             break;
         case TransformOperation::IDENTITY:
             break;
@@ -411,7 +418,7 @@ bool decodeTimingFunction(ArgumentDecoder& decoder, RefPtr<TimingFunction>& timi
     return false;
 }
 
-void ArgumentCoder<GraphicsLayerAnimation>::encode(ArgumentEncoder& encoder, const GraphicsLayerAnimation& animation)
+void ArgumentCoder<TextureMapperAnimation>::encode(ArgumentEncoder& encoder, const TextureMapperAnimation& animation)
 {
     encoder << animation.name();
     encoder << animation.boxSize();
@@ -450,11 +457,11 @@ void ArgumentCoder<GraphicsLayerAnimation>::encode(ArgumentEncoder& encoder, con
     }
 }
 
-bool ArgumentCoder<GraphicsLayerAnimation>::decode(ArgumentDecoder& decoder, GraphicsLayerAnimation& animation)
+bool ArgumentCoder<TextureMapperAnimation>::decode(ArgumentDecoder& decoder, TextureMapperAnimation& animation)
 {
     String name;
     IntSize boxSize;
-    GraphicsLayerAnimation::AnimationState state;
+    TextureMapperAnimation::AnimationState state;
     double startTime;
     double pauseTime;
     bool listsMatch;
@@ -517,21 +524,21 @@ bool ArgumentCoder<GraphicsLayerAnimation>::decode(ArgumentDecoder& decoder, Gra
             float value;
             if (!decoder.decode(value))
                 return false;
-            keyframes.insert(FloatAnimationValue::create(keyTime, value, timingFunction.get()));
+            keyframes.insert(std::make_unique<FloatAnimationValue>(keyTime, value, timingFunction.get()));
             break;
         }
         case AnimatedPropertyWebkitTransform: {
             TransformOperations transform;
             if (!decoder.decode(transform))
                 return false;
-            keyframes.insert(TransformAnimationValue::create(keyTime, transform, timingFunction.get()));
+            keyframes.insert(std::make_unique<TransformAnimationValue>(keyTime, transform, timingFunction.get()));
             break;
         }
         case AnimatedPropertyWebkitFilter: {
             FilterOperations filter;
             if (!decoder.decode(filter))
                 return false;
-            keyframes.insert(FilterAnimationValue::create(keyTime, filter, timingFunction.get()));
+            keyframes.insert(std::make_unique<FilterAnimationValue>(keyTime, filter, timingFunction.get()));
             break;
         }
         default:
@@ -539,18 +546,18 @@ bool ArgumentCoder<GraphicsLayerAnimation>::decode(ArgumentDecoder& decoder, Gra
         }
     }
 
-    animation = GraphicsLayerAnimation(name, keyframes, boxSize, animationObject.get(), startTime, listsMatch);
+    animation = TextureMapperAnimation(name, keyframes, boxSize, animationObject.get(), startTime, listsMatch);
     animation.setState(state, pauseTime);
 
     return true;
 }
 
-void ArgumentCoder<GraphicsLayerAnimations>::encode(ArgumentEncoder& encoder, const GraphicsLayerAnimations& animations)
+void ArgumentCoder<TextureMapperAnimations>::encode(ArgumentEncoder& encoder, const TextureMapperAnimations& animations)
 {
     encoder << animations.animations();
 }
 
-bool ArgumentCoder<GraphicsLayerAnimations>::decode(ArgumentDecoder& decoder, GraphicsLayerAnimations& animations)
+bool ArgumentCoder<TextureMapperAnimations>::decode(ArgumentDecoder& decoder, TextureMapperAnimations& animations)
 {
     return decoder.decode(animations.animations());
 }

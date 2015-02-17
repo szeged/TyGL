@@ -30,32 +30,19 @@
 
 #import "FrameLoadState.h"
 #import "NativeWebWheelEvent.h"
-#import "WebPageGroup.h"
 #import "ViewGestureControllerMessages.h"
 #import "ViewGestureGeometryCollectorMessages.h"
 #import "ViewSnapshotStore.h"
 #import "WebBackForwardList.h"
+#import "WebPageGroup.h"
 #import "WebPageMessages.h"
 #import "WebPageProxy.h"
 #import "WebPreferences.h"
 #import "WebProcessProxy.h"
 #import <Cocoa/Cocoa.h>
-#import <QuartzCore/QuartzCore.h>
 #import <WebCore/IOSurface.h>
+#import <WebCore/QuartzCoreSPI.h>
 #import <WebCore/WebActionDisablingCALayerDelegate.h>
-
-#if defined(__has_include) && __has_include(<QuartzCore/QuartzCorePrivate.h>)
-#import <QuartzCore/QuartzCorePrivate.h>
-#else
-@interface CAFilter : NSObject <NSCopying, NSMutableCopying, NSCoding>
-@end
-#endif
-
-@interface CAFilter (Details)
-+ (CAFilter *)filterWithType:(NSString *)type;
-@end
-
-extern NSString * const kCAFilterColorInvert;
 
 using namespace WebCore;
 
@@ -400,6 +387,9 @@ void ViewGestureController::trackSwipeGesture(NSEvent *event, SwipeDirection dir
     CGFloat maxProgress = (direction == SwipeDirection::Left) ? 1 : 0;
     CGFloat minProgress = (direction == SwipeDirection::Right) ? -1 : 0;
     RefPtr<WebBackForwardListItem> targetItem = (direction == SwipeDirection::Left) ? m_webPageProxy.backForwardList().backItem() : m_webPageProxy.backForwardList().forwardItem();
+    if (!targetItem)
+        return;
+    
     __block bool swipeCancelled = false;
 
     ASSERT(!m_swipeCancellationTracker);
@@ -508,10 +498,8 @@ static bool layerGeometryFlippedToRoot(CALayer *layer)
 
 void ViewGestureController::applyDebuggingPropertiesToSwipeViews()
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     CAFilter* filter = [CAFilter filterWithType:kCAFilterColorInvert];
     [m_swipeLayer setFilters:@[ filter ]];
-#endif
     [m_swipeLayer setBackgroundColor:[NSColor blueColor].CGColor];
     [m_swipeLayer setBorderColor:[NSColor yellowColor].CGColor];
     [m_swipeLayer setBorderWidth:4];

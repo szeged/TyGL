@@ -23,7 +23,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#include "config.h"
 
 #if ENABLE(VIDEO) && !USE(GSTREAMER) && !USE(MEDIA_FOUNDATION)
 
@@ -35,7 +34,7 @@
 #include <WebCore/BitmapInfo.h>
 #include <WebCore/Chrome.h>
 #include <WebCore/FloatRoundedRect.h>
-#include <WebCore/Font.h>
+#include <WebCore/FontCascade.h>
 #include <WebCore/FontSelector.h>
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/HWndDC.h>
@@ -245,7 +244,7 @@ FullscreenVideoController::FullscreenVideoController()
     , m_timeSlider(HUDSlider::DiamondButton, timeSliderButtonSize, IntRect(IntPoint(windowWidth / 2 - timeSliderWidth / 2, windowHeight - margin - sliderHeight), IntSize(timeSliderWidth, sliderHeight)))
     , m_hitWidget(0)
     , m_movingWindow(false)
-    , m_timer(this, &FullscreenVideoController::timerFired)
+    , m_timer(*this, &FullscreenVideoController::timerFired)
     , m_layerClient(adoptPtr(new LayerClient(this)))
     , m_rootChild(PlatformCALayerWin::create(PlatformCALayer::LayerTypeLayer, m_layerClient.get()))
     , m_fullscreenWindow(adoptPtr(new MediaPlayerPrivateFullscreenWindow(this)))
@@ -282,7 +281,8 @@ void FullscreenVideoController::enterFullscreen()
     m_fullscreenWindow->setRootChildLayer(m_rootChild);
 
     PlatformCALayer* videoLayer = PlatformCALayer::platformCALayer(m_videoElement->platformLayer());
-    m_rootChild->appendSublayer(videoLayer);
+    ASSERT(videoLayer);
+    m_rootChild->appendSublayer(*videoLayer);
     m_rootChild->setNeedsLayout();
     m_rootChild->setGeometryFlipped(1);
 
@@ -515,7 +515,7 @@ void FullscreenVideoController::draw()
     desc.setOneFamily(metrics.lfSmCaptionFont.lfFaceName);
 
     desc.setComputedSize(textSize);
-    Font font = Font(desc, 0, 0);
+    FontCascade font = FontCascade(desc, 0, 0);
     font.update(0);
 
     String s;
@@ -594,7 +594,7 @@ void FullscreenVideoController::onKeyDown(int virtualKey)
     }
 }
 
-void FullscreenVideoController::timerFired(Timer<FullscreenVideoController>*)
+void FullscreenVideoController::timerFired()
 {
     // Update the time slider
     m_timeSlider.setValue(currentTime() / duration());

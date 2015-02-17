@@ -53,11 +53,40 @@
 }
 
 .console-item.selected {
-    background-color: rgb(212, 212, 212);
+    background-color: hsl(210, 0%, 96%);
 }
 
 .console-messages:focus .console-item.selected {
-    background-color: highlight;
+    background-color: hsl(210, 98%, 96%);
+}
+
+.console-item.selected .console-user-command::after,
+.console-item.selected .console-message::after {
+    position: absolute;
+    display: block;
+    content: "";
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: hsl(0, 0%, 60%);
+    width: 2px;
+}
+
+.console-messages:focus .console-item.selected .data-grid tr.selected {
+    background-color: hsl(210, 90%, 90%) !important;
+}
+
+.console-item .data-grid tr.selected {
+    background-color: hsl(210, 0%, 90%) !important;
+}
+
+.console-messages:focus .console-item.selected .console-user-command::after,
+.console-messages:focus .console-item.selected .console-message::after {
+    background: hsl(210, 100%, 49%);
+}
+
+.console-messages:focus .console-item.selected .go-to-link {
+    color: hsl(210, 100%, 33%);
 }
 
 .console-user-command-result.console-log-level::before {
@@ -246,18 +275,49 @@
     display: none;
 }
 
-.console-formatted-object, .console-formatted-node {
+.console-object-preview {
+    font-style: italic;
+}
+
+.console-object-preview-lossless,
+.console-formatted-array .console-object-preview,
+.expanded .console-object-preview {
+    font-style: normal;
+}
+
+.console-object-preview .name {
+ /* Match ObjectPropertiesSection name styles */
+    color: rgb(136, 19, 145);
+}
+
+.expanded .console-object-preview > .console-object-preview-body {
+    display: none;
+}
+
+.console-object-preview > .console-object-preview-name.console-object-preview-name-Object {
+    display: none;
+}
+
+.console-object-preview-body .console-object-preview-name.console-object-preview-name-Object { 
+    display: none;
+}
+
+.expanded .console-object-preview > .console-object-preview-name.console-object-preview-name-Object {
+    display: inline;
+}
+
+.console-formatted-object, .console-formatted-node, .console-formatted-error, .console-formatted-map, .console-formatted-set, .console-formatted-weakmap {
     position: relative;
     display: inline-block;
     vertical-align: top;
     color: black;
 }
 
-.console-formatted-object .section, .console-formatted-node .section {
+:matches(.console-formatted-object, .console-formatted-node, .console-formatted-error, .console-formatted-map, .console-formatted-set, .console-formatted-weakmap) .section {
     position: static;
 }
 
-.console-formatted-object .properties, .console-formatted-node .properties {
+:matches(.console-formatted-object, .console-formatted-node, .console-formatted-error, .console-formatted-map, .console-formatted-set, .console-formatted-weakmap) .properties {
     padding-left: 0 !important;
 }
 
@@ -275,6 +335,10 @@
 
 .console-formatted-regexp {
     color: rgb(255, 88, 0);
+}
+
+.console-formatted-symbol {
+    color: rgb(63, 169, 156);
 }
 
 .console-formatted-null, .console-formatted-undefined {

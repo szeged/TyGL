@@ -156,7 +156,7 @@ public:
     virtual bool isAlphaLocked() const override { return m_isAlphaLocked; }
     virtual void setIsAlphaLocked(bool flag) override { m_isAlphaLocked = flag; }
 
-    virtual bool supportsUpdateOnSecondaryThread() const;
+    virtual bool supportsUpdateOnSecondaryThread() const override;
 
 protected:
     Scrollbar(ScrollableArea*, ScrollbarOrientation, ScrollbarControlSize, ScrollbarTheme* = 0, bool isCustomScrollbar = false);
@@ -165,7 +165,7 @@ protected:
     virtual void updateThumbPosition();
     virtual void updateThumbProportion();
 
-    void autoscrollTimerFired(Timer<Scrollbar>&);
+    void autoscrollTimerFired();
     void startTimerIfNeeded(double delay);
     void stopTimerIfNeeded();
     void autoscrollPressedPart(double delay);
@@ -194,7 +194,7 @@ protected:
 
     bool m_enabled;
 
-    Timer<Scrollbar> m_scrollTimer;
+    Timer m_scrollTimer;
     bool m_overlapsResizer;
 
     bool m_suppressInvalidation;

@@ -50,9 +50,9 @@ inline SVGFEColorMatrixElement::SVGFEColorMatrixElement(const QualifiedName& tag
     registerAnimatedPropertiesForSVGFEColorMatrixElement();
 }
 
-PassRefPtr<SVGFEColorMatrixElement> SVGFEColorMatrixElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEColorMatrixElement> SVGFEColorMatrixElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEColorMatrixElement(tagName, document));
+    return adoptRef(*new SVGFEColorMatrixElement(tagName, document));
 }
 
 bool SVGFEColorMatrixElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -115,7 +115,7 @@ void SVGFEColorMatrixElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::typeAttr || attrName == SVGNames::valuesAttr) {
         primitiveAttributeChanged(attrName);

@@ -38,7 +38,6 @@ WebProcessCreationParameters::WebProcessCreationParameters()
 #if PLATFORM(COCOA)
     , nsURLCacheMemoryCapacity(0)
     , nsURLCacheDiskCapacity(0)
-    , shouldForceScreenFontSubstitution(false)
     , shouldEnableKerningAndLigaturesByDefault(false)
     , shouldEnableJIT(false)
     , shouldEnableFTLJIT(false)
@@ -56,10 +55,15 @@ WebProcessCreationParameters::WebProcessCreationParameters()
 {
 }
 
+WebProcessCreationParameters::~WebProcessCreationParameters()
+{
+}
+
 void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder << injectedBundlePath;
     encoder << injectedBundlePathExtensionHandle;
+    encoder << initializationUserData;
     encoder << applicationCacheDirectory;
     encoder << applicationCacheDirectoryExtensionHandle;
     encoder << webSQLDatabaseDirectory;
@@ -73,6 +77,8 @@ void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << containerTemporaryDirectoryExtensionHandle;
     encoder << hstsDatabasePathExtensionHandle;
 #endif
+    encoder << mediaKeyStorageDirectory;
+    encoder << mediaKeyStorageDirectoryExtensionHandle;
     encoder << shouldUseTestingNetworkSession;
     encoder << urlSchemesRegistererdAsEmptyDocument;
     encoder << urlSchemesRegisteredAsSecure;
@@ -84,13 +90,8 @@ void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
 #if ENABLE(CACHE_PARTITIONING)
     encoder << urlSchemesRegisteredAsCachePartitioned;
 #endif
-#if ENABLE(CUSTOM_PROTOCOLS)
     encoder << urlSchemesRegisteredForCustomProtocols;
-#endif
 #if USE(SOUP)
-#if !ENABLE(CUSTOM_PROTOCOLS)
-    encoder << urlSchemesRegistered;
-#endif
     encoder << cookiePersistentStoragePath;
     encoder << cookiePersistentStorageType;
     encoder.encodeEnum(cookieAcceptPolicy);
@@ -116,7 +117,6 @@ void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << acceleratedCompositingPort;
     encoder << uiProcessBundleResourcePath;
     encoder << uiProcessBundleResourcePathExtensionHandle;
-    encoder << shouldForceScreenFontSubstitution;
     encoder << shouldEnableKerningAndLigaturesByDefault;
     encoder << shouldEnableJIT;
     encoder << shouldEnableFTLJIT;
@@ -151,6 +151,8 @@ bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProc
         return false;
     if (!decoder.decode(parameters.injectedBundlePathExtensionHandle))
         return false;
+    if (!decoder.decode(parameters.initializationUserData))
+        return false;
     if (!decoder.decode(parameters.applicationCacheDirectory))
         return false;
     if (!decoder.decode(parameters.applicationCacheDirectoryExtensionHandle))
@@ -175,6 +177,10 @@ bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProc
     if (!decoder.decode(parameters.hstsDatabasePathExtensionHandle))
         return false;
 #endif
+    if (!decoder.decode(parameters.mediaKeyStorageDirectory))
+        return false;
+    if (!decoder.decode(parameters.mediaKeyStorageDirectoryExtensionHandle))
+        return false;
     if (!decoder.decode(parameters.shouldUseTestingNetworkSession))
         return false;
     if (!decoder.decode(parameters.urlSchemesRegistererdAsEmptyDocument))
@@ -195,15 +201,9 @@ bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProc
     if (!decoder.decode(parameters.urlSchemesRegisteredAsCachePartitioned))
         return false;
 #endif
-#if ENABLE(CUSTOM_PROTOCOLS)
     if (!decoder.decode(parameters.urlSchemesRegisteredForCustomProtocols))
         return false;
-#endif
 #if USE(SOUP)
-#if !ENABLE(CUSTOM_PROTOCOLS)
-    if (!decoder.decode(parameters.urlSchemesRegistered))
-        return false;
-#endif
     if (!decoder.decode(parameters.cookiePersistentStoragePath))
         return false;
     if (!decoder.decode(parameters.cookiePersistentStorageType))
@@ -250,8 +250,6 @@ bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProc
     if (!decoder.decode(parameters.uiProcessBundleResourcePath))
         return false;
     if (!decoder.decode(parameters.uiProcessBundleResourcePathExtensionHandle))
-        return false;
-    if (!decoder.decode(parameters.shouldForceScreenFontSubstitution))
         return false;
     if (!decoder.decode(parameters.shouldEnableKerningAndLigaturesByDefault))
         return false;

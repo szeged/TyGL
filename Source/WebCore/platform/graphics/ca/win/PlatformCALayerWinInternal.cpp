@@ -27,8 +27,7 @@
 
 #include "PlatformCALayerWinInternal.h"
 
-#include "Font.h"
-#include "FontCache.h"
+#include "FontCascade.h"
 #include "GraphicsContext.h"
 #include "PlatformCALayer.h"
 #include "TextRun.h"
@@ -69,9 +68,35 @@ PlatformCALayerWinInternal::~PlatformCALayerWinInternal()
 {
 }
 
-void PlatformCALayerWinInternal::displayCallback(CACFLayerRef caLayer, CGContextRef context)
+struct DisplayOnMainThreadContext {
+    RetainPtr<CACFLayerRef> layer;
+    RetainPtr<CGContextRef> context;
+
+    DisplayOnMainThreadContext(CACFLayerRef caLayer, CGContextRef caContext)
+        : layer(caLayer)
+        , context(caContext)
+    {
+    }
+};
+
+static void redispatchOnMainQueue(void* context)
 {
     ASSERT(isMainThread());
+    std::unique_ptr<DisplayOnMainThreadContext> retainedContext(reinterpret_cast<DisplayOnMainThreadContext*>(context));
+    if (!retainedContext)
+        return;
+
+    PlatformCALayerWinInternal* self = static_cast<PlatformCALayerWinInternal*>(CACFLayerGetUserData(retainedContext->layer.get()));
+
+    self->displayCallback(retainedContext->layer.get(), retainedContext->context.get());
+}
+
+void PlatformCALayerWinInternal::displayCallback(CACFLayerRef caLayer, CGContextRef context)
+{
+    if (!isMainThread()) {
+        dispatch_async_f(dispatch_get_main_queue(), new DisplayOnMainThreadContext(caLayer, context), redispatchOnMainQueue);
+        return;
+    }
     
     if (!owner() || !owner()->owner())
         return;
@@ -105,8 +130,6 @@ void PlatformCALayerWinInternal::displayCallback(CACFLayerRef caLayer, CGContext
 #endif
 
     if (owner()->owner()->platformCALayerShowRepaintCounter(owner())) {
-        FontCachePurgePreventer fontCachePurgePreventer;
-
         String text = String::number(owner()->owner()->platformCALayerIncrementRepaintCount(owner()));
 
         CGContextSaveGState(context);
@@ -136,7 +159,7 @@ void PlatformCALayerWinInternal::displayCallback(CACFLayerRef caLayer, CGContext
 
         desc.setComputedSize(18);
         
-        Font font = Font(desc, 0, 0);
+        FontCascade font = FontCascade(desc, 0, 0);
         font.update(0);
 
         GraphicsContext cg(context);
@@ -258,16 +281,16 @@ void PlatformCALayerWinInternal::removeAllSublayers()
     }
 }
 
-void PlatformCALayerWinInternal::insertSublayer(PlatformCALayer* layer, size_t index)
+void PlatformCALayerWinInternal::insertSublayer(PlatformCALayer& layer, size_t index)
 {
     index = min(index, sublayerCount());
     if (layerTypeIsTiled(m_owner->layerType())) {
         // Add 1 to account for the tile parent layer
-        index++;
+        ++index;
     }
 
-    layer->removeFromSuperlayer();
-    CACFLayerInsertSublayer(owner()->platformLayer(), layer->platformLayer(), index);
+    layer.removeFromSuperlayer();
+    CACFLayerInsertSublayer(owner()->platformLayer(), layer.platformLayer(), index);
     owner()->setNeedsCommit();
 }
 
@@ -503,7 +526,7 @@ void PlatformCALayerWinInternal::drawTile(CACFLayerRef tile, CGContextRef contex
 TileController* PlatformCALayerWinInternal::createTileController(PlatformCALayer* rootLayer)
 {
     ASSERT(!m_tileController);
-    m_tileController = TileController::create(rootLayer);
+    m_tileController = std::make_unique<TileController>(rootLayer);
     return m_tileController.get();
 }
 

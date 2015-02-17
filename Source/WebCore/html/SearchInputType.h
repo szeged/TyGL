@@ -48,7 +48,7 @@ public:
 private:
     virtual void addSearchResult() override;
     virtual void maxResultsAttributeChanged() override;
-    virtual RenderPtr<RenderElement> createInputRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createInputRenderer(Ref<RenderStyle>&&) override;
     virtual const AtomicString& formControlType() const override;
     virtual bool isSearchField() const override;
     virtual bool needsContainer() const override;
@@ -61,13 +61,13 @@ private:
     virtual bool sizeShouldIncludeDecoration(int defaultSize, int& preferredSize) const override;
     virtual float decorationWidth() const override;
 
-    void searchEventTimerFired(Timer<SearchInputType>*);
+    void searchEventTimerFired();
     bool searchEventsShouldBeDispatched() const;
     void startSearchEventTimer();
 
     SearchFieldResultsButtonElement* m_resultsButton;
     HTMLElement* m_cancelButton;
-    Timer<SearchInputType> m_searchEventTimer;
+    Timer m_searchEventTimer;
 };
 
 } // namespace WebCore

@@ -58,7 +58,7 @@ namespace WebCore {
 #if PLATFORM(WIN)
     class SharedCursor : public RefCounted<SharedCursor> {
     public:
-        static PassRefPtr<SharedCursor> create(HCURSOR nativeCursor) { return adoptRef(new SharedCursor(nativeCursor)); }
+        static Ref<SharedCursor> create(HCURSOR nativeCursor) { return adoptRef(*new SharedCursor(nativeCursor)); }
         ~SharedCursor();
         HCURSOR nativeCursor() const { return m_nativeCursor; }
     private:
@@ -132,6 +132,9 @@ namespace WebCore {
 #if !PLATFORM(IOS)
             // This is an invalid Cursor and should never actually get used.
             : m_type(static_cast<Type>(-1))
+#if ENABLE(MOUSE_CURSOR_SCALE)
+            , m_imageScaleFactor(1)
+#endif
             , m_platformCursor(0)
 #endif // !PLATFORM(IOS)
         {

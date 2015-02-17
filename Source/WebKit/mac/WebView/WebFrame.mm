@@ -87,6 +87,7 @@
 #import <WebCore/PrintContext.h>
 #import <WebCore/RenderView.h>
 #import <WebCore/RenderWidget.h>
+#import <WebCore/RenderedDocumentMarker.h>
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/ScriptController.h>
 #import <WebCore/SecurityOrigin.h>
@@ -113,11 +114,11 @@
 #import <WebCore/Editor.h>
 #import <WebCore/EditorClient.h>
 #import <WebCore/FocusController.h>
+#import <WebCore/Font.h>
 #import <WebCore/FrameSelection.h>
 #import <WebCore/HistoryController.h>
 #import <WebCore/NodeTraversal.h>
 #import <WebCore/RenderLayer.h>
-#import <WebCore/SimpleFontData.h>
 #import <WebCore/TextResourceDecoder.h>
 #import <WebCore/WAKScrollView.h>
 #import <WebCore/WAKViewPrivate.h>
@@ -315,26 +316,26 @@ WebView *getWebView(WebFrame *webFrame)
     return kit(coreFrame->page());
 }
 
-+ (PassRefPtr<Frame>)_createFrameWithPage:(Page*)page frameName:(const String&)name frameView:(WebFrameView *)frameView ownerElement:(HTMLFrameOwnerElement*)ownerElement
++ (Ref<WebCore::Frame>)_createFrameWithPage:(Page*)page frameName:(const String&)name frameView:(WebFrameView *)frameView ownerElement:(HTMLFrameOwnerElement*)ownerElement
 {
     WebView *webView = kit(page);
 
     WebFrame *frame = [[self alloc] _initWithWebFrameView:frameView webView:webView];
-    RefPtr<Frame> coreFrame = Frame::create(page, ownerElement, new WebFrameLoaderClient(frame));
+    Ref<WebCore::Frame> coreFrame = Frame::create(page, ownerElement, new WebFrameLoaderClient(frame));
     [frame release];
-    frame->_private->coreFrame = coreFrame.get();
+    frame->_private->coreFrame = coreFrame.ptr();
 
-    coreFrame->tree().setName(name);
+    coreFrame.get().tree().setName(name);
     if (ownerElement) {
         ASSERT(ownerElement->document().frame());
-        ownerElement->document().frame()->tree().appendChild(coreFrame.get());
+        ownerElement->document().frame()->tree().appendChild(coreFrame.ptr());
     }
 
-    coreFrame->init();
+    coreFrame.get().init();
 
     [webView _setZoomMultiplier:[webView _realZoomMultiplier] isTextOnly:[webView _realZoomMultiplierIsTextOnly]];
 
-    return coreFrame.release();
+    return coreFrame;
 }
 
 + (void)_createMainFrameWithPage:(Page*)page frameName:(const String&)name frameView:(WebFrameView *)frameView
@@ -352,7 +353,7 @@ WebView *getWebView(WebFrame *webFrame)
     [webView _setZoomMultiplier:[webView _realZoomMultiplier] isTextOnly:[webView _realZoomMultiplierIsTextOnly]];
 }
 
-+ (PassRefPtr<WebCore::Frame>)_createSubframeWithOwnerElement:(HTMLFrameOwnerElement*)ownerElement frameName:(const String&)name frameView:(WebFrameView *)frameView
++ (Ref<WebCore::Frame>)_createSubframeWithOwnerElement:(HTMLFrameOwnerElement*)ownerElement frameName:(const String&)name frameView:(WebFrameView *)frameView
 {
     return [self _createFrameWithPage:ownerElement->document().frame()->page() frameName:name frameView:frameView ownerElement:ownerElement];
 }
@@ -912,7 +913,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 
 - (void)_replaceSelectionWithNode:(DOMNode *)node selectReplacement:(BOOL)selectReplacement smartReplace:(BOOL)smartReplace matchStyle:(BOOL)matchStyle
 {
-    DOMDocumentFragment *fragment = kit(_private->coreFrame->document()->createDocumentFragment().get());
+    DOMDocumentFragment *fragment = kit(_private->coreFrame->document()->createDocumentFragment().ptr());
     [fragment appendChild:node];
     [self _replaceSelectionWithFragment:fragment selectReplacement:selectReplacement smartReplace:smartReplace matchStyle:matchStyle];
 }
@@ -952,7 +953,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         return;
     // FIXME: We shouldn't have to create a copy here.
     Ref<MutableStyleProperties> properties(core(style)->copyProperties());
-    _private->coreFrame->editor().computeAndSetTypingStyle(&properties.get(), undoAction);
+    _private->coreFrame->editor().computeAndSetTypingStyle(properties.ptr(), undoAction);
 }
 
 #if ENABLE(DRAG_SUPPORT)
@@ -1042,7 +1043,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     Document* document = _private->coreFrame->document();
     if (!document)
         return nil;
-    HTMLElement* body = document->body();
+    auto* body = document->bodyOrFrameset();
     if (!body)
         return nil;
     RenderObject* bodyRenderer = body->renderer();
@@ -1329,10 +1330,10 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 
 - (CGSize)renderedSizeOfNode:(DOMNode *)node constrainedToWidth:(float)width
 {
-    Node *n = core(node);
-    RenderObject *r = n ? n->renderer() : 0;
-    float w = std::min((float)r->maxPreferredLogicalWidth(), width);
-    return r && r->isBox() ? CGSizeMake(w, toRenderBox(r)->height()) : CGSizeMake(0,0);
+    Node* n = core(node);
+    RenderObject* renderer = n ? n->renderer() : nullptr;
+    float w = std::min((float)renderer->maxPreferredLogicalWidth(), width);
+    return is<RenderBox>(renderer) ? CGSizeMake(w, downcast<RenderBox>(*renderer).height()) : CGSizeMake(0, 0);
 }
 
 - (DOMNode *)deepestNodeAtViewportLocation:(CGPoint)aViewportLocation
@@ -1753,24 +1754,22 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     NSMutableArray *ranges = [NSMutableArray array];
     NSMutableArray *metadatas = [NSMutableArray array];
     
-    Frame *frame = core(self);
-    Document *document = frame->document();
+    Frame* frame = core(self);
+    Document* document = frame->document();
 
     const VisibleSelection& selection = frame->selection().selection();
-    Element *root = selection.selectionType() == VisibleSelection::NoSelection ? frame->document()->body() : selection.rootEditableElement();
+    Element* root = selection.selectionType() == VisibleSelection::NoSelection ? frame->document()->bodyOrFrameset() : selection.rootEditableElement();
     
     DOMRange *previousDOMRange = nil;
     id previousMetadata = nil;
     
-    for (Node* node = root; node; node = NodeTraversal::next(node)) {
-        Vector<DocumentMarker*> markers = document->markers().markersFor(node);
-        Vector<DocumentMarker*>::const_iterator end = markers.end();
-        for (Vector<DocumentMarker*>::const_iterator it = markers.begin(); it != end; ++it) {
-            
-            if ((*it)->type() != DocumentMarker::DictationResult)
+    for (Node* node = root; node; node = NodeTraversal::next(*node)) {
+        auto markers = document->markers().markersFor(node);
+        for (auto marker : markers) {
+
+            if (marker->type() != DocumentMarker::DictationResult)
                 continue;
             
-            const DocumentMarker* marker = *it;
             id metadata = marker->metadata();
             
             // All result markers should have metadata.
@@ -1812,7 +1811,7 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     if (!range)
         return nil;
     
-    Vector<DocumentMarker*> markers = core(self)->document()->markers().markersInRange(core(range), DocumentMarker::DictationResult);
+    auto markers = core(self)->document()->markers().markersInRange(core(range), DocumentMarker::DictationResult);
     
     // UIKit should only ever give us a DOMRange for a phrase with alternatives, which should not be part of more than one result.
     ASSERT(markers.size() <= 1);
@@ -1870,7 +1869,8 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     bool multipleFonts = false;
     CTFontRef font = nil;
     if (_private->coreFrame) {
-        const SimpleFontData* fd = _private->coreFrame->editor().fontForSelection(multipleFonts);
+        const Font
+        * fd = _private->coreFrame->editor().fontForSelection(multipleFonts);
         if (fd)
             font = fd->getCTFont();
     }
@@ -2093,10 +2093,8 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     }
     
     if (Document* document = _private->coreFrame->document()) {
-#if ENABLE(SQL_DATABASE)
         if (DatabaseManager::manager().hasOpenDatabases(document))
             [result setObject:[NSNumber numberWithBool:YES] forKey:WebFrameUsesDatabases];
-#endif
         if (!document->canSuspendActiveDOMObjects())
             [result setObject:[NSNumber numberWithBool:YES] forKey:WebFrameCanSuspendActiveDOMObjects];
     }
@@ -2236,7 +2234,10 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     if (!AXObjectCache::accessibilityEnabled()) {
         AXObjectCache::enableAccessibility();
 #if !PLATFORM(IOS)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         AXObjectCache::setEnhancedUserInterfaceAccessibility([[NSApp accessibilityAttributeValue:NSAccessibilityEnhancedUserInterfaceAttribute] boolValue]);
+#pragma clang diagnostic pop
 #endif
     }
     
@@ -2335,7 +2336,7 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     Element* root;
     const VisibleSelection& selection = coreFrame->selection().selection();
     if (selection.isNone() || !selection.isContentEditable())
-        root = coreFrame->document()->body();
+        root = coreFrame->document()->bodyOrFrameset();
     else {
         // Can't use the focusedNode here because we want the root of the shadow tree for form elements.
         root = selection.rootEditableElement();

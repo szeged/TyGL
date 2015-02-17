@@ -26,88 +26,42 @@
 #include "config.h"
 #include "PageThrottler.h"
 
-#include "PageActivityAssertionToken.h"
+#include "Page.h"
 
 namespace WebCore {
 
-PageThrottler::PageThrottler(Page& page, ViewState::Flags viewState)
+PageThrottler::PageThrottler(Page& page)
     : m_page(page)
-    , m_viewState(viewState)
-    , m_weakPtrFactory(this)
-    , m_hysteresis(*this)
-    , m_activityCount(0)
+    , m_userInputHysteresis([this](HysteresisState state) { setActivityFlag(PageActivityState::UserInputActivity, state == HysteresisState::Started); })
+    , m_audiblePluginHysteresis([this](HysteresisState state) { setActivityFlag(PageActivityState::AudiblePlugin, state == HysteresisState::Started); })
+    , m_mediaActivityCounter([this](bool value) { setActivityFlag(PageActivityState::MediaActivity, value); })
+    , m_pageLoadActivityCounter([this](bool value) { setActivityFlag(PageActivityState::PageLoadActivity, value); })
 {
-    updateUserActivity();
 }
 
-void PageThrottler::createUserActivity()
+PageActivityAssertionToken PageThrottler::mediaActivityToken()
 {
-    ASSERT(!m_activity);
-    m_activity = std::make_unique<UserActivity::Impl>("Page is active.");
-    updateUserActivity();
+    return m_mediaActivityCounter.token<PageActivityAssertionTokenType>();
 }
 
-std::unique_ptr<PageActivityAssertionToken> PageThrottler::mediaActivityToken()
+PageActivityAssertionToken PageThrottler::pageLoadActivityToken()
 {
-    return std::make_unique<PageActivityAssertionToken>(*this);
+    return m_pageLoadActivityCounter.token<PageActivityAssertionTokenType>();
 }
 
-std::unique_ptr<PageActivityAssertionToken> PageThrottler::pageLoadActivityToken()
+void PageThrottler::setActivityFlag(PageActivityState::Flags flag, bool value)
 {
-    return std::make_unique<PageActivityAssertionToken>(*this);
-}
-
-void PageThrottler::incrementActivityCount()
-{
-    // If m_activityCount is nonzero, state must be Started; if m_activityCount is zero, state may be Waiting or Stopped.
-    ASSERT(!!m_activityCount == (m_hysteresis.state() == HysteresisState::Started));
-
-    if (!m_activityCount++)
-        m_hysteresis.start();
-
-    ASSERT(m_activityCount && m_hysteresis.state() == HysteresisState::Started);
-}
-
-void PageThrottler::decrementActivityCount()
-{
-    ASSERT(m_activityCount && m_hysteresis.state() == HysteresisState::Started);
-
-    if (!--m_activityCount)
-        m_hysteresis.stop();
-
-    // If m_activityCount is nonzero, state must be Started; if m_activityCount is zero, state may be Waiting or Stopped.
-    ASSERT(!!m_activityCount == (m_hysteresis.state() == HysteresisState::Started));
-}
-
-void PageThrottler::updateUserActivity()
-{
-    if (!m_activity)
-        return;
-
-    // Allow throttling if there is no page activity, and the page is visually idle.
-    if (m_hysteresis.state() == HysteresisState::Stopped && m_viewState & ViewState::IsVisuallyIdle)
-        m_activity->endActivity();
+    PageActivityState::Flags activityState = m_activityState;
+    if (value)
+        activityState |= flag;
     else
-        m_activity->beginActivity();
-}
+        activityState &= ~flag;
 
-void PageThrottler::setViewState(ViewState::Flags viewState)
-{
-    ViewState::Flags changed = m_viewState ^ viewState;
-    m_viewState = viewState;
+    if (m_activityState == activityState)
+        return;
+    m_activityState = activityState;
 
-    if (changed & ViewState::IsVisuallyIdle)
-        updateUserActivity();
-}
-
-void PageThrottler::started()
-{
-    updateUserActivity();
-}
-
-void PageThrottler::stopped()
-{
-    updateUserActivity();
+    m_page.setPageActivityState(m_activityState);
 }
 
 }

@@ -101,7 +101,7 @@ ResourceLoadScheduler* resourceLoadScheduler()
 
 ResourceLoadScheduler::ResourceLoadScheduler()
     : m_nonHTTPProtocolHost(new HostInformation(String(), maxRequestsInFlightForNonHTTPProtocols))
-    , m_requestTimer(this, &ResourceLoadScheduler::requestTimerFired)
+    , m_requestTimer(*this, &ResourceLoadScheduler::requestTimerFired)
     , m_suspendPendingRequestsCount(0)
     , m_isSerialLoadingEnabled(false)
 {
@@ -163,7 +163,6 @@ void ResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader)
 #endif
 
     ResourceLoadPriority priority = resourceLoader->request().priority();
-    ASSERT(priority != ResourceLoadPriorityUnresolved);
 
     bool hadRequests = host->hasRequests();
     host->schedule(resourceLoader, priority);
@@ -191,16 +190,9 @@ void ResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader)
     }
 #endif
 
-    notifyDidScheduleResourceRequest(resourceLoader);
-
     // Handle asynchronously so early low priority requests don't
     // get scheduled before later high priority ones.
     scheduleServePendingRequests();
-}
-
-void ResourceLoadScheduler::notifyDidScheduleResourceRequest(ResourceLoader* loader)
-{
-    InspectorInstrumentation::didScheduleResourceRequest(loader->frameLoader() ? loader->frameLoader()->frame().document() : 0, loader->url());
 }
 
 #if USE(QUICK_LOOK)
@@ -332,7 +324,7 @@ void ResourceLoadScheduler::scheduleServePendingRequests()
         m_requestTimer.startOneShot(0);
 }
 
-void ResourceLoadScheduler::requestTimerFired(Timer<ResourceLoadScheduler>&)
+void ResourceLoadScheduler::requestTimerFired()
 {
     LOG(ResourceLoading, "ResourceLoadScheduler::requestTimerFired\n");
     servePendingRequests();

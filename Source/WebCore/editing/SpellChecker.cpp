@@ -57,16 +57,16 @@ SpellCheckRequest::~SpellCheckRequest()
 }
 
 // static
-PassRefPtr<SpellCheckRequest> SpellCheckRequest::create(TextCheckingTypeMask textCheckingOptions, TextCheckingProcessType processType, PassRefPtr<Range> checkingRange, PassRefPtr<Range> paragraphRange)
+RefPtr<SpellCheckRequest> SpellCheckRequest::create(TextCheckingTypeMask textCheckingOptions, TextCheckingProcessType processType, PassRefPtr<Range> checkingRange, PassRefPtr<Range> paragraphRange)
 {
     ASSERT(checkingRange);
     ASSERT(paragraphRange);
 
     String text = checkingRange->text();
     if (!text.length())
-        return PassRefPtr<SpellCheckRequest>();
+        return nullptr;
 
-    return adoptRef(new SpellCheckRequest(checkingRange, paragraphRange, text, textCheckingOptions, processType));
+    return adoptRef(*new SpellCheckRequest(checkingRange, paragraphRange, text, textCheckingOptions, processType));
 }
 
 const TextCheckingRequestData& SpellCheckRequest::data() const
@@ -107,7 +107,7 @@ SpellChecker::SpellChecker(Frame& frame)
     : m_frame(frame)
     , m_lastRequestSequence(0)
     , m_lastProcessedSequence(0)
-    , m_timerToProcessQueuedRequest(this, &SpellChecker::timerFiredToProcessQueuedRequest)
+    , m_timerToProcessQueuedRequest(*this, &SpellChecker::timerFiredToProcessQueuedRequest)
 {
 }
 
@@ -123,11 +123,11 @@ TextCheckerClient* SpellChecker::client() const
 {
     Page* page = m_frame.page();
     if (!page)
-        return 0;
-    return page->editorClient()->textChecker();
+        return nullptr;
+    return page->editorClient().textChecker();
 }
 
-void SpellChecker::timerFiredToProcessQueuedRequest(Timer<SpellChecker>*)
+void SpellChecker::timerFiredToProcessQueuedRequest()
 {
     ASSERT(!m_requestQueue.isEmpty());
     if (m_requestQueue.isEmpty())
@@ -236,8 +236,7 @@ void SpellChecker::didCheckSucceed(int sequence, const Vector<TextCheckingResult
 
 void SpellChecker::didCheckCancel(int sequence)
 {
-    Vector<TextCheckingResult> results;
-    didCheck(sequence, results);
+    didCheck(sequence, Vector<TextCheckingResult>());
 }
 
 } // namespace WebCore

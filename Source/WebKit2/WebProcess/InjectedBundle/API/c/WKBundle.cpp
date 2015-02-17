@@ -29,9 +29,14 @@
 #include "APIArray.h"
 #include "APIData.h"
 #include "InjectedBundle.h"
+#include "InjectedBundleScriptWorld.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WKBundlePrivate.h"
+#include "WebConnection.h"
+#include "WebFrame.h"
+#include "WebPage.h"
+#include "WebPageGroupProxy.h"
 
 using namespace WebKit;
 
@@ -61,11 +66,6 @@ void WKBundlePostSynchronousMessage(WKBundleRef bundleRef, WKStringRef messageNa
 WKConnectionRef WKBundleGetApplicationConnection(WKBundleRef bundleRef)
 {
     return toAPI(toImpl(bundleRef)->webConnectionToUIProcess());
-}
-
-void WKBundleRemoveAllVisitedLinks(WKBundleRef bundleRef)
-{
-    toImpl(bundleRef)->removeAllVisitedLinks();
 }
 
 void WKBundleSetCacheModel(WKBundleRef bundleRef, uint32_t cacheModel)

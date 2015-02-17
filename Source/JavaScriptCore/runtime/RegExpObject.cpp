@@ -34,7 +34,6 @@
 #include "RegExpConstructor.h"
 #include "RegExpMatchesArray.h"
 #include "RegExpPrototype.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace JSC {
@@ -290,10 +289,23 @@ EncodedJSValue regExpObjectSource(ExecState* exec, JSObject* slotBase, EncodedJS
     return JSValue::encode(regExpObjectSourceInternal(exec, pattern, pattern.characters16(), pattern.length()));
 }
 
+static void regExpObjectSetLastIndexStrict(ExecState* exec, JSObject* slotBase, EncodedJSValue, EncodedJSValue value)
+{
+    asRegExpObject(slotBase)->setLastIndex(exec, JSValue::decode(value), true);
+}
+
+static void regExpObjectSetLastIndexNonStrict(ExecState* exec, JSObject* slotBase, EncodedJSValue, EncodedJSValue value)
+{
+    asRegExpObject(slotBase)->setLastIndex(exec, JSValue::decode(value), false);
+}
+
 void RegExpObject::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
 {
     if (propertyName == exec->propertyNames().lastIndex) {
         asRegExpObject(cell)->setLastIndex(exec, value, slot.isStrictMode());
+        slot.setCustomProperty(asRegExpObject(cell), slot.isStrictMode()
+            ? regExpObjectSetLastIndexStrict
+            : regExpObjectSetLastIndexNonStrict);
         return;
     }
     Base::put(cell, exec, propertyName, value, slot);
@@ -302,7 +314,7 @@ void RegExpObject::put(JSCell* cell, ExecState* exec, PropertyName propertyName,
 JSValue RegExpObject::exec(ExecState* exec, JSString* string)
 {
     if (MatchResult result = match(exec, string))
-        return RegExpMatchesArray::create(exec, string, regExp(), result);
+        return createRegExpMatchesArray(exec, string, regExp(), result);
     return jsNull();
 }
 

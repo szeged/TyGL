@@ -58,9 +58,9 @@ inline SVGFEDropShadowElement::SVGFEDropShadowElement(const QualifiedName& tagNa
     registerAnimatedPropertiesForSVGFEDropShadowElement();
 }
 
-PassRefPtr<SVGFEDropShadowElement> SVGFEDropShadowElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEDropShadowElement> SVGFEDropShadowElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEDropShadowElement(tagName, document));
+    return adoptRef(*new SVGFEDropShadowElement(tagName, document));
 }
 
 const AtomicString& SVGFEDropShadowElement::stdDeviationXIdentifier()
@@ -135,7 +135,7 @@ void SVGFEDropShadowElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::inAttr
         || attrName == SVGNames::stdDeviationAttr

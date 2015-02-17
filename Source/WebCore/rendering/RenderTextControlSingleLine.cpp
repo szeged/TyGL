@@ -27,6 +27,7 @@
 #include "CSSFontSelector.h"
 #include "CSSValueKeywords.h"
 #include "Chrome.h"
+#include "Font.h"
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "FrameView.h"
@@ -40,7 +41,6 @@
 #include "RenderTheme.h"
 #include "RenderView.h"
 #include "Settings.h"
-#include "SimpleFontData.h"
 #include "StyleResolver.h"
 #include "TextControlInnerElements.h"
 #include <wtf/StackStats.h>
@@ -53,7 +53,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderTextControlSingleLine::RenderTextControlSingleLine(HTMLInputElement& element, PassRef<RenderStyle> style)
+RenderTextControlSingleLine::RenderTextControlSingleLine(HTMLInputElement& element, Ref<RenderStyle>&& style)
     : RenderTextControl(element, WTF::move(style))
     , m_shouldDrawCapsLockIndicator(false)
     , m_desiredInnerTextLogicalHeight(-1)
@@ -319,7 +319,7 @@ float RenderTextControlSingleLine::getAverageCharWidth()
     // of MS Shell Dlg, the default font for textareas in Firefox, Safari Win and
     // IE for some encodings (in IE, the default font is encoding specific).
     // 901 is the avgCharWidth value in the OS/2 table for MS Shell Dlg.
-    if (style().font().firstFamily() == "Lucida Grande")
+    if (style().fontCascade().firstFamily() == "Lucida Grande")
         return scaleEmToUnits(901);
 #endif
 
@@ -338,15 +338,15 @@ LayoutUnit RenderTextControlSingleLine::preferredContentLogicalWidth(float charW
     float maxCharWidth = 0.f;
 
 #if !PLATFORM(IOS)
-    const AtomicString& family = style().font().firstFamily();
+    const AtomicString& family = style().fontCascade().firstFamily();
     // Since Lucida Grande is the default font, we want this to match the width
     // of MS Shell Dlg, the default font for textareas in Firefox, Safari Win and
     // IE for some encodings (in IE, the default font is encoding specific).
     // 4027 is the (xMax - xMin) value in the "head" font table for MS Shell Dlg.
     if (family == "Lucida Grande")
         maxCharWidth = scaleEmToUnits(4027);
-    else if (style().font().hasValidAverageCharWidth())
-        maxCharWidth = roundf(style().font().primaryFont()->maxCharWidth());
+    else if (style().fontCascade().hasValidAverageCharWidth())
+        maxCharWidth = roundf(style().fontCascade().primaryFont().maxCharWidth());
 #endif
 
     // For text inputs, IE adds some extra width.
@@ -364,11 +364,11 @@ LayoutUnit RenderTextControlSingleLine::computeControlLogicalHeight(LayoutUnit l
     return lineHeight + nonContentHeight;
 }
 
-PassRef<RenderStyle> RenderTextControlSingleLine::createInnerTextStyle(const RenderStyle* startStyle) const
+Ref<RenderStyle> RenderTextControlSingleLine::createInnerTextStyle(const RenderStyle* startStyle) const
 {
     auto textBlockStyle = RenderStyle::create();
     textBlockStyle.get().inheritFrom(startStyle);
-    adjustInnerTextStyle(startStyle, &textBlockStyle.get());
+    adjustInnerTextStyle(startStyle, textBlockStyle.get());
 
     textBlockStyle.get().setWhiteSpace(PRE);
     textBlockStyle.get().setOverflowWrap(NormalOverflowWrap);
@@ -387,7 +387,7 @@ PassRef<RenderStyle> RenderTextControlSingleLine::createInnerTextStyle(const Ren
     return textBlockStyle;
 }
 
-PassRef<RenderStyle> RenderTextControlSingleLine::createInnerBlockStyle(const RenderStyle* startStyle) const
+Ref<RenderStyle> RenderTextControlSingleLine::createInnerBlockStyle(const RenderStyle* startStyle) const
 {
     auto innerBlockStyle = RenderStyle::create();
     innerBlockStyle.get().inheritFrom(startStyle);

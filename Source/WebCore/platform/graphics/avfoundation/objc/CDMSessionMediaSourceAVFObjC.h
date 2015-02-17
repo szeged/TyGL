@@ -40,7 +40,7 @@ namespace WebCore {
 
 class CDMSessionMediaSourceAVFObjC : public CDMSession, public SourceBufferPrivateAVFObjCErrorClient {
 public:
-    CDMSessionMediaSourceAVFObjC();
+    CDMSessionMediaSourceAVFObjC(const Vector<int>& protocolVersions);
     virtual ~CDMSessionMediaSourceAVFObjC();
 
     virtual CDMSessionType type() { return CDMSessionTypeMediaSourceAVFObjC; }
@@ -53,12 +53,15 @@ public:
     virtual void layerDidReceiveError(AVSampleBufferDisplayLayer *, NSError *);
     virtual void rendererDidReceiveError(AVSampleBufferAudioRenderer *, NSError *);
 
+    void setStreamSession(AVStreamSession *);
+
     void addSourceBuffer(SourceBufferPrivateAVFObjC*);
     void removeSourceBuffer(SourceBufferPrivateAVFObjC*);
 
     void setSessionId(const String& sessionId) { m_sessionId = sessionId; }
 
 protected:
+    String storagePath() const;
     PassRefPtr<Uint8Array> generateKeyReleaseMessage(unsigned short& errorCode, unsigned long& systemCode);
 
     Vector<RefPtr<SourceBufferPrivateAVFObjC>> m_sourceBuffers;
@@ -68,6 +71,7 @@ protected:
     RefPtr<Uint8Array> m_certificate;
     RetainPtr<NSData> m_expiredSession;
     RetainPtr<CDMSessionMediaSourceAVFObjCObserver> m_dataParserObserver;
+    Vector<int> m_protocolVersions;
     String m_sessionId;
     enum { Normal, KeyRelease } m_mode;
 };

@@ -67,7 +67,7 @@ class SVGMissingGlyphElement;
 class SVGFontElement final : public SVGElement
                            , public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGFontElement> create(const QualifiedName&, Document&);
+    static Ref<SVGFontElement> create(const QualifiedName&, Document&);
 
     void invalidateGlyphCache();
     void collectGlyphsForString(const String&, Vector<SVGGlyph>&);
@@ -76,7 +76,7 @@ public:
     float horizontalKerningForPairOfStringsAndGlyphs(const String& u1, const String& g1, const String& u2, const String& g2) const;
     float verticalKerningForPairOfStringsAndGlyphs(const String& u1, const String& g1, const String& u2, const String& g2) const;
 
-    // Used by SimpleFontData/WidthIterator.
+    // Used by Font/WidthIterator.
     SVGGlyph svgGlyphForGlyph(Glyph);
     Glyph missingGlyph();
 

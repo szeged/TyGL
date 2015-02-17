@@ -114,7 +114,7 @@ private:
     virtual void removeUpdateAtlas(uint32_t atlasID) override;
 
     // GraphicsLayerFactory
-    virtual std::unique_ptr<GraphicsLayer> createGraphicsLayer(GraphicsLayerClient&) override;
+    virtual std::unique_ptr<GraphicsLayer> createGraphicsLayer(GraphicsLayer::Type, GraphicsLayerClient&) override;
 
     void initializeRootCompositingLayerIfNeeded();
     void flushPendingImageBackingChanges();
@@ -122,7 +122,7 @@ private:
 
     void scheduleReleaseInactiveAtlases();
 
-    void releaseInactiveAtlasesTimerFired(Timer<CompositingCoordinator>*);
+    void releaseInactiveAtlasesTimerFired();
 
     Page* m_page;
     CompositingCoordinator::Client* m_client;
@@ -146,7 +146,7 @@ private:
 
     bool m_shouldSyncFrame;
     bool m_didInitializeRootCompositingLayer;
-    Timer<CompositingCoordinator> m_releaseInactiveAtlasesTimer;
+    Timer m_releaseInactiveAtlasesTimer;
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     double m_lastAnimationServiceTime;

@@ -46,12 +46,12 @@
 
 namespace WebCore {
 
-RenderNamedFlowThread::RenderNamedFlowThread(Document& document, PassRef<RenderStyle> style, PassRef<WebKitNamedFlow> namedFlow)
+RenderNamedFlowThread::RenderNamedFlowThread(Document& document, Ref<RenderStyle>&& style, Ref<WebKitNamedFlow>&& namedFlow)
     : RenderFlowThread(document, WTF::move(style))
     , m_hasRegionsWithStyling(false)
     , m_dispatchRegionOversetChangeEvent(false)
     , m_namedFlow(WTF::move(namedFlow))
-    , m_regionOversetChangeEventTimer(this, &RenderNamedFlowThread::regionOversetChangeEventTimerFired)
+    , m_regionOversetChangeEventTimer(*this, &RenderNamedFlowThread::regionOversetChangeEventTimerFired)
 {
 }
 
@@ -85,7 +85,7 @@ void RenderNamedFlowThread::clearContentElements()
 
 void RenderNamedFlowThread::updateWritingMode()
 {
-    RenderNamedFlowFragment* firstFragment = toRenderNamedFlowFragment(m_regionList.first());
+    auto* firstFragment = downcast<RenderNamedFlowFragment>(m_regionList.first());
     if (!firstFragment)
         return;
     if (style().writingMode() == firstFragment->style().writingMode())
@@ -203,7 +203,7 @@ static void addFragmentToList(RenderRegionList& regionList, RenderNamedFlowFragm
     else {
         // Find the first region "greater" than renderNamedFlowFragment.
         auto it = regionList.begin();
-        while (it != regionList.end() && !compareRenderNamedFlowFragments(renderNamedFlowFragment, toRenderNamedFlowFragment(*it)))
+        while (it != regionList.end() && !compareRenderNamedFlowFragments(renderNamedFlowFragment, downcast<RenderNamedFlowFragment>(*it)))
             ++it;
         regionList.insertBefore(it, renderNamedFlowFragment);
     }
@@ -230,18 +230,18 @@ void RenderNamedFlowThread::addRegionToThread(RenderRegion* renderRegion)
     ASSERT(renderRegion);
     ASSERT(!renderRegion->isValid());
 
-    RenderNamedFlowFragment* renderNamedFlowFragment = toRenderNamedFlowFragment(renderRegion);
+    RenderNamedFlowFragment& renderNamedFlowFragment = downcast<RenderNamedFlowFragment>(*renderRegion);
     resetMarkForDestruction();
 
-    if (renderNamedFlowFragment->parentNamedFlowThread() && renderNamedFlowFragment->parentNamedFlowThread()->dependsOn(this)) {
+    if (renderNamedFlowFragment.parentNamedFlowThread() && renderNamedFlowFragment.parentNamedFlowThread()->dependsOn(this)) {
         // The order of invalid regions is irrelevant.
-        m_invalidRegionList.add(renderNamedFlowFragment);
+        m_invalidRegionList.add(&renderNamedFlowFragment);
         // Register ourself to get a notification when the state changes.
-        renderNamedFlowFragment->parentNamedFlowThread()->m_observerThreadsSet.add(this);
+        renderNamedFlowFragment.parentNamedFlowThread()->m_observerThreadsSet.add(this);
         return;
     }
 
-    addFragmentToNamedFlowThread(renderNamedFlowFragment);
+    addFragmentToNamedFlowThread(&renderNamedFlowFragment);
 
     invalidateRegions();
 }
@@ -250,22 +250,22 @@ void RenderNamedFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
 {
     ASSERT(renderRegion);
 
-    RenderNamedFlowFragment* renderNamedFlowFragment = toRenderNamedFlowFragment(renderRegion);
-    if (renderNamedFlowFragment->parentNamedFlowThread()) {
-        if (!renderNamedFlowFragment->isValid()) {
-            ASSERT(m_invalidRegionList.contains(renderNamedFlowFragment));
-            m_invalidRegionList.remove(renderNamedFlowFragment);
-            renderNamedFlowFragment->parentNamedFlowThread()->m_observerThreadsSet.remove(this);
+    RenderNamedFlowFragment& renderNamedFlowFragment = downcast<RenderNamedFlowFragment>(*renderRegion);
+    if (renderNamedFlowFragment.parentNamedFlowThread()) {
+        if (!renderNamedFlowFragment.isValid()) {
+            ASSERT(m_invalidRegionList.contains(&renderNamedFlowFragment));
+            m_invalidRegionList.remove(&renderNamedFlowFragment);
+            renderNamedFlowFragment.parentNamedFlowThread()->m_observerThreadsSet.remove(this);
             // No need to invalidate the regions rectangles. The removed region
             // was not taken into account. Just return here.
             return;
         }
-        removeDependencyOnFlowThread(renderNamedFlowFragment->parentNamedFlowThread());
+        removeDependencyOnFlowThread(renderNamedFlowFragment.parentNamedFlowThread());
     }
 
-    ASSERT(m_regionList.contains(renderNamedFlowFragment));
-    bool wasFirst = m_regionList.first() == renderNamedFlowFragment;
-    m_regionList.remove(renderNamedFlowFragment);
+    ASSERT(m_regionList.contains(&renderNamedFlowFragment));
+    bool wasFirst = m_regionList.first() == &renderNamedFlowFragment;
+    m_regionList.remove(&renderNamedFlowFragment);
 
     if (canBeDestroyed())
         setMarkForDestruction();
@@ -284,7 +284,7 @@ void RenderNamedFlowThread::regionChangedWritingMode(RenderRegion* region)
 
 LayoutRect RenderNamedFlowThread::decorationsClipRectForBoxInNamedFlowFragment(const RenderBox& box, RenderNamedFlowFragment& fragment) const
 {
-    LayoutRect visualOverflowRect = fragment.visualOverflowRectForBox(&box);
+    LayoutRect visualOverflowRect = fragment.visualOverflowRectForBox(box);
     LayoutUnit initialLogicalX = style().isHorizontalWritingMode() ? visualOverflowRect.x() : visualOverflowRect.y();
 
     // The visual overflow rect returned by visualOverflowRectForBox is already flipped but the
@@ -377,7 +377,7 @@ LayoutRect RenderNamedFlowThread::decorationsClipRectForBoxInNamedFlowFragment(c
 
 RenderBlock* RenderNamedFlowThread::fragmentFromRenderBoxAsRenderBlock(RenderBox* renderBox, const IntPoint& absolutePoint, const RenderBox& flowedBox)
 {
-    return toRenderNamedFlowThread(renderBox)->fragmentFromAbsolutePointAndBox(absolutePoint, flowedBox);
+    return downcast<RenderNamedFlowThread>(*renderBox).fragmentFromAbsolutePointAndBox(absolutePoint, flowedBox);
 }
 
 RenderNamedFlowFragment* RenderNamedFlowThread::fragmentFromAbsolutePointAndBox(const IntPoint& absolutePoint, const RenderBox& flowedBox)
@@ -388,13 +388,13 @@ RenderNamedFlowFragment* RenderNamedFlowThread::fragmentFromAbsolutePointAndBox(
         return nullptr;
     
     for (auto iter = m_regionList.find(startRegion), end = m_regionList.end(); iter != end; ++iter) {
-        RenderNamedFlowFragment* fragment = toRenderNamedFlowFragment(*iter);
-        RenderBlockFlow& fragmentContainer = fragment->fragmentContainer();
+        auto& fragment = downcast<RenderNamedFlowFragment>(**iter);
+        RenderBlockFlow& fragmentContainer = fragment.fragmentContainer();
         IntRect fragmentAbsoluteRect(roundedIntPoint(fragmentContainer.localToAbsolute()), roundedIntSize(fragmentContainer.paddingBoxRect().size()));
         if (fragmentAbsoluteRect.contains(absolutePoint))
-            return fragment;
+            return &fragment;
         
-        if (fragment == endRegion)
+        if (&fragment == endRegion)
             break;
     }
     
@@ -430,13 +430,13 @@ void RenderNamedFlowThread::checkInvalidRegions()
 {
     Vector<RenderNamedFlowFragment*> newValidFragments;
     for (auto& region : m_invalidRegionList) {
-        RenderNamedFlowFragment* namedFlowFragment = toRenderNamedFlowFragment(region);
+        auto& namedFlowFragment = downcast<RenderNamedFlowFragment>(*region);
         // The only reason a region would be invalid is because it has a parent flow thread.
-        ASSERT(!namedFlowFragment->isValid() && namedFlowFragment->parentNamedFlowThread());
-        if (namedFlowFragment->parentNamedFlowThread()->dependsOn(this))
+        ASSERT(!namedFlowFragment.isValid() && namedFlowFragment.parentNamedFlowThread());
+        if (namedFlowFragment.parentNamedFlowThread()->dependsOn(this))
             continue;
 
-        newValidFragments.append(namedFlowFragment);
+        newValidFragments.append(&namedFlowFragment);
     }
 
     for (auto& namedFlowFragment : newValidFragments) {
@@ -506,13 +506,13 @@ void RenderNamedFlowThread::registerNamedFlowContentElement(Element& contentElem
         unsigned short position = contentElement.compareDocumentPosition(element);
         if (position & Node::DOCUMENT_POSITION_FOLLOWING) {
             m_contentElements.insertBefore(element, &contentElement);
-            InspectorInstrumentation::didRegisterNamedFlowContentElement(&document(), &namedFlow(), &contentElement, element);
+            InspectorInstrumentation::didRegisterNamedFlowContentElement(document(), namedFlow(), contentElement, element);
             return;
         }
     }
 
     m_contentElements.add(&contentElement);
-    InspectorInstrumentation::didRegisterNamedFlowContentElement(&document(), &namedFlow(), &contentElement);
+    InspectorInstrumentation::didRegisterNamedFlowContentElement(document(), namedFlow(), contentElement);
 }
 
 void RenderNamedFlowThread::unregisterNamedFlowContentElement(Element& contentElement)
@@ -527,7 +527,7 @@ void RenderNamedFlowThread::unregisterNamedFlowContentElement(Element& contentEl
     if (canBeDestroyed())
         setMarkForDestruction();
 
-    InspectorInstrumentation::didUnregisterNamedFlowContentElement(&document(), &namedFlow(), &contentElement);
+    InspectorInstrumentation::didUnregisterNamedFlowContentElement(document(), namedFlow(), contentElement);
 }
 
 bool RenderNamedFlowThread::hasContentElement(Element& contentElement) const
@@ -560,13 +560,13 @@ void RenderNamedFlowThread::dispatchRegionOversetChangeEventIfNeeded()
         return;
 
     m_dispatchRegionOversetChangeEvent = false;
-    InspectorInstrumentation::didChangeRegionOverset(&document(), &namedFlow());
+    InspectorInstrumentation::didChangeRegionOverset(document(), namedFlow());
     
     if (!m_regionOversetChangeEventTimer.isActive() && namedFlow().hasEventListeners())
         m_regionOversetChangeEventTimer.startOneShot(0);
 }
 
-void RenderNamedFlowThread::regionOversetChangeEventTimerFired(Timer<RenderNamedFlowThread>&)
+void RenderNamedFlowThread::regionOversetChangeEventTimerFired()
 {
     namedFlow().dispatchRegionOversetChangeEvent();
 }
@@ -614,12 +614,11 @@ static bool boxIntersectsRegion(LayoutUnit logicalTopForBox, LayoutUnit logicalB
 }
 
 // Retrieve the next node to be visited while computing the ranges inside a region.
-static Node* nextNodeInsideContentElement(const Node* currNode, const Element* contentElement)
+static Node* nextNodeInsideContentElement(const Node& currNode, const Element* contentElement)
 {
-    ASSERT(currNode);
     ASSERT(contentElement && contentElement->isNamedFlowContentNode());
 
-    if (currNode->renderer() && currNode->renderer()->isSVGRoot())
+    if (currNode.renderer() && currNode.renderer()->isSVGRoot())
         return NodeTraversal::nextSkippingChildren(currNode, contentElement);
 
     return NodeTraversal::next(currNode, contentElement);
@@ -660,7 +659,7 @@ void RenderNamedFlowThread::getRanges(Vector<RefPtr<Range>>& rangeObjects, const
         bool skipOverOutsideNodes = false;
         Node* lastEndNode = nullptr;
 
-        for (Node* node = contentElement; node; node = nextNodeInsideContentElement(node, contentElement)) {
+        for (Node* node = contentElement; node; node = nextNodeInsideContentElement(*node, contentElement)) {
             RenderObject* renderer = node->renderer();
             if (!renderer)
                 continue;
@@ -672,8 +671,8 @@ void RenderNamedFlowThread::getRanges(Vector<RefPtr<Range>>& rangeObjects, const
                 boundingBox = downcast<RenderText>(*renderer).linesBoundingBox();
             else if (is<RenderLineBreak>(*renderer))
                 boundingBox = downcast<RenderLineBreak>(*renderer).linesBoundingBox();
-            else if (renderer->isBox()) {
-                RenderBox& renderBox = downcast<RenderBox>(*renderer);
+            else if (is<RenderBox>(*renderer)) {
+                auto& renderBox = downcast<RenderBox>(*renderer);
                 boundingBox = renderBox.frameRect();
                 if (renderBox.isRelPositioned())
                     boundingBox.move(renderBox.relativePositionLogicalOffset());
@@ -803,7 +802,7 @@ void RenderNamedFlowThread::checkRegionsWithStyling()
 {
     bool hasRegionsWithStyling = false;
     for (const auto& region : m_regionList) {
-        if (toRenderNamedFlowFragment(region)->hasCustomRegionStyle()) {
+        if (downcast<RenderNamedFlowFragment>(*region).hasCustomRegionStyle()) {
             hasRegionsWithStyling = true;
             break;
         }
@@ -816,7 +815,7 @@ void RenderNamedFlowThread::clearRenderObjectCustomStyle(const RenderObject* obj
     // Clear the styles for the object in the regions.
     // FIXME: Region styling is not computed only for the region range of the object so this is why we need to walk the whole chain.
     for (auto& region : m_regionList)
-        toRenderNamedFlowFragment(region)->clearObjectStyleInRegion(object);
+        downcast<RenderNamedFlowFragment>(*region).clearObjectStyleInRegion(object);
 }
 
 void RenderNamedFlowThread::removeFlowChildInfo(RenderObject* child)

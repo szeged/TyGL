@@ -141,10 +141,11 @@ PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGro
     m_view = [[TestRunnerWKView alloc] initWithFrame:rect contextRef:contextRef pageGroupRef:pageGroupRef relatedToPage:relatedPage useThreadedScrolling:useThreadedScrolling];
     [m_view setWindowOcclusionDetectionEnabled:NO];
 
-    NSRect windowRect = NSOffsetRect(rect, -10000, [(NSScreen *)[[NSScreen screens] objectAtIndex:0] frame].size.height - rect.size.height + 10000);
+    NSScreen *firstScreen = [[NSScreen screens] objectAtIndex:0];
+    NSRect windowRect = NSOffsetRect(rect, -10000, [firstScreen frame].size.height - rect.size.height + 10000);
     m_window = [[WebKitTestRunnerWindow alloc] initWithContentRect:windowRect styleMask:NSBorderlessWindowMask backing:(NSBackingStoreType)_NSBackingStoreUnbuffered defer:YES];
     m_window.platformWebView = this;
-    [m_window setColorSpace:[[NSScreen mainScreen] colorSpace]];
+    [m_window setColorSpace:[firstScreen colorSpace]];
     [m_window setCollectionBehavior:NSWindowCollectionBehaviorStationary];
     [[m_window contentView] addSubview:m_view];
     [m_window orderBack:nil];
@@ -230,7 +231,14 @@ void PlatformWebView::makeWebViewFirstResponder()
 WKRetainPtr<WKImageRef> PlatformWebView::windowSnapshotImage()
 {
     [m_view display];
-    RetainPtr<CGImageRef> windowSnapshotImage = adoptCF(CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, [m_window windowNumber], kCGWindowImageBoundsIgnoreFraming | kCGWindowImageShouldBeOpaque));
+    CGWindowImageOption options = kCGWindowImageBoundsIgnoreFraming | kCGWindowImageShouldBeOpaque;
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+    if ([m_window backingScaleFactor] == 1)
+        options |= kCGWindowImageNominalResolution;
+#endif
+
+    RetainPtr<CGImageRef> windowSnapshotImage = adoptCF(CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, [m_window windowNumber], options));
 
     // windowSnapshotImage will be in GenericRGB, as we've set the main display's color space to GenericRGB.
     return adoptWK(WKImageCreateFromCGImage(windowSnapshotImage.get(), 0));

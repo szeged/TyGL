@@ -119,9 +119,9 @@ void JSTestMediaQueryListListenerPrototype::finishCreation(VM& vm)
 
 WEBCORE_EXPORT const ClassInfo JSTestMediaQueryListListener::s_info = { "TestMediaQueryListListener", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestMediaQueryListListener) };
 
-JSTestMediaQueryListListener::JSTestMediaQueryListListener(Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestMediaQueryListListener> impl)
+JSTestMediaQueryListListener::JSTestMediaQueryListListener(Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestMediaQueryListListener>&& impl)
     : JSDOMWrapper(structure, globalObject)
-    , m_impl(impl.leakRef())
+    , m_impl(&impl.leakRef())
 {
 }
 
@@ -167,7 +167,7 @@ EncodedJSValue JSC_HOST_CALL jsTestMediaQueryListListenerPrototypeFunctionMethod
         return throwThisTypeError(*exec, "TestMediaQueryListListener", "method");
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestMediaQueryListListener::info());
     TestMediaQueryListListener& impl = castedThis->impl();
-    if (exec->argumentCount() < 1)
+    if (UNLIKELY(exec->argumentCount() < 1))
         return throwVMError(exec, createNotEnoughArgumentsError(exec));
     if (!exec->argument(0).isFunction())
         return throwArgumentMustBeFunctionError(*exec, 0, "listener", "TestMediaQueryListListener", "method");

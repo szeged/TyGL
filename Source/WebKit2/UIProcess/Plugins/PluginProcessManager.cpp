@@ -29,20 +29,22 @@
 #if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "PluginProcessProxy.h"
-#include "WebContext.h"
 #include <wtf/CryptographicallyRandomNumber.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
 
-PluginProcessManager& PluginProcessManager::shared()
+PluginProcessManager& PluginProcessManager::singleton()
 {
     static NeverDestroyed<PluginProcessManager> pluginProcessManager;
     return pluginProcessManager;
 }
 
 PluginProcessManager::PluginProcessManager()
+#if PLATFORM(COCOA)
+    : m_processSuppressionDisabledForPageCounter([this](bool value) { updateProcessSuppressionDisabled(value); })
+#endif
 {
 }
 

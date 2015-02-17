@@ -27,8 +27,12 @@
 #define WKBundlePageDiagnosticLoggingClient_h
 
 #include <WebKit/WKBase.h>
+#include <WebKit/WKDiagnosticLoggingResultType.h>
 
 typedef void (*WKBundlePageDiagnosticLoggingCallback)(WKBundlePageRef page, WKStringRef message, WKStringRef description, WKStringRef success, const void* clientInfo);
+typedef void (*WKBundlePageLogDiagnosticMessageCallback)(WKBundlePageRef page, WKStringRef message, WKStringRef description, const void* clientInfo);
+typedef void (*WKBundlePageLogDiagnosticMessageWithResultCallback)(WKBundlePageRef page, WKStringRef message, WKStringRef description, WKDiagnosticLoggingResultType result, const void* clientInfo);
+typedef void (*WKBundlePageLogDiagnosticMessageWithValueCallback)(WKBundlePageRef page, WKStringRef message, WKStringRef description, WKStringRef value, const void* clientInfo);
 
 typedef struct WKBundlePageDiagnosticLoggingClientBase {
     int                                                                 version;
@@ -42,13 +46,30 @@ typedef struct WKBundlePageDiagnosticLoggingClientV0 {
     WKBundlePageDiagnosticLoggingCallback                               logDiagnosticMessage;
 } WKBundlePageDiagnosticLoggingClientV0;
 
-enum { kWKBundlePageDiagnosticLoggingClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 0 };
+typedef struct WKBundlePageDiagnosticLoggingClientV1 {
+    WKBundlePageDiagnosticLoggingClientBase                             base;
+
+    // Version 0.
+    WKBundlePageDiagnosticLoggingCallback                               logDiagnosticMessageDeprecated;
+
+    // Version 1.
+    WKBundlePageLogDiagnosticMessageCallback                            logDiagnosticMessage;
+    WKBundlePageLogDiagnosticMessageWithResultCallback                  logDiagnosticMessageWithResult;
+    WKBundlePageLogDiagnosticMessageWithValueCallback                   logDiagnosticMessageWithValue;
+} WKBundlePageDiagnosticLoggingClientV1;
+
+enum { kWKBundlePageDiagnosticLoggingClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 1 };
 typedef struct WKBundlePageDiagnosticLoggingClient {
     int                                                                 version;
     const void *                                                        clientInfo;
 
     // Version 0.
-    WKBundlePageDiagnosticLoggingCallback                               logDiagnosticMessage;
-} WKBundlePageDiagnosticLoggingClient WK_DEPRECATED("Use an explicit versioned struct instead");
+    WKBundlePageDiagnosticLoggingCallback                               logDiagnosticMessageDeprecated;
+
+    // Version 1.
+    WKBundlePageLogDiagnosticMessageCallback                            logDiagnosticMessage;
+    WKBundlePageLogDiagnosticMessageWithResultCallback                  logDiagnosticMessageWithResult;
+    WKBundlePageLogDiagnosticMessageWithValueCallback                   logDiagnosticMessageWithValue;
+} WKBundlePageDiagnosticLoggingClient WK_C_DEPRECATED("Use an explicit versioned struct instead");
 
 #endif // WKBundlePageDiagnosticLoggingClient_h

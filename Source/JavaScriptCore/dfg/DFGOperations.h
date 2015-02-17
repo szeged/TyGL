@@ -97,11 +97,10 @@ size_t JIT_OPERATION operationRegExpTest(ExecState*, JSCell*, JSCell*) WTF_INTER
 size_t JIT_OPERATION operationCompareStrictEqCell(ExecState*, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2) WTF_INTERNAL;
 size_t JIT_OPERATION operationCompareStrictEq(ExecState*, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2) WTF_INTERNAL;
 JSCell* JIT_OPERATION operationCreateInlinedArguments(ExecState*, InlineCallFrame*) WTF_INTERNAL;
-JSCell* JIT_OPERATION operationCreateInlinedArgumentsDuringOSRExit(ExecState*, InlineCallFrame*) WTF_INTERNAL;
 void JIT_OPERATION operationTearOffInlinedArguments(ExecState*, JSCell*, JSCell*, InlineCallFrame*) WTF_INTERNAL;
 EncodedJSValue JIT_OPERATION operationGetInlinedArgumentByVal(ExecState*, int32_t, InlineCallFrame*, int32_t) WTF_INTERNAL;
 EncodedJSValue JIT_OPERATION operationGetArgumentByVal(ExecState*, int32_t, int32_t) WTF_INTERNAL;
-JSCell* JIT_OPERATION operationNewFunctionNoCheck(ExecState*, JSCell*) WTF_INTERNAL;
+JSCell* JIT_OPERATION operationNewFunctionNoCheck(ExecState*, JSScope*, JSCell*) WTF_INTERNAL;
 double JIT_OPERATION operationFModOnInts(int32_t, int32_t) WTF_INTERNAL;
 size_t JIT_OPERATION operationIsObject(ExecState*, EncodedJSValue) WTF_INTERNAL;
 size_t JIT_OPERATION operationIsFunction(EncodedJSValue) WTF_INTERNAL;

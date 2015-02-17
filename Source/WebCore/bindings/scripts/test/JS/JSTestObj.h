@@ -29,9 +29,9 @@ namespace WebCore {
 class JSTestObj : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestObj* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestObj> impl)
+    static JSTestObj* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestObj>&& impl)
     {
-        JSTestObj* ptr = new (NotNull, JSC::allocateCell<JSTestObj>(globalObject->vm().heap)) JSTestObj(structure, globalObject, impl);
+        JSTestObj* ptr = new (NotNull, JSC::allocateCell<JSTestObj>(globalObject->vm().heap)) JSTestObj(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -78,7 +78,7 @@ public:
 private:
     TestObj* m_impl;
 protected:
-    JSTestObj(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestObj>);
+    JSTestObj(JSC::Structure*, JSDOMGlobalObject*, Ref<TestObj>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -101,12 +101,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestObj*)
     return &jsTestObjOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestObj*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestObj*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestObj& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

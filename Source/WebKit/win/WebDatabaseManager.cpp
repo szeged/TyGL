@@ -26,11 +26,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "WebDatabaseManager.h"
 #include "WebKitDLL.h"
-
-#if ENABLE(SQL_DATABASE)
 
 #include "COMEnumVariant.h"
 #include "COMPropertyBag.h"
@@ -115,12 +112,12 @@ HRESULT STDMETHODCALLTYPE DatabaseDetailsPropertyBag::QueryInterface(REFIID riid
 }
 
 // IPropertyBag --------------------------------------------------------------------
-HRESULT STDMETHODCALLTYPE DatabaseDetailsPropertyBag::Read(LPCOLESTR pszPropName, VARIANT* pVar, IErrorLog*)
+HRESULT DatabaseDetailsPropertyBag::Read(LPCOLESTR pszPropName, VARIANT* pVar, IErrorLog*)
 {
     if (!pszPropName || !pVar)
         return E_POINTER;
 
-    VariantInit(pVar);
+    ::VariantInit(pVar);
 
     if (isEqual(pszPropName, WebDatabaseDisplayNameKey)) {
         COMVariantSetter<String>::setVariant(pVar, m_details.displayName());
@@ -383,7 +380,7 @@ HRESULT STDMETHODCALLTYPE WebDatabaseManager::setQuota(
     if (this != s_sharedWebDatabaseManager)
         return E_FAIL;
 
-    DatabaseManager::manager().setQuota(SecurityOrigin::createFromString(origin).get(), quota);
+    DatabaseManager::manager().setQuota(SecurityOrigin::createFromString(origin).ptr(), quota);
 
     return S_OK;
 }
@@ -428,5 +425,3 @@ void WebKitInitializeWebDatabasesIfNecessary()
 
     initialized = true;
 }
-
-#endif

@@ -23,7 +23,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#include "config.h"
 #include "WebKitDLL.h"
 #include "WebCache.h"
 
@@ -100,7 +99,7 @@ HRESULT WebCache::statistics(int* count, IPropertyBag** s)
     if (!s)
         return S_OK;
 
-    WebCore::MemoryCache::Statistics stat = WebCore::memoryCache()->getStatistics();
+    WebCore::MemoryCache::Statistics stat = WebCore::MemoryCache::singleton().getStatistics();
 
     static CFStringRef imagesKey = CFSTR("images");
     static CFStringRef stylesheetsKey = CFSTR("style sheets");
@@ -207,16 +206,17 @@ HRESULT WebCache::statistics(int* count, IPropertyBag** s)
 
 HRESULT STDMETHODCALLTYPE WebCache::empty( void)
 {
-    if (WebCore::memoryCache()->disabled())
+    auto& memoryCache = WebCore::MemoryCache::singleton();
+    if (memoryCache.disabled())
         return S_OK;
-    WebCore::memoryCache()->setDisabled(true);
-    WebCore::memoryCache()->setDisabled(false);
+    memoryCache.setDisabled(true);
+    memoryCache.setDisabled(false);
 
     // Empty the application cache.
     WebCore::cacheStorage().empty();
 
     // Empty the Cross-Origin Preflight cache
-    WebCore::CrossOriginPreflightResultCache::shared().empty();
+    WebCore::CrossOriginPreflightResultCache::singleton().empty();
 
     return S_OK;
 }
@@ -224,7 +224,7 @@ HRESULT STDMETHODCALLTYPE WebCache::empty( void)
 HRESULT STDMETHODCALLTYPE WebCache::setDisabled( 
     /* [in] */ BOOL disabled)
 {
-    WebCore::memoryCache()->setDisabled(!!disabled);
+    WebCore::MemoryCache::singleton().setDisabled(!!disabled);
     return S_OK;
 }
 
@@ -233,7 +233,7 @@ HRESULT STDMETHODCALLTYPE WebCache::disabled(
 {
     if (!disabled)
         return E_POINTER;
-    *disabled = WebCore::memoryCache()->disabled();
+    *disabled = WebCore::MemoryCache::singleton().disabled();
     return S_OK;
 }
 

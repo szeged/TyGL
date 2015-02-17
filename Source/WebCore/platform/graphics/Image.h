@@ -38,6 +38,7 @@
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/RetainPtr.h>
+#include <wtf/TypeCasts.h>
 #include <wtf/text/WTFString.h>
 
 #if USE(APPKIT)
@@ -113,6 +114,7 @@ public:
     virtual String filenameExtension() const { return String(); } // null string if unknown
 
     virtual void destroyDecodedData(bool destroyAll = true) = 0;
+    virtual bool decodedDataIsPurgeable() const { return false; }
 
     SharedBuffer* data() { return m_encodedImageData.get(); }
 
@@ -202,9 +204,11 @@ private:
     FloatSize m_space;
 };
 
-#define IMAGE_TYPE_CASTS(ToClassName) \
-    TYPE_CASTS_BASE(ToClassName, Image, image, image->is##ToClassName(), image.is##ToClassName())
+} // namespace WebCore
 
-}
+#define SPECIALIZE_TYPE_TRAITS_IMAGE(ToClassName) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ToClassName) \
+    static bool isType(const WebCore::Image& image) { return image.is##ToClassName(); } \
+SPECIALIZE_TYPE_TRAITS_END()
 
-#endif
+#endif // Image_h

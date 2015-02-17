@@ -69,9 +69,9 @@ inline SVGAElement::SVGAElement(const QualifiedName& tagName, Document& document
     registerAnimatedPropertiesForSVGAElement();
 }
 
-PassRefPtr<SVGAElement> SVGAElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGAElement> SVGAElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGAElement(tagName, document));
+    return adoptRef(*new SVGAElement(tagName, document));
 }
 
 String SVGAElement::title() const
@@ -126,7 +126,7 @@ void SVGAElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     // Unlike other SVG*Element classes, SVGAElement only listens to SVGURIReference changes
     // as none of the other properties changes the linking behaviour for our <a> element.
@@ -138,7 +138,7 @@ void SVGAElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 }
 
-RenderPtr<RenderElement> SVGAElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGAElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     if (parentNode() && parentNode()->isSVGElement() && downcast<SVGElement>(*parentNode()).isTextContent())
         return createRenderer<RenderSVGInline>(*this, WTF::move(style));
@@ -155,7 +155,7 @@ void SVGAElement::defaultEventHandler(Event* event)
             return;
         }
 
-        if (isLinkClick(event)) {
+        if (MouseEvent::canTriggerActivationBehavior(*event)) {
             String url = stripLeadingAndTrailingHTMLSpaces(href());
 
             if (url[0] == '#') {

@@ -38,6 +38,9 @@ struct CSSParserString {
         m_data.characters8 = characters;
         m_length = length;
         m_is8Bit = true;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+        m_tokenType = TokenType::IdentifierToken;
+#endif
     }
 
     void init(UChar* characters, unsigned length)
@@ -45,6 +48,9 @@ struct CSSParserString {
         m_data.characters16 = characters;
         m_length = length;
         m_is8Bit = false;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+        m_tokenType = TokenType::IdentifierToken;
+#endif
     }
 
     void init(const String& string)
@@ -57,6 +63,9 @@ struct CSSParserString {
             m_data.characters16 = const_cast<UChar*>(string.characters16());
             m_is8Bit = false;
         }
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+        m_tokenType = TokenType::IdentifierToken;
+#endif
     }
 
     void clear()
@@ -64,6 +73,9 @@ struct CSSParserString {
         m_data.characters8 = 0;
         m_length = 0;
         m_is8Bit = true;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+        m_tokenType = TokenType::IdentifierToken;
+#endif
     }
 
     bool is8Bit() const { return m_is8Bit; }
@@ -74,6 +86,11 @@ struct CSSParserString {
 
     unsigned length() const { return m_length; }
     void setLength(unsigned length) { m_length = length; }
+
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+    TokenType tokenType() const { return m_tokenType; }
+    void setTokenType(TokenType tokenType) { m_tokenType = tokenType; }
+#endif
 
     void lower();
 
@@ -101,6 +118,9 @@ struct CSSParserString {
     } m_data;
     unsigned m_length;
     bool m_is8Bit;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+    TokenType m_tokenType;
+#endif
 };
 
 struct CSSParserFunction;
@@ -178,6 +198,14 @@ public:
     std::unique_ptr<CSSParserValueList> args;
 };
 
+enum class CSSParserSelectorCombinator {
+    Child,
+    DescendantSpace,
+    DescendantDoubleChild,
+    DirectAdjacent,
+    IndirectAdjacent
+};
+
 class CSSParserSelector {
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -201,6 +229,9 @@ public:
 
 
     void adoptSelectorVector(Vector<std::unique_ptr<CSSParserSelector>>& selectorVector);
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+    void setLangArgumentList(const Vector<CSSParserString>& stringVector);
+#endif
 
     void setPseudoClassValue(const CSSParserString& pseudoClassString);
     CSSSelector::PseudoClassType pseudoClassType() const { return m_selector->pseudoClassType(); }
@@ -215,7 +246,6 @@ public:
 #endif
     }
 
-    bool isSimple() const;
     bool hasShadowDescendant() const;
     bool matchesPseudoElement() const;
 
@@ -224,9 +254,12 @@ public:
     void clearTagHistory() { m_tagHistory.reset(); }
     void insertTagHistory(CSSSelector::Relation before, std::unique_ptr<CSSParserSelector>, CSSSelector::Relation after);
     void appendTagHistory(CSSSelector::Relation, std::unique_ptr<CSSParserSelector>);
+    void appendTagHistory(CSSParserSelectorCombinator, std::unique_ptr<CSSParserSelector>);
     void prependTagSelector(const QualifiedName&, bool tagIsForNamespaceRule = false);
 
 private:
+    void setDescendantUseDoubleChildSyntax() { m_selector->setDescendantUseDoubleChildSyntax(); }
+
     std::unique_ptr<CSSSelector> m_selector;
     std::unique_ptr<CSSParserSelector> m_tagHistory;
 };

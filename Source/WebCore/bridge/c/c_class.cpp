@@ -78,12 +78,13 @@ Method* CClass::methodNamed(PropertyName propertyName, Instance* instance) const
     const CInstance* inst = static_cast<const CInstance*>(instance);
     NPObject* obj = inst->getObject();
     if (m_isa->hasMethod && m_isa->hasMethod(obj, ident)) {
-        Method* method = new CMethod(ident);
-        m_methods.set(name.impl(), adoptPtr(method));
-        return method;
+        auto method = std::make_unique<CMethod>(ident);
+        CMethod* ret = method.get();
+        m_methods.set(name.impl(), WTF::move(method));
+        return ret;
     }
     
-    return 0;
+    return nullptr;
 }
 
 Field* CClass::fieldNamed(PropertyName propertyName, Instance* instance) const
@@ -97,12 +98,13 @@ Field* CClass::fieldNamed(PropertyName propertyName, Instance* instance) const
     const CInstance* inst = static_cast<const CInstance*>(instance);
     NPObject* obj = inst->getObject();
     if (m_isa->hasProperty && m_isa->hasProperty(obj, ident)) {
-        Field* field = new CField(ident);
-        m_fields.set(name.impl(), adoptPtr(field));
-        return field;
+        auto field = std::make_unique<CField>(ident);
+        CField* ret = field.get();
+        m_fields.set(name.impl(), WTF::move(field));
+        return ret;
     }
 
-    return 0;
+    return nullptr;
 }
 
 } } // namespace JSC::Bindings

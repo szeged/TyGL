@@ -92,7 +92,6 @@ class RenderElement;
 class RenderLayer;
 class RenderWidget;
 class ScrollableArea;
-class SVGElementInstance;
 class Scrollbar;
 class TextEvent;
 class Touch;
@@ -125,7 +124,7 @@ public:
     ~EventHandler();
 
     void clear();
-    void nodeWillBeRemoved(Node*);
+    void nodeWillBeRemoved(Node&);
 
 #if ENABLE(DRAG_SUPPORT)
     void updateSelectionForMouseDrag();
@@ -144,7 +143,7 @@ public:
     bool mouseDownWasInSubframe() const { return m_mouseDownWasInSubframe; }
     bool panScrollInProgress() const;
 
-    void dispatchFakeMouseMoveEventSoon();
+    WEBCORE_EXPORT void dispatchFakeMouseMoveEventSoon();
     void dispatchFakeMouseMoveEventSoonInQuad(const FloatQuad&);
 
     WEBCORE_EXPORT HitTestResult hitTestResultAtPoint(const LayoutPoint&,
@@ -210,6 +209,7 @@ public:
 
 #if ENABLE(IOS_TOUCH_EVENTS)
     bool dispatchTouchEvent(const PlatformTouchEvent&, const AtomicString&, const EventTargetTouchMap&, float, float);
+    bool dispatchSimulatedTouchEvent(IntPoint location);
 #endif
 
 #if ENABLE(IOS_GESTURE_EVENTS)
@@ -326,9 +326,9 @@ private:
 
     OptionalCursor selectCursor(const HitTestResult&, bool shiftKey);
 
-    void hoverTimerFired(Timer<EventHandler>&);
+    void hoverTimerFired();
 #if ENABLE(CURSOR_SUPPORT)
-    void cursorUpdateTimerFired(Timer<EventHandler>&);
+    void cursorUpdateTimerFired();
 #endif
 
     bool logicalScrollOverflow(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
@@ -341,7 +341,7 @@ private:
     static bool eventInvertsTabsToLinksClientCallResult(KeyboardEvent*);
 
 #if !ENABLE(IOS_TOUCH_EVENTS)
-    void fakeMouseMoveEventTimerFired(Timer<EventHandler>&);
+    void fakeMouseMoveEventTimerFired();
     void cancelFakeMouseMoveEvent();
 #endif
 
@@ -437,11 +437,11 @@ private:
 #if ENABLE(CURSOR_VISIBILITY)
     void startAutoHideCursorTimer();
     void cancelAutoHideCursorTimer();
-    void autoHideCursorTimerFired(Timer<EventHandler>&);
+    void autoHideCursorTimerFired();
 #endif
 
     void beginTrackingPotentialLongMousePress(const HitTestResult&);
-    void recognizeLongMousePress(Timer<EventHandler>&);
+    void recognizeLongMousePress();
     void cancelTrackingPotentialLongMousePress();
     bool longMousePressHysteresisExceeded();
     void clearLongMousePressState();
@@ -470,12 +470,12 @@ private:
 
     bool m_panScrollButtonPressed;
 
-    Timer<EventHandler> m_hoverTimer;
+    Timer m_hoverTimer;
 #if ENABLE(CURSOR_SUPPORT)
-    Timer<EventHandler> m_cursorUpdateTimer;
+    Timer m_cursorUpdateTimer;
 #endif
 
-    Timer<EventHandler> m_longMousePressTimer;
+    Timer m_longMousePressTimer;
     bool m_didRecognizeLongMousePress;
 
     std::unique_ptr<AutoscrollController> m_autoscrollController;
@@ -483,12 +483,10 @@ private:
     bool m_mouseDownWasInSubframe;
 
 #if !ENABLE(IOS_TOUCH_EVENTS)
-    Timer<EventHandler> m_fakeMouseMoveEventTimer;
+    Timer m_fakeMouseMoveEventTimer;
 #endif
 
     bool m_svgPan;
-    RefPtr<SVGElementInstance> m_instanceUnderMouse;
-    RefPtr<SVGElementInstance> m_lastInstanceUnderMouse;
 
     RenderLayer* m_resizeLayer;
 
@@ -558,7 +556,7 @@ private:
     bool m_isHandlingWheelEvent;
 
 #if ENABLE(CURSOR_VISIBILITY)
-    Timer<EventHandler> m_autoHideCursorTimer;
+    Timer m_autoHideCursorTimer;
 #endif
 };
 

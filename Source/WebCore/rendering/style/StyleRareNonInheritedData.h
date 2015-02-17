@@ -80,8 +80,8 @@ enum PageSizeType {
 // actually uses one of these properties.
 class StyleRareNonInheritedData : public RefCounted<StyleRareNonInheritedData> {
 public:
-    static PassRef<StyleRareNonInheritedData> create() { return adoptRef(*new StyleRareNonInheritedData); }
-    PassRef<StyleRareNonInheritedData> copy() const;
+    static Ref<StyleRareNonInheritedData> create() { return adoptRef(*new StyleRareNonInheritedData); }
+    Ref<StyleRareNonInheritedData> copy() const;
     ~StyleRareNonInheritedData();
     
     bool operator==(const StyleRareNonInheritedData&) const;
@@ -94,6 +94,9 @@ public:
     bool animationDataEquivalent(const StyleRareNonInheritedData&) const;
     bool transitionDataEquivalent(const StyleRareNonInheritedData&) const;
     bool hasFilters() const;
+#if ENABLE(FILTERS_LEVEL_2)
+    bool hasBackdropFilters() const;
+#endif
     bool hasOpacity() const { return opacity < 1; }
 
     float opacity;
@@ -119,6 +122,9 @@ public:
     DataRef<StyleMultiColData> m_multiCol; //  CSS3 multicol properties
     DataRef<StyleTransformData> m_transform; // Transform properties (rotate, scale, skew, etc.)
     DataRef<StyleFilterData> m_filter; // Filter operations (url, sepia, blur, etc.)
+#if ENABLE(FILTERS_LEVEL_2)
+    DataRef<StyleFilterData> m_backdropFilter; // Filter operations (url, sepia, blur, etc.)
+#endif
 
 #if ENABLE(CSS_GRID_LAYOUT)
     DataRef<StyleGridData> m_grid;

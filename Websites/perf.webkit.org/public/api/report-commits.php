@@ -9,7 +9,7 @@ function main($post_data) {
 
     $report = json_decode($post_data, true);
 
-    verify_builder($db, $report);
+    verify_slave($db, $report);
 
     $commits = array_get($report, 'commits', array());
 
@@ -34,6 +34,18 @@ function main($post_data) {
             exit_with_error('FailedToInsertRepository', array('commit' => $commit_info));
         }
 
+        $account = array_get($commit_info['author'], 'account');
+        $committer_query = array('repository' => $repository_id, 'account' => $account);
+        $committer_data = $committer_query;
+        $name = array_get($commit_info['author'], 'name');
+        if ($name)
+            $committer_data['name'] = $name;
+        $committer_id = $db->update_or_insert_row('committers', 'committer', $committer_query, $committer_data);
+        if (!$committer_id) {
+            $db->rollback_transaction();
+            exit_with_error('FailedToInsertCommitter', array('committer' => $committer_data));
+        }
+
         $parent_revision = array_get($commit_info, 'parent');
         $parent_id = NULL;
         if ($parent_revision) {
@@ -50,8 +62,7 @@ function main($post_data) {
             'revision' => $commit_info['revision'],
             'parent' => $parent_id,
             'time' => $commit_info['time'],
-            'author_name' => array_get($commit_info['author'], 'name'),
-            'author_email' => array_get($commit_info['author'], 'email'),
+            'committer' => $committer_id,
             'message' => $commit_info['message'],
             'reported' => true,
         );
@@ -60,20 +71,6 @@ function main($post_data) {
     $db->commit_transaction();
 
     exit_with_success();
-}
-
-function verify_builder($db, $report) {
-    array_key_exists('builderName', $report) or exit_with_error('MissingBuilderName');
-    array_key_exists('builderPassword', $report) or exit_with_error('MissingBuilderPassword');
-
-    $builder_info = array(
-        'name' => $report['builderName'],
-        'password_hash' => hash('sha256', $report['builderPassword'])
-    );
-
-    $matched_builder = $db->select_first_row('builders', 'builder', $builder_info);
-    if (!$matched_builder)
-        exit_with_error('BuilderNotFound', array('name' => $builder_info['name']));
 }
 
 main($HTTP_RAW_POST_DATA);

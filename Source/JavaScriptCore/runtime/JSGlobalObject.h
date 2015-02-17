@@ -35,12 +35,12 @@
 #include "StringPrototype.h"
 #include "StructureChain.h"
 #include "StructureRareDataInlines.h"
+#include "SymbolPrototype.h"
 #include "VM.h"
 #include "Watchpoint.h"
 #include <JavaScriptCore/JSBase.h>
 #include <array>
 #include <wtf/HashSet.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RandomNumber.h>
 
@@ -80,6 +80,8 @@ class ProgramExecutable;
 class RegExpConstructor;
 class RegExpPrototype;
 class SourceCode;
+class NullGetterFunction;
+class NullSetterFunction;
 struct ActivationStackNode;
 struct HashTable;
 
@@ -90,6 +92,7 @@ struct HashTable;
     macro(Map, map, map, JSMap, Map) \
     macro(Date, date, date, DateInstance, Date) \
     macro(String, string, stringObject, StringObject, String) \
+    macro(Symbol, symbol, symbolObject, SymbolObject, Symbol) \
     macro(Boolean, boolean, booleanObject, BooleanObject, Boolean) \
     macro(Number, number, numberObject, NumberObject, Number) \
     macro(Error, error, error, ErrorInstance, Error) \
@@ -173,6 +176,9 @@ protected:
     WriteBarrier<JSPromiseConstructor> m_promiseConstructor;
 #endif
     WriteBarrier<ObjectConstructor> m_objectConstructor;
+
+    WriteBarrier<NullGetterFunction> m_nullGetterFunction;
+    WriteBarrier<NullSetterFunction> m_nullSetterFunction;
 
     WriteBarrier<JSFunction> m_evalFunction;
     WriteBarrier<JSFunction> m_callFunction;
@@ -260,7 +266,7 @@ protected:
     RefPtr<WatchpointSet> m_havingABadTimeWatchpoint;
     RefPtr<WatchpointSet> m_varInjectionWatchpoint;
 
-    OwnPtr<JSGlobalObjectRareData> m_rareData;
+    std::unique_ptr<JSGlobalObjectRareData> m_rareData;
 
     WeakRandom m_weakRandom;
 
@@ -276,7 +282,7 @@ protected:
     {
         if (m_rareData)
             return;
-        m_rareData = adoptPtr(new JSGlobalObjectRareData);
+        m_rareData = std::make_unique<JSGlobalObjectRareData>();
     }
         
 public:
@@ -371,6 +377,9 @@ public:
     JSPromiseConstructor* promiseConstructor() const { return m_promiseConstructor.get(); }
 #endif
 
+    NullGetterFunction* nullGetterFunction() const { return m_nullGetterFunction.get(); }
+    NullSetterFunction* nullSetterFunction() const { return m_nullSetterFunction.get(); }
+
     JSFunction* evalFunction() const { return m_evalFunction.get(); }
     JSFunction* callFunction() const { return m_callFunction.get(); }
     JSFunction* applyFunction() const { return m_applyFunction.get(); }
@@ -386,6 +395,7 @@ public:
     ArrayPrototype* arrayPrototype() const { return m_arrayPrototype.get(); }
     BooleanPrototype* booleanPrototype() const { return m_booleanPrototype.get(); }
     StringPrototype* stringPrototype() const { return m_stringPrototype.get(); }
+    SymbolPrototype* symbolPrototype() const { return m_symbolPrototype.get(); }
     NumberPrototype* numberPrototype() const { return m_numberPrototype.get(); }
     DatePrototype* datePrototype() const { return m_datePrototype.get(); }
     RegExpPrototype* regExpPrototype() const { return m_regExpPrototype.get(); }
@@ -444,6 +454,7 @@ public:
     Structure* regExpStructure() const { return m_regExpStructure.get(); }
     Structure* setStructure() const { return m_setStructure.get(); }
     Structure* stringObjectStructure() const { return m_stringObjectStructure.get(); }
+    Structure* symbolObjectStructure() const { return m_symbolObjectStructure.get(); }
     Structure* iteratorResultStructure() const { return m_iteratorResultStructure.get(); }
     static ptrdiff_t iteratorResultStructureOffset() { return OBJECT_OFFSETOF(JSGlobalObject, m_iteratorResultStructure); }
 
@@ -672,6 +683,11 @@ inline JSArray* constructArrayNegativeIndexed(ExecState* exec, ArrayAllocationPr
 inline JSArray* constructArrayNegativeIndexed(ExecState* exec, ArrayAllocationProfile* profile, const JSValue* values, unsigned length)
 {
     return constructArrayNegativeIndexed(exec, profile, exec->lexicalGlobalObject(), values, length);
+}
+
+inline JSObject* ExecState::globalThisValue() const
+{
+    return lexicalGlobalObject()->globalThis();
 }
 
 inline JSObject* JSScope::globalThis()

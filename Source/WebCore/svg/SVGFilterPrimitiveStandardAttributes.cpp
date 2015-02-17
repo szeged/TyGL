@@ -112,7 +112,7 @@ void SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(const QualifiedNa
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);    
+    InstanceInvalidationGuard guard(*this);
     invalidate();
 }
 
@@ -141,7 +141,7 @@ void SVGFilterPrimitiveStandardAttributes::setStandardAttributes(FilterEffect* f
         filterEffect->setHasHeight(true);
 }
 
-RenderPtr<RenderElement> SVGFilterPrimitiveStandardAttributes::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGFilterPrimitiveStandardAttributes::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGResourceFilterPrimitive>(*this, WTF::move(style));
 }

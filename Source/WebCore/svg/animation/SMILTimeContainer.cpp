@@ -44,7 +44,7 @@ SMILTimeContainer::SMILTimeContainer(SVGSVGElement* owner)
     , m_resumeTime(0)
     , m_presetStartTime(0)
     , m_documentOrderIndexesDirty(false)
-    , m_timer(this, &SMILTimeContainer::timerFired)
+    , m_timer(*this, &SMILTimeContainer::timerFired)
     , m_ownerSVGElement(owner)
 #ifndef NDEBUG
     , m_preventScheduledAnimationsChanges(false)
@@ -92,9 +92,8 @@ void SMILTimeContainer::unschedule(SVGSMILElement* animation, SVGElement* target
     ElementAttributePair key(target, attributeName);
     AnimationsVector* scheduled = m_scheduledAnimations.get(key);
     ASSERT(scheduled);
-    size_t idx = scheduled->find(animation);
-    ASSERT(idx != notFound);
-    scheduled->remove(idx);
+    bool removed = scheduled->removeFirst(animation);
+    ASSERT_UNUSED(removed, removed);
 }
 
 void SMILTimeContainer::notifyIntervalsChanged()
@@ -213,7 +212,7 @@ void SMILTimeContainer::startTimer(SMILTime fireTime, SMILTime minimumDelay)
     m_timer.startOneShot(delay.value());
 }
 
-void SMILTimeContainer::timerFired(Timer<SMILTimeContainer>*)
+void SMILTimeContainer::timerFired()
 {
     ASSERT(m_beginTime);
     ASSERT(!m_pauseTime);

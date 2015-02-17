@@ -1,3 +1,5 @@
+App.Model = DS.Model;
+
 App.NameLabelModel = DS.Model.extend({
     name: DS.attr('string'),
     label: function ()
@@ -18,7 +20,7 @@ App.Metric = App.NameLabelModel.extend({
     aggregator: DS.attr('string'),
     label: function ()
     {
-        return this.get('name') + ' : ' + this.get('aggregator');
+        return this.get('name') + (this.get('aggregator') ? ' : ' + this.get('aggregator') : '');
     }.property('name', 'aggregator'),
     path: function ()
     {
@@ -30,6 +32,11 @@ App.Metric = App.NameLabelModel.extend({
         }
         return path.reverse();
     }.property('name', 'test'),
+    fullName: function ()
+    {
+        return this.get('path').join(' \u2208 ') /* &in; */
+            + ' : ' + this.get('label');
+    }.property('path', 'label'),
 });
 
 App.Builder = App.NameLabelModel.extend({
@@ -42,7 +49,9 @@ App.Builder = App.NameLabelModel.extend({
 });
 
 App.BugTracker = App.NameLabelModel.extend({
-    buildUrl: DS.attr('string'),
+    bugUrl: DS.attr('string'),
+    newBugUrl: DS.attr('string'),
+    repositories: DS.hasMany('repository'),
 });
 
 App.Platform = App.NameLabelModel.extend({
@@ -73,11 +82,60 @@ App.Repository = App.NameLabelModel.extend({
     url: DS.attr('string'),
     blameUrl: DS.attr('string'),
     hasReportedCommits: DS.attr('boolean'),
-    urlForRevision: function (currentRevision) {
+    urlForRevision: function (currentRevision)
+    {
         return (this.get('url') || '').replace(/\$1/g, currentRevision);
     },
-    urlForRevisionRange: function (from, to) {
+    urlForRevisionRange: function (from, to)
+    {
         return (this.get('blameUrl') || '').replace(/\$1/g, from).replace(/\$2/g, to);
+    },
+});
+
+App.Dashboard = App.Model.extend({
+    serialized: DS.attr('string'),
+    table: function ()
+    {
+        var json = this.get('serialized');
+        try {
+            var parsed = JSON.parse(json);
+        } catch (error) {
+            console.log("Failed to parse the grid:", error, json);
+            return [];
+        }
+        if (!parsed)
+            return [];
+        return this._normalizeTable(parsed);
+    }.property('serialized'),
+
+    rows: function ()
+    {
+        return this.get('table').slice(1);
+    }.property('table'),
+
+    headerColumns: function ()
+    {
+        var table = this.get('table');
+        if (!table || !table.length)
+            return [];
+        return table[0].map(function (name, index) {
+            return {label:name, index: index};
+        });
+    }.property('table'),
+
+    _normalizeTable: function (table)
+    {
+        var maxColumnCount = Math.max(table.map(function (column) { return column.length; }));
+        for (var i = 1; i < table.length; i++) {
+            var row = table[i];
+            for (var j = 1; j < row.length; j++) {
+                if (row[j] && !(row[j] instanceof Array)) {
+                    console.log('Unrecognized (platform, metric) pair at column ' + i + ' row ' + j + ':' + row[j]);
+                    row[j] = [];
+                }
+            }
+        }
+        return table;
     },
 });
 
@@ -93,6 +151,8 @@ App.MetricSerializer = App.PlatformSerializer = DS.RESTSerializer.extend({
             }),
             metrics: this._normalizeIdMap(payload['metrics']),
             repositories: this._normalizeIdMap(payload['repositories']),
+            bugTrackers: this._normalizeIdMap(payload['bugTrackers']),
+            dashboards: [{id: 1, serialized: JSON.stringify(payload['defaultDashboard'])}],
         };
 
         for (var testId in payload['tests']) {
@@ -144,19 +204,18 @@ App.MetricAdapter = DS.RESTAdapter.extend({
 App.Manifest = Ember.Controller.extend({
     platforms: null,
     topLevelTests: null,
+    repositories: [],
+    repositoriesWithReportedCommits: [],
+    bugTrackers: [],
     _platformById: {},
     _metricById: {},
     _builderById: {},
     _repositoryById: {},
     _fetchPromise: null,
-    fetch: function ()
+    fetch: function (store)
     {
-        if (this._fetchPromise)
-            return this._fetchPromise;
-        // FIXME: We shouldn't use DS.Store at all.
-        var store = App.__container__.lookup('store:main');
-        var promise = store.findAll('platform');
-        this._fetchPromise = promise.then(this._fetchedManifest.bind(this, store));
+        if (!this._fetchPromise)
+            this._fetchPromise = store.findAll('platform').then(this._fetchedManifest.bind(this, store));
         return this._fetchPromise;
     },
     isFetched: function () { return !!this.get('platforms'); }.property('platforms'),
@@ -190,8 +249,41 @@ App.Manifest = Ember.Controller.extend({
             self._builderById[builder.get('id')] = builder;
         });
 
-        store.all('repository').forEach(function (repository) {
+        var repositories = store.all('repository');
+        repositories.forEach(function (repository) {
             self._repositoryById[repository.get('id')] = repository;
         });
-    }
+        this.set('repositories', repositories.sortBy('id'));
+        this.set('repositoriesWithReportedCommits',
+            repositories.filter(function (repository) { return repository.get('hasReportedCommits'); }));
+
+        this.set('bugTrackers', store.all('bugTracker').sortBy('name'));
+
+        this.set('defaultDashboard', store.all('dashboard').objectAt(0));
+    },
+    fetchRunsWithPlatformAndMetric: function (store, platformId, metricId)
+    {
+        return Ember.RSVP.all([
+            RunsData.fetchRuns(platformId, metricId),
+            this.fetch(store),
+        ]).then(function (values) {
+            var runs = values[0];
+
+            var platform = App.Manifest.platform(platformId);
+            var metric = App.Manifest.metric(metricId);
+
+            var suffix = metric.get('name').match('([A-z][a-z]+|FrameRate)$')[0];
+            var unit = {
+                'FrameRate': 'fps',
+                'Runs': '/s',
+                'Time': 'ms',
+                'Malloc': 'bytes',
+                'Heap': 'bytes',
+                'Allocations': 'bytes'
+            }[suffix];
+            var smallerIsBetter = unit != 'fps' && unit != '/s'; // Assume smaller is better for unit-less metrics.
+
+            return {platform: platform, metric: metric, runs: runs, unit: unit, useSI: unit == 'bytes', smallerIsBetter: smallerIsBetter};
+        });
+    },
 }).create();

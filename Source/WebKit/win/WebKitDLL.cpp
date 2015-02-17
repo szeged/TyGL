@@ -23,13 +23,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#include "config.h"
 #include "WebKitDLL.h"
 
 #include "ForEachCoClass.h"
 #include "resource.h"
 #include "WebKit.h"
 #include "WebKitClassFactory.h"
+#include "WebStorageNamespaceProvider.h"
 #include <WebCore/COMPtr.h>
 #include <WebCore/IconDatabase.h>
 #include <WebCore/Page.h>
@@ -141,7 +141,7 @@ STDAPI LocalServerDidDie()
 void shutDownWebKit()
 {
     WebCore::iconDatabase().close();
-    WebCore::PageGroup::closeLocalStorage();
+    WebStorageNamespaceProvider::closeLocalStorage();
 }
 
 //FIXME: We should consider moving this to a new file for cross-project functionality

@@ -41,7 +41,7 @@ XMLHttpRequestProgressEventThrottle::XMLHttpRequestProgressEventThrottle(EventTa
     , m_loaded(0)
     , m_total(0)
     , m_deferEvents(false)
-    , m_dispatchDeferredEventsTimer(this, &XMLHttpRequestProgressEventThrottle::dispatchDeferredEvents)
+    , m_dispatchDeferredEventsTimer(*this, &XMLHttpRequestProgressEventThrottle::dispatchDeferredEvents)
 {
     ASSERT(target);
 }
@@ -128,18 +128,17 @@ void XMLHttpRequestProgressEventThrottle::flushProgressEvent()
 
     if (!hasEventToDispatch())
         return;
-    PassRefPtr<Event> event = XMLHttpRequestProgressEvent::create(eventNames().progressEvent, m_lengthComputable, m_loaded, m_total);
+    Ref<Event> event = XMLHttpRequestProgressEvent::create(eventNames().progressEvent, m_lengthComputable, m_loaded, m_total);
     m_hasThrottledProgressEvent = false;
 
     // We stop the timer as this is called when no more events are supposed to occur.
     stop();
 
-    dispatchEvent(event);
+    dispatchEvent(WTF::move(event));
 }
 
-void XMLHttpRequestProgressEventThrottle::dispatchDeferredEvents(Timer<XMLHttpRequestProgressEventThrottle>* timer)
+void XMLHttpRequestProgressEventThrottle::dispatchDeferredEvents()
 {
-    ASSERT_UNUSED(timer, timer == &m_dispatchDeferredEventsTimer);
     ASSERT(m_deferEvents);
     m_deferEvents = false;
 

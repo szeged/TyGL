@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014 Dhi Aurrahman <diorahman@rockybars.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -86,20 +87,17 @@ ALWAYS_INLINE bool isChecked(Element* element)
 
 ALWAYS_INLINE bool isInRange(Element* element)
 {
-    element->document().setContainsValidityStyleRules();
     return element->isInRange();
 }
 
 ALWAYS_INLINE bool isOutOfRange(Element* element)
 {
-    element->document().setContainsValidityStyleRules();
     return element->isOutOfRange();
 }
 
 ALWAYS_INLINE bool isInvalid(const Element* element)
 {
-    element->document().setContainsValidityStyleRules();
-    return element->willValidate() && !element->isValidFormControlElement();
+    return element->matchesInvalidPseudoClass();
 }
 
 ALWAYS_INLINE bool isOptionalFormControl(const Element* element)
@@ -114,16 +112,114 @@ ALWAYS_INLINE bool isRequiredFormControl(const Element* element)
 
 ALWAYS_INLINE bool isValid(const Element* element)
 {
-    element->document().setContainsValidityStyleRules();
-    return element->willValidate() && element->isValidFormControlElement();
+    return element->matchesValidPseudoClass();
 }
 
 ALWAYS_INLINE bool isWindowInactive(const Element* element)
 {
     return !element->document().page()->focusController().isActive();
 }
+
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+ALWAYS_INLINE bool equalIgnoringASCIICase(const String& a, const String& b)
+{
+    if (a.length() != b.length()) 
+        return false;
+    for (size_t i = 0; i < a.length(); ++i) {
+        if (toASCIILower(a[i]) != toASCIILower(b[i]))
+            return false;
+    }
+    return true;
+}
+
+ALWAYS_INLINE bool containslanguageSubtagMatchingRange(StringView language, StringView range, unsigned languageLength, unsigned& position)
+{
+    unsigned languageSubtagsStartIndex = position;
+    unsigned languageSubtagsEndIndex = languageLength;
+    bool isAsteriskRange = range == "*";
+    do {
+        if (languageSubtagsStartIndex > 0)
+            languageSubtagsStartIndex += 1;
+        
+        languageSubtagsEndIndex = std::min<unsigned>(language.find('-', languageSubtagsStartIndex), languageLength);
+
+        if (languageSubtagsStartIndex > languageSubtagsEndIndex)
+            return false;
+
+        StringView languageSubtag = language.substring(languageSubtagsStartIndex, languageSubtagsEndIndex - languageSubtagsStartIndex);
+        bool isEqual = equalIgnoringASCIICase(range, languageSubtag);
+        if (!isAsteriskRange) {
+            if ((!isEqual && !languageSubtagsStartIndex) || (languageSubtag.length() == 1 && languageSubtagsStartIndex > 0))
+                return false;
+        }
+        languageSubtagsStartIndex = languageSubtagsEndIndex;
+        if (isEqual || isAsteriskRange) {
+            position = languageSubtagsStartIndex;
+            return true;
+        }
+
+    } while (languageSubtagsStartIndex < languageLength);
+    return false;
+}
+
+ALWAYS_INLINE bool matchesLangPseudoClass(const Element* element, const Vector<LanguageArgument>& argumentList)
+{
+    ASSERT(element);
+
+    AtomicString language;
+#if ENABLE(VIDEO_TRACK)
+    if (is<WebVTTElement>(*element))
+        language = downcast<WebVTTElement>(*element).language();
+    else
+#endif
+        language = element->computeInheritedLanguage();
+
+    if (language.isEmpty())
+        return false;
+
+    // Implement basic and extended filterings of given language tags
+    // as specified in www.ietf.org/rfc/rfc4647.txt.
+    StringView languageStringView = language.string();
+    unsigned languageLength = language.length();
+    for (const LanguageArgument& argument : argumentList) {
+        const AtomicString& range = argument.languageRange;
+        if (range.isEmpty())
+            continue;
+
+        if (range == "*")
+            return true;
+
+        StringView rangeStringView = range.string();
+        if (equalIgnoringASCIICase(languageStringView, rangeStringView) && !languageStringView.contains('-'))
+            return true;
+        
+        unsigned rangeLength = rangeStringView.length();
+        unsigned rangeSubtagsStartIndex = 0;
+        unsigned rangeSubtagsEndIndex = rangeLength;
+        unsigned lastMatchedLanguageSubtagIndex = 0;
+
+        bool matchedRange = true;
+        do {
+            if (rangeSubtagsStartIndex > 0)
+                rangeSubtagsStartIndex += 1;
+            if (rangeSubtagsStartIndex > languageLength)
+                return false;
+            rangeSubtagsEndIndex = std::min<unsigned>(rangeStringView.find('-', rangeSubtagsStartIndex), rangeLength);
+            StringView rangeSubtag = rangeStringView.substring(rangeSubtagsStartIndex, rangeSubtagsEndIndex - rangeSubtagsStartIndex);
+            if (!containslanguageSubtagMatchingRange(languageStringView, rangeSubtag, languageLength, lastMatchedLanguageSubtagIndex)) {
+                matchedRange = false;
+                break;
+            }
+            rangeSubtagsStartIndex = rangeSubtagsEndIndex;
+        } while (rangeSubtagsStartIndex < rangeLength);
+        if (matchedRange)
+            return true;
+    }
+    return false;
+}
+#endif
     
-inline bool matchesLangPseudoClass(const Element* element, AtomicStringImpl* filter)
+inline bool matchesLangPseudoClassDeprecated(const Element* element, AtomicStringImpl* filter)
 {
     AtomicString value;
 #if ENABLE(VIDEO_TRACK)

@@ -49,9 +49,35 @@ struct SameSizeAsCSSSelector {
 
 static_assert(sizeof(CSSSelector) == sizeof(SameSizeAsCSSSelector), "CSSSelector should remain small.");
 
+CSSSelector::CSSSelector(const QualifiedName& tagQName, bool tagIsForNamespaceRule)
+    : m_relation(Descendant)
+    , m_match(Tag)
+    , m_pseudoType(0)
+    , m_parsedNth(false)
+    , m_isLastInSelectorList(false)
+    , m_isLastInTagHistory(true)
+    , m_hasRareData(false)
+    , m_hasNameWithCase(false)
+    , m_isForPage(false)
+    , m_tagIsForNamespaceRule(tagIsForNamespaceRule)
+    , m_descendantDoubleChildSyntax(false)
+{
+    const AtomicString& tagLocalName = tagQName.localName();
+    const AtomicString tagLocalNameASCIILowercase = tagLocalName.convertToASCIILowercase();
+
+    if (tagLocalName == tagLocalNameASCIILowercase) {
+        m_data.m_tagQName = tagQName.impl();
+        m_data.m_tagQName->ref();
+    } else {
+        m_data.m_nameWithCase = adoptRef(new NameWithCase(tagQName, tagLocalNameASCIILowercase)).leakRef();
+        m_hasNameWithCase = true;
+    }
+}
+
 void CSSSelector::createRareData()
 {
     ASSERT(match() != Tag);
+    ASSERT(!m_hasNameWithCase);
     if (m_hasRareData)
         return;
     // Move the value to the rare data stucture.
@@ -59,72 +85,158 @@ void CSSSelector::createRareData()
     m_hasRareData = true;
 }
 
-unsigned CSSSelector::specificity() const
+static unsigned simpleSelectorSpecificityInternal(const CSSSelector& simpleSelector, bool isComputingMaximumSpecificity);
+
+static unsigned selectorSpecificity(const CSSSelector& firstSimpleSelector, bool isComputingMaximumSpecificity)
 {
-    // make sure the result doesn't overflow
-    static const unsigned maxValueMask = 0xffffff;
-    static const unsigned idMask = 0xff0000;
-    static const unsigned classMask = 0xff00;
-    static const unsigned elementMask = 0xff;
+    unsigned total = simpleSelectorSpecificityInternal(firstSimpleSelector, isComputingMaximumSpecificity);
 
-    if (isForPage())
-        return specificityForPage() & maxValueMask;
-
-    unsigned total = 0;
-    unsigned temp = 0;
-
-    for (const CSSSelector* selector = this; selector; selector = selector->tagHistory()) {
-        temp = total + selector->specificityForOneSelector();
-        // Clamp each component to its max in the case of overflow.
-        if ((temp & idMask) < (total & idMask))
-            total |= idMask;
-        else if ((temp & classMask) < (total & classMask))
-            total |= classMask;
-        else if ((temp & elementMask) < (total & elementMask))
-            total |= elementMask;
-        else
-            total = temp;
-    }
+    for (const CSSSelector* selector = firstSimpleSelector.tagHistory(); selector; selector = selector->tagHistory())
+        total = CSSSelector::addSpecificities(total, simpleSelectorSpecificityInternal(*selector, isComputingMaximumSpecificity));
     return total;
 }
 
-inline unsigned CSSSelector::specificityForOneSelector() const
+static unsigned maxSpecificity(const CSSSelectorList& selectorList)
 {
-    // FIXME: Pseudo-elements and pseudo-classes do not have the same specificity. This function
-    // isn't quite correct.
-    switch (match()) {
-    case Id:
-        return 0x10000;
+    unsigned maxSpecificity = 0;
+    for (const CSSSelector* subSelector = selectorList.first(); subSelector; subSelector = CSSSelectorList::next(subSelector))
+        maxSpecificity = std::max(maxSpecificity, selectorSpecificity(*subSelector, true));
+    return maxSpecificity;
+}
 
-    case PagePseudoClass:
+static unsigned simpleSelectorSpecificityInternal(const CSSSelector& simpleSelector, bool isComputingMaximumSpecificity)
+{
+    ASSERT_WITH_MESSAGE(!simpleSelector.isForPage(), "At the time of this writing, page selectors are not treated as real selectors that are matched. The value computed here only account for real selectors.");
+
+    switch (simpleSelector.match()) {
+    case CSSSelector::Id:
+        return static_cast<unsigned>(SelectorSpecificityIncrement::ClassA);
+
+    case CSSSelector::PagePseudoClass:
         break;
-    case PseudoClass:
-        // FIXME: PseudoAny should base the specificity on the sub-selectors.
-        // See http://lists.w3.org/Archives/Public/www-style/2010Sep/0530.html
-        if (pseudoClassType() == PseudoClassNot && selectorList())
-            return selectorList()->first()->specificityForOneSelector();
+    case CSSSelector::PseudoClass:
+        if (simpleSelector.pseudoClassType() == CSSSelector::PseudoClassMatches) {
+            ASSERT_WITH_MESSAGE(simpleSelector.selectorList() && simpleSelector.selectorList()->first(), "The parser should never generate a valid selector for an empty :matches().");
+            if (!isComputingMaximumSpecificity)
+                return 0;
+            return maxSpecificity(*simpleSelector.selectorList());
+        }
+
+        if (simpleSelector.pseudoClassType() == CSSSelector::PseudoClassNot) {
+            ASSERT_WITH_MESSAGE(simpleSelector.selectorList() && simpleSelector.selectorList()->first(), "The parser should never generate a valid selector for an empty :not().");
+            return maxSpecificity(*simpleSelector.selectorList());
+        }
         FALLTHROUGH;
-    case Exact:
-    case Class:
-    case Set:
-    case List:
-    case Hyphen:
-    case PseudoElement:
-    case Contain:
-    case Begin:
-    case End:
-        return 0x100;
-    case Tag:
-        return (tagQName().localName() != starAtom) ? 1 : 0;
-    case Unknown:
+    case CSSSelector::Exact:
+    case CSSSelector::Class:
+    case CSSSelector::Set:
+    case CSSSelector::List:
+    case CSSSelector::Hyphen:
+    case CSSSelector::Contain:
+    case CSSSelector::Begin:
+    case CSSSelector::End:
+        return static_cast<unsigned>(SelectorSpecificityIncrement::ClassB);
+    case CSSSelector::Tag:
+        return (simpleSelector.tagQName().localName() != starAtom) ? static_cast<unsigned>(SelectorSpecificityIncrement::ClassC) : 0;
+    case CSSSelector::PseudoElement:
+        return static_cast<unsigned>(SelectorSpecificityIncrement::ClassC);
+    case CSSSelector::Unknown:
         return 0;
     }
     ASSERT_NOT_REACHED();
     return 0;
 }
 
+unsigned CSSSelector::simpleSelectorSpecificity() const
+{
+    return simpleSelectorSpecificityInternal(*this, false);
+}
+
+static unsigned staticSpecificityInternal(const CSSSelector& firstSimpleSelector, bool& ok);
+
+static unsigned simpleSelectorFunctionalPseudoClassStaticSpecificity(const CSSSelector& simpleSelector, bool& ok)
+{
+    if (simpleSelector.match() == CSSSelector::PseudoClass) {
+        CSSSelector::PseudoClassType pseudoClassType = simpleSelector.pseudoClassType();
+        if (pseudoClassType == CSSSelector::PseudoClassMatches || pseudoClassType == CSSSelector::PseudoClassNthChild || pseudoClassType == CSSSelector::PseudoClassNthLastChild) {
+            const CSSSelectorList* selectorList = simpleSelector.selectorList();
+            if (!selectorList) {
+                ASSERT_WITH_MESSAGE(pseudoClassType != CSSSelector::PseudoClassMatches, ":matches() should never be created without a valid selector list.");
+                return 0;
+            }
+
+            const CSSSelector& firstSubselector = *selectorList->first();
+
+            unsigned initialSpecificity = staticSpecificityInternal(firstSubselector, ok);
+            if (!ok)
+                return 0;
+
+            const CSSSelector* subselector = &firstSubselector;
+            while ((subselector = CSSSelectorList::next(subselector))) {
+                unsigned subSelectorSpecificity = staticSpecificityInternal(*subselector, ok);
+                if (initialSpecificity != subSelectorSpecificity)
+                    ok = false;
+                if (!ok)
+                    return 0;
+            }
+            return initialSpecificity;
+        }
+    }
+    return 0;
+}
+
+static unsigned functionalPseudoClassStaticSpecificity(const CSSSelector& firstSimpleSelector, bool& ok)
+{
+    unsigned total = 0;
+    for (const CSSSelector* selector = &firstSimpleSelector; selector; selector = selector->tagHistory()) {
+        total = CSSSelector::addSpecificities(total, simpleSelectorFunctionalPseudoClassStaticSpecificity(*selector, ok));
+        if (!ok)
+            return 0;
+    }
+    return total;
+}
+
+static unsigned staticSpecificityInternal(const CSSSelector& firstSimpleSelector, bool& ok)
+{
+    unsigned staticSpecificity = selectorSpecificity(firstSimpleSelector, false);
+    return CSSSelector::addSpecificities(staticSpecificity, functionalPseudoClassStaticSpecificity(firstSimpleSelector, ok));
+}
+
+unsigned CSSSelector::staticSpecificity(bool &ok) const
+{
+    ok = true;
+    return staticSpecificityInternal(*this, ok);
+}
+
+unsigned CSSSelector::addSpecificities(unsigned a, unsigned b)
+{
+    unsigned total = a;
+
+    unsigned newIdValue = (b & idMask);
+    if (((total & idMask) + newIdValue) & ~idMask)
+        total |= idMask;
+    else
+        total += newIdValue;
+
+    unsigned newClassValue = (b & classMask);
+    if (((total & classMask) + newClassValue) & ~classMask)
+        total |= classMask;
+    else
+        total += newClassValue;
+
+    unsigned newElementValue = (b & elementMask);
+    if (((total & elementMask) + newElementValue) & ~elementMask)
+        total |= elementMask;
+    else
+        total += newElementValue;
+
+    return total;
+}
+
 unsigned CSSSelector::specificityForPage() const
 {
+    ASSERT(isForPage());
+
     // See http://dev.w3.org/csswg/css3-page/#cascading-and-page-context
     unsigned s = 0;
 
@@ -239,11 +351,17 @@ bool CSSSelector::operator==(const CSSSelector& other) const
 static void appendPseudoClassFunctionTail(StringBuilder& str, const CSSSelector* selector)
 {
     switch (selector->pseudoClassType()) {
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+    case CSSSelector::PseudoClassDir:
+#endif
     case CSSSelector::PseudoClassLang:
     case CSSSelector::PseudoClassNthChild:
     case CSSSelector::PseudoClassNthLastChild:
     case CSSSelector::PseudoClassNthOfType:
     case CSSSelector::PseudoClassNthLastOfType:
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+    case CSSSelector::PseudoClassRole:
+#endif
         str.append(selector->argument());
         str.append(')');
         break;
@@ -253,15 +371,23 @@ static void appendPseudoClassFunctionTail(StringBuilder& str, const CSSSelector*
 
 }
 
-static void appendSelectorList(StringBuilder& str, const CSSSelectorList* selectorList)
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+static void appendLangArgumentList(StringBuilder& str, const Vector<LanguageArgument>& argumentList)
 {
-    const CSSSelector* firstSubSelector = selectorList->first();
-    for (const CSSSelector* subSelector = firstSubSelector; subSelector; subSelector = CSSSelectorList::next(subSelector)) {
-        if (subSelector != firstSubSelector)
+    unsigned argumentListSize = argumentList.size();
+    for (unsigned i = 0; i < argumentListSize; ++i) {
+        const LanguageArgument& argument = argumentList[i];
+        bool isAtomicStringToken = argument.tokenType == TokenType::AtomicStringToken;
+        if (isAtomicStringToken)
+            str.append('"');
+        str.append(argument.languageRange);
+        if (isAtomicStringToken)
+            str.append('"');
+        if (i != argumentListSize - 1)
             str.appendLiteral(", ");
-        str.append(subSelector->selectorText());
     }
 }
+#endif
 
 String CSSSelector::selectorText(const String& rightSide) const
 {
@@ -294,16 +420,16 @@ String CSSSelector::selectorText(const String& rightSide) const
 #endif
             case CSSSelector::PseudoClassAny: {
                 str.appendLiteral(":-webkit-any(");
-                const CSSSelector* firstSubSelector = cs->selectorList()->first();
-                for (const CSSSelector* subSelector = firstSubSelector; subSelector; subSelector = CSSSelectorList::next(subSelector)) {
-                    if (subSelector != firstSubSelector)
-                        str.append(',');
-                    str.append(subSelector->selectorText());
-                }
+                cs->selectorList()->buildSelectorsText(str);
                 str.append(')');
                 break;
             }
+#if ENABLE(CSS_SELECTORS_LEVEL4)
             case CSSSelector::PseudoClassAnyLink:
+                str.appendLiteral(":any-link");
+                break;
+#endif
+            case CSSSelector::PseudoClassAnyLinkDeprecated:
                 str.appendLiteral(":-webkit-any-link");
                 break;
             case CSSSelector::PseudoClassAutofill:
@@ -341,6 +467,12 @@ String CSSSelector::selectorText(const String& rightSide) const
             case CSSSelector::PseudoClassDefault:
                 str.appendLiteral(":default");
                 break;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+            case CSSSelector::PseudoClassDir:
+                str.appendLiteral(":dir(");
+                appendPseudoClassFunctionTail(str, cs);
+                break;
+#endif
             case CSSSelector::PseudoClassDisabled:
                 str.appendLiteral(":disabled");
                 break;
@@ -390,7 +522,13 @@ String CSSSelector::selectorText(const String& rightSide) const
                 break;
             case CSSSelector::PseudoClassLang:
                 str.appendLiteral(":lang(");
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+                ASSERT_WITH_MESSAGE(cs->langArgumentList() && !cs->langArgumentList()->isEmpty(), "An empty :lang() is invalid and should never be generated by the parser.");
+                appendLangArgumentList(str, *cs->langArgumentList());
+                str.append(')');
+#else
                 appendPseudoClassFunctionTail(str, cs);
+#endif
                 break;
             case CSSSelector::PseudoClassLastChild:
                 str.appendLiteral(":last-child");
@@ -406,30 +544,26 @@ String CSSSelector::selectorText(const String& rightSide) const
                 break;
             case CSSSelector::PseudoClassNot:
                 str.appendLiteral(":not(");
-#if ENABLE(CSS_SELECTORS_LEVEL4)
-                appendSelectorList(str, cs->selectorList());
-#else
-                if (const CSSSelectorList* selectorList = cs->selectorList())
-                    str.append(selectorList->first()->selectorText());
-#endif
+                cs->selectorList()->buildSelectorsText(str);
                 str.append(')');
                 break;
             case CSSSelector::PseudoClassNthChild:
                 str.appendLiteral(":nth-child(");
                 str.append(cs->argument());
-#if ENABLE(CSS_SELECTORS_LEVEL4)
                 if (const CSSSelectorList* selectorList = cs->selectorList()) {
                     str.appendLiteral(" of ");
-                    appendSelectorList(str, selectorList);
+                    selectorList->buildSelectorsText(str);
                 }
-#else
-                ASSERT(!cs->selectorList());
-#endif
                 str.append(')');
                 break;
             case CSSSelector::PseudoClassNthLastChild:
                 str.appendLiteral(":nth-last-child(");
-                appendPseudoClassFunctionTail(str, cs);
+                str.append(cs->argument());
+                if (const CSSSelectorList* selectorList = cs->selectorList()) {
+                    str.appendLiteral(" of ");
+                    selectorList->buildSelectorsText(str);
+                }
+                str.append(')');
                 break;
             case CSSSelector::PseudoClassNthLastOfType:
                 str.appendLiteral(":nth-last-of-type(");
@@ -448,17 +582,15 @@ String CSSSelector::selectorText(const String& rightSide) const
             case CSSSelector::PseudoClassOptional:
                 str.appendLiteral(":optional");
                 break;
-#if ENABLE(CSS_SELECTORS_LEVEL4)
             case CSSSelector::PseudoClassMatches: {
                 str.appendLiteral(":matches(");
-                appendSelectorList(str, cs->selectorList());
+                cs->selectorList()->buildSelectorsText(str);
                 str.append(')');
                 break;
             }
             case CSSSelector::PseudoClassPlaceholderShown:
                 str.appendLiteral(":placeholder-shown");
                 break;
-#endif
             case CSSSelector::PseudoClassOutOfRange:
                 str.appendLiteral(":out-of-range");
                 break;
@@ -476,6 +608,12 @@ String CSSSelector::selectorText(const String& rightSide) const
             case CSSSelector::PseudoClassRequired:
                 str.appendLiteral(":required");
                 break;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+            case CSSSelector::PseudoClassRole:
+                str.appendLiteral(":role(");
+                appendPseudoClassFunctionTail(str, cs);
+                break;
+#endif
             case CSSSelector::PseudoClassRoot:
                 str.appendLiteral(":root");
                 break;
@@ -569,6 +707,8 @@ String CSSSelector::selectorText(const String& rightSide) const
     if (const CSSSelector* tagHistory = cs->tagHistory()) {
         switch (cs->relation()) {
         case CSSSelector::Descendant:
+            if (cs->m_descendantDoubleChildSyntax)
+                return tagHistory->selectorText(" >> " + str.toString() + rightSide);
             return tagHistory->selectorText(" " + str.toString() + rightSide);
         case CSSSelector::Child:
             return tagHistory->selectorText(" > " + str.toString() + rightSide);
@@ -592,7 +732,7 @@ void CSSSelector::setAttribute(const QualifiedName& value, bool isCaseInsensitiv
 {
     createRareData();
     m_data.m_rareData->m_attribute = value;
-    m_data.m_rareData->m_attributeCanonicalLocalName = isCaseInsensitive ? value.localName().lower() : value.localName();
+    m_data.m_rareData->m_attributeCanonicalLocalName = isCaseInsensitive ? value.localName().convertToASCIILowercase() : value.localName();
 }
 
 void CSSSelector::setArgument(const AtomicString& value)
@@ -600,6 +740,14 @@ void CSSSelector::setArgument(const AtomicString& value)
     createRareData();
     m_data.m_rareData->m_argument = value;
 }
+
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+void CSSSelector::setLangArgumentList(std::unique_ptr<Vector<LanguageArgument>> argumentList)
+{
+    createRareData();
+    m_data.m_rareData->m_langArgumentList = WTF::move(argumentList);
+}
+#endif
 
 void CSSSelector::setSelectorList(std::unique_ptr<CSSSelectorList> selectorList)
 {

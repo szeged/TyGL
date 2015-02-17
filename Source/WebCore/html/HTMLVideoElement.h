@@ -37,7 +37,7 @@ class HTMLImageLoader;
 
 class HTMLVideoElement final : public HTMLMediaElement {
 public:
-    static PassRefPtr<HTMLVideoElement> create(const QualifiedName&, Document&, bool);
+    static Ref<HTMLVideoElement> create(const QualifiedName&, Document&, bool);
 
     WEBCORE_EXPORT unsigned videoWidth() const;
     WEBCORE_EXPORT unsigned videoHeight() const;
@@ -76,7 +76,16 @@ public:
     bool shouldDisplayPosterImage() const { return displayMode() == Poster || displayMode() == PosterWaitingForVideo; }
 
     URL posterImageURL() const;
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
+
+#if ENABLE(VIDEO_PRESENTATION_MODE)
+    bool webkitSupportsPresentationMode(const String&) const;
+    void webkitSetPresentationMode(const String&);
+    String webkitPresentationMode() const;
+    virtual void fullscreenModeChanged(VideoFullscreenMode) override;
+
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitpresentationmodechanged);
+#endif
 
 private:
     HTMLVideoElement(const QualifiedName&, Document&, bool);
@@ -92,7 +101,7 @@ private:
     virtual bool isURLAttribute(const Attribute&) const override;
     virtual const AtomicString& imageSourceURL() const override;
 
-    virtual bool hasAvailableVideoFrame() const;
+    bool hasAvailableVideoFrame() const;
     virtual void updateDisplayState() override;
     virtual void didMoveToNewDocument(Document* oldDocument) override;
     virtual void setDisplayMode(DisplayMode) override;
@@ -104,7 +113,13 @@ private:
     AtomicString m_defaultPosterURL;
 };
 
-} //namespace
+} // namespace WebCore
 
-#endif
-#endif
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::HTMLVideoElement)
+    static bool isType(const WebCore::HTMLMediaElement& element) { return element.hasTagName(WebCore::HTMLNames::videoTag); }
+    static bool isType(const WebCore::Element& element) { return is<WebCore::HTMLMediaElement>(element) && isType(downcast<WebCore::HTMLMediaElement>(element)); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::HTMLMediaElement>(node) && isType(downcast<WebCore::HTMLMediaElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
+
+#endif // ENABLE(VIDEO)
+#endif // HTMLVideoElement_h

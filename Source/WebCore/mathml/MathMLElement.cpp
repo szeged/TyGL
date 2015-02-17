@@ -50,9 +50,9 @@ MathMLElement::MathMLElement(const QualifiedName& tagName, Document& document)
 {
 }
     
-PassRefPtr<MathMLElement> MathMLElement::create(const QualifiedName& tagName, Document& document)
+Ref<MathMLElement> MathMLElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new MathMLElement(tagName, document));
+    return adoptRef(*new MathMLElement(tagName, document));
 }
 
 bool MathMLElement::isPresentationMathML() const
@@ -212,11 +212,11 @@ int MathMLElement::rowSpan() const
 void MathMLElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == rowspanAttr) {
-        if (renderer() && renderer()->isTableCell() && hasTagName(mtdTag))
-            toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
+        if (is<RenderTableCell>(renderer()) && hasTagName(mtdTag))
+            downcast<RenderTableCell>(*renderer()).colSpanOrRowSpanChanged();
     } else if (name == columnspanAttr) {
-        if (renderer() && renderer()->isTableCell() && hasTagName(mtdTag))
-            toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
+        if (is<RenderTableCell>(renderer()) && hasTagName(mtdTag))
+            downcast<RenderTableCell>(renderer())->colSpanOrRowSpanChanged();
     } else
         StyledElement::parseAttribute(name, value);
 }

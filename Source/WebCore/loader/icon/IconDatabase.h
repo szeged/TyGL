@@ -115,9 +115,9 @@ private:
 
     void wakeSyncThread();
     void scheduleOrDeferSyncTimer();
-    void syncTimerFired(Timer<IconDatabase>&);
+    void syncTimerFired();
     
-    Timer<IconDatabase> m_syncTimer;
+    Timer m_syncTimer;
     ThreadIdentifier m_syncThread;
     bool m_syncThreadRunning;
     
@@ -130,8 +130,8 @@ private:
 
 // *** Any Thread ***
 public:
-    WEBCORE_EXPORT virtual bool isOpen() const;
-    WEBCORE_EXPORT virtual String databasePath() const;
+    WEBCORE_EXPORT virtual bool isOpen() const override;
+    WEBCORE_EXPORT virtual String databasePath() const override;
     WEBCORE_EXPORT static String defaultDatabaseFilename();
 
 private:
@@ -178,7 +178,7 @@ private:
 
 // *** Sync Thread Only ***
 public:
-    WEBCORE_EXPORT virtual bool shouldStopThreadActivity() const;
+    WEBCORE_EXPORT virtual bool shouldStopThreadActivity() const override;
 
 private:    
     static void iconDatabaseSyncThreadStart(void *);
@@ -231,20 +231,20 @@ private:
     
     SQLiteDatabase m_syncDB;
     
-    OwnPtr<SQLiteStatement> m_setIconIDForPageURLStatement;
-    OwnPtr<SQLiteStatement> m_removePageURLStatement;
-    OwnPtr<SQLiteStatement> m_getIconIDForIconURLStatement;
-    OwnPtr<SQLiteStatement> m_getImageDataForIconURLStatement;
-    OwnPtr<SQLiteStatement> m_addIconToIconInfoStatement;
-    OwnPtr<SQLiteStatement> m_addIconToIconDataStatement;
-    OwnPtr<SQLiteStatement> m_getImageDataStatement;
-    OwnPtr<SQLiteStatement> m_deletePageURLsForIconURLStatement;
-    OwnPtr<SQLiteStatement> m_deleteIconFromIconInfoStatement;
-    OwnPtr<SQLiteStatement> m_deleteIconFromIconDataStatement;
-    OwnPtr<SQLiteStatement> m_updateIconInfoStatement;
-    OwnPtr<SQLiteStatement> m_updateIconDataStatement;
-    OwnPtr<SQLiteStatement> m_setIconInfoStatement;
-    OwnPtr<SQLiteStatement> m_setIconDataStatement;
+    std::unique_ptr<SQLiteStatement> m_setIconIDForPageURLStatement;
+    std::unique_ptr<SQLiteStatement> m_removePageURLStatement;
+    std::unique_ptr<SQLiteStatement> m_getIconIDForIconURLStatement;
+    std::unique_ptr<SQLiteStatement> m_getImageDataForIconURLStatement;
+    std::unique_ptr<SQLiteStatement> m_addIconToIconInfoStatement;
+    std::unique_ptr<SQLiteStatement> m_addIconToIconDataStatement;
+    std::unique_ptr<SQLiteStatement> m_getImageDataStatement;
+    std::unique_ptr<SQLiteStatement> m_deletePageURLsForIconURLStatement;
+    std::unique_ptr<SQLiteStatement> m_deleteIconFromIconInfoStatement;
+    std::unique_ptr<SQLiteStatement> m_deleteIconFromIconDataStatement;
+    std::unique_ptr<SQLiteStatement> m_updateIconInfoStatement;
+    std::unique_ptr<SQLiteStatement> m_updateIconDataStatement;
+    std::unique_ptr<SQLiteStatement> m_setIconInfoStatement;
+    std::unique_ptr<SQLiteStatement> m_setIconDataStatement;
 };
 
 #endif // !ENABLE(ICONDATABASE)

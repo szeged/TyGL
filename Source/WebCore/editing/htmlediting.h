@@ -41,6 +41,7 @@ class HTMLTextFormControlElement;
 class Node;
 class Position;
 class Range;
+class RenderBlock;
 class VisiblePosition;
 class VisibleSelection;
 
@@ -170,7 +171,7 @@ bool isAtUnsplittableElement(const Position&);
 // miscellaneous functions on Position
 
 unsigned numEnclosingMailBlockquotes(const Position&);
-void updatePositionForNodeRemoval(Position&, Node*);
+void updatePositionForNodeRemoval(Position&, Node&);
 
 // -------------------------------------------------------------------------
 // VisiblePosition
@@ -203,8 +204,8 @@ PassRefPtr<HTMLElement> createBreakElement(Document&);
 PassRefPtr<HTMLElement> createOrderedListElement(Document&);
 PassRefPtr<HTMLElement> createUnorderedListElement(Document&);
 PassRefPtr<HTMLElement> createListItemElement(Document&);
-PassRefPtr<HTMLElement> createHTMLElement(Document&, const QualifiedName&);
-PassRefPtr<HTMLElement> createHTMLElement(Document&, const AtomicString&);
+Ref<HTMLElement> createHTMLElement(Document&, const QualifiedName&);
+Ref<HTMLElement> createHTMLElement(Document&, const AtomicString&);
 
 HTMLElement* enclosingList(Node*);
 HTMLElement* outermostEnclosingList(Node*, Node* rootList = 0);
@@ -259,9 +260,9 @@ const String& nonBreakingSpaceString();
 
 // Miscellaaneous functions that for caret rendering
 
-RenderObject* rendererForCaretPainting(Node*);
-LayoutRect localCaretRectInRendererForCaretPainting(const VisiblePosition&, RenderObject*&);
-IntRect absoluteBoundsForLocalCaretRect(RenderObject* rendererForCaretPainting, const LayoutRect&);
+RenderBlock* rendererForCaretPainting(Node*);
+LayoutRect localCaretRectInRendererForCaretPainting(const VisiblePosition&, RenderBlock*&);
+IntRect absoluteBoundsForLocalCaretRect(RenderBlock* rendererForCaretPainting, const LayoutRect&);
 
 }
 

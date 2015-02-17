@@ -29,6 +29,7 @@
 #include "Font.h"
 
 #include "FloatRect.h"
+#include "FontCascade.h"
 #include "GraphicsContext.h"
 #include "HarfBuzzShaper.h"
 #include "LayoutRect.h"
@@ -41,7 +42,7 @@ namespace WebCore {
 // FIXME: Instead of copying all FontCairoHarfbuzzNG methods here, we could
 // remove its -unused- Cairo dependencies and move it to HarfBuzz directory.
 
-void Font::adjustSelectionRectForComplexText(const TextRun& run, LayoutRect& selectionRect, int from, int to) const
+void FontCascade::adjustSelectionRectForComplexText(const TextRun& run, LayoutRect& selectionRect, int from, int to) const
 {
     HarfBuzzShaper shaper(this, run);
     if (shaper.shape()) {
@@ -53,17 +54,17 @@ void Font::adjustSelectionRectForComplexText(const TextRun& run, LayoutRect& sel
     LOG_ERROR("Shaper couldn't shape text run.");
 }
 
-bool Font::canExpandAroundIdeographsInComplexText()
+bool FontCascade::canExpandAroundIdeographsInComplexText()
 {
     return false;
 }
 
-bool Font::canReturnFallbackFontsForComplexText()
+bool FontCascade::canReturnFallbackFontsForComplexText()
 {
     return false;
 }
 
-float Font::floatWidthForComplexText(const TextRun& run, HashSet<const SimpleFontData*>*, GlyphOverflow*) const
+float FontCascade::floatWidthForComplexText(const TextRun& run, HashSet<const Font*>*, GlyphOverflow*) const
 {
     HarfBuzzShaper shaper(this, run);
     if (shaper.shape())
@@ -72,7 +73,7 @@ float Font::floatWidthForComplexText(const TextRun& run, HashSet<const SimpleFon
     return 0;
 }
 
-float Font::drawComplexText(GraphicsContext* context, const TextRun& run, const FloatPoint& point, int/* from*/, int/* to*/) const
+float FontCascade::drawComplexText(GraphicsContext* context, const TextRun& run, const FloatPoint& point, int/* from*/, int/* to*/) const
 {
     GlyphBuffer glyphBuffer;
     HarfBuzzShaper shaper(this, run);
@@ -86,7 +87,7 @@ float Font::drawComplexText(GraphicsContext* context, const TextRun& run, const 
     return 0;
 }
 
-int Font::offsetForPositionForComplexText(const TextRun& run, float x, bool) const
+int FontCascade::offsetForPositionForComplexText(const TextRun& run, float x, bool) const
 {
     HarfBuzzShaper shaper(this, run);
     if (shaper.shape())
@@ -95,7 +96,7 @@ int Font::offsetForPositionForComplexText(const TextRun& run, float x, bool) con
     return 0;
 }
 
-void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font, const GlyphBuffer& glyphBuffer, int from, int numGlyphs, const FloatPoint& point) const
+void FontCascade::drawGlyphs(GraphicsContext* gc, const Font* font, const GlyphBuffer& glyphBuffer, int from, int numGlyphs, const FloatPoint& point) const
 {
     if (!font->platformData().size())
         return;
@@ -103,7 +104,17 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font, const Gly
     gc->platformContext()->fillText(font->platformData().textureFont(), &glyphBuffer, from, numGlyphs, point, gc->platformContext()->parseFillColoring(gc->state()));
 }
 
-void Font::drawEmphasisMarksForComplexText(GraphicsContext* context, const TextRun& run, const AtomicString& mark, const FloatPoint& point, int from, int to) const
+DashArray FontCascade::dashesForIntersectionsWithRect(const TextRun& run, const FloatPoint& textOrigin, const FloatRect& lineExtents) const
+{
+    //FIXME: Implement as soon as possible, see same function in FontCairo.cpp.
+    UNUSED_PARAM(run);
+    UNUSED_PARAM(textOrigin);
+    UNUSED_PARAM(lineExtents);
+    DashArray array;
+    return array;
+}
+
+void FontCascade::drawEmphasisMarksForComplexText(GraphicsContext* context, const TextRun& run, const AtomicString& mark, const FloatPoint& point, int from, int to) const
 {
     notImplemented();
 }

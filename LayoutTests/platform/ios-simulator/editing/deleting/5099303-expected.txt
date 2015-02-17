@@ -17,3 +17,4 @@ layer at (0,0) size 800x600
         RenderBlock {DIV} at (0,30) size 784x20
           RenderText {#text} at (0,0) size 10x19
             text run at (0,0) width 10: ")."
+caret: position 0 of child 0 {#text} of child 1 {DIV} of child 2 {DIV} of body

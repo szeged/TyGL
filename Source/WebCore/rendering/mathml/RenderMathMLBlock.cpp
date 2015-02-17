@@ -43,12 +43,12 @@ namespace WebCore {
     
 using namespace MathMLNames;
     
-RenderMathMLBlock::RenderMathMLBlock(Element& container, PassRef<RenderStyle> style)
+RenderMathMLBlock::RenderMathMLBlock(Element& container, Ref<RenderStyle>&& style)
     : RenderFlexibleBox(container, WTF::move(style))
 {
 }
 
-RenderMathMLBlock::RenderMathMLBlock(Document& document, PassRef<RenderStyle> style)
+RenderMathMLBlock::RenderMathMLBlock(Document& document, Ref<RenderStyle>&& style)
     : RenderFlexibleBox(document, WTF::move(style))
 {
 }
@@ -222,7 +222,7 @@ bool parseMathMLLength(const String& string, LayoutUnit& lengthValue, const Rend
         return true;
     }
     if (unit == "em") {
-        lengthValue = floatValue * style->font().size();
+        lengthValue = floatValue * style->fontCascade().size();
         return true;
     }
     if (unit == "ex") {
@@ -293,7 +293,7 @@ bool parseMathMLNamedSpace(const String& string, LayoutUnit& lengthValue, const 
             length = -7;        
     }
     if (length) {
-        lengthValue = length * style->font().size() / 18;
+        lengthValue = length * style->fontCascade().size() / 18;
         return true;
     }
     return false;

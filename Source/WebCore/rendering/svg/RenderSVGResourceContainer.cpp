@@ -34,7 +34,7 @@ static inline SVGDocumentExtensions& svgExtensionsFromElement(SVGElement& elemen
     return element.document().accessSVGExtensions();
 }
 
-RenderSVGResourceContainer::RenderSVGResourceContainer(SVGElement& element, PassRef<RenderStyle> style)
+RenderSVGResourceContainer::RenderSVGResourceContainer(SVGElement& element, Ref<RenderStyle>&& style)
     : RenderSVGHiddenContainer(element, WTF::move(style))
     , m_id(element.getIdAttribute())
     , m_registered(false)
@@ -96,8 +96,8 @@ void RenderSVGResourceContainer::markAllClientsForInvalidation(InvalidationMode 
     bool markForInvalidation = mode != ParentOnlyInvalidation;
 
     for (auto* client : m_clients) {
-        if (client->isSVGResourceContainer()) {
-            toRenderSVGResourceContainer(*client).removeAllClientsFromCache(markForInvalidation);
+        if (is<RenderSVGResourceContainer>(*client)) {
+            downcast<RenderSVGResourceContainer>(*client).removeAllClientsFromCache(markForInvalidation);
             continue;
         }
 

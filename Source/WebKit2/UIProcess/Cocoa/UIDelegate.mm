@@ -72,6 +72,9 @@ void UIDelegate::setDelegate(id <WKUIDelegate> delegate)
     m_delegateMethods.webViewDecideWebApplicationCacheQuotaForSecurityOriginCurrentQuotaTotalBytesNeeded = [delegate respondsToSelector:@selector(_webView:decideWebApplicationCacheQuotaForSecurityOrigin:currentQuota:totalBytesNeeded:decisionHandler:)];
     m_delegateMethods.webViewPrintFrame = [delegate respondsToSelector:@selector(_webView:printFrame:)];
     m_delegateMethods.webViewClose = [delegate respondsToSelector:@selector(_webViewClose:)];
+    m_delegateMethods.webViewFullscreenMayReturnToInline = [delegate respondsToSelector:@selector(_webViewFullscreenMayReturnToInline:)];
+    m_delegateMethods.webViewDidEnterFullscreen = [delegate respondsToSelector:@selector(_webViewDidEnterFullscreen:)];
+    m_delegateMethods.webViewDidExitFullscreen = [delegate respondsToSelector:@selector(_webViewDidExitFullscreen:)];
 #if PLATFORM(IOS)
     m_delegateMethods.webViewActionsForElementDefaultActions = [delegate respondsToSelector:@selector(_webView:actionsForElement:defaultActions:)];
     m_delegateMethods.webViewDidNotHandleTapAsClickAtPoint = [delegate respondsToSelector:@selector(_webView:didNotHandleTapAsClickAtPoint:)];
@@ -99,12 +102,10 @@ PassRefPtr<WebKit::WebPageProxy> UIDelegate::UIClient::createNewPage(WebKit::Web
     auto configuration = adoptNS([m_uiDelegate.m_webView->_configuration copy]);
     [configuration _setRelatedWebView:m_uiDelegate.m_webView];
 
-    auto navigationAction = adoptNS([[WKNavigationAction alloc] _initWithNavigationActionData:navigationActionData]);
+    auto sourceFrameInfo = API::FrameInfo::create(*initiatingFrame);
+    auto navigationAction = API::NavigationAction::create(navigationActionData, sourceFrameInfo.ptr(), nullptr, request, WebCore::URL());
 
-    [navigationAction setSourceFrame:adoptNS([[WKFrameInfo alloc] initWithWebFrameProxy:*initiatingFrame]).get()];
-    [navigationAction setRequest:request.nsURLRequest(WebCore::DoNotUpdateHTTPBody)];
-
-    RetainPtr<WKWebView> webView = [delegate.get() webView:m_uiDelegate.m_webView createWebViewWithConfiguration:configuration.get() forNavigationAction:navigationAction.get() windowFeatures:adoptNS([[WKWindowFeatures alloc] _initWithWindowFeatures:windowFeatures]).get()];
+    RetainPtr<WKWebView> webView = [delegate.get() webView:m_uiDelegate.m_webView createWebViewWithConfiguration:configuration.get() forNavigationAction:wrapper(navigationAction) windowFeatures:adoptNS([[WKWindowFeatures alloc] _initWithWindowFeatures:windowFeatures]).get()];
 
     if (!webView)
         return nullptr;
@@ -129,7 +130,7 @@ void UIDelegate::UIClient::runJavaScriptAlert(WebKit::WebPageProxy*, const WTF::
     }
 
     RefPtr<CompletionHandlerCallChecker> checker = CompletionHandlerCallChecker::create(delegate.get(), @selector(webView:runJavaScriptAlertPanelWithMessage:initiatedByFrame:completionHandler:));
-    [delegate webView:m_uiDelegate.m_webView runJavaScriptAlertPanelWithMessage:message initiatedByFrame:adoptNS([[WKFrameInfo alloc] initWithWebFrameProxy:*webFrameProxy]).get() completionHandler:[completionHandler, checker] {
+    [delegate webView:m_uiDelegate.m_webView runJavaScriptAlertPanelWithMessage:message initiatedByFrame:wrapper(API::FrameInfo::create(*webFrameProxy)) completionHandler:[completionHandler, checker] {
         completionHandler();
         checker->didCallCompletionHandler();
     }];
@@ -149,7 +150,7 @@ void UIDelegate::UIClient::runJavaScriptConfirm(WebKit::WebPageProxy*, const WTF
     }
 
     RefPtr<CompletionHandlerCallChecker> checker = CompletionHandlerCallChecker::create(delegate.get(), @selector(webView:runJavaScriptConfirmPanelWithMessage:initiatedByFrame:completionHandler:));
-    [delegate webView:m_uiDelegate.m_webView runJavaScriptConfirmPanelWithMessage:message initiatedByFrame:adoptNS([[WKFrameInfo alloc] initWithWebFrameProxy:*webFrameProxy]).get() completionHandler:[completionHandler, checker](BOOL result) {
+    [delegate webView:m_uiDelegate.m_webView runJavaScriptConfirmPanelWithMessage:message initiatedByFrame:wrapper(API::FrameInfo::create(*webFrameProxy)) completionHandler:[completionHandler, checker](BOOL result) {
         completionHandler(result);
         checker->didCallCompletionHandler();
     }];
@@ -169,13 +170,13 @@ void UIDelegate::UIClient::runJavaScriptPrompt(WebKit::WebPageProxy*, const WTF:
     }
 
     RefPtr<CompletionHandlerCallChecker> checker = CompletionHandlerCallChecker::create(delegate.get(), @selector(webView:runJavaScriptTextInputPanelWithPrompt:defaultText:initiatedByFrame:completionHandler:));
-    [delegate webView:m_uiDelegate.m_webView runJavaScriptTextInputPanelWithPrompt:message defaultText:defaultValue initiatedByFrame:adoptNS([[WKFrameInfo alloc] initWithWebFrameProxy:*webFrameProxy]).get() completionHandler:[completionHandler, checker](NSString *result) {
+    [delegate webView:m_uiDelegate.m_webView runJavaScriptTextInputPanelWithPrompt:message defaultText:defaultValue initiatedByFrame:wrapper(API::FrameInfo::create(*webFrameProxy)) completionHandler:[completionHandler, checker](NSString *result) {
         completionHandler(result);
         checker->didCallCompletionHandler();
     }];
 }
 
-void UIDelegate::UIClient::exceededDatabaseQuota(WebPageProxy*, WebFrameProxy*, WebSecurityOrigin* securityOrigin, const WTF::String& databaseName, const WTF::String& displayName, unsigned long long currentQuota, unsigned long long currentOriginUsage, unsigned long long currentUsage, unsigned long long expectedUsage, std::function<void (unsigned long long)> completionHandler)
+void UIDelegate::UIClient::exceededDatabaseQuota(WebPageProxy*, WebFrameProxy*, API::SecurityOrigin* securityOrigin, const WTF::String& databaseName, const WTF::String& displayName, unsigned long long currentQuota, unsigned long long currentOriginUsage, unsigned long long currentUsage, unsigned long long expectedUsage, std::function<void (unsigned long long)> completionHandler)
 {
     if (!m_uiDelegate.m_delegateMethods.webViewDecideDatabaseQuotaForSecurityOriginCurrentQuotaCurrentOriginUsageCurrentDatabaseUsageExpectedUsageDecisionHandler) {
         completionHandler(currentQuota);
@@ -226,7 +227,7 @@ void UIDelegate::UIClient::printFrame(WebKit::WebPageProxy*, WebKit::WebFramePro
     if (!delegate)
         return;
 
-    [(id <WKUIDelegatePrivate>)delegate _webView:m_uiDelegate.m_webView printFrame:wrapper(*API::FrameHandle::create(webFrameProxy->frameID()))];
+    [(id <WKUIDelegatePrivate>)delegate _webView:m_uiDelegate.m_webView printFrame:wrapper(API::FrameHandle::create(webFrameProxy->frameID()))];
 }
 
 void UIDelegate::UIClient::close(WebKit::WebPageProxy*)
@@ -241,6 +242,42 @@ void UIDelegate::UIClient::close(WebKit::WebPageProxy*)
     [(id <WKUIDelegatePrivate>)delegate _webViewClose:m_uiDelegate.m_webView];
 }
 
+void UIDelegate::UIClient::fullscreenMayReturnToInline(WebKit::WebPageProxy*)
+{
+    if (!m_uiDelegate.m_delegateMethods.webViewFullscreenMayReturnToInline)
+        return;
+    
+    auto delegate = m_uiDelegate.m_delegate.get();
+    if (!delegate)
+        return;
+    
+    [(id <WKUIDelegatePrivate>)delegate _webViewFullscreenMayReturnToInline:m_uiDelegate.m_webView];
+}
+
+void UIDelegate::UIClient::didEnterFullscreen(WebKit::WebPageProxy*)
+{
+    if (!m_uiDelegate.m_delegateMethods.webViewDidEnterFullscreen)
+        return;
+
+    auto delegate = m_uiDelegate.m_delegate.get();
+    if (!delegate)
+        return;
+
+    [(id <WKUIDelegatePrivate>)delegate _webViewDidEnterFullscreen:m_uiDelegate.m_webView];
+}
+
+void UIDelegate::UIClient::didExitFullscreen(WebKit::WebPageProxy*)
+{
+    if (!m_uiDelegate.m_delegateMethods.webViewDidExitFullscreen)
+        return;
+
+    auto delegate = m_uiDelegate.m_delegate.get();
+    if (!delegate)
+        return;
+
+    [(id <WKUIDelegatePrivate>)delegate _webViewDidExitFullscreen:m_uiDelegate.m_webView];
+}
+    
 #if PLATFORM(IOS)
 RetainPtr<NSArray> UIDelegate::UIClient::actionsForElement(_WKActivatedElementInfo *elementInfo, RetainPtr<NSArray> defaultActions)
 {

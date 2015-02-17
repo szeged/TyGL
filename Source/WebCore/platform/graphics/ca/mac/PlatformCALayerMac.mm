@@ -34,7 +34,7 @@
 #import "LengthFunctions.h"
 #import "PlatformCAAnimationMac.h"
 #import "PlatformCAFilters.h"
-#import "PlatformCAFiltersMac.h"
+#import "QuartzCoreSPI.h"
 #import "ScrollbarThemeMac.h"
 #import "SoftLinking.h"
 #import "TiledBacking.h"
@@ -56,12 +56,14 @@
 #import "WKGraphics.h"
 #import "WebCoreThread.h"
 #import "WebTiledLayer.h"
-#import <Foundation/NSGeometry.h>
-#import <QuartzCore/CATiledLayerPrivate.h>
 #else
 #import "ThemeMac.h"
 #endif
 
+#if ENABLE(FILTERS_LEVEL_2)
+@interface CABackdropLayer : CALayer
+@end
+#endif
 
 SOFT_LINK_FRAMEWORK_OPTIONAL(AVFoundation)
 SOFT_LINK_CLASS(AVFoundation, AVPlayerLayer)
@@ -170,18 +172,6 @@ static double mediaTimeToCurrentTime(CFTimeInterval t)
 
 @end
 
-@interface CATiledLayer(GraphicsLayerCAPrivate)
-- (void)displayInRect:(CGRect)r levelOfDetail:(int)lod options:(NSDictionary *)dict;
-- (BOOL)canDrawConcurrently;
-- (void)setCanDrawConcurrently:(BOOL)flag;
-@end
-
-@interface CALayer(Private)
-- (void)setContentsChanged;
-- (void)setAcceleratesDrawing:(BOOL)flag;
-- (BOOL)acceleratesDrawing;
-@end
-
 void PlatformCALayerMac::setOwner(PlatformCALayerClient* owner)
 {
     PlatformCALayer::setOwner(owner);
@@ -215,7 +205,6 @@ PlatformCALayer::LayerType PlatformCALayerMac::layerTypeForPlatformLayer(Platfor
 PlatformCALayerMac::PlatformCALayerMac(LayerType layerType, PlatformCALayerClient* owner)
     : PlatformCALayer(layerType, owner)
     , m_customAppearance(GraphicsLayer::NoCustomAppearance)
-    , m_customBehavior(GraphicsLayer::NoCustomBehavior)
 {
     Class layerClass = Nil;
     switch (layerType) {
@@ -223,6 +212,9 @@ PlatformCALayerMac::PlatformCALayerMac(LayerType layerType, PlatformCALayerClien
     case LayerTypeRootLayer:
         layerClass = [CALayer class];
         break;
+    case LayerTypeScrollingLayer:
+        // Scrolling layers only have special behavior with PlatformCALayerRemote.
+        // fallthrough
     case LayerTypeWebLayer:
         layerClass = [WebLayer class];
         break;
@@ -232,6 +224,14 @@ PlatformCALayerMac::PlatformCALayerMac(LayerType layerType, PlatformCALayerClien
         break;
     case LayerTypeTransformLayer:
         layerClass = [CATransformLayer class];
+        break;
+    case LayerTypeBackdropLayer:
+#if ENABLE(FILTERS_LEVEL_2)
+        layerClass = [CABackdropLayer class];
+#else
+        ASSERT_NOT_REACHED();
+        layerClass = [CALayer class];
+#endif
         break;
     case LayerTypeWebTiledLayer:
         ASSERT_NOT_REACHED();
@@ -247,20 +247,23 @@ PlatformCALayerMac::PlatformCALayerMac(LayerType layerType, PlatformCALayerClien
         // We don't create PlatformCALayerMacs wrapped around WebGLLayers.
         ASSERT_NOT_REACHED();
         break;
+    case LayerTypeShapeLayer:
+        layerClass = [CAShapeLayer class];
+        // fillColor defaults to opaque black.
+        break;
     case LayerTypeCustom:
         break;
     }
 
     if (layerClass)
-        m_layer = adoptNS([[layerClass alloc] init]);
-    
+        m_layer = adoptNS([(CALayer *)[layerClass alloc] init]);
+
     commonInit();
 }
 
 PlatformCALayerMac::PlatformCALayerMac(PlatformLayer* layer, PlatformCALayerClient* owner)
     : PlatformCALayer(layerTypeForPlatformLayer(layer), owner)
     , m_customAppearance(GraphicsLayer::NoCustomAppearance)
-    , m_customBehavior(GraphicsLayer::NoCustomBehavior)
 {
     m_layer = layer;
     commonInit();
@@ -273,7 +276,7 @@ void PlatformCALayerMac::commonInit()
     [m_layer setValue:[NSValue valueWithPointer:this] forKey:platformCALayerPointer];
     
     // Clear all the implicit animations on the CALayer
-    if (m_layerType == LayerTypeAVPlayerLayer || m_layerType == LayerTypeWebGLLayer || m_layerType == LayerTypeCustom)
+    if (m_layerType == LayerTypeAVPlayerLayer || m_layerType == LayerTypeWebGLLayer || m_layerType == LayerTypeScrollingLayer || m_layerType == LayerTypeCustom)
         [m_layer web_disableAllActions];
     else
         [m_layer setDelegate:[WebActionDisablingCALayerDelegate shared]];
@@ -302,6 +305,9 @@ PassRefPtr<PlatformCALayer> PlatformCALayerMac::clone(PlatformCALayerClient* own
     case LayerTypeAVPlayerLayer:
         type = LayerTypeAVPlayerLayer;
         break;
+    case LayerTypeShapeLayer:
+        type = LayerTypeShapeLayer;
+        break;
     case LayerTypeLayer:
     default:
         type = LayerTypeLayer;
@@ -320,7 +326,8 @@ PassRefPtr<PlatformCALayer> PlatformCALayerMac::clone(PlatformCALayerClient* own
     newLayer->setOpaque(isOpaque());
     newLayer->setBackgroundColor(backgroundColor());
     newLayer->setContentsScale(contentsScale());
-    newLayer->copyFiltersFrom(this);
+    newLayer->setCornerRadius(cornerRadius());
+    newLayer->copyFiltersFrom(*this);
     newLayer->updateCustomAppearance(customAppearance());
 
     if (type == LayerTypeAVPlayerLayer) {
@@ -333,6 +340,9 @@ PassRefPtr<PlatformCALayer> PlatformCALayerMac::clone(PlatformCALayerClient* own
             [destinationPlayerLayer setPlayer:[sourcePlayerLayer player]];
         });
     }
+    
+    if (type == LayerTypeShapeLayer)
+        newLayer->setShapeRoundedRect(shapeRoundedRect());
 
     return newLayer;
 }
@@ -422,38 +432,38 @@ void PlatformCALayerMac::removeAllSublayers()
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
-void PlatformCALayerMac::appendSublayer(PlatformCALayer* layer)
+void PlatformCALayerMac::appendSublayer(PlatformCALayer& layer)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS
-    ASSERT(m_layer != layer->m_layer);
-    [m_layer.get() addSublayer:layer->m_layer.get()];
+    ASSERT(m_layer != layer.m_layer);
+    [m_layer.get() addSublayer:layer.m_layer.get()];
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
-void PlatformCALayerMac::insertSublayer(PlatformCALayer* layer, size_t index)
+void PlatformCALayerMac::insertSublayer(PlatformCALayer& layer, size_t index)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS
-    ASSERT(m_layer != layer->m_layer);
-    [m_layer.get() insertSublayer:layer->m_layer.get() atIndex:index];
+    ASSERT(m_layer != layer.m_layer);
+    [m_layer.get() insertSublayer:layer.m_layer.get() atIndex:index];
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
-void PlatformCALayerMac::replaceSublayer(PlatformCALayer* reference, PlatformCALayer* layer)
+void PlatformCALayerMac::replaceSublayer(PlatformCALayer& reference, PlatformCALayer& layer)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS
-    ASSERT(m_layer != layer->m_layer);
-    [m_layer.get() replaceSublayer:reference->m_layer.get() with:layer->m_layer.get()];
+    ASSERT(m_layer != layer.m_layer);
+    [m_layer.get() replaceSublayer:reference.m_layer.get() with:layer.m_layer.get()];
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
-void PlatformCALayerMac::adoptSublayers(PlatformCALayer* source)
+void PlatformCALayerMac::adoptSublayers(PlatformCALayer& source)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS
-    [m_layer.get() setSublayers:[source->m_layer.get() sublayers]];
+    [m_layer.get() setSublayers:[source.m_layer.get() sublayers]];
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
-void PlatformCALayerMac::addAnimationForKey(const String& key, PlatformCAAnimation* animation)
+void PlatformCALayerMac::addAnimationForKey(const String& key, PlatformCAAnimation& animation)
 {
     // Add the delegate
     if (!m_delegate) {
@@ -462,7 +472,7 @@ void PlatformCALayerMac::addAnimationForKey(const String& key, PlatformCAAnimati
         [webAnimationDelegate setOwner:this];
     }
     
-    CAPropertyAnimation* propertyAnimation = static_cast<CAPropertyAnimation*>(toPlatformCAAnimationMac(animation)->platformAnimation());
+    CAPropertyAnimation* propertyAnimation = static_cast<CAPropertyAnimation*>(downcast<PlatformCAAnimationMac>(animation).platformAnimation());
     if (![propertyAnimation delegate])
         [propertyAnimation setDelegate:static_cast<id>(m_delegate.get())];
      
@@ -489,7 +499,7 @@ PassRefPtr<PlatformCAAnimation> PlatformCALayerMac::animationForKey(const String
 void PlatformCALayerMac::setMask(PlatformCALayer* layer)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS
-    [m_layer.get() setMask:layer ? layer->platformLayer() : 0];
+    [m_layer.get() setMask:layer ? layer->platformLayer() : nil];
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
@@ -685,15 +695,21 @@ void PlatformCALayerMac::setBorderWidth(float value)
 
 void PlatformCALayerMac::setBorderColor(const Color& value)
 {
-    CGFloat components[4];
-    value.getRGBA(components[0], components[1], components[2], components[3]);
+    if (value.isValid()) {
+        CGFloat components[4];
+        value.getRGBA(components[0], components[1], components[2], components[3]);
 
-    RetainPtr<CGColorSpaceRef> colorSpace = adoptCF(CGColorSpaceCreateDeviceRGB());
-    RetainPtr<CGColorRef> color = adoptCF(CGColorCreate(colorSpace.get(), components));
+        RetainPtr<CGColorSpaceRef> colorSpace = adoptCF(CGColorSpaceCreateDeviceRGB());
+        RetainPtr<CGColorRef> color = adoptCF(CGColorCreate(colorSpace.get(), components));
 
-    BEGIN_BLOCK_OBJC_EXCEPTIONS
-    [m_layer.get() setBorderColor:color.get()];
-    END_BLOCK_OBJC_EXCEPTIONS
+        BEGIN_BLOCK_OBJC_EXCEPTIONS
+        [m_layer.get() setBorderColor:color.get()];
+        END_BLOCK_OBJC_EXCEPTIONS
+    } else {
+        BEGIN_BLOCK_OBJC_EXCEPTIONS
+        [m_layer.get() setBorderColor:nil];
+        END_BLOCK_OBJC_EXCEPTIONS
+    }
 }
 
 float PlatformCALayerMac::opacity() const
@@ -713,10 +729,10 @@ void PlatformCALayerMac::setFilters(const FilterOperations& filters)
     PlatformCAFilters::setFiltersOnLayer(platformLayer(), filters);
 }
 
-void PlatformCALayerMac::copyFiltersFrom(const PlatformCALayer* sourceLayer)
+void PlatformCALayerMac::copyFiltersFrom(const PlatformCALayer& sourceLayer)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS
-    [m_layer.get() setFilters:[sourceLayer->platformLayer() filters]];
+    [m_layer.get() setFilters:[sourceLayer.platformLayer() filters]];
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
@@ -794,10 +810,43 @@ void PlatformCALayerMac::setContentsScale(float value)
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
+float PlatformCALayerMac::cornerRadius() const
+{
+    return [m_layer.get() cornerRadius];
+}
+
+void PlatformCALayerMac::setCornerRadius(float value)
+{
+    BEGIN_BLOCK_OBJC_EXCEPTIONS
+    [m_layer.get() setCornerRadius:value];
+    END_BLOCK_OBJC_EXCEPTIONS
+}
+
 void PlatformCALayerMac::setEdgeAntialiasingMask(unsigned mask)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS
     [m_layer.get() setEdgeAntialiasingMask:mask];
+    END_BLOCK_OBJC_EXCEPTIONS
+}
+
+FloatRoundedRect PlatformCALayerMac::shapeRoundedRect() const
+{
+    ASSERT(m_layerType == LayerTypeShapeLayer);
+    if (m_shapeRoundedRect)
+        return *m_shapeRoundedRect;
+
+    return FloatRoundedRect();
+}
+
+void PlatformCALayerMac::setShapeRoundedRect(const FloatRoundedRect& roundedRect)
+{
+    ASSERT(m_layerType == LayerTypeShapeLayer);
+    m_shapeRoundedRect = std::make_unique<FloatRoundedRect>(roundedRect);
+
+    BEGIN_BLOCK_OBJC_EXCEPTIONS
+    Path shapePath;
+    shapePath.addRoundedRect(roundedRect);
+    [(CAShapeLayer *)m_layer setPath:shapePath.platformPath()];
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
@@ -808,6 +857,9 @@ bool PlatformCALayerMac::requiresCustomAppearanceUpdateOnBoundsChange() const
 
 void PlatformCALayerMac::updateCustomAppearance(GraphicsLayer::CustomAppearance appearance)
 {
+    if (m_customAppearance == appearance)
+        return;
+
     m_customAppearance = appearance;
 
 #if ENABLE(RUBBER_BANDING)
@@ -826,23 +878,10 @@ void PlatformCALayerMac::updateCustomAppearance(GraphicsLayer::CustomAppearance 
 #endif
 }
 
-void PlatformCALayerMac::updateCustomBehavior(GraphicsLayer::CustomBehavior customBehavior)
-{
-    m_customBehavior = customBehavior;
-
-    // Custom layers can get wrapped in UIViews (which clobbers the layer delegate),
-    // so fall back to the slower way of disabling implicit animations.
-    if (m_customBehavior != GraphicsLayer::NoCustomBehavior) {
-        if ([[m_layer delegate] isKindOfClass:[WebActionDisablingCALayerDelegate class]])
-            [m_layer setDelegate:nil];
-        [m_layer web_disableAllActions];
-    }
-}
-
 TiledBacking* PlatformCALayerMac::tiledBacking()
 {
     if (!usesTiledBackingLayer())
-        return 0;
+        return nullptr;
 
     WebTiledBackingLayer *tiledBackingLayer = static_cast<WebTiledBackingLayer *>(m_layer.get());
     return [tiledBackingLayer tiledBacking];
@@ -961,19 +1000,11 @@ void PlatformCALayer::drawLayerContents(CGContextRef context, WebCore::PlatformC
         graphicsContext.setShouldSmoothFonts(false);
     }
     
-#if !PLATFORM(IOS)
+#if PLATFORM(MAC)
     // It's important to get the clip from the context, because it may be significantly
     // smaller than the layer bounds (e.g. tiled layers)
-    FloatRect clipBounds = CGContextGetClipBoundingBox(context);
-    
-    FloatRect focusRingClipRect = clipBounds;
-#if __MAC_OS_X_VERSION_MIN_REQUIRED < 1090
-    // Set the focus ring clip rect which needs to be in base coordinates.
-    AffineTransform transform = CGContextGetCTM(context);
-    focusRingClipRect = transform.mapRect(clipBounds);
+    ThemeMac::setFocusRingClipRect(CGContextGetClipBoundingBox(context));
 #endif
-    ThemeMac::setFocusRingClipRect(focusRingClipRect);
-#endif // !PLATFORM(IOS)
     
     for (const auto& rect : dirtyRects) {
         GraphicsContextStateSaver stateSaver(graphicsContext);

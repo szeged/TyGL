@@ -162,7 +162,7 @@ static bool isFormElementTooLargeToDisplay(const IntSize& elementSize)
     return elementSize.width() > maxEdjeDimension || elementSize.height() > maxEdjeDimension;
 }
 
-PassOwnPtr<RenderThemeEfl::ThemePartCacheEntry> RenderThemeEfl::ThemePartCacheEntry::create(const String& themePath, FormType type, const IntSize& size)
+std::unique_ptr<RenderThemeEfl::ThemePartCacheEntry> RenderThemeEfl::ThemePartCacheEntry::create(const String& themePath, FormType type, const IntSize& size)
 {
     ASSERT(!themePath.isEmpty());
 
@@ -171,7 +171,7 @@ PassOwnPtr<RenderThemeEfl::ThemePartCacheEntry> RenderThemeEfl::ThemePartCacheEn
         return nullptr;
     }
 
-    OwnPtr<ThemePartCacheEntry> entry = adoptPtr(new ThemePartCacheEntry);
+    auto entry = std::make_unique<ThemePartCacheEntry>();
 
     entry->m_canvas = EflUniquePtr<Ecore_Evas>(ecore_evas_buffer_new(size.width(), size.height()));
     if (!entry->canvas()) {
@@ -200,7 +200,7 @@ PassOwnPtr<RenderThemeEfl::ThemePartCacheEntry> RenderThemeEfl::ThemePartCacheEn
     entry->type = type;
     entry->size = size;
 
-    return entry.release();
+    return entry;
 }
 
 void RenderThemeEfl::ThemePartCacheEntry::reuse(const String& themePath, FormType newType, const IntSize& newSize)
@@ -232,54 +232,51 @@ void RenderThemeEfl::ThemePartCacheEntry::reuse(const String& themePath, FormTyp
 
 RenderThemeEfl::ThemePartCacheEntry* RenderThemeEfl::getThemePartFromCache(FormType type, const IntSize& size)
 {
-    void* data;
-    Eina_List* node;
-    Eina_List* reusableNode = 0;
+    size_t reusableNodeIndex = 0;
 
-    // Look for the item in the cache.
-    EINA_LIST_FOREACH(m_partCache, node, data) {
-        ThemePartCacheEntry* cachedEntry = static_cast<ThemePartCacheEntry*>(data);
-        if (cachedEntry->size == size) {
-            if (cachedEntry->type == type) {
+    for (size_t i = 0; i < m_partCache.size(); ++i) {
+        ThemePartCacheEntry* candidatedEntry = m_partCache[i].get();
+        if (candidatedEntry->size == size) {
+            if (candidatedEntry->type == type) {
                 // Found the right item, move it to the head of the list
                 // and return it.
-                m_partCache = eina_list_promote_list(m_partCache, node);
-                return cachedEntry;
+                auto temp = WTF::move(m_partCache[i]);
+                m_partCache.remove(i);
+                m_partCache.insert(0, WTF::move(temp));
+                return m_partCache.first().get();
             }
-            // We reuse in priority the last item in the list that has
-            // the requested size.
-            reusableNode = node;
+            reusableNodeIndex = i;
         }
     }
 
-    if (eina_list_count(m_partCache) < RENDER_THEME_EFL_PART_CACHE_MAX) {
-        ThemePartCacheEntry* entry = ThemePartCacheEntry::create(themePath(), type, size).leakPtr();
+    if (m_partCache.size() < RENDER_THEME_EFL_PART_CACHE_MAX) {
+        auto entry = ThemePartCacheEntry::create(themePath(), type, size);
         if (entry)
-            m_partCache = eina_list_prepend(m_partCache, entry);
+            m_partCache.insert(0, WTF::move(entry));
 
-        return entry;
+        return m_partCache.first().get();
     }
 
     // The cache is full, reuse the last item we found that had the
     // requested size to avoid resizing. If there was none, reuse
     // the last item of the list.
-    if (!reusableNode)
-        reusableNode = eina_list_last(m_partCache);
+    if (!reusableNodeIndex)
+        reusableNodeIndex = m_partCache.size() - 1;
 
-    ThemePartCacheEntry* reusedEntry = static_cast<ThemePartCacheEntry*>(eina_list_data_get(reusableNode));
+    ThemePartCacheEntry* reusedEntry = m_partCache[reusableNodeIndex].get();
     ASSERT(reusedEntry);
     reusedEntry->reuse(themePath(), type, size);
-    m_partCache = eina_list_promote_list(m_partCache, reusableNode);
+    auto temp = WTF::move(m_partCache[reusableNodeIndex]);
+    m_partCache.remove(reusableNodeIndex);
+    m_partCache.insert(0, WTF::move(temp));
 
-    return reusedEntry;
+    return m_partCache.first().get();
 }
 
 void RenderThemeEfl::clearThemePartCache()
 {
-    void* data;
-    EINA_LIST_FREE(m_partCache, data)
-        delete static_cast<ThemePartCacheEntry*>(data);
-
+    for (auto& part : m_partCache)
+        part = nullptr;
 }
 
 void RenderThemeEfl::applyEdjeStateFromForm(Evas_Object* object, const ControlStates* states, bool haveBackground)
@@ -311,14 +308,13 @@ void RenderThemeEfl::applyEdjeStateFromForm(Evas_Object* object, const ControlSt
 void RenderThemeEfl::applyEdjeRTLState(Evas_Object* edje, const RenderObject& object, FormType type, const IntRect& rect)
 {
     if (type == SliderVertical || type == SliderHorizontal) {
-        if (!object.isSlider())
+        if (!is<RenderSlider>(object))
             return; // probably have -webkit-appearance: slider..
 
-        const RenderSlider* renderSlider = toRenderSlider(&object);
-        HTMLInputElement& input = renderSlider->element();
+        HTMLInputElement& input = downcast<RenderSlider>(object).element();
         double valueRange = input.maximum() - input.minimum();
 
-        OwnPtr<Edje_Message_Float_Set> msg = adoptPtr(static_cast<Edje_Message_Float_Set*>(::operator new (sizeof(Edje_Message_Float_Set) + sizeof(double))));
+        auto msg = std::make_unique<Edje_Message_Float_Set>();
         msg->count = 2;
 
         // The first parameter of the message decides if the progress bar
@@ -333,12 +329,12 @@ void RenderThemeEfl::applyEdjeRTLState(Evas_Object* edje, const RenderObject& ob
         msg->val[1] = (input.valueAsNumber() - input.minimum()) / valueRange;
         edje_object_message_send(edje, EDJE_MESSAGE_FLOAT_SET, 0, msg.get());
     } else if (type == ProgressBar) {
-        const RenderProgress& renderProgress = toRenderProgress(object);
+        const auto& renderProgress = downcast<RenderProgress>(object);
 
         int max = rect.width();
         double value = renderProgress.position();
 
-        OwnPtr<Edje_Message_Float_Set> msg = adoptPtr(static_cast<Edje_Message_Float_Set*>(::operator new (sizeof(Edje_Message_Float_Set) + sizeof(double))));
+        auto msg = std::make_unique<Edje_Message_Float_Set>();
         msg->count = 2;
 
         if (object.style().direction() == RTL)
@@ -605,7 +601,6 @@ RenderThemeEfl::RenderThemeEfl(Page* page)
     , m_focusRingColor(32, 32, 224, 224)
     , m_sliderThumbColor(Color::darkGray)
     , m_supportsSelectionForegroundColor(false)
-    , m_partCache(0)
 {
 }
 
@@ -645,12 +640,12 @@ bool RenderThemeEfl::controlSupportsTints(const RenderObject& object) const
 
 int RenderThemeEfl::baselinePosition(const RenderObject& object) const
 {
-    if (!object.isBox())
+    if (!is<RenderBox>(object))
         return 0;
 
     if (object.style().appearance() == CheckboxPart
     ||  object.style().appearance() == RadioPart)
-        return toRenderBox(&object)->marginTop() + toRenderBox(&object)->height() - 3;
+        return downcast<RenderBox>(object).marginTop() + downcast<RenderBox>(object).height() - 3;
 
     return RenderTheme::baselinePosition(object);
 }
@@ -1001,16 +996,15 @@ void RenderThemeEfl::setDefaultFontSize(int size)
     defaultFontSize = size;
 }
 
-void RenderThemeEfl::systemFont(CSSValueID, FontDescription& fontDescription) const
+void RenderThemeEfl::updateCachedSystemFontDescription(CSSValueID, FontDescription& fontDescription) const
 {
     // It was called by RenderEmbeddedObject::paintReplaced to render alternative string.
     // To avoid cairo_error while rendering, fontDescription should be passed.
     fontDescription.setOneFamily("Sans");
     fontDescription.setSpecifiedSize(defaultFontSize);
     fontDescription.setIsAbsoluteSize(true);
-    fontDescription.setGenericFamily(FontDescription::NoFamily);
     fontDescription.setWeight(FontWeightNormal);
-    fontDescription.setItalic(false);
+    fontDescription.setItalic(FontItalicOff);
 }
 
 void RenderThemeEfl::adjustProgressBarStyle(StyleResolver&, RenderStyle& style, Element*) const

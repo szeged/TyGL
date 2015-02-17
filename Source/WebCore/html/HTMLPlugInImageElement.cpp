@@ -107,8 +107,8 @@ HTMLPlugInImageElement::HTMLPlugInImageElement(const QualifiedName& tagName, Doc
     , m_needsWidgetUpdate(!createdByParser)
     , m_shouldPreferPlugInsForImages(preferPlugInsForImagesOption == ShouldPreferPlugInsForImages)
     , m_needsDocumentActivationCallbacks(false)
-    , m_simulatedMouseClickTimer(this, &HTMLPlugInImageElement::simulatedMouseClickTimerFired, simulatedMouseClickTimerDelay)
-    , m_removeSnapshotTimer(this, &HTMLPlugInImageElement::removeSnapshotTimerFired)
+    , m_simulatedMouseClickTimer(*this, &HTMLPlugInImageElement::simulatedMouseClickTimerFired, simulatedMouseClickTimerDelay)
+    , m_removeSnapshotTimer(*this, &HTMLPlugInImageElement::removeSnapshotTimerFired)
     , m_createdDuringUserGesture(ScriptController::processingUserGesture())
     , m_isRestartedPlugin(false)
     , m_needsCheckForSizeChange(false)
@@ -145,9 +145,7 @@ RenderEmbeddedObject* HTMLPlugInImageElement::renderEmbeddedObject() const
 {
     // HTMLObjectElement and HTMLEmbedElement may return arbitrary renderers
     // when using fallback content.
-    if (!renderer() || !renderer()->isEmbeddedObject())
-        return 0;
-    return toRenderEmbeddedObject(renderer());
+    return is<RenderEmbeddedObject>(renderer()) ? downcast<RenderEmbeddedObject>(renderer()) : nullptr;
 }
 
 bool HTMLPlugInImageElement::isImageType()
@@ -191,7 +189,7 @@ bool HTMLPlugInImageElement::wouldLoadAsNetscapePlugin(const String& url, const 
     return false;
 }
 
-RenderPtr<RenderElement> HTMLPlugInImageElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLPlugInImageElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     ASSERT(!document().inPageCache());
 
@@ -221,6 +219,14 @@ RenderPtr<RenderElement> HTMLPlugInImageElement::createElementRenderer(PassRef<R
         return createRenderer<RenderImage>(*this, WTF::move(style));
 
     return HTMLPlugInElement::createElementRenderer(WTF::move(style));
+}
+
+bool HTMLPlugInImageElement::childShouldCreateRenderer(const Node& child) const
+{
+    if (is<RenderSnapshottedPlugIn>(renderer()) && !partOfSnapshotOverlay(&child))
+        return false;
+
+    return HTMLPlugInElement::childShouldCreateRenderer(child);
 }
 
 bool HTMLPlugInImageElement::willRecalcStyle(Style::Change change)
@@ -334,18 +340,22 @@ void HTMLPlugInImageElement::updateSnapshot(PassRefPtr<Image> image)
 
     m_snapshotImage = image;
 
-    if (renderer()->isSnapshottedPlugIn()) {
-        toRenderSnapshottedPlugIn(renderer())->updateSnapshot(image);
+    if (!renderer())
+        return;
+    auto& renderer = *this->renderer();
+
+    if (is<RenderSnapshottedPlugIn>(renderer)) {
+        downcast<RenderSnapshottedPlugIn>(renderer).updateSnapshot(image);
         return;
     }
 
-    if (renderer()->isEmbeddedObject())
-        renderer()->repaint();
+    if (is<RenderEmbeddedObject>(renderer))
+        renderer.repaint();
 }
 
 static DOMWrapperWorld& plugInImageElementIsolatedWorld()
 {
-    static DOMWrapperWorld& isolatedWorld = *DOMWrapperWorld::create(JSDOMWindow::commonVM()).leakRef();
+    static DOMWrapperWorld& isolatedWorld = DOMWrapperWorld::create(JSDOMWindow::commonVM()).leakRef();
     return isolatedWorld;
 }
 
@@ -394,14 +404,17 @@ void HTMLPlugInImageElement::didAddUserAgentShadowRoot(ShadowRoot* root)
     JSC::call(exec, overlay, callType, callData, globalObject, argList);
 }
 
-bool HTMLPlugInImageElement::partOfSnapshotOverlay(Node* node)
+bool HTMLPlugInImageElement::partOfSnapshotOverlay(const Node* node) const
 {
     DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, selector, (".snapshot-overlay", AtomicString::ConstructFromLiteral));
-    RefPtr<Element> snapshotLabel = ensureUserAgentShadowRoot().querySelector(selector, ASSERT_NO_EXCEPTION);
+    ShadowRoot* shadow = userAgentShadowRoot();
+    if (!shadow)
+        return false;
+    RefPtr<Element> snapshotLabel = shadow->querySelector(selector, ASSERT_NO_EXCEPTION);
     return node && snapshotLabel && (node == snapshotLabel.get() || node->isDescendantOf(snapshotLabel.get()));
 }
 
-void HTMLPlugInImageElement::removeSnapshotTimerFired(Timer<HTMLPlugInImageElement>&)
+void HTMLPlugInImageElement::removeSnapshotTimerFired()
 {
     m_snapshotImage = nullptr;
     m_isRestartedPlugin = false;
@@ -540,7 +553,7 @@ void HTMLPlugInImageElement::checkSizeChangeForSnapshotting()
         return;
 
     m_needsCheckForSizeChange = false;
-    LayoutRect contentBoxRect = toRenderBox(renderer())->contentBoxRect();
+    LayoutRect contentBoxRect = downcast<RenderBox>(*renderer()).contentBoxRect();
     int contentWidth = contentBoxRect.width();
     int contentHeight = contentBoxRect.height();
 
@@ -582,7 +595,7 @@ bool HTMLPlugInImageElement::isTopLevelFullPagePlugin(const RenderEmbeddedObject
     
 void HTMLPlugInImageElement::checkSnapshotStatus()
 {
-    if (!renderer()->isSnapshottedPlugIn()) {
+    if (!is<RenderSnapshottedPlugIn>(*renderer())) {
         if (displayState() == Playing)
             checkSizeChangeForSnapshotting();
         return;
@@ -590,7 +603,7 @@ void HTMLPlugInImageElement::checkSnapshotStatus()
     
     // If width and height styles were previously not set and we've snapshotted the plugin we may need to restart the plugin so that its state can be updated appropriately.
     if (!document().page()->settings().snapshotAllPlugIns() && displayState() <= DisplayingSnapshot && !m_plugInDimensionsSpecified) {
-        RenderSnapshottedPlugIn& renderer = toRenderSnapshottedPlugIn(*this->renderer());
+        RenderSnapshottedPlugIn& renderer = downcast<RenderSnapshottedPlugIn>(*this->renderer());
         if (!renderer.style().logicalWidth().isSpecified() && !renderer.style().logicalHeight().isSpecified())
             return;
         
@@ -693,7 +706,7 @@ void HTMLPlugInImageElement::subframeLoaderWillCreatePlugIn(const URL& url)
         return;
     }
     
-    auto& renderer = toRenderEmbeddedObject(*this->renderer());
+    auto& renderer = downcast<RenderEmbeddedObject>(*this->renderer());
     LayoutRect contentRect = renderer.contentBoxRect();
     int contentWidth = contentRect.width();
     int contentHeight = contentRect.height();

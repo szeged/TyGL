@@ -29,10 +29,6 @@
 namespace WebCore {
 
 struct SVGElementAnimatedProperties {
-    SVGElementAnimatedProperties();
-
-    SVGElementAnimatedProperties(SVGElement*, Vector<RefPtr<SVGAnimatedProperty>>&);
-
     SVGElement* element;
     Vector<RefPtr<SVGAnimatedProperty>> properties;
 };
@@ -62,7 +58,7 @@ public:
     void setContextElement(SVGElement* contextElement) { m_contextElement = contextElement; }
     AnimatedPropertyType type() const { return m_type; }
 
-    SVGElementAnimatedPropertyList findAnimatedPropertiesForAttributeName(SVGElement*, const QualifiedName&);
+    SVGElementAnimatedPropertyList findAnimatedPropertiesForAttributeName(SVGElement&, const QualifiedName&);
 
 protected:
     SVGAnimatedTypeAnimator(AnimatedPropertyType, SVGAnimationElement*, SVGElement*);
@@ -193,7 +189,8 @@ private:
     template<typename AnimValType>
     void executeAction(AnimationAction action, const SVGElementAnimatedPropertyList& animatedTypes, unsigned whichProperty, typename AnimValType::ContentType* type = 0)
     {
-        SVGElementInstance::InstanceUpdateBlocker blocker(animatedTypes[0].element);
+        // FIXME: Can't use SVGElement::InstanceUpdateBlocker because of circular header dependency. Would be nice to untangle this.
+        setInstanceUpdatesBlocked(*animatedTypes[0].element, true);
 
         SVGElementAnimatedPropertyList::const_iterator end = animatedTypes.end();
         for (SVGElementAnimatedPropertyList::const_iterator it = animatedTypes.begin(); it != end; ++it) {
@@ -220,7 +217,11 @@ private:
                 break;
             }
         }
+
+        setInstanceUpdatesBlocked(*animatedTypes[0].element, false);
     }
+
+    static void setInstanceUpdatesBlocked(SVGElement&, bool);
 };
 
 } // namespace WebCore

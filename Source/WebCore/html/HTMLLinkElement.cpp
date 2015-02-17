@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2003, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2006, 2007, 2008, 2009, 2010, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Rob Buis (rwlbuis@gmail.com)
  * Copyright (C) 2011 Google Inc. All rights reserved.
  *
@@ -39,11 +39,14 @@
 #include "FrameLoaderClient.h"
 #include "FrameTree.h"
 #include "FrameView.h"
+#include "HTMLAnchorElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "MediaList.h"
 #include "MediaQueryEvaluator.h"
+#include "MouseEvent.h"
 #include "Page.h"
+#include "RelList.h"
 #include "RenderStyle.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
@@ -78,9 +81,9 @@ inline HTMLLinkElement::HTMLLinkElement(const QualifiedName& tagName, Document& 
     ASSERT(hasTagName(linkTag));
 }
 
-PassRefPtr<HTMLLinkElement> HTMLLinkElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
+Ref<HTMLLinkElement> HTMLLinkElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
 {
-    return adoptRef(new HTMLLinkElement(tagName, document, createdByParser));
+    return adoptRef(*new HTMLLinkElement(tagName, document, createdByParser));
 }
 
 HTMLLinkElement::~HTMLLinkElement()
@@ -137,8 +140,14 @@ void HTMLLinkElement::parseAttribute(const QualifiedName& name, const AtomicStri
 {
     if (name == relAttr) {
         m_relAttribute = LinkRelAttribute(value);
+        if (m_relList)
+            m_relList->updateRelAttribute(value);
         process();
     } else if (name == hrefAttr) {
+        bool wasLink = isLink();
+        setIsLink(!value.isNull() && !shouldProhibitLinks(this));
+        if (wasLink != isLink())
+            setNeedsStyleRecalc();
         process();
     } else if (name == typeAttr) {
         m_type = value;
@@ -166,7 +175,7 @@ bool HTMLLinkElement::shouldLoadLink()
     if (!dispatchBeforeLoadEvent(getNonEmptyURLAttribute(hrefAttr)))
         return false;
     // A beforeload handler might have removed us from the document or changed the document.
-    if (!inDocument() || &document() != &originalDocument.get())
+    if (!inDocument() || &document() != originalDocument.ptr())
         return false;
     return true;
 }
@@ -220,10 +229,12 @@ void HTMLLinkElement::process()
         addPendingSheet(isActive ? ActiveSheet : InactiveSheet);
 
         // Load stylesheets that are not needed for the rendering immediately with low priority.
-        ResourceLoadPriority priority = isActive ? ResourceLoadPriorityUnresolved : ResourceLoadPriorityVeryLow;
+        Optional<ResourceLoadPriority> priority;
+        if (!isActive)
+            priority = ResourceLoadPriorityVeryLow;
         CachedResourceRequest request(ResourceRequest(document().completeURL(url)), charset, priority);
         request.setInitiator(this);
-        m_cachedSheet = document().cachedResourceLoader()->requestCSSStyleSheet(request);
+        m_cachedSheet = document().cachedResourceLoader().requestCSSStyleSheet(request);
         
         if (m_cachedSheet)
             m_cachedSheet->addClient(this);
@@ -319,7 +330,7 @@ void HTMLLinkElement::setCSSStyleSheet(const String& href, const URL& baseURL, c
     }
 
     Ref<StyleSheetContents> styleSheet(StyleSheetContents::create(href, parserContext));
-    m_sheet = CSSStyleSheet::create(styleSheet.get(), this);
+    m_sheet = CSSStyleSheet::create(styleSheet.copyRef(), this);
     m_sheet->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(m_media));
     m_sheet->setTitle(title());
 
@@ -330,7 +341,7 @@ void HTMLLinkElement::setCSSStyleSheet(const String& href, const URL& baseURL, c
     styleSheet.get().checkLoaded();
 
     if (styleSheet.get().isCacheable())
-        const_cast<CachedCSSStyleSheet*>(cachedStyleSheet)->saveParsedStyleSheet(styleSheet.get());
+        const_cast<CachedCSSStyleSheet*>(cachedStyleSheet)->saveParsedStyleSheet(WTF::move(styleSheet));
 }
 
 bool HTMLLinkElement::styleSheetIsLoading() const
@@ -375,6 +386,13 @@ void HTMLLinkElement::dispatchPendingEvent(LinkEventSender* eventSender)
         linkLoadingErrored();
 }
 
+DOMTokenList& HTMLLinkElement::relList()
+{
+    if (!m_relList) 
+        m_relList = std::make_unique<RelList>(*this);
+    return *m_relList;
+}
+
 void HTMLLinkElement::notifyLoadedSheetAndAllCriticalSubresources(bool errorOccurred)
 {
     if (m_firedLoad)
@@ -394,6 +412,28 @@ void HTMLLinkElement::startLoadingDynamicSheet()
 bool HTMLLinkElement::isURLAttribute(const Attribute& attribute) const
 {
     return attribute.name().localName() == hrefAttr || HTMLElement::isURLAttribute(attribute);
+}
+
+void HTMLLinkElement::defaultEventHandler(Event* event)
+{
+    ASSERT(event);
+    if (MouseEvent::canTriggerActivationBehavior(*event)) {
+        handleClick(*event);
+        return;
+    }
+    HTMLElement::defaultEventHandler(event);
+}
+
+void HTMLLinkElement::handleClick(Event& event)
+{
+    event.setDefaultHandled();
+    URL url = href();
+    if (url.isNull())
+        return;
+    Frame* frame = document().frame();
+    if (!frame)
+        return;
+    frame->loader().urlSelected(url, target(), PassRefPtr<Event>(&event), LockHistory::No, LockBackForwardList::No, MaybeSendReferrer);
 }
 
 URL HTMLLinkElement::href() const
@@ -474,11 +514,6 @@ void HTMLLinkElement::removePendingSheet(RemovePendingSheetNotificationType noti
         notification == RemovePendingSheetNotifyImmediately
         ? DocumentStyleSheetCollection::RemovePendingSheetNotifyImmediately
         : DocumentStyleSheetCollection::RemovePendingSheetNotifyLater);
-}
-
-DOMSettableTokenList* HTMLLinkElement::sizes() const
-{
-    return m_sizes.get();
 }
 
 void HTMLLinkElement::setSizes(const String& value)

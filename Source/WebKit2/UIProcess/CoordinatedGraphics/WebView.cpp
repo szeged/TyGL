@@ -34,6 +34,8 @@
 #include "CoordinatedLayerTreeHostProxy.h"
 #include "NotImplemented.h"
 #include "ViewState.h"
+#include "WebBackForwardList.h"
+#include "WebBackForwardListItem.h"
 #include "WebContextMenuProxy.h"
 #include "WebPageProxy.h"
 
@@ -45,7 +47,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-WebView::WebView(WebContext* context, WebPageGroup* pageGroup)
+WebView::WebView(WebProcessPool* context, WebPageGroup* pageGroup)
     : m_focused(false)
     , m_visible(false)
     , m_opacity(1.0)
@@ -154,7 +156,7 @@ void WebView::paintToCurrentGLContext()
 
     const FloatRect& viewport = m_userViewportTransform.mapRect(IntRect(IntPoint(), m_size));
 
-    scene->paintToCurrentGLContext(transformToScene().toTransformationMatrix(), m_opacity, viewport, m_page->pageExtendedBackgroundColor(), m_page->drawsBackground());
+    scene->paintToCurrentGLContext(transformToScene().toTransformationMatrix(), m_opacity, viewport, m_page->pageExtendedBackgroundColor(), m_page->drawsBackground(), m_contentPosition);
 }
 
 void WebView::setDrawsBackground(bool drawsBackground)
@@ -345,7 +347,7 @@ bool WebView::isViewInWindow()
 
 void WebView::processDidExit()
 {
-    m_client.webProcessCrashed(this, m_page->urlAtProcessExit());
+    m_client.webProcessCrashed(this, m_page->backForwardList().currentItem()->url());
 }
 
 void WebView::didRelaunchProcess()
@@ -448,7 +450,12 @@ PassRefPtr<WebColorPicker> WebView::createColorPicker(WebPageProxy*, const WebCo
 }
 #endif
 
-void WebView::setFindIndicator(PassRefPtr<FindIndicator>, bool, bool)
+void WebView::setTextIndicator(PassRefPtr<WebCore::TextIndicator>, bool)
+{
+    notImplemented();
+}
+
+void WebView::setTextIndicatorAnimationProgress(float)
 {
     notImplemented();
 }

@@ -107,12 +107,16 @@ $outputDir = Pathname.new("results")
 $verbosity = 0
 $bundle = nil
 $tarball = false
+$tarFileName = "payload.tar.gz"
 $copyVM = false
 $testRunnerType = :make
 $remoteUser = nil
 $remoteHost = nil
 $remotePort = nil
 $remoteDirectory = nil
+$architecture = nil
+$hostOS = nil
+
 
 def usage
     puts "run-jsc-stress-tests -j <shell path> <collections path> [<collections path> ...]"
@@ -126,7 +130,11 @@ def usage
     puts "--output-dir         (-o)   Path where to put results. Default is #{$outputDir}."
     puts "--verbose            (-v)   Print more things while running."
     puts "--run-bundle                Runs a bundle previously created by run-jsc-stress-tests."
-    puts "--tarball                   Creates a tarball of the final bundle."
+    puts "--tarball [fileName]        Creates a tarball of the final bundle.  Use name if supplied for tar file."
+    puts "--arch                      Specify architecture instead of determining from JavaScriptCore build."
+    puts "                            e.g. x86, x86_64, arm."
+    puts "--os                        Specify os instead of determining from JavaScriptCore build."
+    puts "                            e.g. darwin, linux & windows."
     puts "--shell-runner              Uses the shell-based test runner instead of the default make-based runner."
     puts "                            In general the shell runner is slower than the make runner."
     puts "--remote                    Specify a remote host on which to run tests."
@@ -144,8 +152,10 @@ GetoptLong.new(['--help', '-h', GetoptLong::NO_ARGUMENT],
                ['--memory-limited', GetoptLong::NO_ARGUMENT],
                ['--output-dir', '-o', GetoptLong::REQUIRED_ARGUMENT],
                ['--run-bundle', GetoptLong::REQUIRED_ARGUMENT],
-               ['--tarball', GetoptLong::NO_ARGUMENT],
+               ['--tarball', GetoptLong::OPTIONAL_ARGUMENT],
                ['--force-vm-copy', GetoptLong::NO_ARGUMENT],
+               ['--arch', GetoptLong::REQUIRED_ARGUMENT],
+               ['--os', GetoptLong::REQUIRED_ARGUMENT],
                ['--shell-runner', GetoptLong::NO_ARGUMENT],
                ['--remote', GetoptLong::REQUIRED_ARGUMENT],
                ['--child-processes', '-c', GetoptLong::REQUIRED_ARGUMENT],
@@ -171,6 +181,7 @@ GetoptLong.new(['--help', '-h', GetoptLong::NO_ARGUMENT],
     when '--tarball'
         $tarball = true
         $copyVM = true
+        $tarFileName = arg unless arg == ''
     when '--force-vm-copy'
         $copyVM = true
     when '--shell-runner'
@@ -184,6 +195,10 @@ GetoptLong.new(['--help', '-h', GetoptLong::NO_ARGUMENT],
         $remoteUser, $remoteHost, $remotePort = uri.user, uri.host, uri.port
     when '--child-processes'
         $numProcessors = arg.to_i
+    when '--arch'
+        $architecture = arg
+    when '--os'
+        $hostOS = arg
     end
 }
 
@@ -255,15 +270,15 @@ def determineOS
     end
 end
 
-$architecture = determineArchitecture
-$hostOS = determineOS
+$architecture = determineArchitecture unless $architecture
+$hostOS = determineOS unless $hostOS
 
 $numFailures = 0
 
 BASE_OPTIONS = ["--useFTLJIT=false", "--enableFunctionDotArguments=true"]
 EAGER_OPTIONS = ["--thresholdForJITAfterWarmUp=10", "--thresholdForJITSoon=10", "--thresholdForOptimizeAfterWarmUp=20", "--thresholdForOptimizeAfterLongWarmUp=20", "--thresholdForOptimizeSoon=20", "--thresholdForFTLOptimizeAfterWarmUp=20", "--thresholdForFTLOptimizeSoon=20"]
 NO_CJIT_OPTIONS = ["--enableConcurrentJIT=false", "--thresholdForJITAfterWarmUp=100"]
-FTL_OPTIONS = ["--useFTLJIT=true", "--enableExperimentalFTLCoverage=true"]
+FTL_OPTIONS = ["--useFTLJIT=true"]
 
 $runlist = []
 
@@ -601,7 +616,7 @@ def runFTLNoCJITValidate
 end
 
 def runFTLNoCJITNoInlineValidate
-    run("ftl-no-cjit-no-inline-validate", "--validateGraph=true", "--maximumInliningDepth=1", "--maximumInliningDepthForMustInline=1", *(FTL_OPTIONS + NO_CJIT_OPTIONS)) if $enableFTL
+    run("ftl-no-cjit-no-inline-validate", "--validateGraph=true", "--maximumInliningDepth=1", *(FTL_OPTIONS + NO_CJIT_OPTIONS)) if $enableFTL
 end
 
 def runFTLNoCJITOSRValidation
@@ -712,7 +727,15 @@ def runTypeProfiler
     if $enableFTL
         run("ftl-no-cjit-type-profiler", "--enableTypeProfiler=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS))
     else
-       run("no-cjit-type-profiler", "--enableTypeProfiler=true", *NO_CJIT_OPTIONS)
+        run("no-cjit-type-profiler", "--enableTypeProfiler=true", *NO_CJIT_OPTIONS)
+    end
+end
+
+def runControlFlowProfiler
+    if $enableFTL
+        run("ftl-no-cjit-type-profiler", "--enableControlFlowProfiler=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS))
+    else
+        run("no-cjit-type-profiler", "--enableControlFlowProfiler=true", *NO_CJIT_OPTIONS)
     end
 end
 
@@ -1275,7 +1298,12 @@ def sshRead(cmd)
     result
 end
 
-def runAndMonitorTestRunnerCommand(numberOfTests, *cmd)
+def runAndMonitorTestRunnerCommand(*cmd)
+    numberOfTests = 0
+    Dir.chdir($runnerDir) {
+        # -1 for the runscript, and -2 for '..' and '.'
+        numberOfTests = Dir.entries(".").count - 3
+    }
     unless $progressMeter
         mysys(cmd.join(' '))
     else
@@ -1339,27 +1367,19 @@ end
 
 def runShellTestRunner
     if $remote
-        numberOfTests = 0
-        Dir.chdir($runnerDir) {
-            # -1 for the runscript, and -2 for '..' and '.'
-            numberOfTests = Dir.entries(".").count - 3
-        }
-
         $remoteDirectory = JSON::parse(sshRead("cat ~/.bencher"))["tempPath"]
-        mysys("scp", "-P", $remotePort.to_s, ($outputDir.dirname + "payload.tar.gz").to_s, "#{$remoteUser}@#{$remoteHost}:#{$remoteDirectory}")
+        mysys("scp", "-P", $remotePort.to_s, ($outputDir.dirname + $tarFileName).to_s, "#{$remoteUser}@#{$remoteHost}:#{$remoteDirectory}")
         remoteScript = "\""
         remoteScript += "cd #{$remoteDirectory} && "
         remoteScript += "rm -rf #{$outputDir.basename} && "
-        remoteScript += "tar xzf payload.tar.gz && "
+        remoteScript += "tar xzf #{$tarFileName} && "
         remoteScript += "cd #{$outputDir.basename}/.runner && "
         remoteScript += "DYLD_FRAMEWORK_PATH=\\\"\\$(cd #{$testingFrameworkPath.dirname}; pwd)\\\" sh runscript"
         remoteScript += "\""
-        runAndMonitorTestRunnerCommand(numberOfTests, "ssh", "-p", $remotePort.to_s, "#{$remoteUser}@#{$remoteHost}", remoteScript)
+        runAndMonitorTestRunnerCommand("ssh", "-p", $remotePort.to_s, "#{$remoteUser}@#{$remoteHost}", remoteScript)
     else
         Dir.chdir($runnerDir) {
-            # -1 for the runscript, and -2 for '..' and '.'
-            numberOfTests = Dir.entries(".").count - 3
-            runAndMonitorTestRunnerCommand(numberOfTests, "sh", "runscript")
+            runAndMonitorTestRunnerCommand("sh", "runscript")
         }
     end
 end
@@ -1367,9 +1387,7 @@ end
 def runMakeTestRunner
     raise if $remote
     Dir.chdir($runnerDir) {
-        # -1 for the Makefile, and -2 for '..' and '.'
-        numberOfTests = Dir.entries(".").count - 3
-        runAndMonitorTestRunnerCommand(numberOfTests, "make", "-j", $numProcessors.to_s, "-s", "-f", "Makefile")
+        runAndMonitorTestRunnerCommand("make", "-j", $numProcessors.to_s, "-s", "-f", "Makefile")
     }
 end
 
@@ -1377,7 +1395,7 @@ def detectFailures
     raise if $bundle
 
     if $remote
-        output = sshRead("cd #{$remoteDirectory}/#{$outputDir.basename}/.runner && find . -name \"test_fail_*\" -depth 1")
+        output = sshRead("cd #{$remoteDirectory}/#{$outputDir.basename}/.runner && find . -maxdepth 1 -name \"test_fail_*\"")
         output.split(/\n/).each {
             | line |
             next unless line =~ /test_fail_/
@@ -1393,7 +1411,7 @@ def detectFailures
 end
 
 def compressBundle
-    cmd = "cd #{$outputDir}/.. && tar -czf payload.tar.gz #{$outputDir.basename}"
+    cmd = "cd #{$outputDir}/.. && tar -czf #{$tarFileName} #{$outputDir.basename}"
     $stderr.puts ">> #{cmd}" if $verbosity >= 2
     raise unless system(cmd)
 end

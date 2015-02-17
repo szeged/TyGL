@@ -26,10 +26,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "WebInspectorClient.h"
-
-#if ENABLE(INSPECTOR)
 
 #include "WebCoreBundleWin.h"
 #include "WebInspectorDelegate.h"
@@ -561,5 +558,3 @@ static ATOM registerWindowClass()
 
     return ::RegisterClassEx(&wcex);
 }
-
-#endif // ENABLE(INSPECTOR)

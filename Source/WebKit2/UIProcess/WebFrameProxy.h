@@ -39,6 +39,11 @@
 #include <WebCore/ContentFilter.h>
 #endif
 
+namespace API {
+class Navigation;
+}
+
+
 namespace IPC {
     class ArgumentDecoder;
     class Connection;
@@ -113,9 +118,9 @@ public:
     void didChangeTitle(const String&);
 
     // Policy operations.
-    void receivedPolicyDecision(WebCore::PolicyAction, uint64_t listenerID, uint64_t navigationID = 0);
-    WebFramePolicyListenerProxy* setUpPolicyListenerProxy(uint64_t listenerID);
-    WebFormSubmissionListenerProxy* setUpFormSubmissionListenerProxy(uint64_t listenerID);
+    void receivedPolicyDecision(WebCore::PolicyAction, uint64_t listenerID, API::Navigation* = nullptr);
+    WebFramePolicyListenerProxy& setUpPolicyListenerProxy(uint64_t listenerID);
+    WebFormSubmissionListenerProxy& setUpFormSubmissionListenerProxy(uint64_t listenerID);
 
 #if ENABLE(CONTENT_FILTERING)
     void setContentFilterForBlockedLoad(std::unique_ptr<WebCore::ContentFilter> contentFilter) { m_contentFilterForBlockedLoad = WTF::move(contentFilter); }

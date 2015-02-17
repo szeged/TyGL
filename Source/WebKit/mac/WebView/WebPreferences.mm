@@ -43,6 +43,7 @@
 #import <WebCore/ApplicationCacheStorage.h>
 #import <WebCore/AudioSession.h>
 #import <WebCore/NetworkStorageSession.h>
+#import <WebCore/PlatformCookieJar.h>
 #import <WebCore/ResourceHandle.h>
 #import <WebCore/TextEncodingRegistry.h>
 #import <runtime/InitializeThreading.h>
@@ -474,7 +475,7 @@ public:
         [NSNumber numberWithBool:NO],   WebKitDeveloperExtrasEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitJavaScriptExperimentsEnabledPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitAuthorAndUserStylesEnabledPreferenceKey,
-        [NSNumber numberWithBool:NO],   WebKitApplicationChromeModeEnabledPreferenceKey,
+        [NSNumber numberWithBool:YES],  WebKitDOMTimersThrottlingEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitWebArchiveDebugModeEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitLocalFileContentSniffingEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitOfflineWebApplicationCacheEnabledPreferenceKey,
@@ -492,6 +493,7 @@ public:
         [NSNumber numberWithBool:NO],  WebKitCanvasUsesAcceleratedDrawingPreferenceKey,
 #endif
         [NSNumber numberWithBool:NO],   WebKitShowDebugBordersPreferenceKey,
+        [NSNumber numberWithBool:NO],   WebKitSimpleLineLayoutDebugBordersEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitShowRepaintCounterPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitWebGLEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitForceSoftwareWebGLRenderingPreferenceKey,
@@ -537,15 +539,10 @@ public:
 
         [NSNumber numberWithBool:YES],   WebKitShouldRespectImageOrientationKey,
 #endif // PLATFORM(IOS)
+        [NSNumber numberWithBool:YES],  WebKitAllowsAlternateFullscreenPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitRequestAnimationFrameEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitWantsBalancedSetDefersLoadingBehaviorKey,
         [NSNumber numberWithBool:NO],   WebKitDiagnosticLoggingEnabledKey,
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-        [NSNumber numberWithBool:NO],
-#else
-        [NSNumber numberWithBool:YES],
-#endif
-                                        WebKitScreenFontSubstitutionEnabledKey,
         [NSNumber numberWithInt:WebAllowAllStorage], WebKitStorageBlockingPolicyKey,
         [NSNumber numberWithBool:NO],   WebKitPlugInSnapshottingEnabledPreferenceKey,
 
@@ -580,6 +577,9 @@ public:
         [NSNumber numberWithBool:NO], WebKitServiceControlsEnabledPreferenceKey,
 #endif
         [NSNumber numberWithBool:NO], WebKitEnableInheritURIQueryComponentPreferenceKey,
+#if ENABLE(ENCRYPTED_MEDIA_V2)
+        @"~/Library/WebKit/MediaKeys", WebKitMediaKeysStorageDirectoryKey,
+#endif
         nil];
 
 #if !PLATFORM(IOS)
@@ -1209,14 +1209,24 @@ public:
     [self _setBoolValue:flag forKey:WebKitAuthorAndUserStylesEnabledPreferenceKey];
 }
 
+// FIXME: applicationChromeMode is no longer needed by ToT, but is still used in Safari 8.
 - (BOOL)applicationChromeModeEnabled
 {
-    return [self _boolValueForKey:WebKitApplicationChromeModeEnabledPreferenceKey];
+    return NO;
 }
 
 - (void)setApplicationChromeModeEnabled:(BOOL)flag
 {
-    [self _setBoolValue:flag forKey:WebKitApplicationChromeModeEnabledPreferenceKey];
+}
+
+- (BOOL)domTimersThrottlingEnabled
+{
+    return [self _boolValueForKey:WebKitDOMTimersThrottlingEnabledPreferenceKey];
+}
+
+- (void)setDOMTimersThrottlingEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitDOMTimersThrottlingEnabledPreferenceKey];
 }
 
 - (BOOL)webArchiveDebugModeEnabled
@@ -1439,16 +1449,6 @@ public:
 - (float)_maxParseDuration
 {
     return [self _floatValueForKey:WebKitMaxParseDurationPreferenceKey];
-}
-
-- (void)_setAlwaysUseBaselineOfPrimaryFont:(BOOL)flag
-{
-    [self _setBoolValue:flag forKey:WebKitAlwaysUseBaselineOfPrimaryFontPreferenceKey];
-}
-
-- (BOOL)_alwaysUseBaselineOfPrimaryFont
-{
-    return [self _boolValueForKey:WebKitAlwaysUseBaselineOfPrimaryFontPreferenceKey];
 }
 
 - (void)_setAllowMultiElementImplicitFormSubmission:(BOOL)flag
@@ -1729,6 +1729,11 @@ static NSString *classIBCreatorID = nil;
     NetworkStorageSession::switchToNewTestingSession();
 }
 
++ (void)_clearNetworkLoaderSession
+{
+    WebCore::deleteAllCookies(NetworkStorageSession::defaultStorageSession());
+}
+
 + (void)_setCurrentNetworkLoaderSessionCookieAcceptPolicy:(NSHTTPCookieAcceptPolicy)policy
 {
     WKSetHTTPCookieAcceptPolicy(NetworkStorageSession::defaultStorageSession().cookieStorage().get(), policy);
@@ -1832,6 +1837,16 @@ static NSString *classIBCreatorID = nil;
 - (void)setShowDebugBorders:(BOOL)enabled
 {
     [self _setBoolValue:enabled forKey:WebKitShowDebugBordersPreferenceKey];
+}
+
+- (BOOL)simpleLineLayoutDebugBordersEnabled
+{
+    return [self _boolValueForKey:WebKitSimpleLineLayoutDebugBordersEnabledPreferenceKey];
+}
+
+- (void)setSimpleLineLayoutDebugBordersEnabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitSimpleLineLayoutDebugBordersEnabledPreferenceKey];
 }
 
 - (BOOL)showRepaintCounter
@@ -2153,6 +2168,16 @@ static NSString *classIBCreatorID = nil;
     [self _setBoolValue:flag forKey:WebKitMediaPlaybackAllowsInlinePreferenceKey];
 }
 
+- (BOOL)allowsAlternateFullscreen
+{
+    return [self _boolValueForKey:WebKitAllowsAlternateFullscreenPreferenceKey];
+}
+
+- (void)setAllowsAlternateFullscreen:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitAllowsAlternateFullscreenPreferenceKey];
+}
+
 - (BOOL)mockScrollbarsEnabled
 {
     return [self _boolValueForKey:WebKitMockScrollbarsEnabledPreferenceKey];
@@ -2325,29 +2350,6 @@ static NSString *classIBCreatorID = nil;
     [self _setBoolValue:enabled forKey:WebKitDiagnosticLoggingEnabledKey];
 }
 
-static bool needsScreenFontsEnabledQuirk()
-{
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-    static bool is1PasswordNeedingScreenFontsQuirk = WKExecutableWasLinkedOnOrBeforeMountainLion()
-        && [[[NSBundle mainBundle] bundleIdentifier] isEqualToString:@"ws.agile.1Password"];
-    return is1PasswordNeedingScreenFontsQuirk;
-#else
-    return NO;
-#endif
-}
-
-- (BOOL)screenFontSubstitutionEnabled
-{
-    if (needsScreenFontsEnabledQuirk())
-        return YES;
-    return [self _boolValueForKey:WebKitScreenFontSubstitutionEnabledKey];
-}
-
-- (void)setScreenFontSubstitutionEnabled:(BOOL)enabled
-{
-    [self _setBoolValue:enabled forKey:WebKitScreenFontSubstitutionEnabledKey];
-}
-
 - (void)setStorageBlockingPolicy:(WebStorageBlockingPolicy)storageBlockingPolicy
 {
 #if PLATFORM(IOS)
@@ -2463,6 +2465,16 @@ static bool needsScreenFontsEnabledQuirk()
 - (void)setShouldConvertPositionStyleOnCopy:(BOOL)enabled
 {
     [self _setBoolValue:enabled forKey:WebKitShouldConvertPositionStyleOnCopyPreferenceKey];
+}
+
+- (NSString *)mediaKeysStorageDirectory
+{
+    return [[self _stringValueForKey:WebKitMediaKeysStorageDirectoryKey] stringByStandardizingPath];
+}
+
+- (void)setMediaKeysStorageDirectory:(NSString *)directory
+{
+    [self _setStringValue:directory forKey:WebKitMediaKeysStorageDirectoryKey];
 }
 
 @end

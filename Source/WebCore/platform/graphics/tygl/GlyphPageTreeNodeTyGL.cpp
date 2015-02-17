@@ -24,15 +24,13 @@
  */
 
 #include "config.h"
-#include "GlyphPageTreeNode.h"
 
 #include "Font.h"
-#include "SimpleFontData.h"
 #include "UTF16UChar32Iterator.h"
 
 namespace WebCore {
 
-bool GlyphPage::fill(unsigned offset, unsigned length, UChar* buffer, unsigned bufferLength, const SimpleFontData* fontData)
+bool GlyphPage::fill(unsigned offset, unsigned length, UChar* buffer, unsigned bufferLength, const Font* fontData)
 {
     FT_Face face = fontData->platformData().scaledFont()->fontFace();
     if (!face)

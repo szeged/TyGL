@@ -91,16 +91,9 @@ class PortTestCase(unittest.TestCase):
         port._config.build_directory = lambda configuration: '/mock-build'
         return port
 
-    def test_default_max_locked_shards(self):
-        port = self.make_port()
-        port.default_child_processes = lambda: 16
-        self.assertEqual(port.default_max_locked_shards(), 1)
-        port.default_child_processes = lambda: 2
-        self.assertEqual(port.default_max_locked_shards(), 1)
-
     def test_default_timeout_ms(self):
-        self.assertEqual(self.make_port(options=MockOptions(configuration='Release')).default_timeout_ms(), 35000)
-        self.assertEqual(self.make_port(options=MockOptions(configuration='Debug')).default_timeout_ms(), 35000)
+        self.assertEqual(self.make_port(options=MockOptions(configuration='Release')).default_timeout_ms(), 30000)
+        self.assertEqual(self.make_port(options=MockOptions(configuration='Debug')).default_timeout_ms(), 30000)
 
     def test_default_pixel_tests(self):
         self.assertEqual(self.make_port().default_pixel_tests(), False)
@@ -135,12 +128,6 @@ class PortTestCase(unittest.TestCase):
                 self.fail('failed to connect to %s:%d' % (host, port))
             finally:
                 test_socket.close()
-
-    def integration_test_http_lock(self):
-        port = self.make_port()
-        # Only checking that no exception is raised.
-        port.acquire_http_lock()
-        port.release_http_lock()
 
     def integration_test_check_sys_deps(self):
         port = self.make_port()
@@ -555,7 +542,7 @@ MOCK output of child process
     def test_apache_config_file_name_for_platform(self):
         port = TestWebKitPort()
         port._apache_version = lambda: '2.2'
-        self._assert_config_file_for_platform(port, 'cygwin', 'cygwin-httpd.conf')
+        self._assert_config_file_for_platform(port, 'cygwin', 'apache2.2-httpd-win.conf')
 
         self._assert_config_file_for_platform(port, 'linux2', 'apache2.2-httpd.conf')
         self._assert_config_file_for_platform(port, 'linux3', 'apache2.2-httpd.conf')
@@ -570,7 +557,7 @@ MOCK output of child process
         self._assert_config_file_for_platform(port, 'linux2', 'debian-httpd-2.2.conf')
 
         self._assert_config_file_for_platform(port, 'mac', 'apache2.2-httpd.conf')
-        self._assert_config_file_for_platform(port, 'win32', 'apache2.2-httpd.conf')  # win32 isn't a supported sys.platform.  AppleWin/WinCairo ports all use cygwin.
+        self._assert_config_file_for_platform(port, 'win32', 'apache2.2-httpd-win.conf')  # win32 isn't a supported sys.platform.  AppleWin/WinCairo ports all use cygwin.
         self._assert_config_file_for_platform(port, 'barf', 'apache2.2-httpd.conf')
 
     def test_path_to_apache_config_file(self):

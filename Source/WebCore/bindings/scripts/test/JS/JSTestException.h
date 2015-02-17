@@ -30,9 +30,9 @@ namespace WebCore {
 class JSTestException : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestException* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestException> impl)
+    static JSTestException* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestException>&& impl)
     {
-        JSTestException* ptr = new (NotNull, JSC::allocateCell<JSTestException>(globalObject->vm().heap)) JSTestException(structure, globalObject, impl);
+        JSTestException* ptr = new (NotNull, JSC::allocateCell<JSTestException>(globalObject->vm().heap)) JSTestException(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -66,7 +66,7 @@ public:
 private:
     TestException* m_impl;
 protected:
-    JSTestException(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestException>);
+    JSTestException(JSC::Structure*, JSDOMGlobalObject*, Ref<TestException>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -89,12 +89,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestException*)
     return &jsTestExceptionOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestException*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestException*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestException& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

@@ -58,7 +58,7 @@ namespace WTF {
 
 namespace WebCore {
 
-template <typename T> class Timer;
+class Timer;
 
 // ================================================
 // FrameData Class
@@ -108,13 +108,13 @@ class BitmapImage final : public Image {
     friend class GradientImage;
     friend class GraphicsContext;
 public:
-    static PassRefPtr<BitmapImage> create(PassNativeImagePtr nativeImage, ImageObserver* observer = 0)
+    static Ref<BitmapImage> create(PassNativeImagePtr nativeImage, ImageObserver* observer = 0)
     {
-        return adoptRef(new BitmapImage(nativeImage, observer));
+        return adoptRef(*new BitmapImage(nativeImage, observer));
     }
-    static PassRefPtr<BitmapImage> create(ImageObserver* observer = 0)
+    static Ref<BitmapImage> create(ImageObserver* observer = 0)
     {
-        return adoptRef(new BitmapImage(observer));
+        return adoptRef(*new BitmapImage(observer));
     }
 #if PLATFORM(WIN)
     static PassRefPtr<BitmapImage> create(HBITMAP);
@@ -258,7 +258,7 @@ protected:
     int repetitionCount(bool imageKnownToBeComplete);  // |imageKnownToBeComplete| should be set if the caller knows the entire image has been decoded.
     bool shouldAnimate();
     virtual void startAnimation(CatchUpAnimation = CatchUp) override;
-    void advanceAnimation(Timer<BitmapImage>&);
+    void advanceAnimation();
 
     // Function that does the real work of advancing the animation.  When
     // skippingFrames is true, we're in the middle of a loop trying to skip over
@@ -283,6 +283,8 @@ protected:
 #endif
 
 private:
+    virtual bool decodedDataIsPurgeable() const override;
+
     ImageSource m_source;
     mutable IntSize m_size; // The size to use for the overall image (will just be the size of the first image).
     mutable IntSize m_sizeRespectingOrientation;
@@ -295,7 +297,7 @@ private:
     size_t m_currentFrame; // The index of the current frame of animation.
     Vector<FrameData, 1> m_frames; // An array of the cached frames of the animation. We have to ref frames to pin them in the cache.
 
-    std::unique_ptr<Timer<BitmapImage>> m_frameTimer;
+    std::unique_ptr<Timer> m_frameTimer;
     int m_repetitionCount; // How many total animation loops we should do.  This will be cAnimationNone if this image type is incapable of animation.
     RepetitionCountStatus m_repetitionCountStatus;
     int m_repetitionsComplete;  // How many repetitions we've finished.
@@ -335,8 +337,8 @@ private:
     RefPtr<Image> m_cachedImage;
 };
 
-IMAGE_TYPE_CASTS(BitmapImage)
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_IMAGE(BitmapImage)
 
-#endif
+#endif // BitmapImage_h

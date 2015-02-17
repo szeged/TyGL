@@ -34,44 +34,15 @@
 #import "ServicesController.h"
 #import "ShareableBitmap.h"
 #import "StringUtilities.h"
-#import "WebContext.h"
 #import "WebContextMenuItemData.h"
 #import "WebProcessProxy.h"
 #import "WKView.h"
 #import <WebCore/GraphicsContext.h>
 #import <WebCore/IntRect.h>
+#import <WebCore/NSSharingServicePickerSPI.h>
+#import <WebCore/NSSharingServiceSPI.h>
 #import <WebKitSystemInterface.h>
 #import <wtf/RetainPtr.h>
-
-#if ENABLE(SERVICE_CONTROLS)
-#import <AppKit/NSSharingService.h>
-
-#if __has_include(<AppKit/NSSharingService_Private.h>)
-#import <AppKit/NSSharingService_Private.h>
-#else
-typedef enum {
-    NSSharingServicePickerStyleMenu = 0,
-    NSSharingServicePickerStyleRollover = 1,
-    NSSharingServicePickerStyleTextSelection = 2
-} NSSharingServicePickerStyle;
-
-typedef enum {
-    NSSharingServiceTypeEditor = 2
-} NSSharingServiceType;
-
-typedef NSUInteger NSSharingServiceMask;
-#endif
-
-@interface NSSharingServicePicker (Details)
-@property NSSharingServicePickerStyle style;
-- (NSMenu *)menu;
-@end
-
-@interface NSSharingService (Private)
-@property (readonly) NSSharingServiceType type;
-@end
-
-#endif // ENABLE(SERVICE_CONTROLS)
 
 using namespace WebCore;
 
@@ -102,14 +73,14 @@ using namespace WebCore;
 @end
 
 @interface WKSelectionHandlerWrapper : NSObject {
-    std::function<void()> _selectionHandler;
+    std::function<void ()> _selectionHandler;
 }
-- (id)initWithSelectionHandler:(std::function<void()>)selectionHandler;
+- (id)initWithSelectionHandler:(std::function<void ()>)selectionHandler;
 - (void)executeSelectionHandler;
 @end
 
 @implementation WKSelectionHandlerWrapper
-- (id)initWithSelectionHandler:(std::function<void()>)selectionHandler
+- (id)initWithSelectionHandler:(std::function<void ()>)selectionHandler
 {
     self = [super init];
     if (!self)
@@ -275,6 +246,7 @@ using namespace WebCore;
         return;
     }
 
+    // FIXME: We should adopt replaceSelectionWithAttributedString instead of bouncing through the (fake) pasteboard.
     _menuProxy->page().replaceSelectionWithPasteboardData(types, dataReference);
 }
 
@@ -335,7 +307,7 @@ static Vector<RetainPtr<NSMenuItem>> nsMenuItemVector(const Vector<WebContextMen
             [menuItem setEnabled:items[i].enabled()];
             [menuItem setState:items[i].checked() ? NSOnState : NSOffState];
 
-            if (std::function<void()> selectionHandler = items[i].selectionHandler()) {
+            if (std::function<void ()> selectionHandler = items[i].selectionHandler()) {
                 WKSelectionHandlerWrapper *wrapper = [[WKSelectionHandlerWrapper alloc] initWithSelectionHandler:selectionHandler];
                 [menuItem setRepresentedObject:wrapper];
                 [wrapper release];
@@ -382,10 +354,10 @@ static Vector<RetainPtr<NSMenuItem>> nsMenuItemVector(const Vector<WebContextMen
 void WebContextMenuProxyMac::setupServicesMenu(const ContextMenuContextData& context)
 {
     bool includeEditorServices = context.controlledDataIsEditable();
-    bool hasControlledImage = !context.controlledImageHandle().isNull();
+    bool hasControlledImage = context.controlledImage();
     NSArray *items = nil;
     if (hasControlledImage) {
-        RefPtr<ShareableBitmap> image = ShareableBitmap::create(context.controlledImageHandle());
+        RefPtr<ShareableBitmap> image = context.controlledImage();
         if (!image)
             return;
 
@@ -439,7 +411,7 @@ void WebContextMenuProxyMac::setupServicesMenu(const ContextMenuContextData& con
     // If there is no services menu, then the existing services on the system have changed, so refresh that list of services.
     // If <rdar://problem/17954709> is resolved then we can more accurately keep the list up to date without this call.
     if (!m_servicesMenu)
-        ServicesController::shared().refreshExistingServices();
+        ServicesController::singleton().refreshExistingServices();
 }
 
 void WebContextMenuProxyMac::clearServicesMenu()
@@ -499,7 +471,7 @@ void WebContextMenuProxyMac::showContextMenu(const IntPoint& menuLocation, const
     // FIXME: That API is better than WKPopupContextMenu. In the future all menus should use either it
     // or the [NSMenu popUpContextMenu:withEvent:forView:] API, depending on the menu type.
     // Then we could get rid of NSPopUpButtonCell, custom metrics, and WKPopupContextMenu.
-    if (context.isTelephoneNumberContext() || context.needsServicesMenu()) {
+    if (context.needsServicesMenu()) {
         [menu popUpMenuPositioningItem:nil atLocation:menuLocation inView:m_webView];
         hideContextMenu();
         return;

@@ -420,20 +420,6 @@ private:
                 break;
             }
                 
-            case ProfiledCall:
-            case ProfiledConstruct: {
-                if (!m_state.forNode(m_graph.varArgChild(node, 0)).m_value)
-                    break;
-                
-                // If we were able to prove that the callee is a constant then the normal call
-                // inline cache will record this callee. This means that there is no need to do any
-                // additional profiling.
-                m_interpreter.execute(indexInBlock);
-                node->setOp(node->op() == ProfiledCall ? Call : Construct);
-                eliminated = true;
-                break;
-            }
-
             default:
                 break;
             }
@@ -492,7 +478,6 @@ private:
     {
         NodeOrigin origin = node->origin;
         Edge childEdge = node->child1();
-        Node* child = childEdge.node();
 
         addBaseCheck(indexInBlock, node, baseValue, variant.structureSet());
         
@@ -507,7 +492,7 @@ private:
         }
         
         if (variant.alternateBase()) {
-            child = m_insertionSet.insertConstant(indexInBlock, origin, variant.alternateBase());
+            Node* child = m_insertionSet.insertConstant(indexInBlock, origin, variant.alternateBase());
             childEdge = Edge(child, KnownCellUse);
         } else
             childEdge.setUseKind(KnownCellUse);

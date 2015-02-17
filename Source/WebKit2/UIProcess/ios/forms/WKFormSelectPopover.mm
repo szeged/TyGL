@@ -28,20 +28,12 @@
 
 #if PLATFORM(IOS)
 
+#import "UIKitSPI.h"
 #import "WKContentView.h"
 #import "WKContentViewInteraction.h"
 #import "WKFormPopover.h"
 #import "WebPageProxy.h"
-#import <CoreFoundation/CFUniChar.h>
-#import <UIKit/UIApplication_Private.h>
-#import <UIKit/UIDevice_Private.h>
-#import <UIKit/UIKeyboard_Private.h>
-#import <UIKit/UIKeyboardImpl.h>
 #import <UIKit/UIPickerView.h>
-#import <UIKit/UIPickerView_Private.h>
-#import <UIKit/UITableViewCell_Private.h>
-#import <UIKit/UIStringDrawing_Private.h>
-#import <UIKit/UIWebFormAccessory.h>
 #import <WebCore/LocalizedStrings.h>
 #import <wtf/RetainPtr.h>
 
@@ -143,11 +135,18 @@ static NSString *stringWithWritingDirection(NSString *string, UITextWritingDirec
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
-    
-    if (_singleSelectionIndex != NSNotFound) {
-        NSIndexPath *indexPath = [NSIndexPath indexPathForRow:_singleSelectionIndex inSection:_singleSelectionSection];
-        [self.tableView scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionMiddle animated:NO];
-    }
+
+    if (_singleSelectionIndex == NSNotFound)
+        return;
+
+    if (_singleSelectionSection >= (NSUInteger)[self.tableView numberOfSections])
+        return;
+
+    if (_singleSelectionIndex >= (NSUInteger)[self.tableView numberOfRowsInSection:_singleSelectionSection])
+        return;
+
+    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:_singleSelectionIndex inSection:_singleSelectionSection];
+    [self.tableView scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionMiddle animated:NO];
 }
 
 #pragma mark UITableView delegate methods

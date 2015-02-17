@@ -40,12 +40,12 @@
 #import "PluginView.h"
 #import "WKAccessibilityWebPageObjectMac.h"
 #import "WKPageFindMatchesClient.h"
-#import "WebContextMessages.h"
 #import "WebCoreArgumentCoders.h"
 #import "WebEvent.h"
 #import "WebEventConversion.h"
 #import "WebPage.h"
 #import "WebPageProxyMessages.h"
+#import "WebPasteboardProxyMessages.h"
 #import "WebProcess.h"
 #import <JavaScriptCore/JSContextRef.h>
 #import <JavaScriptCore/JSObjectRef.h>
@@ -519,7 +519,7 @@ PDFPlugin::PDFPlugin(WebFrame* frame)
         m_annotationStyle->setTextContent(annotationStyle, ASSERT_NO_EXCEPTION);
 
         m_annotationContainer->appendChild(m_annotationStyle.get());
-        document->body()->appendChild(m_annotationContainer.get());
+        document->bodyOrFrameset()->appendChild(m_annotationContainer.get());
     }
 
     m_accessibilityObject = adoptNS([[WKPDFPluginAccessibilityObject alloc] initWithPDFPlugin:this]);
@@ -1662,8 +1662,9 @@ void PDFPlugin::writeItemsToPasteboard(NSString *pasteboardName, NSArray *items,
         pasteboardTypes.append(type);
 
     uint64_t newChangeCount;
-    WebProcess::shared().parentProcessConnection()->sendSync(Messages::WebContext::SetPasteboardTypes(pasteboardName, pasteboardTypes),
-        Messages::WebContext::SetPasteboardTypes::Reply(newChangeCount), 0);
+    auto& webProcess = WebProcess::singleton();
+    webProcess.parentProcessConnection()->sendSync(Messages::WebPasteboardProxy::SetPasteboardTypes(pasteboardName, pasteboardTypes),
+        Messages::WebPasteboardProxy::SetPasteboardTypes::Reply(newChangeCount), 0);
 
     for (NSUInteger i = 0, count = items.count; i < count; ++i) {
         NSString *type = [types objectAtIndex:i];
@@ -1677,8 +1678,7 @@ void PDFPlugin::writeItemsToPasteboard(NSString *pasteboardName, NSArray *items,
 
         if ([type isEqualToString:NSStringPboardType] || [type isEqualToString:NSPasteboardTypeString]) {
             RetainPtr<NSString> plainTextString = adoptNS([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
-            WebProcess::shared().parentProcessConnection()->sendSync(Messages::WebContext::SetPasteboardStringForType(pasteboardName, type, plainTextString.get()),
-                Messages::WebContext::SetPasteboardStringForType::Reply(newChangeCount), 0);
+            webProcess.parentProcessConnection()->sendSync(Messages::WebPasteboardProxy::SetPasteboardStringForType(pasteboardName, type, plainTextString.get()), Messages::WebPasteboardProxy::SetPasteboardStringForType::Reply(newChangeCount), 0);
         } else {
             RefPtr<SharedBuffer> buffer = SharedBuffer::wrapNSData(data);
 
@@ -1689,8 +1689,7 @@ void PDFPlugin::writeItemsToPasteboard(NSString *pasteboardName, NSArray *items,
             RefPtr<SharedMemory> sharedMemory = SharedMemory::create(buffer->size());
             memcpy(sharedMemory->data(), buffer->data(), buffer->size());
             sharedMemory->createHandle(handle, SharedMemory::ReadOnly);
-            WebProcess::shared().parentProcessConnection()->sendSync(Messages::WebContext::SetPasteboardBufferForType(pasteboardName, type, handle, buffer->size()),
-                Messages::WebContext::SetPasteboardBufferForType::Reply(newChangeCount), 0);
+            webProcess.parentProcessConnection()->sendSync(Messages::WebPasteboardProxy::SetPasteboardBufferForType(pasteboardName, type, handle, buffer->size()), Messages::WebPasteboardProxy::SetPasteboardBufferForType::Reply(newChangeCount), 0);
         }
     }
 }
@@ -1699,11 +1698,9 @@ void PDFPlugin::showDefinitionForAttributedString(NSAttributedString *string, CG
 {
     DictionaryPopupInfo dictionaryPopupInfo;
     dictionaryPopupInfo.origin = convertFromPDFViewToRootView(IntPoint(point));
+    dictionaryPopupInfo.attributedString.string = string;
 
-    AttributedString attributedString;
-    attributedString.string = string;
-
-    webFrame()->page()->send(Messages::WebPageProxy::DidPerformDictionaryLookup(attributedString, dictionaryPopupInfo));
+    webFrame()->page()->send(Messages::WebPageProxy::DidPerformDictionaryLookup(dictionaryPopupInfo));
 }
 
 unsigned PDFPlugin::countFindMatches(const String& target, WebCore::FindOptions options, unsigned maxMatchCount)

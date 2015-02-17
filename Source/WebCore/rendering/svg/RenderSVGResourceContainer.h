@@ -45,7 +45,7 @@ public:
     void removeClientRenderLayer(RenderLayer*);
 
 protected:
-    RenderSVGResourceContainer(SVGElement&, PassRef<RenderStyle>);
+    RenderSVGResourceContainer(SVGElement&, Ref<RenderStyle>&&);
 
     enum InvalidationMode {
         LayoutAndBoundariesInvalidation,
@@ -75,8 +75,6 @@ private:
     HashSet<RenderLayer*> m_clientLayers;
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderSVGResourceContainer, isSVGResourceContainer())
-
 inline RenderSVGResourceContainer* getRenderSVGResourceContainerById(Document& document, const AtomicString& id)
 {
     if (id.isEmpty())
@@ -91,8 +89,11 @@ inline RenderSVGResourceContainer* getRenderSVGResourceContainerById(Document& d
 template<typename Renderer>
 Renderer* getRenderSVGResourceById(Document& document, const AtomicString& id)
 {
-    if (RenderSVGResourceContainer* container = getRenderSVGResourceContainerById(document, id))
-        return container->cast<Renderer>();
+    // Using the RenderSVGResource type here avoids ambiguous casts for types that
+    // descend from both RenderObject and RenderSVGResourceContainer.
+    RenderSVGResource* container = getRenderSVGResourceContainerById(document, id);
+    if (is<Renderer>(container))
+        return downcast<Renderer>(container);
 
     return nullptr;
 }

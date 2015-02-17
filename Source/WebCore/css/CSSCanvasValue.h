@@ -35,7 +35,7 @@ class Document;
 
 class CSSCanvasValue : public CSSImageGeneratorValue {
 public:
-    static PassRef<CSSCanvasValue> create(const String& name) { return adoptRef(*new CSSCanvasValue(name)); }
+    static Ref<CSSCanvasValue> create(const String& name) { return adoptRef(*new CSSCanvasValue(name)); }
     ~CSSCanvasValue();
 
     String customCSSText() const;
@@ -45,7 +45,7 @@ public:
     FloatSize fixedSize(const RenderElement*);
 
     bool isPending() const { return false; }
-    void loadSubimages(CachedResourceLoader*) { }
+    void loadSubimages(CachedResourceLoader&) { }
 
     bool equals(const CSSCanvasValue&) const;
 

@@ -54,7 +54,7 @@ ScriptedAnimationController::ScriptedAnimationController(Document* document, Pla
     , m_nextCallbackId(0)
     , m_suspendCount(0)
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
-    , m_animationTimer(this, &ScriptedAnimationController::animationTimerFired)
+    , m_animationTimer(*this, &ScriptedAnimationController::animationTimerFired)
     , m_lastAnimationFrameTimeMonotonic(0)
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
     , m_isUsingTimer(false)
@@ -132,8 +132,8 @@ void ScriptedAnimationController::serviceScriptedAnimations(double monotonicTime
     if (!m_callbacks.size() || m_suspendCount || (m_document->settings() && !m_document->settings()->requestAnimationFrameEnabled()))
         return;
 
-    double highResNowMs = 1000.0 * m_document->loader()->timing()->monotonicTimeToZeroBasedDocumentTime(monotonicTimeNow);
-    double legacyHighResNowMs = 1000.0 * m_document->loader()->timing()->monotonicTimeToPseudoWallTime(monotonicTimeNow);
+    double highResNowMs = 1000.0 * m_document->loader()->timing().monotonicTimeToZeroBasedDocumentTime(monotonicTimeNow);
+    double legacyHighResNowMs = 1000.0 * m_document->loader()->timing().monotonicTimeToPseudoWallTime(monotonicTimeNow);
 
     // First, generate a list of callbacks to consider.  Callbacks registered from this point
     // on are considered only for the "next" frame, not this one.
@@ -211,7 +211,7 @@ void ScriptedAnimationController::scheduleAnimation()
 }
 
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
-void ScriptedAnimationController::animationTimerFired(Timer<ScriptedAnimationController>&)
+void ScriptedAnimationController::animationTimerFired()
 {
     m_lastAnimationFrameTimeMonotonic = monotonicallyIncreasingTime();
     serviceScriptedAnimations(m_lastAnimationFrameTimeMonotonic);

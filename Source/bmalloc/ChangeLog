@@ -1,3 +1,541 @@
+2015-01-31  Sam Weinig  <sam@webkit.org>
+
+        Remove even more Mountain Lion support
+        https://bugs.webkit.org/show_bug.cgi?id=141124
+
+        Reviewed by Alexey Proskuryakov.
+
+        * Configurations/Base.xcconfig:
+        * Configurations/DebugRelease.xcconfig:
+
+2015-01-30  Geoffrey Garen  <ggaren@apple.com>
+
+        GC marking threads should clear malloc caches
+        https://bugs.webkit.org/show_bug.cgi?id=141097
+
+        Reviewed by Andreas Kling.
+
+        Split the scavenging API into per-thread vs global, so that you can
+        request to scavenge your own thread without scavenging the whole heap.
+
+        * bmalloc/Cache.cpp:
+        (bmalloc::Cache::scavenge):
+        * bmalloc/bmalloc.h:
+        (bmalloc::api::scavengeThisThread):
+        (bmalloc::api::scavenge):
+
+2015-01-28  Dana Burkart  <dburkart@apple.com>
+
+        Move ASan flag settings from DebugRelease.xcconfig to Base.xcconfig
+        https://bugs.webkit.org/show_bug.cgi?id=136765
+
+        Reviewed by Alexey Proskuryakov.
+
+        * Configurations/Base.xcconfig:
+        * Configurations/DebugRelease.xcconfig:
+
+2015-01-21  Geoffrey Garen  <ggaren@apple.com>
+
+        bmalloc: support aligned allocation
+        https://bugs.webkit.org/show_bug.cgi?id=140732
+
+        Reviewed by Andreas Kling.
+
+        * bmalloc/Allocator.cpp:
+        (bmalloc::Allocator::allocate): New function for aligned allocation.
+
+        Small and medium requests just allocate and free until they find an
+        aligned pointer. This is slightly inefficient in the worst case, but
+        still constant-time with little-to-no space overhead.
+
+        Large requests use a new API that requires the client to specify both
+        its ideal size and alignment, and the worst-case size you would have to
+        allocate in order to produce some interior pointer of the requested size
+        and alignment. We put the burden of this calculation on the client
+        because it simplifies things if we guarantee that allocation won't fail.
+
+        XLarge requests are easy: we just forward them to vmAllocate, which
+        already supported aligned requests.
+
+        * bmalloc/BoundaryTag.h:
+        * bmalloc/BoundaryTagInlines.h:
+        (bmalloc::BoundaryTag::mergeLeft):
+        (bmalloc::BoundaryTag::mergeRight):
+        (bmalloc::BoundaryTag::merge):
+        (bmalloc::BoundaryTag::deallocate):
+        (bmalloc::BoundaryTag::split):
+        (bmalloc::BoundaryTag::allocate): No behavior change here. I just
+        refactored the interface to remove some reference out parameters in
+        order to clarify what changes and what doesn't.
+
+        * bmalloc/Heap.cpp:
+        (bmalloc::Heap::allocateXLarge): Added an alignment API.
+
+        (bmalloc::Heap::allocateLarge):
+        * bmalloc/Heap.h: Added an alignment API. I split out allocateLarge into
+        a few variants, so aligned and unaligned allocation could share some code.
+
+        * bmalloc/SegregatedFreeList.cpp:
+        (bmalloc::SegregatedFreeList::take):
+        * bmalloc/SegregatedFreeList.h: Changed to use a separate, explicit API
+        for aligned allocation. It turns out that the aligned path is pretty
+        different, since it ends up searching for two potential ways to satisfy
+        an allocation: either large enough and aligned, or large enough to split
+        into something not aligned and something large enough and aligned.
+
+        * bmalloc/VMAllocate.h:
+        (bmalloc::vmAllocate): Switched alignment to come before size because
+        that's how the memalign API specifies it.
+
+        * bmalloc/VMHeap.h:
+        (bmalloc::VMHeap::allocateLargeRange): Added an alignment API.
+
+2015-01-20  Geoffrey Garen  <ggaren@apple.com>
+
+        bmalloc: a little bit of cleanup
+        https://bugs.webkit.org/show_bug.cgi?id=140687
+
+        Reviewed by Anders Carlsson.
+
+        * bmalloc/Algorithm.h:
+        (bmalloc::isPowerOfTwo): Added a check for 0, since 0 would break a lot
+        of code.
+
+        * bmalloc/BoundaryTag.h:
+        * bmalloc/BoundaryTagInlines.h:
+        (bmalloc::BoundaryTag::mergeLeft):
+        (bmalloc::BoundaryTag::mergeRight):
+        (bmalloc::BoundaryTag::merge):
+        (bmalloc::BoundaryTag::deallocate):
+        (bmalloc::BoundaryTag::split):
+        (bmalloc::BoundaryTag::allocate):
+        (bmalloc::BoundaryTag::mergeLargeLeft): Deleted.
+        (bmalloc::BoundaryTag::mergeLargeRight): Deleted.
+        (bmalloc::BoundaryTag::mergeLarge): Deleted.
+        (bmalloc::BoundaryTag::splitLarge): Deleted. Removed the word "Large"
+        from all these functions, since boundary tags always pertain to large
+        objects, and putting the word "Large" everywhere wasn't helping to
+        explain that.
+
+        * bmalloc/Heap.cpp:
+        (bmalloc::Heap::allocateXLarge):
+        (bmalloc::Heap::findXLarge):
+        (bmalloc::Heap::deallocateXLarge):
+        * bmalloc/Heap.h:
+        * bmalloc/VMHeap.h:
+        (bmalloc::VMHeap::allocateXLarge): Deleted.
+        (bmalloc::VMHeap::findXLarge): Deleted.
+        (bmalloc::VMHeap::deallocateXLarge): Deleted. Moved XLarge allocation
+        from VMHeap to Heap. Since the purpose of the VMHeap is to cache VM
+        ranges, and the VMHeap never caches any XLarge ranges, it doesn't
+        really make sense for the VMHeap to be involved.
+
+2015-01-16  Geoffrey Garen  <ggaren@apple.com>
+
+        bmalloc: refactored XLarge allocation for better alignment
+        https://bugs.webkit.org/show_bug.cgi?id=140582
+
+        Reviewed by Andreas Kling.
+
+        XLarge objects used to be Large objects with an extra bit of metadata
+        that said "actually, I'm not large -- I'm extra large".
+
+        The metadata header in an XLarge allocation made it impossible for the
+        XLarge object to honor a very large alignment request.
+
+        The solution is to stop using a metadata header for XLarge objects, and
+        instead to store explicit metadata on the side.
+
+        This is a bit less astonishing, which is also nice.
+
+        Finding XLarge metadata is now a linear search. That's probably OK, since
+        it was always so in TCMalloc, and the usual number of XLarge allocations
+        in a process is 0.
+
+        This design makes it possible for the heap to cache XLarge allocations
+        with and/or without physical pages. I haven't actually done that yet
+        because the tradeoffs are subtle, so I don't want to do anything without
+        a motivating test case.
+
+        * bmalloc.xcodeproj/project.pbxproj:
+        * bmalloc/Allocator.cpp:
+        (bmalloc::Allocator::reallocate): Removed the concept of an XLargeChunk,
+        since an XLarge allocation is now just a naked buffer without a header.
+
+        (bmalloc::Allocator::allocateXLarge): Added an explicit qualifier for
+        XLarge alignment, since XLargeChunk won't give this to us implicitly
+        anymore.
+
+        * bmalloc/BoundaryTag.h:
+        (bmalloc::BoundaryTag::setRange):
+        (bmalloc::BoundaryTag::isXLarge): Deleted.
+        (bmalloc::BoundaryTag::setXLarge): Deleted.
+        * bmalloc/BoundaryTagInlines.h:
+        (bmalloc::validate):
+        (bmalloc::BoundaryTag::deallocate): Removed the XLarge hacks from Large allocations.
+
+        * bmalloc/Deallocator.cpp:
+        (bmalloc::Deallocator::deallocateXLarge):
+        (bmalloc::Deallocator::deallocateSlowCase):
+        * bmalloc/Heap.cpp:
+        (bmalloc::Heap::findXLarge):
+        (bmalloc::Heap::allocateXLarge):
+        (bmalloc::Heap::deallocateXLarge):
+        * bmalloc/Heap.h: Updated for interface changes.
+
+        * bmalloc/ObjectType.cpp:
+        (bmalloc::objectType):
+        * bmalloc/ObjectType.h:
+        (bmalloc::isXLarge): We can now tell if a pointer is XLarge just by
+        examining its bit pattern -- just like we do for other kinds of
+        allocations -- which is nice.
+
+        * bmalloc/Sizes.h:
+        * bmalloc/VMHeap.h:
+        (bmalloc::VMHeap::allocateXLarge):
+        (bmalloc::VMHeap::findXLarge):
+        (bmalloc::VMHeap::deallocateXLarge): Keep an explicit vector of metadata
+        for XLarge allocations.
+
+        * bmalloc/XLargeChunk.h: Removed.
+
+2015-01-16  Geoffrey Garen  <ggaren@apple.com>
+
+        bmalloc: added some infrastructure for aligned allocation
+        https://bugs.webkit.org/show_bug.cgi?id=140572
+
+        Reviewed by Andreas Kling.
+
+        * bmalloc/Algorithm.h:
+        (bmalloc::isPowerOfTwo):
+        (bmalloc::roundUpToMultipleOf):
+        (bmalloc::roundDownToMultipleOf): Refactored some duplicate code to use our
+        isPowerOfTwo helper function.
+
+        * bmalloc/Allocator.cpp:
+        (bmalloc::Allocator::allocate):
+        * bmalloc/Allocator.h: Stubbed out an implementation of aligned allocation.
+        Doesn't do anything yet, but does correctly forward to system malloc
+        when bmalloc is disabled.
+
+        * bmalloc/Cache.cpp:
+        (bmalloc::Cache::allocateSlowCaseNullCache):
+        * bmalloc/Cache.h:
+        (bmalloc::Cache::allocate):
+        * bmalloc/bmalloc.h:
+        (bmalloc::api::memalign):
+        * bmalloc/mbmalloc.cpp: Stubbed out an API for aligned allocation.
+
+2015-01-13  Geoffrey Garen  <ggaren@apple.com>
+
+        Consider alignment when allocating from a SegregatedFreeList
+        https://bugs.webkit.org/show_bug.cgi?id=140408
+
+        Reviewed by Sam Weinig.
+
+        In preparation for supporting aligned allocation.
+
+        No performance change.
+
+        Since this is just one extra branch in an already expensive function,
+        I decided not to duplicate the function just to avoid the branch in
+        the un-aligned case.
+
+        * bmalloc/SegregatedFreeList.cpp:
+        (bmalloc::SegregatedFreeList::take):
+        * bmalloc/SegregatedFreeList.h:
+
+2015-01-13  Geoffrey Garen  <ggaren@apple.com>
+
+        Renamed minimum to size in SegregatedFreeList
+        https://bugs.webkit.org/show_bug.cgi?id=140406
+
+        Reviewed by Sam Weinig.
+
+        In preparation for supporting aligned allocation.
+
+        * bmalloc/SegregatedFreeList.cpp:
+        (bmalloc::SegregatedFreeList::takeGreedy):
+        (bmalloc::SegregatedFreeList::take): Every size passed to malloc is
+        really just a minimum. Let's not imply that this value is special.
+
+2015-01-11  Dan Bernstein  <mitz@apple.com>
+
+        Geoff is organized, but he is not an organization.
+
+        Rubber-stamped by Anders Carlsson.
+
+        * bmalloc.xcodeproj/project.pbxproj: Removed the ORGANIZATIONNAME project attribute.
+
+2015-01-07  Geoffrey Garen  <ggaren@apple.com>
+
+        Make bmalloc work with ASan
+        https://bugs.webkit.org/show_bug.cgi?id=140194
+
+        Reviewed by Mark Lam.
+
+        * bmalloc/BPlatform.h: Added a way to detect Darwin OSes, since we need
+        an OS-specific API to test for loaded runtime libraries.
+
+        * bmalloc/Environment.cpp:
+        (bmalloc::isASanEnabled):
+        (bmalloc::Environment::computeIsBmallocEnabled): Disabled bmalloc if
+        ASan is enabled, since system malloc has the Asan hooks we need.
+
+        You could check for the ASan compile-time flag instead, but doing this
+        check at runtime prepares bmalloc for a world where it is a dynamic
+        library that might be loaded into projects it did not compile with.
+
+2015-01-05  Geoffrey Garen  <ggaren@apple.com>
+
+        Fix up bmalloc's PerThread for use on Linux
+        https://bugs.webkit.org/show_bug.cgi?id=139804
+
+        Reviewed by Anders Carlsson.
+
+        The previous implementation was a bit slow.
+
+        * bmalloc/PerThread.h:
+        (bmalloc::PerThreadStorage<Cache>::get):
+        (bmalloc::PerThreadStorage::get):
+        (bmalloc::PerThreadStorage::init): Added a catch-all cross-platform Unix
+        way to do fast per-thread access without taking a lock every time. This
+        probably works on all the platforms we care about, and it matches other
+        techniques we use elsewhere in WebKit.
+
+        (bmalloc::PerThread<T>::getFastCase): Removed the conditional from
+        this class because PerThreadStorage now encapsulates everything that
+        needs to be conditional.
+
+        (bmalloc::PerThreadStorage::initSharedKeyIfNeeded): Deleted.
+
+2014-12-26  Dan Bernstein  <mitz@apple.com>
+
+        <rdar://problem/19348208> REGRESSION (r177027): iOS builds use the wrong toolchain
+        https://bugs.webkit.org/show_bug.cgi?id=139950
+
+        Reviewed by David Kilzer.
+
+        * Configurations/Base.xcconfig: Only define TOOLCHAINS when building for OS X, doing so
+        in a manner that works with Xcode 5.1.1.
+
+2014-12-15  Geoffrey Garen  <ggaren@apple.com>
+
+        Safari crashes when you set Malloc environment variables
+        https://bugs.webkit.org/show_bug.cgi?id=139656
+
+        Reviewed by Michael Saboff.
+
+        I forgot to cover the realloc() case. Whoops. (OoPS?)
+
+        This time around, I ran the full MallocBench test suite in Malloc=1
+        mode, and it passed.
+
+        * bmalloc/Allocator.cpp:
+        (bmalloc::Allocator::reallocate):
+        * bmalloc/Allocator.h: Pushed realloc() logic down into the allocator.
+        It needs to be down there so that we can do the short-circuiting check
+        for whether bmalloc is enabled first.
+
+        Also added the check.
+
+        * bmalloc/Cache.cpp:
+        (bmalloc::Cache::scavenge):
+        (bmalloc::Cache::Cache):
+        (bmalloc::Cache::reallocateSlowCaseNullCache):
+        * bmalloc/Cache.h:
+        (bmalloc::Cache::deallocator):
+        (bmalloc::Cache::reallocate): Ditto.
+
+        * bmalloc/bmalloc.h:
+        (bmalloc::api::free):
+        (bmalloc::api::realloc): Ditto.
+
+        (bmalloc::api::scavenge): Pushed this down into Cache to match the
+        surrounding functions.
+
+2014-12-11  Geoffrey Garen  <ggaren@apple.com>
+
+        bmalloc should support system memory analysis tools (part 2)
+        https://bugs.webkit.org/show_bug.cgi?id=139565
+
+        Reviewed by Mark Lam.
+
+        This patch actually queries the environment to see if memory analysis
+        tools have been enabled.
+
+        * bmalloc/Deallocator.cpp:
+        (bmalloc::Deallocator::scavenge): Don't process the object log if
+        we've disabled bmalloc because it will be full of invalid nullptrs.
+
+        * bmalloc/Environment.cpp:
+        (bmalloc::isMallocEnvironmentVariableSet): Test for the list of known
+        Malloc debugging flags. I also added a plain "Malloc" catch-all for
+        when you want to disable bmalloc without enabling any kind of funny
+        business.
+
+        It would be slightly nicer just to iterate the list of environment
+        variables and strstr them, but getenv is the more portable option,
+        and performance here doesn't really matter.
+
+        (bmalloc::isLibgmallocEnabled): Test for the libgmalloc insertion
+        environment variable.
+
+        (bmalloc::Environment::computeIsBmallocEnabled):
+
+2014-12-11  Geoffrey Garen  <ggaren@apple.com>
+
+        Try to fix the iOS simulator build.
+
+        #include the declaration of malloc / free.
+
+        * bmalloc/Allocator.cpp:
+        * bmalloc/Deallocator.cpp:
+
+2014-12-11  Geoffrey Garen  <ggaren@apple.com>
+
+        Try to fix the build.
+
+        * bmalloc.xcodeproj/project.pbxproj: Marked a header exported.
+
+2014-12-11  Geoffrey Garen  <ggaren@apple.com>
+
+        bmalloc should support system memory analysis tools (part 1)
+        https://bugs.webkit.org/show_bug.cgi?id=139559
+
+        Reviewed by Mark Lam.
+
+        This patch adds the hooks to disable bmalloc at runtime if certain
+        environment variables are set, but doesn't actually read from the
+        environment yet.
+
+        No performance change.
+
+        * bmalloc.xcodeproj/project.pbxproj: Added the Environment class, which
+        we'll use to read environment variables and see if memory analysis tools
+        have been enabled.
+
+        * bmalloc/Allocator.cpp:
+        (bmalloc::Allocator::Allocator):
+        (bmalloc::Allocator::allocateSlowCase): Added a hook to disable bmalloc
+        on the allocation path. We cache the setting to make the check fast.
+
+        * bmalloc/Allocator.h: Interface changes.
+
+        * bmalloc/Cache.cpp:
+        (bmalloc::Cache::Cache): Pass a heap pointer through to our allocator
+        and deallocator. This main purpose is to enable them to query the
+        environment for whether bmalloc is enabled; but this is also a slightly
+        cleaner way to guarantee to them that the Heap has been pre-initialized.
+
+        * bmalloc/Deallocator.cpp:
+        (bmalloc::Deallocator::Deallocator): If bmalloc is disable, artificially
+        fill the object log to force us to take the slow path on all deallocations.
+
+        (bmalloc::Deallocator::deallocateSlowCase): Do the disabled check.
+
+        * bmalloc/Deallocator.h: Interface changes.
+
+        * bmalloc/Environment.cpp: Added.
+        (bmalloc::Environment::Environment):
+        (bmalloc::Environment::computeIsBmallocEnabled):
+        * bmalloc/Environment.h: Added.
+        (bmalloc::Environment::isBmallocEnabled): This is the class that will
+        encapsulate looking for environment variables that turn on heap
+        analysis tools.
+
+        * bmalloc/Heap.h:
+        (bmalloc::Heap::environment):
+
+        * bmalloc/Mutex.h:
+        (bmalloc::Mutex::Mutex):
+        * bmalloc/StaticMutex.h: A little refactoring to clarify these comments,
+        since I got super confused about them while writing this patch.
+
+        * bmalloc/VMHeap.cpp: Fixed an #include.
+
+2014-12-09  David Kilzer  <ddkilzer@apple.com>
+
+        Switch from using PLATFORM_NAME to SDK selectors in ANGLE, bmalloc, gtest, JavaScriptCore, WTF
+        <http://webkit.org/b/139212>
+
+        Reviewed by Joseph Pecoraro.
+
+        * Configurations/Base.xcconfig:
+        - Only set GCC_ENABLE_OBJC_GC, GCC_MODEL_TUNING and TOOLCHAINS
+          on OS X.
+        * Configurations/DebugRelease.xcconfig:
+        - Only set MACOSX_DEPLOYMENT_TARGET and SDKROOT on OS X.
+
+2014-11-07  Geoffrey Garen  <ggaren@apple.com>
+
+        bmalloc uses 8X more virtual memory than necessary
+        https://bugs.webkit.org/show_bug.cgi?id=138495
+
+        Reviewed by Mark Lam.
+
+        iOS has a per-process virtual memory cap around 1GB, so there's some
+        value to not going totally ham with virtual memory.
+
+        We currently use about 8X the necessary amount:
+            - 2X to align our VM allocation
+            - 4X to reserve small / medium / (2) large chunk VM ranges per superchunk
+
+        We can cut that down:
+            - Return the unaligned portion of our VM allocation (-2X)
+            - Use all the chunks in a superchunk, instead of allocating one
+              chunk per superchunk (-4X)
+
+        * bmalloc/Algorithm.h:
+        (bmalloc::roundUpToMultipleOf): Added a non-constant version of this
+        function so we can call it with getpagesize() at runtime.
+
+        * bmalloc/Chunk.h:
+        * bmalloc/LargeChunk.h:
+        (bmalloc::LargeChunk::create): Deleted. Instead of each chunk allocating
+        its own VM, VMHeap allocates the superchunk and all the chunks in it at a time.
+
+        * bmalloc/VMAllocate.h:
+        (bmalloc::vmValidate):
+        (bmalloc::vmAllocate): ASSERT that mmap succeeds to make crashes clearer
+        if it does not succeed. Allocate precisely, and give back the extra.
+
+        * bmalloc/VMHeap.cpp:
+        (bmalloc::VMHeap::allocateSuperChunk):
+        (bmalloc::VMHeap::allocateSmallChunk): Deleted.
+        (bmalloc::VMHeap::allocateMediumChunk): Deleted.
+        (bmalloc::VMHeap::allocateLargeChunk): Deleted. Use all the chunks
+        in a superchunk, instead of just one.
+
+        * bmalloc/VMHeap.h:
+        (bmalloc::VMHeap::allocateSmallPage):
+        (bmalloc::VMHeap::allocateMediumPage):
+        (bmalloc::VMHeap::allocateLargeRange):
+        * bmalloc/XLargeChunk.h:
+        (bmalloc::XLargeChunk::create): Updated to match changes above.
+
+2014-11-01  David Kilzer  <ddkilzer@apple.com>
+
+        JavaScriptCore is missing debug info for bmalloc because libbmalloc.a is stripped
+        <https://webkit.org/b/138286>
+        <rdar://problem/18847087>
+
+        Reviewed by Dan Bernstein.
+
+        * Configurations/bmalloc.xcconfig: Set STRIP_INSTALLED_PRODUCT
+        to NO for the target that produces libbmalloc.a so that the
+        debug symbols will be linked into JavaScriptCore and end up in
+        its dSYM file.
+
+2014-10-30  Dana Burkart  <dburkart@apple.com>
+
+        <rdar://problem/18821260> Prepare for the mysterious future
+
+        Reviewed by Lucas Forschler.
+
+        * Configurations/Base.xcconfig:
+        * Configurations/DebugRelease.xcconfig:
+
 2014-09-24  Geoffrey Garen  <ggaren@apple.com>
 
         bmalloc: cleaned up fast path vs slow path

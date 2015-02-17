@@ -1,4 +1,4 @@
-# Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
+# Copyright (C) 2011-2015 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,10 +34,10 @@ end
 
 if JSVALUE64
     const PtrSize = 8
-    const CallFrameHeaderSlots = 6
+    const CallFrameHeaderSlots = 5
 else
     const PtrSize = 4
-    const CallFrameHeaderSlots = 5
+    const CallFrameHeaderSlots = 4
     const CallFrameAlignSlots = 1
 end
 const SlotSize = 8
@@ -50,10 +50,10 @@ const CallerFrameAndPCSize = 2 * PtrSize
 const CallerFrame = 0
 const ReturnPC = CallerFrame + PtrSize
 const CodeBlock = ReturnPC + PtrSize
-const ScopeChain = CodeBlock + SlotSize
-const Callee = ScopeChain + SlotSize
+const Callee = CodeBlock + SlotSize
 const ArgumentCount = Callee + SlotSize
 const ThisArgumentOffset = ArgumentCount + SlotSize
+const FirstArgumentOffset = ThisArgumentOffset + SlotSize
 const CallFrameHeaderSize = ThisArgumentOffset
 
 # Some value representation constants.
@@ -154,8 +154,8 @@ const SlowPutArrayStorageShape = 30
 
 # Type constants.
 const StringType = 6
-const ObjectType = 17
-const FinalObjectType = 18
+const ObjectType = 18
+const FinalObjectType = 19
 
 # Type flags constants.
 const MasqueradesAsUndefined = 1
@@ -509,7 +509,7 @@ macro arrayProfile(cellAndIndexingType, profile, scratch)
     loadb JSCell::m_indexingType[cell], indexingType
 end
 
-macro checkMarkByte(cell, scratch1, scratch2, continuation)
+macro skipIfIsRememberedOrInEden(cell, scratch1, scratch2, continuation)
     loadb JSCell::m_gcData[cell], scratch1
     continuation(scratch1)
 end
@@ -1132,7 +1132,7 @@ _llint_op_switch_string:
 _llint_op_new_func_exp:
     traceExecution()
     callSlowPath(_llint_slow_path_new_func_exp)
-    dispatch(3)
+    dispatch(4)
 
 
 _llint_op_call:
@@ -1235,19 +1235,19 @@ _llint_op_strcat:
 _llint_op_push_with_scope:
     traceExecution()
     callSlowPath(_llint_slow_path_push_with_scope)
-    dispatch(2)
+    dispatch(3)
 
 
 _llint_op_pop_scope:
     traceExecution()
     callSlowPath(_llint_slow_path_pop_scope)
-    dispatch(1)
+    dispatch(2)
 
 
 _llint_op_push_name_scope:
     traceExecution()
     callSlowPath(_llint_slow_path_push_name_scope)
-    dispatch(5)
+    dispatch(6)
 
 
 _llint_op_throw:
@@ -1346,6 +1346,12 @@ _llint_op_to_index_string:
     callSlowPath(_slow_path_to_index_string)
     dispatch(3)
 
+_llint_op_profile_control_flow:
+    traceExecution()
+    loadpFromInstruction(1, t0)
+    storeb 1, BasicBlockLocation::m_hasExecuted[t0]
+    dispatch(2)
+
 # Lastly, make sure that we can link even though we don't support all opcodes.
 # These opcodes should never arise when using LLInt or either JIT. We assert
 # as much.
@@ -1366,7 +1372,3 @@ end
 
 _llint_op_init_global_const_nop:
     dispatch(5)
-
-_llint_op_profile_type:
-    callSlowPath(_slow_path_profile_type)
-    dispatch(6)

@@ -30,11 +30,12 @@
 #import "CSSPrimitiveValue.h"
 #import "CSSToLengthConversionData.h"
 #import "CSSValueKeywords.h"
+#import "CoreTextSPI.h"
 #import "DateComponents.h"
 #import "Document.h"
 #import "FloatRoundedRect.h"
-#import "Font.h"
 #import "FontCache.h"
+#import "FontCascade.h"
 #import "Frame.h"
 #import "FrameView.h"
 #import "Gradient.h"
@@ -47,8 +48,8 @@
 #import "LocalizedDateCache.h"
 #import "NodeRenderStyle.h"
 #import "Page.h"
-#import "PlatformLocale.h"
 #import "PaintInfo.h"
+#import "PlatformLocale.h"
 #import "RenderObject.h"
 #import "RenderProgress.h"
 #import "RenderStyle.h"
@@ -58,8 +59,7 @@
 #import "UserAgentScripts.h"
 #import "UserAgentStyleSheets.h"
 #import "WebCoreThreadRun.h"
-#import <CoreGraphics/CGPathPrivate.h>
-#import <CoreText/CTFontDescriptorPriv.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <objc/runtime.h>
 #import <wtf/NeverDestroyed.h>
 #import <wtf/RefPtr.h>
@@ -80,14 +80,6 @@ SOFT_LINK_CONSTANT(UIKit, UIContentSizeCategoryDidChangeNotification, CFStringRe
 
 @implementation WebCoreRenderThemeBundle
 @end
-
-// This is a temporary hack to build on iOS. Should be removed as soon as CT fixes the header files.
-extern const CFStringRef kCTUIFontTextStyleShortHeadline CT_AVAILABLE(10_10, 7_0);
-extern const CFStringRef kCTUIFontTextStyleShortBody CT_AVAILABLE(10_10, 7_0);
-extern const CFStringRef kCTUIFontTextStyleShortSubhead CT_AVAILABLE(10_10, 7_0);
-extern const CFStringRef kCTUIFontTextStyleShortFootnote CT_AVAILABLE(10_10, 7_0);
-extern const CFStringRef kCTUIFontTextStyleShortCaption1 CT_AVAILABLE(10_10, 7_0);
-extern const CFStringRef kCTUIFontTextStyleTallBody CT_AVAILABLE(10_10, 7_0);
 
 namespace WebCore {
 
@@ -422,10 +414,10 @@ bool RenderThemeIOS::paintCheckboxDecorations(const RenderObject& box, const Pai
 
 int RenderThemeIOS::baselinePosition(const RenderObject& renderer) const
 {
-    if (!renderer.isBox())
+    if (!is<RenderBox>(renderer))
         return 0;
 
-    const RenderBox& box = *toRenderBox(&renderer);
+    const auto& box = downcast<RenderBox>(renderer);
 
     if (box.style().appearance() == CheckboxPart || box.style().appearance() == RadioPart)
         return box.marginTop() + box.height() - 2; // The baseline is 2px up from the bottom of the checkbox/radio in AppKit.
@@ -553,7 +545,7 @@ static void adjustSelectListButtonStyle(RenderStyle& style, Element& element)
     
 class RenderThemeMeasureTextClient : public MeasureTextClient {
 public:
-    RenderThemeMeasureTextClient(const Font& font, RenderObject& renderObject, const RenderStyle& style)
+    RenderThemeMeasureTextClient(const FontCascade& font, RenderObject& renderObject, const RenderStyle& style)
         : m_font(font)
         , m_renderObject(renderObject)
         , m_style(style)
@@ -565,7 +557,7 @@ public:
         return m_font.width(run);
     }
 private:
-    const Font& m_font;
+    const FontCascade& m_font;
     RenderObject& m_renderObject;
     const RenderStyle& m_style;
 };
@@ -585,13 +577,12 @@ static void adjustInputElementButtonStyle(RenderStyle& style, HTMLInputElement& 
         return;
 
     // Enforce the width and set the box-sizing to content-box to not conflict with the padding.
-    Font font = style.font();
+    FontCascade font = style.fontCascade();
     
     RenderObject* renderer = inputElement.renderer();
-    if (font.primaryFont()->isSVGFont() && !renderer)
+    if (font.primaryFont().isSVGFont() && !renderer)
         return;
     
-    FontCachePurgePreventer fontCachePurgePreventer;
     float maximumWidth = localizedDateCache().maximumWidthForDateType(dateType, font, RenderThemeMeasureTextClient(font, *renderer, style));
 
     ASSERT(maximumWidth >= 0);
@@ -849,7 +840,7 @@ double RenderThemeIOS::animationDurationForProgressBar(RenderProgress&) const
 
 bool RenderThemeIOS::paintProgressBar(const RenderObject& renderer, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    if (!renderer.isProgress())
+    if (!is<RenderProgress>(renderer))
         return true;
 
     const int progressBarHeight = 9;
@@ -897,7 +888,7 @@ bool RenderThemeIOS::paintProgressBar(const RenderObject& renderer, const PaintI
 
     context->fillRect(FloatRect(rect.x(), verticalRenderingPosition, rect.width(), upperGradientHeight));
 
-    const RenderProgress& renderProgress = *toRenderProgress(&renderer);
+    const auto& renderProgress = downcast<RenderProgress>(renderer);
     if (renderProgress.isDeterminate()) {
         // 2) Draw the progress bar.
         double position = clampTo(renderProgress.position(), 0.0, 1.0);
@@ -1112,7 +1103,7 @@ static FontWeight fromCTFontWeight(float fontWeight)
     return FontWeightNormal;
 }
 
-void RenderThemeIOS::systemFont(CSSValueID valueID, FontDescription& fontDescription) const
+FontDescription& RenderThemeIOS::cachedSystemFontDescription(CSSValueID valueID) const
 {
     static NeverDestroyed<FontDescription> systemFont;
     static NeverDestroyed<FontDescription> headlineFont;
@@ -1127,6 +1118,11 @@ void RenderThemeIOS::systemFont(CSSValueID valueID, FontDescription& fontDescrip
     static NeverDestroyed<FontDescription> shortFootnoteFont;
     static NeverDestroyed<FontDescription> shortCaption1Font;
     static NeverDestroyed<FontDescription> tallBodyFont;
+#if __IPHONE_OS_VERSION_MIN_REQUIRED > 80200
+    static NeverDestroyed<FontDescription> title1Font;
+    static NeverDestroyed<FontDescription> title2Font;
+    static NeverDestroyed<FontDescription> title3Font;
+#endif
 
     static CFStringRef userTextSize = contentSizeCategory();
 
@@ -1147,112 +1143,142 @@ void RenderThemeIOS::systemFont(CSSValueID valueID, FontDescription& fontDescrip
         tallBodyFont.get().setIsAbsoluteSize(false);
     }
 
-    FontDescription* cachedDesc;
+    switch (valueID) {
+    case CSSValueAppleSystemHeadline:
+        return headlineFont;
+    case CSSValueAppleSystemBody:
+        return bodyFont;
+#if __IPHONE_OS_VERSION_MIN_REQUIRED > 80200
+    case CSSValueAppleSystemTitle1:
+        return title1Font;
+    case CSSValueAppleSystemTitle2:
+        return title2Font;
+    case CSSValueAppleSystemTitle3:
+        return title3Font;
+#endif
+    case CSSValueAppleSystemSubheadline:
+        return subheadlineFont;
+    case CSSValueAppleSystemFootnote:
+        return footnoteFont;
+    case CSSValueAppleSystemCaption1:
+        return caption1Font;
+    case CSSValueAppleSystemCaption2:
+        return caption2Font;
+        // Short version.
+    case CSSValueAppleSystemShortHeadline:
+        return shortHeadlineFont;
+    case CSSValueAppleSystemShortBody:
+        return shortBodyFont;
+    case CSSValueAppleSystemShortSubheadline:
+        return shortSubheadlineFont;
+    case CSSValueAppleSystemShortFootnote:
+        return shortFootnoteFont;
+    case CSSValueAppleSystemShortCaption1:
+        return shortCaption1Font;
+        // Tall version.
+    case CSSValueAppleSystemTallBody:
+        return tallBodyFont;
+    default:
+        return systemFont;
+    }
+}
+
+void RenderThemeIOS::updateCachedSystemFontDescription(CSSValueID valueID, FontDescription& fontDescription) const
+{
     RetainPtr<CTFontDescriptorRef> fontDescriptor;
     CFStringRef textStyle;
     switch (valueID) {
     case CSSValueAppleSystemHeadline:
-        cachedDesc = &headlineFont.get();
         textStyle = kCTUIFontTextStyleHeadline;
-        if (!headlineFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
     case CSSValueAppleSystemBody:
-        cachedDesc = &bodyFont.get();
         textStyle = kCTUIFontTextStyleBody;
-        if (!bodyFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
+#if __IPHONE_OS_VERSION_MIN_REQUIRED > 80200
+    case CSSValueAppleSystemTitle1:
+        textStyle = kCTUIFontTextStyleTitle1;
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
+        break;
+    case CSSValueAppleSystemTitle2:
+        textStyle = kCTUIFontTextStyleTitle2;
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
+        break;
+    case CSSValueAppleSystemTitle3:
+        textStyle = kCTUIFontTextStyleTitle3;
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
+        break;
+#endif
     case CSSValueAppleSystemSubheadline:
-        cachedDesc = &subheadlineFont.get();
         textStyle = kCTUIFontTextStyleSubhead;
-        if (!subheadlineFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
     case CSSValueAppleSystemFootnote:
-        cachedDesc = &footnoteFont.get();
         textStyle = kCTUIFontTextStyleFootnote;
-        if (!footnoteFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
     case CSSValueAppleSystemCaption1:
-        cachedDesc = &caption1Font.get();
         textStyle = kCTUIFontTextStyleCaption1;
-        if (!caption1Font.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
     case CSSValueAppleSystemCaption2:
-        cachedDesc = &caption2Font.get();
         textStyle = kCTUIFontTextStyleCaption2;
-        if (!caption2Font.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
 
     // Short version.
     case CSSValueAppleSystemShortHeadline:
-        cachedDesc = &shortHeadlineFont.get();
         textStyle = kCTUIFontTextStyleShortHeadline;
-        if (!shortHeadlineFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
     case CSSValueAppleSystemShortBody:
-        cachedDesc = &shortBodyFont.get();
         textStyle = kCTUIFontTextStyleShortBody;
-        if (!shortBodyFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
     case CSSValueAppleSystemShortSubheadline:
-        cachedDesc = &shortSubheadlineFont.get();
         textStyle = kCTUIFontTextStyleShortSubhead;
-        if (!shortSubheadlineFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
     case CSSValueAppleSystemShortFootnote:
-        cachedDesc = &shortFootnoteFont.get();
         textStyle = kCTUIFontTextStyleShortFootnote;
-        if (!shortFootnoteFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
     case CSSValueAppleSystemShortCaption1:
-        cachedDesc = &shortCaption1Font.get();
         textStyle = kCTUIFontTextStyleShortCaption1;
-        if (!shortCaption1Font.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
 
     // Tall version.
     case CSSValueAppleSystemTallBody:
-        cachedDesc = &tallBodyFont.get();
         textStyle = kCTUIFontTextStyleTallBody;
-        if (!tallBodyFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, userTextSize, 0));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateWithTextStyle(textStyle, contentSizeCategory(), 0));
         break;
 
     default:
         textStyle = kCTFontDescriptorTextStyleEmphasized;
-        cachedDesc = &systemFont.get();
-        if (!systemFont.get().isAbsoluteSize())
-            fontDescriptor = adoptCF(CTFontDescriptorCreateForUIType(kCTFontSystemFontType, 0, nullptr));
+        fontDescriptor = adoptCF(CTFontDescriptorCreateForUIType(kCTFontSystemFontType, 0, nullptr));
     }
 
-    if (fontDescriptor) {
-        RetainPtr<CTFontRef> font = adoptCF(CTFontCreateWithFontDescriptor(fontDescriptor.get(), 0, nullptr));
-        cachedDesc->setIsAbsoluteSize(true);
-        cachedDesc->setGenericFamily(FontDescription::NoFamily);
-        cachedDesc->setOneFamily(textStyle);
-        cachedDesc->setSpecifiedSize(CTFontGetSize(font.get()));
-        cachedDesc->setWeight(fromCTFontWeight(FontCache::weightOfCTFont(font.get())));
-        cachedDesc->setItalic(0);
-    }
-    fontDescription = *cachedDesc;
+    ASSERT(fontDescriptor);
+    RetainPtr<CTFontRef> font = adoptCF(CTFontCreateWithFontDescriptor(fontDescriptor.get(), 0, nullptr));
+    fontDescription.setIsAbsoluteSize(true);
+    fontDescription.setOneFamily(textStyle);
+    fontDescription.setSpecifiedSize(CTFontGetSize(font.get()));
+    fontDescription.setWeight(fromCTFontWeight(FontCache::weightOfCTFont(font.get())));
+    fontDescription.setItalic(FontItalicOff);
 }
 
 #if ENABLE(VIDEO)
 String RenderThemeIOS::mediaControlsStyleSheet()
 {
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)
-    if (m_mediaControlsStyleSheet.isEmpty())
-        m_mediaControlsStyleSheet = [NSString stringWithContentsOfFile:[[NSBundle bundleForClass:[WebCoreRenderThemeBundle class]] pathForResource:@"mediaControlsiOS" ofType:@"css"] encoding:NSUTF8StringEncoding error:nil];
+    if (m_mediaControlsStyleSheet.isEmpty()) {
+        StringBuilder builder;
+        builder.append([NSString stringWithContentsOfFile:[[NSBundle bundleForClass:[WebCoreRenderThemeBundle class]] pathForResource:@"mediaControlsiOS" ofType:@"css"] encoding:NSUTF8StringEncoding error:nil]);
+        builder.append(wkGetMediaUIImageData(wkMediaUIPartOptimizedFullscreenButton));
+        m_mediaControlsStyleSheet = builder.toString();
+    }
     return m_mediaControlsStyleSheet;
 #else
     return emptyString();

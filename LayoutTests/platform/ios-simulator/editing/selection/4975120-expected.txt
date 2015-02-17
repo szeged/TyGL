@@ -24,3 +24,5 @@ layer at (17,89) size 122x14
   RenderBlock {DIV} at (6,3) size 123x15
     RenderText {#text} at (0,0) size 16x14
       text run at (0,0) width 16: "foo"
+selection start: position 0 of child 0 {#text} of child 0 {DIV} of {#document-fragment} of child 3 {INPUT} of body
+selection end:   position 3 of child 0 {#text} of child 0 {DIV} of {#document-fragment} of child 3 {INPUT} of body

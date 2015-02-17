@@ -26,6 +26,7 @@
 #include "config.h"
 #include "RenderTreeAsText.h"
 
+#include "ClipRect.h"
 #include "Document.h"
 #include "FlowThreadController.h"
 #include "Frame.h"
@@ -226,15 +227,15 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
 
     // FIXME: Temporary in order to ensure compatibility with existing layout test results.
     if (adjustForTableCells)
-        r.move(0, -toRenderTableCell(o.containingBlock())->intrinsicPaddingBefore());
+        r.move(0, -downcast<RenderTableCell>(*o.containingBlock()).intrinsicPaddingBefore());
 
     // FIXME: Convert layout test results to report sub-pixel values, in the meantime using enclosingIntRect
     // for consistency with old results.
     ts << " " << enclosingIntRect(r);
 
-    if (!o.isText()) {
-        if (o.isFileUploadControl())
-            ts << " " << quoteAndEscapeNonPrintables(toRenderFileUploadControl(&o)->fileTextValue());
+    if (!is<RenderText>(o)) {
+        if (is<RenderFileUploadControl>(o))
+            ts << " " << quoteAndEscapeNonPrintables(downcast<RenderFileUploadControl>(o).fileTextValue());
 
         if (o.parent()) {
             Color color = o.style().visitedDependentColor(CSSPropertyColor);
@@ -445,7 +446,7 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
     }
     
     if (behavior & RenderAsTextShowOverflow && is<RenderBox>(o)) {
-        const RenderBox& box = downcast<RenderBox>(o);
+        const auto& box = downcast<RenderBox>(o);
         if (box.hasRenderOverflow()) {
             LayoutRect layoutOverflow = box.layoutOverflowRect();
             ts << " (layout overflow " << layoutOverflow.x().toInt() << "," << layoutOverflow.y().toInt() << " " << layoutOverflow.width().toInt() << "x" << layoutOverflow.height().toInt() << ")";
@@ -467,8 +468,8 @@ static void writeTextRun(TextStream& ts, const RenderText& o, const InlineTextBo
     int logicalWidth = ceilf(run.left() + run.logicalWidth()) - x;
 
     // FIXME: Table cell adjustment is temporary until results can be updated.
-    if (o.containingBlock()->isTableCell())
-        y -= toRenderTableCell(o.containingBlock())->intrinsicPaddingBefore();
+    if (is<RenderTableCell>(*o.containingBlock()))
+        y -= downcast<RenderTableCell>(*o.containingBlock()).intrinsicPaddingBefore();
         
     ts << "text run at (" << x << "," << y << ") width " << logicalWidth;
     if (!run.isLeftToRightDirection() || run.dirOverride()) {
@@ -489,8 +490,8 @@ static void writeSimpleLine(TextStream& ts, const RenderText& o, const LayoutRec
     int y = rect.y();
     int logicalWidth = ceilf(rect.x() + rect.width()) - x;
 
-    if (o.containingBlock()->isTableCell())
-        y -= toRenderTableCell(o.containingBlock())->intrinsicPaddingBefore();
+    if (is<RenderTableCell>(*o.containingBlock()))
+        y -= downcast<RenderTableCell>(*o.containingBlock()).intrinsicPaddingBefore();
         
     ts << "text run at (" << x << "," << y << ") width " << logicalWidth;
     ts << ": "
@@ -543,8 +544,7 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
         if (auto layout = text.simpleLineLayout()) {
             ASSERT(!text.firstTextBox());
             auto resolver = runResolver(downcast<RenderBlockFlow>(*text.parent()), *layout);
-            for (auto it = resolver.begin(), end = resolver.end(); it != end; ++it) {
-                auto run = *it;
+            for (const auto& run : resolver.rangeForRenderer(text)) {
                 writeIndent(ts, indent + 1);
                 writeSimpleLine(ts, text, run.rect(), run.text());
             }
@@ -652,8 +652,8 @@ static void writeRenderRegionList(const RenderRegionList& flowThreadRegionList, 
 
         Element* generatingElement = renderRegion->generatingElement();
         if (generatingElement) {
-            bool isRenderNamedFlowFragment = renderRegion->isRenderNamedFlowFragment();
-            if (isRenderNamedFlowFragment && toRenderNamedFlowFragment(renderRegion)->hasCustomRegionStyle())
+            bool isRenderNamedFlowFragment = is<RenderNamedFlowFragment>(*renderRegion);
+            if (isRenderNamedFlowFragment && downcast<RenderNamedFlowFragment>(*renderRegion).hasCustomRegionStyle())
                 ts << " region style: 1";
             if (renderRegion->hasAutoLogicalHeight())
                 ts << " hasAutoLogicalHeight";
@@ -802,15 +802,15 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
     
     // Altough the RenderFlowThread requires a layer, it is not collected by its parent,
     // so we have to treat it as a special case.
-    if (l->renderer().isRenderView())
-        writeRenderNamedFlowThreads(ts, toRenderView(l->renderer()), rootLayer, paintDirtyRect, indent, behavior);
+    if (is<RenderView>(l->renderer()))
+        writeRenderNamedFlowThreads(ts, downcast<RenderView>(l->renderer()), rootLayer, paintDirtyRect, indent, behavior);
 }
 
 static String nodePosition(Node* node)
 {
     StringBuilder result;
 
-    Element* body = node->document().body();
+    auto* body = node->document().bodyOrFrameset();
     Node* parent;
     for (Node* n = node; n; n = parent) {
         parent = n->parentOrShadowHostNode();
@@ -874,30 +874,30 @@ static String externalRepresentation(RenderBox* renderer, RenderAsTextBehavior b
 
 String externalRepresentation(Frame* frame, RenderAsTextBehavior behavior)
 {
-    RenderObject* renderer = frame->contentRenderer();
-    if (!renderer || !renderer->isBox())
+    RenderView* renderer = frame->contentRenderer();
+    if (!renderer)
         return String();
 
     PrintContext printContext(frame);
     if (behavior & RenderAsTextPrintingMode)
-        printContext.begin(toRenderBox(renderer)->width());
+        printContext.begin(renderer->width());
     if (!(behavior & RenderAsTextDontUpdateLayout))
         frame->document()->updateLayout();
 
-    return externalRepresentation(toRenderBox(renderer), behavior);
+    return externalRepresentation(renderer, behavior);
 }
 
 String externalRepresentation(Element* element, RenderAsTextBehavior behavior)
 {
-    RenderObject* renderer = element->renderer();
-    if (!renderer || !renderer->isBox())
+    RenderElement* renderer = element->renderer();
+    if (!is<RenderBox>(renderer))
         return String();
     // Doesn't support printing mode.
     ASSERT(!(behavior & RenderAsTextPrintingMode));
     if (!(behavior & RenderAsTextDontUpdateLayout))
         element->document().updateLayout();
     
-    return externalRepresentation(toRenderBox(renderer), behavior | RenderAsTextShowAllLayers);
+    return externalRepresentation(downcast<RenderBox>(renderer), behavior | RenderAsTextShowAllLayers);
 }
 
 static void writeCounterValuesFromChildren(TextStream& stream, const RenderElement* parent, bool& isFirstCounter)
@@ -934,11 +934,11 @@ String markerTextForListItem(Element* element)
     RefPtr<Element> elementRef(element);
     element->document().updateLayout();
 
-    RenderObject* renderer = element->renderer();
-    if (!renderer || !renderer->isListItem())
+    RenderElement* renderer = element->renderer();
+    if (!is<RenderListItem>(renderer))
         return String();
 
-    return toRenderListItem(renderer)->markerText();
+    return downcast<RenderListItem>(*renderer).markerText();
 }
 
 } // namespace WebCore

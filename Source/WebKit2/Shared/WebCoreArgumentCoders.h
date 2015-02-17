@@ -43,6 +43,7 @@ class FilterOperations;
 class FloatPoint;
 class FloatPoint3D;
 class FloatRect;
+class FloatRoundedRect;
 class FloatSize;
 class FixedPositionViewportConstraints;
 class HTTPHeaderMap;
@@ -84,12 +85,14 @@ struct PasteboardWebContent;
 struct PluginInfo;
 struct ScrollableAreaParameters;
 struct TextCheckingResult;
+struct TextIndicatorData;
 struct ViewportAttributes;
 struct WindowFeatures;
 }
 
 #if PLATFORM(COCOA)
 namespace WebCore {
+class MachSendRight;
 struct KeypressCommand;
 }
 #endif
@@ -163,6 +166,11 @@ template<> struct ArgumentCoder<WebCore::FloatSize> {
     static bool decode(ArgumentDecoder&, WebCore::FloatSize&);
 };
 
+template<> struct ArgumentCoder<WebCore::FloatRoundedRect> {
+    static void encode(ArgumentEncoder&, const WebCore::FloatRoundedRect&);
+    static bool decode(ArgumentDecoder&, WebCore::FloatRoundedRect&);
+};
+
 #if PLATFORM(IOS)
 template<> struct ArgumentCoder<WebCore::FloatQuad> {
     static void encode(ArgumentEncoder&, const WebCore::FloatQuad&);
@@ -215,11 +223,6 @@ template<> struct ArgumentCoder<WebCore::PluginInfo> {
     static bool decode(ArgumentDecoder&, WebCore::PluginInfo&);
 };
 
-template<> struct ArgumentCoder<WebCore::HTTPHeaderMap> {
-    static void encode(ArgumentEncoder&, const WebCore::HTTPHeaderMap&);
-    static bool decode(ArgumentDecoder&, WebCore::HTTPHeaderMap&);
-};
-
 template<> struct ArgumentCoder<WebCore::AuthenticationChallenge> {
     static void encode(ArgumentEncoder&, const WebCore::AuthenticationChallenge&);
     static bool decode(ArgumentDecoder&, WebCore::AuthenticationChallenge&);
@@ -269,6 +272,12 @@ template<> struct ArgumentCoder<WebCore::Color> {
 };
 
 #if PLATFORM(COCOA)
+template<> struct ArgumentCoder<WebCore::MachSendRight> {
+    static void encode(ArgumentEncoder&, const WebCore::MachSendRight&);
+    static void encode(ArgumentEncoder&, WebCore::MachSendRight&&);
+    static bool decode(ArgumentDecoder&, WebCore::MachSendRight&);
+};
+
 template<> struct ArgumentCoder<WebCore::KeypressCommand> {
     static void encode(ArgumentEncoder&, const WebCore::KeypressCommand&);
     static bool decode(ArgumentDecoder&, WebCore::KeypressCommand&);
@@ -433,6 +442,11 @@ template<> struct ArgumentCoder<WebCore::ContentFilter> {
     static bool decode(ArgumentDecoder&, WebCore::ContentFilter&);
 };
 #endif
+
+template<> struct ArgumentCoder<WebCore::TextIndicatorData> {
+    static void encode(ArgumentEncoder&, const WebCore::TextIndicatorData&);
+    static bool decode(ArgumentDecoder&, WebCore::TextIndicatorData&);
+};
 
 } // namespace IPC
 

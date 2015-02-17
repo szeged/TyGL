@@ -34,6 +34,10 @@
 #endif
 #endif
 
+#ifndef __NSi_10_11
+#define __NSi_10_11 introduced=10.11
+#endif
+
 #ifdef __cplusplus
 #define WK_EXTERN extern "C" __attribute__((visibility ("default")))
 #else
@@ -43,6 +47,7 @@
 #ifndef WK_API_AVAILABILITY_ENABLED
 #define WK_AVAILABLE(_mac, _ios)
 #define WK_CLASS_AVAILABLE(_mac, _ios) __attribute__((visibility ("default")))
+#define WK_DEPRECATED(_macIntro, _macDep, _iosIntro, _iosDep, ...) __attribute__((deprecated(__VA_ARGS__)))
 #define WK_ENUM_AVAILABLE(_mac, _ios)
 #define WK_ENUM_AVAILABLE_IOS(_ios)
 
@@ -53,7 +58,10 @@
 
 #ifdef __OBJC__
 #import <Foundation/Foundation.h>
+
+#if __MAC_OS_X_VERSION_MAX_ALLOWED < 101000
 typedef NSUInteger NSEventModifierFlags;
+#endif
 
 #if __MAC_OS_X_VERSION_MAX_ALLOWED < 1090
 typedef NSInteger NSURLSessionAuthChallengeDisposition;

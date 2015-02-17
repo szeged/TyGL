@@ -316,7 +316,7 @@ public:
     GPRReg fillSpeculateBoolean(Edge);
     GeneratedOperandType checkGeneratedTypeForToInt32(Node*);
 
-    void addSlowPathGenerator(PassOwnPtr<SlowPathGenerator>);
+    void addSlowPathGenerator(std::unique_ptr<SlowPathGenerator>);
     void runSlowPathGenerators();
     
     void compile(Node*);
@@ -1049,7 +1049,7 @@ public:
         m_jit.setupArgumentsWithExecState(arg1, arg2, arg3);
         return appendCallWithExceptionCheckSetResult(operation, result);
     }
-    JITCompiler::Call callOperation(C_JITOperation_ECC operation, GPRReg result, GPRReg arg1, JSCell* cell)
+    JITCompiler::Call callOperation(C_JITOperation_EJscC operation, GPRReg result, GPRReg arg1, JSCell* cell)
     {
         m_jit.setupArgumentsWithExecState(arg1, TrustedImmPtr(cell));
         return appendCallWithExceptionCheckSetResult(operation, result);
@@ -1204,6 +1204,11 @@ public:
         m_jit.setupArgumentsWithExecState(arg1);
         return appendCallWithExceptionCheckSetResult(operation, result);
     }
+    JITCompiler::Call callOperation(C_JITOperation_EJscZ operation, GPRReg result, GPRReg arg1, int32_t arg2)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, TrustedImm32(arg2));
+        return appendCallWithExceptionCheckSetResult(operation, result);
+    }
     JITCompiler::Call callOperation(C_JITOperation_EZ operation, GPRReg result, GPRReg arg1)
     {
         m_jit.setupArgumentsWithExecState(arg1);
@@ -1286,6 +1291,11 @@ public:
     JITCompiler::Call callOperation(J_JITOperation_ECZ operation, GPRReg result, GPRReg arg1, GPRReg arg2)
     {
         m_jit.setupArgumentsWithExecState(arg1, arg2);
+        return appendCallWithExceptionCheckSetResult(operation, result);
+    }
+    JITCompiler::Call callOperation(J_JITOperation_EJscC operation, GPRReg result, GPRReg arg1, JSCell* cell)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, TrustedImmPtr(cell));
         return appendCallWithExceptionCheckSetResult(operation, result);
     }
     JITCompiler::Call callOperation(J_JITOperation_ESsiCI operation, GPRReg result, StructureStubInfo* stubInfo, GPRReg arg1, const StringImpl* uid)
@@ -1593,6 +1603,11 @@ public:
     JITCompiler::Call callOperation(J_JITOperation_ECZ operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1, GPRReg arg2)
     {
         m_jit.setupArgumentsWithExecState(arg1, arg2);
+        return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
+    }
+    JITCompiler::Call callOperation(J_JITOperation_EJscC operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1, JSCell* cell)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, TrustedImmPtr(cell));
         return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
     }
     JITCompiler::Call callOperation(J_JITOperation_ESsiCI operation, GPRReg resultTag, GPRReg resultPayload, StructureStubInfo* stubInfo, GPRReg arg1, const StringImpl* uid)
@@ -2252,6 +2267,38 @@ public:
         emitAllocateJSObject(resultGPR, scratchGPR1, structure, storage, scratchGPR2, slowPath);
     }
 
+    template <typename ClassType, typename StructureType> // StructureType and StorageType can be GPR or ImmPtr.
+    void emitAllocateVariableSizedJSObject(GPRReg resultGPR, StructureType structure, GPRReg allocationSize, GPRReg scratchGPR1, GPRReg scratchGPR2, MacroAssembler::JumpList& slowPath)
+    {
+        static_assert(!(MarkedSpace::preciseStep & (MarkedSpace::preciseStep - 1)), "MarkedSpace::preciseStep must be a power of two.");
+        static_assert(!(MarkedSpace::impreciseStep & (MarkedSpace::impreciseStep - 1)), "MarkedSpace::impreciseStep must be a power of two.");
+
+        MarkedSpace::Subspace* subspace;
+        if (ClassType::needsDestruction && ClassType::hasImmortalStructure)
+            subspace = &m_jit.vm()->heap.subspaceForObjectsWithImmortalStructure();
+        else if (ClassType::needsDestruction)
+            subspace = &m_jit.vm()->heap.subspaceForObjectNormalDestructor();
+        else
+            subspace = &m_jit.vm()->heap.subspaceForObjectWithoutDestructor();
+        m_jit.add32(TrustedImm32(MarkedSpace::preciseStep - 1), allocationSize);
+        MacroAssembler::Jump notSmall = m_jit.branch32(MacroAssembler::AboveOrEqual, allocationSize, TrustedImm32(MarkedSpace::preciseCutoff));
+        m_jit.rshift32(allocationSize, TrustedImm32(getLSBSet(MarkedSpace::preciseStep)), scratchGPR1);
+        m_jit.mul32(TrustedImm32(sizeof(MarkedAllocator)), scratchGPR1, scratchGPR1);
+        m_jit.addPtr(MacroAssembler::TrustedImmPtr(&subspace->preciseAllocators[0]), scratchGPR1);
+
+        MacroAssembler::Jump selectedSmallSpace = m_jit.jump();
+        notSmall.link(&m_jit);
+        slowPath.append(m_jit.branch32(MacroAssembler::AboveOrEqual, allocationSize, TrustedImm32(MarkedSpace::impreciseCutoff)));
+        m_jit.rshift32(allocationSize, TrustedImm32(getLSBSet(MarkedSpace::impreciseStep)), scratchGPR1);
+        m_jit.mul32(TrustedImm32(sizeof(MarkedAllocator)), scratchGPR1, scratchGPR1);
+        m_jit.addPtr(MacroAssembler::TrustedImmPtr(&subspace->impreciseAllocators[0]), scratchGPR1);
+
+        selectedSmallSpace.link(&m_jit);
+
+        emitAllocateJSObject(resultGPR, scratchGPR1, TrustedImmPtr(structure), TrustedImmPtr(0), scratchGPR2, slowPath);
+        m_jit.storePtr(TrustedImmPtr(structure->classInfo()), MacroAssembler::Address(resultGPR, JSDestructibleObject::classInfoOffset()));
+    }
+
     template <typename T>
     void emitAllocateDestructibleObject(GPRReg resultGPR, Structure* structure, 
         GPRReg scratchGPR1, GPRReg scratchGPR2, MacroAssembler::JumpList& slowPath)
@@ -2401,7 +2448,7 @@ public:
     
     bool m_isCheckingArgumentTypes;
     
-    Vector<OwnPtr<SlowPathGenerator>, 8> m_slowPathGenerators;
+    Vector<std::unique_ptr<SlowPathGenerator>, 8> m_slowPathGenerators;
     Vector<SilentRegisterSavePlan> m_plans;
 };
 

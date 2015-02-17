@@ -81,8 +81,9 @@ public:
     // standard String constructor.
 
     // Makes a deep copy. Helpful only if you need to use a URL on another
-    // thread.  Since the underlying StringImpl objects are immutable, there's
+    // thread. Since the underlying StringImpl objects are immutable, there's
     // no other reason to ever prefer copy() over plain old assignment.
+    // FIXME: Rename to isolatedCopy to match String.
     URL copy() const;
 
     bool isNull() const;
@@ -234,9 +235,9 @@ WEBCORE_EXPORT const URL& blankURL();
 // These are also different from the URL functions in that they don't require the string to be a valid and parsable URL.
 // This is especially important because valid javascript URLs are not necessarily considered valid by URL.
 
-bool protocolIs(const String& url, const char* protocol);
+WEBCORE_EXPORT bool protocolIs(const String& url, const char* protocol);
 WEBCORE_EXPORT bool protocolIsJavaScript(const String& url);
-bool protocolIsInHTTPFamily(const String& url);
+WEBCORE_EXPORT bool protocolIsInHTTPFamily(const String& url);
 
 bool isDefaultPortForProtocol(unsigned short port, const String& protocol);
 bool portAllowed(const URL&); // Blacklist ports that should never be used for Web resources.
@@ -253,6 +254,24 @@ WEBCORE_EXPORT String decodeURLEscapeSequences(const String&);
 String decodeURLEscapeSequences(const String&, const TextEncoding&);
 
 WEBCORE_EXPORT String encodeWithURLEscapeSequences(const String&);
+
+#if PLATFORM(IOS)
+WEBCORE_EXPORT void enableURLSchemeCanonicalization(bool);
+#endif
+
+// Like StringCapture, but for URLs.
+class URLCapture {
+public:
+    explicit URLCapture(const URL&);
+    explicit URLCapture(URL&&);
+    URLCapture(const URLCapture&);
+    const URL& url() const;
+    URL releaseURL();
+
+private:
+    void operator=(const URLCapture&) = delete;
+    URL m_URL;
+};
 
 // Inlines.
 
@@ -344,9 +363,30 @@ inline unsigned URL::pathAfterLastSlash() const
     return m_pathAfterLastSlash;
 }
 
-#if PLATFORM(IOS)
-WEBCORE_EXPORT void enableURLSchemeCanonicalization(bool);
-#endif
+inline URLCapture::URLCapture(const URL& url)
+    : m_URL(url)
+{
+}
+
+inline URLCapture::URLCapture(URL&& url)
+    : m_URL(url)
+{
+}
+
+inline URLCapture::URLCapture(const URLCapture& other)
+    : m_URL(other.m_URL.copy())
+{
+}
+
+inline const URL& URLCapture::url() const
+{
+    return m_URL;
+}
+
+inline URL URLCapture::releaseURL()
+{
+    return WTF::move(m_URL);
+}
 
 } // namespace WebCore
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2010, 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2015 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -70,7 +70,6 @@
 #include "Watchpoint.h"
 #include <wtf/Bag.h>
 #include <wtf/FastMalloc.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCountedArray.h>
 #include <wtf/RefPtr.h>
 #include <wtf/SegmentedVector.h>
@@ -85,8 +84,6 @@ class RepatchBuffer;
 class TypeLocation;
 
 inline VirtualRegister unmodifiedArgumentsRegister(VirtualRegister argumentsRegister) { return VirtualRegister(argumentsRegister.offset() + 1); }
-
-static ALWAYS_INLINE int missingThisObjectMarker() { return std::numeric_limits<int>::max(); }
 
 enum ReoptimizationMode { DontCountReoptimization, CountReoptimization };
 
@@ -230,18 +227,14 @@ public:
     void unlinkCalls();
         
     void linkIncomingCall(ExecState* callerFrame, CallLinkInfo*);
-        
-    bool isIncomingCallAlreadyLinked(CallLinkInfo* incoming)
-    {
-        return m_incomingCalls.isOnList(incoming);
-    }
+    void linkIncomingPolymorphicCall(ExecState* callerFrame, PolymorphicCallNode*);
 #endif // ENABLE(JIT)
 
     void linkIncomingCall(ExecState* callerFrame, LLIntCallLinkInfo*);
 
-    void setJITCodeMap(PassOwnPtr<CompactJITCodeMap> jitCodeMap)
+    void setJITCodeMap(std::unique_ptr<CompactJITCodeMap> jitCodeMap)
     {
-        m_jitCodeMap = jitCodeMap;
+        m_jitCodeMap = WTF::move(jitCodeMap);
     }
     CompactJITCodeMap* jitCodeMap()
     {
@@ -323,6 +316,17 @@ public:
 
     bool usesEval() const { return m_unlinkedCode->usesEval(); }
 
+    void setScopeRegister(VirtualRegister scopeRegister)
+    {
+        ASSERT(scopeRegister.isLocal() || !scopeRegister.isValid());
+        m_scopeRegister = scopeRegister;
+    }
+
+    VirtualRegister scopeRegister() const
+    {
+        return m_scopeRegister;
+    }
+
     void setArgumentsRegister(VirtualRegister argumentsRegister)
     {
         ASSERT(argumentsRegister.isValid());
@@ -340,6 +344,7 @@ public:
             return VirtualRegister();
         return argumentsRegister();
     }
+
     void setActivationRegister(VirtualRegister activationRegister)
     {
         m_lexicalEnvironmentRegister = activationRegister;
@@ -942,6 +947,20 @@ public:
 
     bool isKnownToBeLiveDuringGC(); // Will only return valid results when called during GC. Assumes that you've already established that the owner executable is live.
 
+    struct RareData {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
+        Vector<HandlerInfo> m_exceptionHandlers;
+
+        // Buffers used for large array literals
+        Vector<Vector<JSValue>> m_constantBuffers;
+
+        // Jump Tables
+        Vector<SimpleJumpTable> m_switchJumpTables;
+        Vector<StringJumpTable> m_stringSwitchJumpTables;
+
+        EvalCodeCache m_evalCodeCache;
+    };
 
 protected:
     virtual void visitWeakReferences(SlotVisitor&) override;
@@ -962,10 +981,6 @@ private:
     
     double optimizationThresholdScalingFactor();
 
-#if ENABLE(JIT)
-    ClosureCallStubRoutine* findClosureCallForReturnPC(ReturnAddressPtr);
-#endif
-        
     void updateAllPredictionsAndCountLiveness(unsigned& numberOfLiveNonArgumentValueProfiles, unsigned& numberOfSamplesInProfiles);
 
     void setConstantRegisters(const Vector<WriteBarrier<Unknown>>& constants)
@@ -1009,8 +1024,10 @@ private:
     void createRareDataIfNecessary()
     {
         if (!m_rareData)
-            m_rareData = adoptPtr(new RareData);
+            m_rareData = std::make_unique<RareData>();
     }
+
+    void insertBasicBlockBoundariesForControlFlowProfiler(Vector<Instruction, 0, UnsafeVectorOverflow>&);
 
 #if ENABLE(JIT)
     void resetStubInternal(RepatchBuffer&, StructureStubInfo&);
@@ -1032,6 +1049,7 @@ private:
     RefCountedArray<Instruction> m_instructions;
     WriteBarrier<SymbolTable> m_symbolTable;
     VirtualRegister m_thisRegister;
+    VirtualRegister m_scopeRegister;
     VirtualRegister m_argumentsRegister;
     VirtualRegister m_lexicalEnvironmentRegister;
 
@@ -1053,8 +1071,9 @@ private:
     Vector<ByValInfo> m_byValInfos;
     Bag<CallLinkInfo> m_callLinkInfos;
     SentinelLinkedList<CallLinkInfo, BasicRawSentinelNode<CallLinkInfo>> m_incomingCalls;
+    SentinelLinkedList<PolymorphicCallNode, BasicRawSentinelNode<PolymorphicCallNode>> m_incomingPolymorphicCalls;
 #endif
-    OwnPtr<CompactJITCodeMap> m_jitCodeMap;
+    std::unique_ptr<CompactJITCodeMap> m_jitCodeMap;
 #if ENABLE(DFG_JIT)
     // This is relevant to non-DFG code blocks that serve as the profiled code block
     // for DFG code blocks.
@@ -1091,24 +1110,7 @@ private:
 
     std::unique_ptr<BytecodeLivenessAnalysis> m_livenessAnalysis;
 
-    struct RareData {
-        WTF_MAKE_FAST_ALLOCATED;
-    public:
-        Vector<HandlerInfo> m_exceptionHandlers;
-
-        // Buffers used for large array literals
-        Vector<Vector<JSValue>> m_constantBuffers;
-
-        // Jump Tables
-        Vector<SimpleJumpTable> m_switchJumpTables;
-        Vector<StringJumpTable> m_stringSwitchJumpTables;
-
-        EvalCodeCache m_evalCodeCache;
-    };
-#if COMPILER(MSVC)
-    friend void WTF::deleteOwnedPtr<RareData>(RareData*);
-#endif
-    OwnPtr<RareData> m_rareData;
+    std::unique_ptr<RareData> m_rareData;
 #if ENABLE(JIT)
     DFG::CapabilityLevel m_capabilityLevelState;
 #endif

@@ -24,7 +24,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
-# This script generates JS and C++ bindings for the inspector protocol.
+# This script generates JS, Objective C, and C++ bindings for the inspector protocol.
 # Generators for individual files are located in the codegen/ directory.
 
 import os.path
@@ -40,27 +40,39 @@ try:
 except ImportError:
     import simplejson as json
 
+logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.ERROR)
+log = logging.getLogger('global')
+
 try:
     from codegen import *
 
 # When copying generator files to JavaScriptCore's private headers on Mac,
 # the codegen/ module directory is flattened. So, import directly.
-except ImportError:
+except ImportError, e:
+    # log.error(e) # Uncomment this to debug early import errors.
     import models
     from models import *
     from generator import *
+    from cpp_generator import *
+    from objc_generator import *
 
-    from generate_backend_commands import *
-    from generate_backend_dispatcher_header import *
-    from generate_backend_dispatcher_implementation import *
-    from generate_frontend_dispatcher_header import *
-    from generate_frontend_dispatcher_implementation import *
-    from generate_protocol_types_header import *
-    from generate_protocol_types_implementation import *
-
-
-logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.ERROR)
-log = logging.getLogger('global')
+    from generate_cpp_alternate_backend_dispatcher_header import *
+    from generate_cpp_backend_dispatcher_header import *
+    from generate_cpp_backend_dispatcher_implementation import *
+    from generate_cpp_frontend_dispatcher_header import *
+    from generate_cpp_frontend_dispatcher_implementation import *
+    from generate_cpp_protocol_types_header import *
+    from generate_cpp_protocol_types_implementation import *
+    from generate_js_backend_commands import *
+    from generate_objc_backend_dispatcher_header import *
+    from generate_objc_backend_dispatcher_implementation import *
+    from generate_objc_configuration_header import *
+    from generate_objc_configuration_implementation import *
+    from generate_objc_conversion_helpers import *
+    from generate_objc_frontend_dispatcher_implementation import *
+    from generate_objc_header import *
+    from generate_objc_internal_header import *
+    from generate_objc_protocol_types_implementation import *
 
 
 # A writer that only updates file if it actually changed.
@@ -118,13 +130,26 @@ def generate_from_specification(primary_specification_filepath=None,
     protocol.resolve_types()
 
     generators = []
-    generators.append(BackendCommandsGenerator(protocol, primary_specification_filepath))
-    generators.append(BackendDispatcherHeaderGenerator(protocol, primary_specification_filepath))
-    generators.append(BackendDispatcherImplementationGenerator(protocol, primary_specification_filepath))
-    generators.append(FrontendDispatcherHeaderGenerator(protocol, primary_specification_filepath))
-    generators.append(FrontendDispatcherImplementationGenerator(protocol, primary_specification_filepath))
-    generators.append(ProtocolTypesHeaderGenerator(protocol, primary_specification_filepath))
-    generators.append(ProtocolTypesImplementationGenerator(protocol, primary_specification_filepath))
+    is_test = protocol.framework is Frameworks.Test
+    if is_test or protocol.framework is not Frameworks.WebInspector:
+        generators.append(CppAlternateBackendDispatcherHeaderGenerator(protocol, primary_specification_filepath))
+        generators.append(JSBackendCommandsGenerator(protocol, primary_specification_filepath))
+        generators.append(CppBackendDispatcherHeaderGenerator(protocol, primary_specification_filepath))
+        generators.append(CppBackendDispatcherImplementationGenerator(protocol, primary_specification_filepath))
+        generators.append(CppFrontendDispatcherHeaderGenerator(protocol, primary_specification_filepath))
+        generators.append(CppFrontendDispatcherImplementationGenerator(protocol, primary_specification_filepath))
+        generators.append(CppProtocolTypesHeaderGenerator(protocol, primary_specification_filepath))
+        generators.append(CppProtocolTypesImplementationGenerator(protocol, primary_specification_filepath))
+    if is_test or protocol.framework is Frameworks.WebInspector:
+        generators.append(ObjCBackendDispatcherHeaderGenerator(protocol, primary_specification_filepath))
+        generators.append(ObjCBackendDispatcherImplementationGenerator(protocol, primary_specification_filepath))
+        generators.append(ObjCConfigurationHeaderGenerator(protocol, primary_specification_filepath))
+        generators.append(ObjCConfigurationImplementationGenerator(protocol, primary_specification_filepath))
+        generators.append(ObjCConversionHelpersGenerator(protocol, primary_specification_filepath))
+        generators.append(ObjCFrontendDispatcherImplementationGenerator(protocol, primary_specification_filepath))
+        generators.append(ObjCHeaderGenerator(protocol, primary_specification_filepath))
+        generators.append(ObjCProtocolTypesImplementationGenerator(protocol, primary_specification_filepath))
+        generators.append(ObjCInternalHeaderGenerator(protocol, primary_specification_filepath))
 
     single_output_file_contents = []
 
@@ -148,7 +173,7 @@ def generate_from_specification(primary_specification_filepath=None,
 
 
 if __name__ == '__main__':
-    allowed_framework_names = ['JavaScriptCore', 'WebCore', 'Test']
+    allowed_framework_names = ['JavaScriptCore', 'WebInspector', 'Test']
     cli_parser = optparse.OptionParser(usage="usage: %prog [options] PrimaryProtocol.json [SupplementalProtocol.json ...]")
     cli_parser.add_option("-o", "--outputDir", help="Directory where generated files should be written.")
     cli_parser.add_option("--framework", type="choice", choices=allowed_framework_names, help="The framework that the primary specification belongs to.")

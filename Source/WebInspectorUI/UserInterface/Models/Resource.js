@@ -34,7 +34,7 @@ WebInspector.Resource = function(url, mimeType, type, loaderIdentifier, requestI
 
     this._url = url;
     this._mimeType = mimeType;
-    this._type = type || WebInspector.Resource.Type.fromMIMEType(mimeType);
+    this._type = type || WebInspector.Resource.typeFromMIMEType(mimeType);
     this._loaderIdentifier = loaderIdentifier || null;
     this._requestIdentifier = requestIdentifier || null;
     this._requestMethod = requestMethod || null;
@@ -85,8 +85,8 @@ WebInspector.Resource.Type = {
     Other: "resource-type-other"
 };
 
-// This MIME Type map is private, use WebInspector.Resource.Type.fromMIMEType().
-WebInspector.Resource.Type._mimeTypeMap = {
+// This MIME Type map is private, use WebInspector.Resource.typeFromMIMEType().
+WebInspector.Resource._mimeTypeMap = {
     "text/html": WebInspector.Resource.Type.Document,
     "text/xml": WebInspector.Resource.Type.Document,
     "text/plain": WebInspector.Resource.Type.Document,
@@ -126,15 +126,15 @@ WebInspector.Resource.Type._mimeTypeMap = {
     "text/x-coffeescript": WebInspector.Resource.Type.Script
 };
 
-WebInspector.Resource.Type.fromMIMEType = function(mimeType)
+WebInspector.Resource.typeFromMIMEType = function(mimeType)
 {
     if (!mimeType)
         return WebInspector.Resource.Type.Other;
 
     mimeType = parseMIMEType(mimeType).type;
 
-    if (mimeType in WebInspector.Resource.Type._mimeTypeMap)
-        return WebInspector.Resource.Type._mimeTypeMap[mimeType];
+    if (mimeType in WebInspector.Resource._mimeTypeMap)
+        return WebInspector.Resource._mimeTypeMap[mimeType];
 
     if (mimeType.startsWith("image/"))
         return WebInspector.Resource.Type.Image;
@@ -145,7 +145,7 @@ WebInspector.Resource.Type.fromMIMEType = function(mimeType)
     return WebInspector.Resource.Type.Other;
 };
 
-WebInspector.Resource.Type.displayName = function(type, plural)
+WebInspector.Resource.displayNameForType = function(type, plural)
 {
     switch(type) {
     case WebInspector.Resource.Type.Document:
@@ -186,6 +186,7 @@ WebInspector.Resource.Type.displayName = function(type, plural)
 
 WebInspector.Resource.prototype = {
     constructor: WebInspector.Resource,
+    __proto__: WebInspector.SourceCode.prototype,
 
     // Public
 
@@ -235,7 +236,7 @@ WebInspector.Resource.prototype = {
         // This getter generates a MIME-type, if needed, that matches the resource type.
 
         // If the type matches the Resource.Type of the MIME-type, then return the actual MIME-type.
-        if (this._type === WebInspector.Resource.Type.fromMIMEType(this._mimeType))
+        if (this._type === WebInspector.Resource.typeFromMIMEType(this._mimeType))
             return this._mimeType;
 
         // Return the default MIME-types for the Resource.Type, since the current MIME-type
@@ -459,7 +460,7 @@ WebInspector.Resource.prototype = {
         return null;
     },
 
-    updateForRedirectResponse: function(url, requestHeaders, timestamp)
+    updateForRedirectResponse: function(url, requestHeaders, elapsedTime)
     {
         console.assert(!this._finished);
         console.assert(!this._failed);
@@ -469,7 +470,7 @@ WebInspector.Resource.prototype = {
 
         this._url = url;
         this._requestHeaders = requestHeaders || {};
-        this._lastRedirectReceivedTimestamp = timestamp || NaN;
+        this._lastRedirectReceivedTimestamp = elapsedTime || NaN;
 
         if (oldURL !== url) {
             // Delete the URL components so the URL is re-parsed the next time it is requested.
@@ -482,7 +483,7 @@ WebInspector.Resource.prototype = {
         this.dispatchEventToListeners(WebInspector.Resource.Event.TimestampsDidChange);
     },
 
-    updateForResponse: function(url, mimeType, type, responseHeaders, statusCode, statusText, timestamp)
+    updateForResponse: function(url, mimeType, type, responseHeaders, statusCode, statusText, elapsedTime)
     {
         console.assert(!this._finished);
         console.assert(!this._failed);
@@ -497,11 +498,11 @@ WebInspector.Resource.prototype = {
 
         this._url = url;
         this._mimeType = mimeType;
-        this._type = type || WebInspector.Resource.Type.fromMIMEType(mimeType);
+        this._type = type || WebInspector.Resource.typeFromMIMEType(mimeType);
         this._statusCode = statusCode;
         this._statusText = statusText;
         this._responseHeaders = responseHeaders || {};
-        this._responseReceivedTimestamp = timestamp || NaN;
+        this._responseReceivedTimestamp = elapsedTime || NaN;
 
         this._responseHeadersSize = String(this._statusCode).length + this._statusText.length + 12; // Extra length is for "HTTP/1.1 ", " ", and "\r\n".
         for (var name in this._responseHeaders)
@@ -539,31 +540,26 @@ WebInspector.Resource.prototype = {
         this.dispatchEventToListeners(WebInspector.Resource.Event.TimestampsDidChange);
     },
 
-    canRequestContentFromBackend: function()
+    canRequestContent: function()
     {
         return this._finished;
     },
 
-    requestContentFromBackend: function(callback)
+    requestContentFromBackend: function()
     {
         // If we have the requestIdentifier we can get the actual response for this specific resource.
         // Otherwise the content will be cached resource data, which might not exist anymore.
-        if (this._requestIdentifier) {
-            NetworkAgent.getResponseBody(this._requestIdentifier, callback);
-            return true;
-        }
+        if (this._requestIdentifier)
+            return NetworkAgent.getResponseBody.promise(this._requestIdentifier);
 
-        if (this._parentFrame) {
-            PageAgent.getResourceContent(this._parentFrame.id, this._url, callback);
-            return true;
-        }
+        // There is no request identifier or frame to request content from.
+        if (this._parentFrame)
+            return PageAgent.getResourceContent.promise(this._parentFrame.id, this._url);
 
-        // There is no request identifier or frame to request content from. Return false to cause the
-        // pending callbacks to get null content.
-        return false;
+        return Promise.reject(new Error("Content request failed."));
     },
 
-    increaseSize: function(dataLength, timestamp)
+    increaseSize: function(dataLength, elapsedTime)
     {
         console.assert(dataLength >= 0);
 
@@ -574,7 +570,7 @@ WebInspector.Resource.prototype = {
 
         this._size += dataLength;
 
-        this._lastDataReceivedTimestamp = timestamp || NaN;
+        this._lastDataReceivedTimestamp = elapsedTime || NaN;
 
         this.dispatchEventToListeners(WebInspector.Resource.Event.SizeDidChange, {previousSize: previousSize});
 
@@ -605,37 +601,34 @@ WebInspector.Resource.prototype = {
             this.dispatchEventToListeners(WebInspector.Resource.Event.TransferSizeDidChange);
     },
 
-    markAsFinished: function(timestamp)
+    markAsFinished: function(elapsedTime)
     {
         console.assert(!this._failed);
         console.assert(!this._canceled);
 
         this._finished = true;
-        this._finishedOrFailedTimestamp = timestamp || NaN;
+        this._finishedOrFailedTimestamp = elapsedTime || NaN;
+
+        if (this._finishThenRequestContentPromise)
+            delete this._finishThenRequestContentPromise;
 
         this.dispatchEventToListeners(WebInspector.Resource.Event.LoadingDidFinish);
         this.dispatchEventToListeners(WebInspector.Resource.Event.TimestampsDidChange);
-
-        if (this.canRequestContentFromBackend())
-            this.requestContentFromBackendIfNeeded();
     },
 
-    markAsFailed: function(canceled, timestamp)
+    markAsFailed: function(canceled, elapsedTime)
     {
         console.assert(!this._finished);
 
         this._failed = true;
         this._canceled = canceled;
-        this._finishedOrFailedTimestamp = timestamp || NaN;
+        this._finishedOrFailedTimestamp = elapsedTime || NaN;
 
         this.dispatchEventToListeners(WebInspector.Resource.Event.LoadingDidFail);
         this.dispatchEventToListeners(WebInspector.Resource.Event.TimestampsDidChange);
-
-        // Force the content requests to be serviced. They will get null as the content.
-        this.servicePendingContentRequests(true);
     },
 
-    revertMarkAsFinished: function(timestamp)
+    revertMarkAsFinished: function()
     {
         console.assert(!this._failed);
         console.assert(!this._canceled);
@@ -676,9 +669,28 @@ WebInspector.Resource.prototype = {
         image.addEventListener("load", imageDidLoad.bind(this), false);
 
         // Set the image source once we've obtained the base64-encoded URL for it.
-        this.requestContent(function() {
-            image.src = this.contentURL;
-        }.bind(this));
+        this.requestContent().then(function(content) {
+            image.src = content.sourceCode.contentURL;
+        });
+    },
+
+    requestContent: function()
+    {
+        if (this._finished)
+            return WebInspector.SourceCode.prototype.requestContent.call(this);
+
+        if (this._failed)
+            return Promise.resolve({error: WebInspector.UIString("An error occurred trying to load the resource.")});
+
+        if (!this._finishThenRequestContentPromise) {
+            var listener = new WebInspector.EventListener(this, true);
+            this._finishThenRequestContentPromise = new Promise(function (resolve, reject) {
+                this.addEventListener(WebInspector.Resource.Event.LoadingDidFinish, resolve);
+                this.addEventListener(WebInspector.Resource.Event.LoadingDidFail, reject);
+            }.bind(this)).then(WebInspector.SourceCode.prototype.requestContent.bind(this));
+        }
+
+        return this._finishThenRequestContentPromise;
     },
 
     associateWithScript: function(script)
@@ -703,5 +715,3 @@ WebInspector.Resource.prototype = {
         cookie[WebInspector.Resource.MainResourceCookieKey] = this.isMainResource();
     }
 };
-
-WebInspector.Resource.prototype.__proto__ = WebInspector.SourceCode.prototype;

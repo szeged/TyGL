@@ -177,12 +177,11 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
         - Initializes ArgumentCount; CallerFrame; Callee.
 
        For a JS call:
-        - Caller initializes ScopeChain.
         - Callee initializes ReturnPC; CodeBlock.
         - Callee restores callFrameRegister before return.
 
        For a non-JS call:
-        - Caller initializes ScopeChain; ReturnPC; CodeBlock.
+        - Caller initializes ReturnPC; CodeBlock.
         - Caller restores callFrameRegister after return.
     */
     COMPILE_ASSERT(OPCODE_LENGTH(op_call) == OPCODE_LENGTH(op_construct), call_and_construct_opcodes_must_be_same_length);
@@ -215,10 +214,6 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     
     CallLinkInfo* info = m_codeBlock->addCallLinkInfo();
 
-    if (CallEdgeLog::isEnabled() && shouldEmitProfiling()
-        && Options::baselineDoesCallEdgeProfiling())
-        m_vm->ensureCallEdgeLog().emitLogCode(*this, info->callEdgeProfile, JSValueRegs(regT0));
-
     if (opcodeID == op_call_eval) {
         compileCallEval(instruction);
         return;
@@ -235,9 +230,6 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     m_callCompilationInfo.append(CallCompilationInfo());
     m_callCompilationInfo[callLinkInfoIndex].hotPathBegin = addressOfLinkedFunctionCheck;
     m_callCompilationInfo[callLinkInfoIndex].callLinkInfo = info;
-
-    loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_scope)), regT2);
-    store64(regT2, Address(MacroAssembler::stackPointerRegister, JSStack::ScopeChain * sizeof(Register) - sizeof(CallerFrameAndPC)));
 
     m_callCompilationInfo[callLinkInfoIndex].hotPathOther = emitNakedCall();
 

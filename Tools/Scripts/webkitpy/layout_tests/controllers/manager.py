@@ -78,8 +78,8 @@ class Manager(object):
         self._expectations = None
 
         self.HTTP_SUBDIR = 'http' + port.TEST_PATH_SEPARATOR
-        self.PERF_SUBDIR = 'perf'
         self.WEBSOCKET_SUBDIR = 'websocket' + port.TEST_PATH_SEPARATOR
+        self.web_platform_test_subdir = self._port.web_platform_test_server_doc_root()
         self.LAYOUT_TESTS_DIRECTORY = 'LayoutTests'
 
         # disable wss server. need to install pyOpenSSL on buildbots.
@@ -94,16 +94,16 @@ class Manager(object):
         return self._finder.find_tests(self._options, args)
 
     def _is_http_test(self, test):
-        return self.HTTP_SUBDIR in test or self._is_websocket_test(test)
+        return self.HTTP_SUBDIR in test or self._is_websocket_test(test) or self._is_web_platform_test(test)
 
     def _is_websocket_test(self, test):
         return self.WEBSOCKET_SUBDIR in test
 
+    def _is_web_platform_test(self, test):
+        return self.web_platform_test_subdir in test
+
     def _http_tests(self, test_names):
         return set(test for test in test_names if self._is_http_test(test))
-
-    def _is_perf_test(self, test):
-        return self.PERF_SUBDIR == test or (self.PERF_SUBDIR + self._port.TEST_PATH_SEPARATOR) in test
 
     def _prepare_lists(self, paths, test_names):
         tests_to_skip = self._finder.skip_tests(paths, test_names, self._expectations, self._http_tests(test_names))
@@ -125,20 +125,13 @@ class Manager(object):
     def _test_input_for_file(self, test_file):
         return TestInput(test_file,
             self._options.slow_time_out_ms if self._test_is_slow(test_file) else self._options.time_out_ms,
-            self._test_requires_lock(test_file))
-
-    def _test_requires_lock(self, test_file):
-        """Return True if the test needs to be locked when
-        running multiple copies of NRWTs. Perf tests are locked
-        because heavy load caused by running other tests in parallel
-        might cause some of them to timeout."""
-        return self._is_http_test(test_file) or self._is_perf_test(test_file)
+            self._is_http_test(test_file))
 
     def _test_is_slow(self, test_file):
         return self._expectations.model().has_modifier(test_file, test_expectations.SLOW)
 
     def needs_servers(self, test_names):
-        return any(self._test_requires_lock(test_name) for test_name in test_names) and self._options.http
+        return any(self._is_http_test(test_name) for test_name in test_names) and self._options.http
 
     def _set_up_run(self, test_names):
         self._printer.write_update("Checking build ...")
@@ -246,7 +239,8 @@ class Manager(object):
                                            summarized_results, initial_results, retry_results, enabled_pixel_tests_in_retry)
 
     def _run_tests(self, tests_to_run, tests_to_skip, repeat_each, iterations, num_workers, retrying):
-        needs_http = any(self._is_http_test(test) for test in tests_to_run)
+        needs_http = any((self._is_http_test(test) and not self._is_web_platform_test(test)) for test in tests_to_run)
+        needs_web_platform_test_server = any(self._is_web_platform_test(test) for test in tests_to_run)
         needs_websockets = any(self._is_websocket_test(test) for test in tests_to_run)
 
         test_inputs = []
@@ -254,7 +248,7 @@ class Manager(object):
             for test in tests_to_run:
                 for _ in xrange(repeat_each):
                     test_inputs.append(self._test_input_for_file(test))
-        return self._runner.run_tests(self._expectations, test_inputs, tests_to_skip, num_workers, needs_http, needs_websockets, retrying)
+        return self._runner.run_tests(self._expectations, test_inputs, tests_to_skip, num_workers, needs_http, needs_websockets, needs_web_platform_test_server, retrying)
 
     def _clean_up_run(self):
         _log.debug("Flushing stdout")

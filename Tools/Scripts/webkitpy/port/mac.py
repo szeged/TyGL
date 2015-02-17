@@ -48,12 +48,10 @@ class MacPort(ApplePort):
 
     ARCHITECTURES = ['x86_64', 'x86']
 
+    DEFAULT_ARCHITECTURE = 'x86_64'
+
     def __init__(self, host, port_name, **kwargs):
         ApplePort.__init__(self, host, port_name, **kwargs)
-        self._architecture = self.get_option('architecture')
-
-        if not self._architecture:
-            self._architecture = 'x86_64'
 
         self._leak_detector = LeakDetector(self)
         if self.get_option("leaks"):
@@ -90,6 +88,12 @@ class MacPort(ApplePort):
 
     def _port_specific_expectations_files(self):
         return list(reversed([self._filesystem.join(self._webkit_baseline_path(p), 'TestExpectations') for p in self.baseline_search_path()]))
+
+    def configuration_specifier_macros(self):
+        return {
+            "mavericks+": ["mavericks", "yosemite", "future"],
+            "yosemite+": ["yosemite", "future"],
+        }
 
     def setup_environ_for_server(self, server_name=None):
         env = super(MacPort, self).setup_environ_for_server(server_name)
@@ -143,7 +147,6 @@ class MacPort(ApplePort):
         return min(supportable_instances, default_count)
 
     def _build_java_test_support(self):
-        return True
         java_tests_path = self._filesystem.join(self.layout_tests_dir(), "java")
         build_java = [self.make_command(), "-C", java_tests_path]
         if self._executive.run_command(build_java, return_exit_code=True):  # Paths are absolute, so we don't need to set a cwd.
@@ -168,11 +171,11 @@ class MacPort(ApplePort):
             return
         total_bytes_string, unique_leaks = self._leak_detector.count_total_bytes_and_unique_leaks(leaks_files)
         total_leaks = self._leak_detector.count_total_leaks(leaks_files)
-        _log.info("%s total leaks found for a total of %s!" % (total_leaks, total_bytes_string))
-        _log.info("%s unique leaks found!" % unique_leaks)
+        _log.info("%s total leaks found for a total of %s." % (total_leaks, total_bytes_string))
+        _log.info("%s unique leaks found." % unique_leaks)
 
     def _check_port_build(self):
-        return self.get_option('nojava') or self._build_java_test_support()
+        return not self.get_option('java') or self._build_java_test_support()
 
     def _path_to_webcore_library(self):
         return self._build_path('WebCore.framework/Versions/A/WebCore')
@@ -183,23 +186,6 @@ class MacPort(ApplePort):
         # launching the browser.
         self._executive.popen([self.path_to_script('run-safari')] + self._arguments_for_configuration() + ['--no-saved-state', '-NSOpen', results_filename],
             cwd=self.webkit_base(), stdout=file(os.devnull), stderr=file(os.devnull))
-
-    # FIXME: The next two routines turn off the http locking in order
-    # to work around failures on the bots caused when the slave restarts.
-    # See https://bugs.webkit.org/show_bug.cgi?id=64886 for more info.
-    # The proper fix is to make sure the slave is actually stopping NRWT
-    # properly on restart. Note that by removing the lock file and not waiting,
-    # the result should be that if there is a web server already running,
-    # it'll be killed and this one will be started in its place; this
-    # may lead to weird things happening in the other run. However, I don't
-    # think we're (intentionally) actually running multiple runs concurrently
-    # on any Mac bots.
-
-    def acquire_http_lock(self):
-        pass
-
-    def release_http_lock(self):
-        pass
 
     def sample_file_path(self, name, pid):
         return self._filesystem.join(self.results_directory(), "{0}-{1}-sample.txt".format(name, pid))

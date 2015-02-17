@@ -54,9 +54,6 @@ void InitWebCoreSystemInterface(void)
 #if !PLATFORM(IOS)
     INIT(CGContextDrawsWithCorrectShadowOffsets);
 #endif
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-    INIT(CTFontTransformGlyphs);
-#endif
     INIT(CopyCONNECTProxyResponse);
     INIT(CopyNSURLResponseStatusLine);
     INIT(CopyNSURLResponseCertificateChain);
@@ -68,8 +65,6 @@ void InitWebCoreSystemInterface(void)
     INIT(DrawCellFocusRingWithFrameAtTime);
     INIT(DrawMediaUIPart);
     INIT(DrawMediaSliderTrack);
-    INIT(GetFontInLanguageForCharacter);
-    INIT(GetFontInLanguageForRange);
 #endif
     INIT(GetHTTPRequestPriority);
     INIT(GetNSURLResponseLastModifiedDate);
@@ -105,7 +100,6 @@ void InitWebCoreSystemInterface(void)
     INIT(SetPatternPhaseInUserSpace);
     INIT(CGContextIsPDFContext);
     INIT(GetUserToBaseCTM);
-    INIT(SetUpFontCache);
 #if ENABLE(VIDEO) && !PLATFORM(IOS)
     INIT(QTIncludeOnlyModernMediaFileTypes);
     INIT(QTMovieDisableComponent);
@@ -123,7 +117,6 @@ void InitWebCoreSystemInterface(void)
     INIT(QTClearMediaDownloadCache);
 #endif
 
-    INIT(GetVerticalGlyphsForCharacters);
 #if PLATFORM(IOS)
     INIT(ExecutableWasLinkedOnOrAfterIOSVersion);
     INIT(GetDeviceClass);
@@ -131,16 +124,14 @@ void InitWebCoreSystemInterface(void)
     INIT(GetAvailableScreenSize);
     INIT(GetScreenScaleFactor);
     INIT(IsGB18030ComplianceRequired);
+    INIT(IsOptimizedFullscreenSupported);
+    INIT(GetMediaUIImageData);
 #endif
-
-    INIT(CreateCTLineWithUniCharProvider);
 
 #if !PLATFORM(IOS_SIMULATOR)
     INIT(IOSurfaceContextCreate);
     INIT(IOSurfaceContextCreateImage);
 #endif
-    INIT(CreateCTTypesetterWithUniCharProviderAndOptions);
-    INIT(CTRunGetInitialAdvance);
 #if !PLATFORM(IOS)
     INIT(RecommendedScrollerStyle);
     INIT(ExecutableWasLinkedOnOrBeforeSnowLeopard);
@@ -193,11 +184,7 @@ void InitWebCoreSystemInterface(void)
 
 #if !PLATFORM(IOS)
     INIT(CreateVMPressureDispatchOnMainQueue);
-
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     INIT(CreateMemoryStatusPressureCriticalDispatchOnMainQueue);
-#endif
-
     INIT(ExecutableWasLinkedOnOrBeforeLion);
 #endif
 

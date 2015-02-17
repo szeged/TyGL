@@ -35,6 +35,7 @@
 #include "WebPreferencesKeys.h"
 #include "WebProcess.h"
 #include <WebCore/GraphicsContext.h>
+#include <WebCore/MainFrame.h>
 #include <WebCore/Page.h>
 #include <WebCore/Settings.h>
 
@@ -63,6 +64,11 @@ DrawingAreaImpl::DrawingAreaImpl(WebPage& webPage, const WebPageCreationParamete
     , m_displayTimer(RunLoop::main(), this, &DrawingAreaImpl::displayTimerFired)
     , m_exitCompositingTimer(RunLoop::main(), this, &DrawingAreaImpl::exitAcceleratedCompositingMode)
 {
+
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    webPage.corePage()->settings().setForceCompositingMode(true);
+#endif
+
     if (webPage.corePage()->settings().acceleratedDrawingEnabled() || webPage.corePage()->settings().forceCompositingMode())
         m_alwaysUseCompositing = true;
 
@@ -220,6 +226,16 @@ void DrawingAreaImpl::setPaintingEnabled(bool paintingEnabled)
     m_isPaintingEnabled = paintingEnabled;
 }
 
+void DrawingAreaImpl::mainFrameContentSizeChanged(const WebCore::IntSize& newSize)
+{
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    if (m_layerTreeHost)
+        m_layerTreeHost->sizeDidChange(newSize);
+#else
+    UNUSED_PARAM(newSize);
+#endif
+}
+
 void DrawingAreaImpl::updatePreferences(const WebPreferencesStore& store)
 {
     m_webPage.corePage()->settings().setForceCompositingMode(store.getBoolValueForKey(WebPreferencesKey::forceCompositingModeKey()));
@@ -322,7 +338,11 @@ void DrawingAreaImpl::updateBackingStoreState(uint64_t stateID, bool respondImme
         m_webPage.scrollMainFrameIfNotAtMaxScrollPosition(scrollOffset);
 
         if (m_layerTreeHost) {
+#if USE(COORDINATED_GRAPHICS_THREADED)
+            m_layerTreeHost->viewportSizeChanged(m_webPage.size());
+#else
             m_layerTreeHost->sizeDidChange(m_webPage.size());
+#endif
         } else
             m_dirtyRegion = m_webPage.bounds();
     } else {
@@ -630,17 +650,38 @@ void DrawingAreaImpl::display(UpdateInfo& updateInfo)
 
     graphicsContext->translate(-bounds.x(), -bounds.y());
 
-    for (size_t i = 0; i < rects.size(); ++i) {
-        m_webPage.drawRect(*graphicsContext, rects[i]);
-
-        // FIXME: Draw page olverlays. https://bugs.webkit.org/show_bug.cgi?id=131433.
-
-        updateInfo.updateRects.append(rects[i]);
+    for (const auto& rect : rects) {
+        m_webPage.drawRect(*graphicsContext, rect);
+        updateInfo.updateRects.append(rect);
     }
 
     // Layout can trigger more calls to setNeedsDisplay and we don't want to process them
     // until the UI process has painted the update, so we stop the timer here.
     m_displayTimer.stop();
 }
+
+void DrawingAreaImpl::attachViewOverlayGraphicsLayer(WebCore::Frame* frame, WebCore::GraphicsLayer* viewOverlayRootLayer)
+{
+    if (!frame->isMainFrame())
+        return;
+
+    if (!m_layerTreeHost)
+        return;
+
+    m_layerTreeHost->setViewOverlayRootLayer(viewOverlayRootLayer);
+}
+
+#if USE(TEXTURE_MAPPER_GL) && PLATFORM(GTK)
+void DrawingAreaImpl::setNativeSurfaceHandleForCompositing(uint64_t handle)
+{
+    m_nativeSurfaceHandleForCompositing = handle;
+    m_webPage.corePage()->settings().setAcceleratedCompositingEnabled(true);
+
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    if (m_layerTreeHost)
+        m_layerTreeHost->setNativeSurfaceHandleForCompositing(handle);
+#endif
+}
+#endif
 
 } // namespace WebKit

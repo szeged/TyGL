@@ -50,12 +50,12 @@ MediaController::MediaController(ScriptExecutionContext& context)
     , m_muted(false)
     , m_readyState(HAVE_NOTHING)
     , m_playbackState(WAITING)
-    , m_asyncEventTimer(this, &MediaController::asyncEventTimerFired)
-    , m_clearPositionTimer(this, &MediaController::clearPositionTimerFired)
+    , m_asyncEventTimer(*this, &MediaController::asyncEventTimerFired)
+    , m_clearPositionTimer(*this, &MediaController::clearPositionTimerFired)
     , m_closedCaptionsVisible(false)
     , m_clock(Clock::create())
     , m_scriptExecutionContext(context)
-    , m_timeupdateTimer(this, &MediaController::timeupdateTimerFired)
+    , m_timeupdateTimer(*this, &MediaController::timeupdateTimerFired)
     , m_previousTimeupdateTime(0)
 {
 }
@@ -538,7 +538,7 @@ void MediaController::scheduleEvent(const AtomicString& eventName)
         m_asyncEventTimer.startOneShot(0);
 }
 
-void MediaController::asyncEventTimerFired(Timer<MediaController>&)
+void MediaController::asyncEventTimerFired()
 {
     Vector<RefPtr<Event>> pendingEvents;
 
@@ -548,7 +548,7 @@ void MediaController::asyncEventTimerFired(Timer<MediaController>&)
         dispatchEvent(pendingEvents[index].release(), IGNORE_EXCEPTION);
 }
 
-void MediaController::clearPositionTimerFired(Timer<MediaController>&)
+void MediaController::clearPositionTimerFired()
 {
     m_position = MediaPlayer::invalidTime();
 }
@@ -672,7 +672,7 @@ void MediaController::startTimeupdateTimer()
     m_timeupdateTimer.startRepeating(maxTimeupdateEventFrequency);
 }
 
-void MediaController::timeupdateTimerFired(Timer<MediaController>&)
+void MediaController::timeupdateTimerFired()
 {
     scheduleTimeupdateEvent();
 }

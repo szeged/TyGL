@@ -65,9 +65,9 @@ inline SVGLinearGradientElement::SVGLinearGradientElement(const QualifiedName& t
     registerAnimatedPropertiesForSVGLinearGradientElement();
 }
 
-PassRefPtr<SVGLinearGradientElement> SVGLinearGradientElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGLinearGradientElement> SVGLinearGradientElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGLinearGradientElement(tagName, document));
+    return adoptRef(*new SVGLinearGradientElement(tagName, document));
 }
 
 bool SVGLinearGradientElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -109,7 +109,7 @@ void SVGLinearGradientElement::svgAttributeChanged(const QualifiedName& attrName
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     updateRelativeLengthsInformation();
 
@@ -117,7 +117,7 @@ void SVGLinearGradientElement::svgAttributeChanged(const QualifiedName& attrName
         object->setNeedsLayout();
 }
 
-RenderPtr<RenderElement> SVGLinearGradientElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGLinearGradientElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGResourceLinearGradient>(*this, WTF::move(style));
 }

@@ -34,6 +34,7 @@
 #import "URL.h"
 #import "NetworkStorageSession.h"
 #import "WebCoreSystemInterface.h"
+#import <wtf/text/StringBuilder.h>
 
 enum {
     NSHTTPCookieAcceptPolicyExclusivelyFromMainDocumentDomain = 3
@@ -41,6 +42,8 @@ enum {
 
 @interface NSHTTPCookieStorage (Details)
 - (void)removeCookiesSinceDate:(NSDate *)date;
+- (id)_initWithCFHTTPCookieStorage:(CFHTTPCookieStorageRef)cfStorage;
+- (CFHTTPCookieStorageRef)_cookieStorage;
 @end
 
 namespace WebCore {
@@ -69,26 +72,44 @@ static RetainPtr<NSArray> filterCookies(NSArray *unfilteredCookies)
     return filteredCookies;
 }
 
-String cookiesForDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
+enum IncludeHTTPOnlyOrNot { DoNotIncludeHTTPOnly, IncludeHTTPOnly };
+static String cookiesForSession(const NetworkStorageSession& session, const URL& firstParty, const URL& url, IncludeHTTPOnlyOrNot includeHTTPOnly)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
 
     NSArray *cookies = wkHTTPCookiesForURL(session.cookieStorage().get(), firstParty, url);
-    return [[NSHTTPCookie requestHeaderFieldsWithCookies:filterCookies(cookies).get()] objectForKey:@"Cookie"];
+    if (![cookies count])
+        return String(); // Return a null string, not an empty one that StringBuilder would create below.
+
+    StringBuilder cookiesBuilder;
+    for (NSHTTPCookie *cookie in cookies) {
+        if (![[cookie name] length])
+            continue;
+
+        if (!includeHTTPOnly && [cookie isHTTPOnly])
+            continue;
+
+        if (!cookiesBuilder.isEmpty())
+            cookiesBuilder.appendLiteral("; ");
+
+        cookiesBuilder.append(String([cookie name]));
+        cookiesBuilder.append('=');
+        cookiesBuilder.append(String([cookie value]));
+    }
+    return cookiesBuilder.toString();
 
     END_BLOCK_OBJC_EXCEPTIONS;
     return String();
 }
 
+String cookiesForDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
+{
+    return cookiesForSession(session, firstParty, url, DoNotIncludeHTTPOnly);
+}
+
 String cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
-    BEGIN_BLOCK_OBJC_EXCEPTIONS;
-
-    NSArray *cookies = wkHTTPCookiesForURL(session.cookieStorage().get(), firstParty, url);
-    return [[NSHTTPCookie requestHeaderFieldsWithCookies:cookies] objectForKey:@"Cookie"];
-
-    END_BLOCK_OBJC_EXCEPTIONS;
-    return String();
+    return cookiesForSession(session, firstParty, url, IncludeHTTPOnly);
 }
 
 void setCookiesFromDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url, const String& cookieStr)
@@ -196,13 +217,24 @@ void deleteAllCookies(const NetworkStorageSession& session)
     wkDeleteAllHTTPCookies(session.cookieStorage().get());
 }
 
-void deleteAllCookiesModifiedAfterDate(const NetworkStorageSession& session, double date)
+static NSHTTPCookieStorage *cookieStorage(const NetworkStorageSession& session)
 {
-    UNUSED_PARAM(session);
+    auto cookieStorage = session.cookieStorage();
+    if (!cookieStorage || [NSHTTPCookieStorage sharedHTTPCookieStorage]._cookieStorage == cookieStorage)
+        return [NSHTTPCookieStorage sharedHTTPCookieStorage];
 
-    NSHTTPCookieStorage *cookieStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
-    if ([cookieStorage respondsToSelector:@selector(removeCookiesSinceDate:)])
-        [cookieStorage removeCookiesSinceDate:[NSDate dateWithTimeIntervalSince1970:date]];
+    return [[[NSHTTPCookieStorage alloc] _initWithCFHTTPCookieStorage:cookieStorage.get()] autorelease];
+}
+
+void deleteAllCookiesModifiedSince(const NetworkStorageSession& session, std::chrono::system_clock::time_point timePoint)
+{
+    if (![NSHTTPCookieStorage instancesRespondToSelector:@selector(removeCookiesSinceDate:)])
+        return;
+
+    NSTimeInterval timeInterval = std::chrono::duration_cast<std::chrono::duration<double>>(timePoint.time_since_epoch()).count();
+    NSDate *date = [NSDate dateWithTimeIntervalSince1970:timeInterval];
+
+    [cookieStorage(session) removeCookiesSinceDate:date];
 }
 
 }

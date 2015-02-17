@@ -36,13 +36,13 @@
 
 namespace WebCore {
 
-class TouchEvent : public MouseRelatedEvent {
+class TouchEvent final : public MouseRelatedEvent {
 public:
     virtual ~TouchEvent();
 
-    static PassRefPtr<TouchEvent> create()
+    static Ref<TouchEvent> create()
     {
-        return adoptRef(new TouchEvent);
+        return adoptRef(*new TouchEvent);
     }
     static PassRefPtr<TouchEvent> create(TouchList* touches, 
             TouchList* targetTouches, TouchList* changedTouches, 

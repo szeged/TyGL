@@ -71,9 +71,9 @@ inline SVGFEConvolveMatrixElement::SVGFEConvolveMatrixElement(const QualifiedNam
     registerAnimatedPropertiesForSVGFEConvolveMatrixElement();
 }
 
-PassRefPtr<SVGFEConvolveMatrixElement> SVGFEConvolveMatrixElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEConvolveMatrixElement> SVGFEConvolveMatrixElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEConvolveMatrixElement(tagName, document));
+    return adoptRef(*new SVGFEConvolveMatrixElement(tagName, document));
 }
 
 const AtomicString& SVGFEConvolveMatrixElement::kernelUnitLengthXIdentifier()
@@ -257,7 +257,7 @@ void SVGFEConvolveMatrixElement::svgAttributeChanged(const QualifiedName& attrNa
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::edgeModeAttr
         || attrName == SVGNames::divisorAttr

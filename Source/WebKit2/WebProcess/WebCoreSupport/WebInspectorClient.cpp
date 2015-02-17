@@ -26,8 +26,6 @@
 #include "config.h"
 #include "WebInspectorClient.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "DrawingArea.h"
 #include "WebInspector.h"
 #include "WebPage.h"
@@ -74,7 +72,7 @@ WebInspectorClient::~WebInspectorClient()
         delete layer;
     }
 
-    if (m_paintRectOverlay)
+    if (m_paintRectOverlay && m_page->mainFrame())
         m_page->mainFrame()->pageOverlayController().uninstallPageOverlay(m_paintRectOverlay.get(), PageOverlay::FadeMode::Fade);
 }
 
@@ -123,7 +121,7 @@ void WebInspectorClient::highlight()
     }
 #else
     Highlight highlight;
-    m_page->corePage()->inspectorController().getHighlight(&highlight, InspectorOverlay::CoordinateSystem::Document);
+    m_page->corePage()->inspectorController().getHighlight(highlight, InspectorOverlay::CoordinateSystem::Document);
     m_page->showInspectorHighlight(highlight);
 #endif
 }
@@ -131,7 +129,7 @@ void WebInspectorClient::highlight()
 void WebInspectorClient::hideHighlight()
 {
 #if !PLATFORM(IOS)
-    if (m_highlightOverlay)
+    if (m_highlightOverlay && m_page->mainFrame())
         m_page->mainFrame()->pageOverlayController().uninstallPageOverlay(m_highlightOverlay, PageOverlay::FadeMode::Fade);
 #else
     m_page->hideInspectorHighlight();
@@ -156,11 +154,9 @@ void WebInspectorClient::showPaintRect(const FloatRect& rect)
     paintLayer->setBackgroundColor(Color(1.0f, 0.0f, 0.0f, 0.2f));
 
     KeyframeValueList fadeKeyframes(AnimatedPropertyOpacity);
-    OwnPtr<AnimationValue> intialValue = FloatAnimationValue::create(0, 1);
-    fadeKeyframes.insert(intialValue.release());
+    fadeKeyframes.insert(std::make_unique<FloatAnimationValue>(0, 1));
 
-    OwnPtr<AnimationValue> finalValue = FloatAnimationValue::create(0.25, 0);
-    fadeKeyframes.insert(finalValue.release());
+    fadeKeyframes.insert(std::make_unique<FloatAnimationValue>(0.25, 0));
     
     RefPtr<Animation> opacityAnimation = Animation::create();
     opacityAnimation->setDuration(0.25);
@@ -211,7 +207,7 @@ void WebInspectorClient::willMoveToPage(PageOverlay&, Page* page)
 
     // The page overlay is moving away from the web page, reset it.
     ASSERT(m_highlightOverlay);
-    m_highlightOverlay = 0;
+    m_highlightOverlay = nullptr;
 }
 
 void WebInspectorClient::didMoveToPage(PageOverlay&, Page*)
@@ -229,5 +225,3 @@ bool WebInspectorClient::mouseEvent(PageOverlay&, const PlatformMouseEvent&)
 }
 
 } // namespace WebKit
-
-#endif // ENABLE(INSPECTOR)

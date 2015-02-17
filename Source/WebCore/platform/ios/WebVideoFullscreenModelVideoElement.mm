@@ -54,6 +54,7 @@ using namespace WebCore;
 WebVideoFullscreenModelVideoElement::WebVideoFullscreenModelVideoElement()
     : EventListener(EventListener::CPPEventListenerType)
     , m_isListening(false)
+    , m_videoFullscreenInterface(nullptr)
 {
 }
 
@@ -66,6 +67,9 @@ void WebVideoFullscreenModelVideoElement::setVideoElement(HTMLVideoElement* vide
     if (m_videoElement == videoElement)
         return;
 
+    if (m_videoFullscreenInterface)
+        m_videoFullscreenInterface->resetMediaState();
+    
     if (m_videoElement && m_isListening) {
         for (auto eventName : observedEventNames())
             m_videoElement->removeEventListener(eventName, this, false);
@@ -376,6 +380,16 @@ const AtomicString& WebVideoFullscreenModelVideoElement::eventNameAll()
 {
     static NeverDestroyed<AtomicString> sEventNameAll = "allEvents";
     return sEventNameAll;
+}
+
+void WebVideoFullscreenModelVideoElement::fullscreenModeChanged(HTMLMediaElement::VideoFullscreenMode videoFullscreenMode)
+{
+    __block RefPtr<WebVideoFullscreenModelVideoElement> protect(this);
+    WebThreadRun(^{
+        if (m_videoElement)
+            m_videoElement->fullscreenModeChanged(videoFullscreenMode);
+        protect.clear();
+    });
 }
 
 #endif

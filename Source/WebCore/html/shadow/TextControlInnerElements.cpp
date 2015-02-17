@@ -56,7 +56,7 @@ PassRefPtr<TextControlInnerContainer> TextControlInnerContainer::create(Document
     return adoptRef(new TextControlInnerContainer(document));
 }
     
-RenderPtr<RenderElement> TextControlInnerContainer::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> TextControlInnerContainer::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderTextControlInnerContainer>(*this, WTF::move(style));
 }
@@ -72,10 +72,10 @@ PassRefPtr<TextControlInnerElement> TextControlInnerElement::create(Document& do
     return adoptRef(new TextControlInnerElement(document));
 }
 
-PassRefPtr<RenderStyle> TextControlInnerElement::customStyleForRenderer(RenderStyle&)
+RefPtr<RenderStyle> TextControlInnerElement::customStyleForRenderer(RenderStyle&)
 {
-    RenderTextControlSingleLine* parentRenderer = toRenderTextControlSingleLine(shadowHost()->renderer());
-    return parentRenderer->createInnerBlockStyle(&parentRenderer->style());
+    RenderTextControlSingleLine& parentRenderer = downcast<RenderTextControlSingleLine>(*shadowHost()->renderer());
+    return parentRenderer.createInnerBlockStyle(&parentRenderer.style());
 }
 
 // ---------------------------
@@ -110,20 +110,20 @@ void TextControlInnerTextElement::defaultEventHandler(Event* event)
         HTMLDivElement::defaultEventHandler(event);
 }
 
-RenderPtr<RenderElement> TextControlInnerTextElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> TextControlInnerTextElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderTextControlInnerBlock>(*this, WTF::move(style));
 }
 
 RenderTextControlInnerBlock* TextControlInnerTextElement::renderer() const
 {
-    return toRenderTextControlInnerBlock(HTMLDivElement::renderer());
+    return downcast<RenderTextControlInnerBlock>(HTMLDivElement::renderer());
 }
 
-PassRefPtr<RenderStyle> TextControlInnerTextElement::customStyleForRenderer(RenderStyle&)
+RefPtr<RenderStyle> TextControlInnerTextElement::customStyleForRenderer(RenderStyle&)
 {
-    RenderTextControl* parentRenderer = toRenderTextControl(shadowHost()->renderer());
-    return parentRenderer->createInnerTextStyle(&parentRenderer->style());
+    RenderTextControl& parentRenderer = downcast<RenderTextControl>(*shadowHost()->renderer());
+    return parentRenderer.createInnerTextStyle(&parentRenderer.style());
 }
 
 // ----------------------------
@@ -146,11 +146,11 @@ void SearchFieldResultsButtonElement::defaultEventHandler(Event* event)
         input->focus();
         input->select();
 #if !PLATFORM(IOS)
-        RenderSearchField* renderer = toRenderSearchField(input->renderer());
-        if (renderer->popupIsVisible())
-            renderer->hidePopup();
+        RenderSearchField& renderer = downcast<RenderSearchField>(*input->renderer());
+        if (renderer.popupIsVisible())
+            renderer.hidePopup();
         else if (input->maxResults() > 0)
-            renderer->showPopup();
+            renderer.showPopup();
 #endif
         event->setDefaultHandled();
     }

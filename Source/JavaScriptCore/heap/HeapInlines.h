@@ -249,7 +249,7 @@ inline BlockAllocator& Heap::blockAllocator()
 template <typename T>
 inline void Heap::releaseSoon(RetainPtr<T>&& object)
 {
-    m_objectSpace.releaseSoon(WTF::move(object));
+    m_delayedReleaseObjects.append(WTF::move(object));
 }
 #endif
 
@@ -286,7 +286,7 @@ inline void Heap::decrementDeferralDepthAndGCIfNeeded()
 inline HashSet<MarkedArgumentBuffer*>& Heap::markListSet()
 {
     if (!m_markListSet)
-        m_markListSet = adoptPtr(new HashSet<MarkedArgumentBuffer*>); 
+        m_markListSet = std::make_unique<HashSet<MarkedArgumentBuffer*>>();
     return *m_markListSet;
 }
     

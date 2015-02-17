@@ -1,25 +1,80 @@
 // We don't use DS.Model for these object types because we can't afford to process millions of them.
 
-function FetchCommitsForTimeRange(repository, from, to)
+var PrivilegedAPI = {
+    _token: null,
+    _expiration: null,
+    _maxNetworkLatency: 3 * 60 * 1000 /* 3 minutes */,
+};
+
+PrivilegedAPI.sendRequest = function (url, parameters)
 {
-    var url = '../api/commits/' + repository.get('id') + '/' + from + '-' + to;
+    return this._generateTokenInServerIfNeeded().then(function (token) {
+        return PrivilegedAPI._post(url, $.extend({token: token}, parameters));
+    });
+}
 
-    var cachedCommits = FetchCommitsForTimeRange._cachedCommitsByRepository[repository];
-    if (!cachedCommits) {
-        cachedCommits = {commitsByRevision: {}, commitsByTime: []};
-        FetchCommitsForTimeRange._cachedCommitsByRepository[repository] = cachedCommits;
+PrivilegedAPI._generateTokenInServerIfNeeded = function ()
+{
+    var self = this;
+    return new Ember.RSVP.Promise(function (resolve, reject) {
+        if (self._token && self._expiration > Date.now() + self._maxNetworkLatency)
+            resolve(self._token);
+
+        PrivilegedAPI._post('generate-csrf-token')
+            .then(function (result, reject) {
+                self._token = result['token'];
+                self._expiration = new Date(result['expiration']);
+                resolve(self._token);
+            }).catch(reject);
+    });
+}
+
+PrivilegedAPI._post = function (url, parameters)
+{
+    return new Ember.RSVP.Promise(function (resolve, reject) {
+        $.ajax({
+            url: '../privileged-api/' + url,
+            type: 'POST',
+            contentType: 'application/json',
+            data: parameters ? JSON.stringify(parameters) : '{}',
+            dataType: 'json',
+        }).done(function (data) {
+            if (data.status != 'OK')
+                reject(data.status);
+            else
+                resolve(data);
+        }).fail(function (xhr, status, error) {
+            reject(xhr.status + (error ? ', ' + error : '') + '\n\nWith response:\n' + xhr.responseText);
+        });
+    });
+}
+
+var CommitLogs = {
+    _cachedCommitsByRepository: {}
+};
+
+CommitLogs.fetchForTimeRange = function (repository, from, to, keyword)
+{
+    var params = [];
+    if (from && to) {
+        params.push(['from', from]);
+        params.push(['to', to]);
     }
+    if (keyword)
+        params.push(['keyword', keyword]);
 
-    if (cachedCommits) {
-        var startCommit = cachedCommits.commitsByRevision[from];
-        var endCommit = cachedCommits.commitsByRevision[to];
-        if (startCommit && endCommit) {
-            return new Ember.RSVP.Promise(function (resolve) {
-                resolve(cachedCommits.commitsByTime.slice(startCommit.index, endCommit.index + 1)) });
-        }
+    // FIXME: We should be able to use the cache if all commits in the range have been cached.
+    var useCache = from && to && !keyword;
+
+    var url = '../api/commits/' + repository + '/?' + params.map(function (keyValue) {
+        return encodeURIComponent(keyValue[0]) + '=' + encodeURIComponent(keyValue[1]);
+    }).join('&');
+
+    if (useCache) {
+        var cachedCommitsForRange = CommitLogs._cachedCommitsBetween(repository, from, to);
+        if (cachedCommitsForRange)
+            return new Ember.RSVP.Promise(function (resolve) { resolve(cachedCommitsForRange); });
     }
-
-    console.log('Fecthing ' + url);
 
     return new Ember.RSVP.Promise(function (resolve, reject) {
         $.getJSON(url, function (data) {
@@ -28,25 +83,52 @@ function FetchCommitsForTimeRange(repository, from, to)
                 return;
             }
 
-            data.commits.forEach(function (commit) {
-                if (cachedCommits.commitsByRevision[commit.revision])
-                    return;
-                commit.time = new Date(commit.time.replace(' ', 'T'));
-                cachedCommits.commitsByRevision[commit.revision] = commit;
-                cachedCommits.commitsByTime.push(commit);
-            });
+            var fetchedCommits = data.commits;
+            fetchedCommits.forEach(function (commit) { commit.time = new Date(commit.time.replace(' ', 'T')); });
 
-            cachedCommits.commitsByTime.sort(function (a, b) { return a.time - b.time; });
-            cachedCommits.commitsByTime.forEach(function (commit, index) { commit.index = index; });
+            if (useCache)
+                CommitLogs._cacheConsecutiveCommits(repository, from, to, fetchedCommits);
 
-            resolve(data.commits);
+            resolve(fetchedCommits);
         }).fail(function (xhr, status, error) {
             reject(xhr.status + (error ? ', ' + error : ''));
         })
     });
 }
 
-FetchCommitsForTimeRange._cachedCommitsByRepository = {};
+CommitLogs._cachedCommitsBetween = function (repository, from, to)
+{
+    var cachedCommits = this._cachedCommitsByRepository[repository];
+    if (!cachedCommits)
+        return null;
+
+    var startCommit = cachedCommits.commitsByRevision[from];
+    var endCommit = cachedCommits.commitsByRevision[to];
+    if (!startCommit || !endCommit)
+        return null;
+
+    return cachedCommits.commitsByTime.slice(startCommit.cacheIndex, endCommit.cacheIndex + 1);
+}
+
+CommitLogs._cacheConsecutiveCommits = function (repository, from, to, consecutiveCommits)
+{
+    var cachedCommits = this._cachedCommitsByRepository[repository];
+    if (!cachedCommits) {
+        cachedCommits = {commitsByRevision: {}, commitsByTime: []};
+        this._cachedCommitsByRepository[repository] = cachedCommits;
+    }
+
+    consecutiveCommits.forEach(function (commit) {
+        if (cachedCommits.commitsByRevision[commit.revision])
+            return;
+        cachedCommits.commitsByRevision[commit.revision] = commit;
+        cachedCommits.commitsByTime.push(commit);
+    });
+
+    cachedCommits.commitsByTime.sort(function (a, b) { return a.time - b.time; });
+    cachedCommits.commitsByTime.forEach(function (commit, index) { commit.cacheIndex = index; });
+}
+
 
 function Measurement(rawData)
 {
@@ -59,8 +141,8 @@ function Measurement(rawData)
         revisions = {};
     this._raw['revisions'] = revisions;
 
-    for (var repositoryName in revisions) {
-        var commitTimeOrUndefined = revisions[repositoryName][1]; // e.g. ["162190", 1389945046000]
+    for (var repositoryId in revisions) {
+        var commitTimeOrUndefined = revisions[repositoryId][1]; // e.g. ["162190", 1389945046000]
         if (latestTime < commitTimeOrUndefined)
             latestTime = commitTimeOrUndefined;
     }
@@ -70,21 +152,25 @@ function Measurement(rawData)
     this._formattedRevisions = undefined;
 }
 
+Measurement.prototype.commitTimeForRepository = function (repositoryId)
+{
+    var revisions = this._raw['revisions'];
+    var rawData = revisions[repositoryId];
+    if (!rawData)
+        return null;
+    return new Date(rawData[1]);
+}
+
 Measurement.prototype.formattedRevisions = function (previousMeasurement)
 {
     var revisions = this._raw['revisions'];
     var previousRevisions = previousMeasurement ? previousMeasurement._raw['revisions'] : null;
     var formattedRevisions = {};
-    for (var repositoryName in revisions) {
-        var currentRevision = revisions[repositoryName][0];
-        var commitTimeInPOSIX = revisions[repositoryName][1];
-
-        var previousRevision = previousRevisions ? previousRevisions[repositoryName][0] : null;
-
+    for (var repositoryId in revisions) {
+        var currentRevision = revisions[repositoryId][0];
+        var previousRevision = previousRevisions ? previousRevisions[repositoryId][0] : null;
         var formatttedRevision = this._formatRevisionRange(previousRevision, currentRevision);
-        if (commitTimeInPOSIX)
-            formatttedRevision['commitTime'] = new Date(commitTimeInPOSIX);
-        formattedRevisions[repositoryName] = formatttedRevision;
+        formattedRevisions[repositoryId] = formatttedRevision;
     }
 
     return formattedRevisions;
@@ -109,18 +195,18 @@ Measurement.prototype._formatRevisionRange = function (previousRevision, current
     } else if (currentRevision.indexOf(' ') >= 0) // e.g. 10.9 13C64.
         revisionDelimiter = ' - ';
     else if (currentRevision.length == 40) { // e.g. git hash
-        formattedCurrentHash = currentRevision.substring(0, 8);
+        var formattedCurrentHash = currentRevision.substring(0, 8);
         if (previousRevision)
             label = previousRevision.substring(0, 8) + '..' + formattedCurrentHash;
         else
-            label = 'At ' + formattedCurrentHash;
+            label = formattedCurrentHash;
     }
 
     if (!label) {
         if (previousRevision)
             label = revisionPrefix + previousRevision + revisionDelimiter + revisionPrefix + currentRevision;
         else
-            label = 'At ' + revisionPrefix + currentRevision;
+            label = revisionPrefix + currentRevision;
     }
 
     return {
@@ -179,6 +265,17 @@ Measurement.prototype.formattedBuildTime = function ()
 Measurement._formatDate = function (date)
 {
     return date.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+}
+
+Measurement.prototype.bugs = function ()
+{
+    return this._raw['bugs'];
+}
+
+Measurement.prototype.hasBugs = function ()
+{
+    var bugs = this.bugs();
+    return bugs && Object.keys(bugs).length;
 }
 
 function RunsData(rawData)
@@ -258,6 +355,23 @@ function TimeSeries(series)
     this._max = max;
 }
 
+TimeSeries.prototype.findPointByMeasurementId = function (measurementId)
+{
+    return this._series.find(function (point) { return point.measurement.id() == measurementId; });
+}
+
+TimeSeries.prototype.findPointAfterTime = function (time)
+{
+    return this._series.find(function (point) { return point.time >= time; });
+}
+
+TimeSeries.prototype.seriesBetweenPoints = function (startPoint, endPoint)
+{
+    if (!startPoint.seriesIndex || !endPoint.seriesIndex)
+        return null;
+    return this._series.slice(startPoint.seriesIndex, endPoint.seriesIndex + 1);
+}
+
 TimeSeries.prototype.minMaxForTimeRange = function (startTime, endTime)
 {
     var data = this._series;
@@ -296,4 +410,11 @@ TimeSeries.prototype.previousPoint = function (point)
     if (!point.seriesIndex)
         return null;
     return this._series[point.seriesIndex - 1];
+}
+
+TimeSeries.prototype.nextPoint = function (point)
+{
+    if (!point.seriesIndex)
+        return null;
+    return this._series[point.seriesIndex + 1];
 }

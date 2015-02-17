@@ -48,9 +48,9 @@ public:
 
     typedef unsigned CommandOptions;
 
-    static PassRefPtr<ReplaceSelectionCommand> create(Document& document, PassRefPtr<DocumentFragment> fragment, CommandOptions options, EditAction action = EditActionPaste)
+    static Ref<ReplaceSelectionCommand> create(Document& document, PassRefPtr<DocumentFragment> fragment, CommandOptions options, EditAction action = EditActionPaste)
     {
-        return adoptRef(new ReplaceSelectionCommand(document, fragment, options, action));
+        return adoptRef(*new ReplaceSelectionCommand(document, fragment, options, action));
     }
 
 private:
@@ -68,7 +68,14 @@ private:
 
         Node* firstNodeInserted() const { return m_firstNodeInserted.get(); }
         Node* lastLeafInserted() const { return m_lastNodeInserted->lastDescendant(); }
-        Node* pastLastLeaf() const { return m_lastNodeInserted ? NodeTraversal::next(lastLeafInserted()) : 0; }
+        Node* pastLastLeaf() const
+        {
+            if (m_lastNodeInserted) {
+                ASSERT(lastLeafInserted());
+                return NodeTraversal::next(*lastLeafInserted());
+            }
+            return nullptr;
+        }
 
     private:
         RefPtr<Node> m_firstNodeInserted;

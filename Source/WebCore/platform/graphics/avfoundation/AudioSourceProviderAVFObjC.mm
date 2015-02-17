@@ -84,11 +84,11 @@ namespace WebCore {
 
 static double kRingBufferDuration = 1;
 
-PassRefPtr<AudioSourceProviderAVFObjC> AudioSourceProviderAVFObjC::create(AVPlayerItem *item)
+RefPtr<AudioSourceProviderAVFObjC> AudioSourceProviderAVFObjC::create(AVPlayerItem *item)
 {
     if (!canLoadMTAudioProcessingTapCreate())
         return nullptr;
-    return adoptRef(new AudioSourceProviderAVFObjC(item));
+    return adoptRef(*new AudioSourceProviderAVFObjC(item));
 }
 
 AudioSourceProviderAVFObjC::AudioSourceProviderAVFObjC(AVPlayerItem *item)
@@ -184,7 +184,7 @@ void AudioSourceProviderAVFObjC::createMix()
     ASSERT(m_avPlayerItem);
     ASSERT(m_client);
 
-    m_avAudioMix = adoptNS([[getAVMutableAudioMixClass() alloc] init]);
+    m_avAudioMix = adoptNS([allocAVMutableAudioMixInstance() init]);
 
     MTAudioProcessingTapCallbacks callbacks = {
         0,
@@ -201,7 +201,7 @@ void AudioSourceProviderAVFObjC::createMix()
     ASSERT(tap);
     ASSERT(m_tap == tap);
 
-    RetainPtr<AVMutableAudioMixInputParameters> parameters = adoptNS([[getAVMutableAudioMixInputParametersClass() alloc] init]);
+    RetainPtr<AVMutableAudioMixInputParameters> parameters = adoptNS([allocAVMutableAudioMixInputParametersInstance() init]);
     [parameters setAudioTapProcessor:m_tap.get()];
 
     CMPersistentTrackID firstEnabledAudioTrackID = kCMPersistentTrackID_Invalid;

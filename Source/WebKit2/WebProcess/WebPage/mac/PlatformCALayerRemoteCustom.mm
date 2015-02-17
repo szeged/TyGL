@@ -59,7 +59,7 @@ PlatformCALayerRemoteCustom::PlatformCALayerRemoteCustom(LayerType layerType, Pl
 {
     switch (context.layerHostingMode()) {
     case LayerHostingMode::InProcess:
-        m_layerHostingContext = LayerHostingContext::createForPort(WebProcess::shared().compositingRenderServerPort());
+        m_layerHostingContext = LayerHostingContext::createForPort(WebProcess::singleton().compositingRenderServerPort());
         break;
 #if HAVE(OUT_OF_PROCESS_LAYER_HOSTING)
     case LayerHostingMode::OutOfProcess:
@@ -104,7 +104,7 @@ PassRefPtr<WebCore::PlatformCALayer> PlatformCALayerRemoteCustom::clone(Platform
     bool copyContents = true;
 
     if (layerType() == LayerTypeAVPlayerLayer) {
-        clonedLayer = adoptNS([[getAVPlayerLayerClass() alloc] init]);
+        clonedLayer = adoptNS([allocAVPlayerLayerInstance() init]);
 
         AVPlayerLayer* destinationPlayerLayer = static_cast<AVPlayerLayer *>(clonedLayer.get());
         AVPlayerLayer* sourcePlayerLayer = static_cast<AVPlayerLayer *>(platformLayer());

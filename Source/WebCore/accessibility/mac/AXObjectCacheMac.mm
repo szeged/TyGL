@@ -29,6 +29,7 @@
 #if HAVE(ACCESSIBILITY)
 
 #import "AccessibilityObject.h"
+#import "AccessibilityTable.h"
 #import "RenderObject.h"
 #import "WebAccessibilityObjectWrapperMac.h"
 #import "WebCoreSystemInterface.h"
@@ -96,7 +97,7 @@ void AXObjectCache::postPlatformNotification(AccessibilityObject* obj, AXNotific
             macNotification = @"AXInvalidStatusChanged";
             break;
         case AXSelectedChildrenChanged:
-            if (obj->isAccessibilityTable())
+            if (is<AccessibilityTable>(*obj) && downcast<AccessibilityTable>(*obj).isExposableThroughAccessibility())
                 macNotification = NSAccessibilitySelectedRowsChangedNotification;
             else
                 macNotification = NSAccessibilitySelectedChildrenChangedNotification;
@@ -160,8 +161,13 @@ void AXObjectCache::nodeTextChangePlatformNotification(AccessibilityObject*, AXT
 {
 }
 
-void AXObjectCache::frameLoadingEventPlatformNotification(AccessibilityObject*, AXLoadingEvent)
+void AXObjectCache::frameLoadingEventPlatformNotification(AccessibilityObject* axFrameObject, AXLoadingEvent loadingEvent)
 {
+    if (!axFrameObject)
+        return;
+    
+    if (loadingEvent == AXLoadingFinished && axFrameObject->document() == axFrameObject->topDocument())
+        postPlatformNotification(axFrameObject, AXLoadComplete);
 }
 
 void AXObjectCache::platformHandleFocusedUIElementChanged(Node*, Node*)

@@ -36,7 +36,6 @@ public:
 
     virtual ~CSSStyleRule();
 
-    virtual CSSRule::Type type() const { return STYLE_RULE; }
     virtual String cssText() const override;
     virtual void reattach(StyleRuleBase&) override;
 
@@ -46,10 +45,12 @@ public:
     CSSStyleDeclaration& style();
 
     // FIXME: Not CSSOM. Remove.
-    StyleRule* styleRule() const { return &const_cast<StyleRule&>(m_styleRule.get()); }
+    StyleRule& styleRule() const { return const_cast<StyleRule&>(m_styleRule.get()); }
 
 private:
     CSSStyleRule(StyleRule&, CSSStyleSheet*);
+
+    virtual CSSRule::Type type() const override { return STYLE_RULE; }
 
     String generateSelectorText() const;
 

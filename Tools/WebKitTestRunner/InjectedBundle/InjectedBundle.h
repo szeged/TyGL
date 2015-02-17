@@ -44,7 +44,7 @@ class InjectedBundlePage;
 
 class InjectedBundle {
 public:
-    static InjectedBundle& shared();
+    static InjectedBundle& singleton();
 
     // Initialize the InjectedBundle.
     void initialize(WKBundleRef, WKTypeRef initializationUserData);
@@ -91,6 +91,9 @@ public:
     void setGeolocationPermission(bool);
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed);
     void setMockGeolocationPositionUnavailableError(WKStringRef errorMessage);
+
+    // MediaStream.
+    void setUserMediaPermission(bool);
 
     // Policy delegate.
     void setCustomPolicyDelegate(bool enabled, bool permissive);

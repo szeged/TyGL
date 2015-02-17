@@ -55,8 +55,8 @@ private:
 
 class ChildNodeRemovalNotifier {
 public:
-    explicit ChildNodeRemovalNotifier(ContainerNode& insertionPoint)
-        : m_insertionPoint(insertionPoint)
+    explicit ChildNodeRemovalNotifier(ContainerNode& removalPoint)
+        : m_removalPoint(removalPoint)
     {
     }
 
@@ -68,7 +68,7 @@ private:
     void notifyNodeRemovedFromDocument(Node&);
     void notifyNodeRemovedFromTree(ContainerNode&);
 
-    ContainerNode& m_insertionPoint;
+    ContainerNode& m_removalPoint;
 };
 
 namespace Private {
@@ -217,9 +217,7 @@ inline void ChildNodeInsertionNotifier::notify(Node& node)
 {
     ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
 
-#if ENABLE(INSPECTOR)
-    InspectorInstrumentation::didInsertDOMNode(&node.document(), &node);
-#endif
+    InspectorInstrumentation::didInsertDOMNode(node.document(), node);
 
     Ref<Document> protectDocument(node.document());
     Ref<Node> protectNode(node);
@@ -236,8 +234,8 @@ inline void ChildNodeInsertionNotifier::notify(Node& node)
 
 inline void ChildNodeRemovalNotifier::notifyNodeRemovedFromDocument(Node& node)
 {
-    ASSERT(m_insertionPoint.inDocument());
-    node.removedFrom(m_insertionPoint);
+    ASSERT(m_removalPoint.inDocument());
+    node.removedFrom(m_removalPoint);
 
     if (is<ContainerNode>(node))
         notifyDescendantRemovedFromDocument(downcast<ContainerNode>(node));
@@ -246,9 +244,9 @@ inline void ChildNodeRemovalNotifier::notifyNodeRemovedFromDocument(Node& node)
 inline void ChildNodeRemovalNotifier::notifyNodeRemovedFromTree(ContainerNode& node)
 {
     NoEventDispatchAssertion assertNoEventDispatch;
-    ASSERT(!m_insertionPoint.inDocument());
+    ASSERT(!m_removalPoint.inDocument());
 
-    node.removedFrom(m_insertionPoint);
+    node.removedFrom(m_removalPoint);
     notifyDescendantRemovedFromTree(node);
 }
 

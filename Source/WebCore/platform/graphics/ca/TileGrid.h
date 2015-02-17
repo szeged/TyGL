@@ -51,7 +51,9 @@ public:
     TileGrid(TileController&);
     ~TileGrid();
 
-    PlatformCALayer& containerLayer() { return m_containerLayer.get(); }
+    PlatformCALayer& containerLayer() { return m_containerLayer; }
+
+    void setIsZoomedOutTileGrid(bool);
 
     void setScale(float);
     float scale() const { return m_scale; }
@@ -123,7 +125,7 @@ private:
     void removeTilesInCohort(TileCohort);
 
     void scheduleCohortRemoval();
-    void cohortRemovalTimerFired(Timer<TileGrid>*);
+    void cohortRemovalTimerFired();
     TileCohort nextTileCohort() const;
     void startedNewCohort(TileCohort);
     TileCohort newestTileCohort() const;
@@ -154,7 +156,7 @@ private:
     typedef Deque<TileCohortInfo> TileCohortList;
     TileCohortList m_cohortList;
 
-    Timer<TileGrid> m_cohortRemovalTimer;
+    Timer m_cohortRemovalTimer;
 
     typedef HashMap<PlatformCALayer*, int> RepaintCountMap;
     RepaintCountMap m_tileRepaintCounts;

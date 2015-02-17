@@ -58,9 +58,9 @@ inline SVGFEImageElement::SVGFEImageElement(const QualifiedName& tagName, Docume
     registerAnimatedPropertiesForSVGFEImageElement();
 }
 
-PassRefPtr<SVGFEImageElement> SVGFEImageElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEImageElement> SVGFEImageElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEImageElement(tagName, document));
+    return adoptRef(*new SVGFEImageElement(tagName, document));
 }
 
 SVGFEImageElement::~SVGFEImageElement()
@@ -82,7 +82,7 @@ void SVGFEImageElement::requestImageResource()
 {
     CachedResourceRequest request(ResourceRequest(document().completeURL(href())));
     request.setInitiator(this);
-    m_cachedImage = document().cachedResourceLoader()->requestImage(request);
+    m_cachedImage = document().cachedResourceLoader().requestImage(request);
 
     if (m_cachedImage)
         m_cachedImage->addClient(this);
@@ -155,7 +155,7 @@ void SVGFEImageElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::preserveAspectRatioAttr) {
         invalidate();
@@ -191,8 +191,11 @@ void SVGFEImageElement::removedFrom(ContainerNode& rootParent)
         clearResourceReferences();
 }
 
-void SVGFEImageElement::notifyFinished(CachedResource*)
+void SVGFEImageElement::imageChanged(CachedImage* cachedImage, const IntRect*)
 {
+    if (!cachedImage || !cachedImage->isLoaded())
+        return;
+
     if (!inDocument())
         return;
 

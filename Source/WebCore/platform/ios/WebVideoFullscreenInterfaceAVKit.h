@@ -30,10 +30,12 @@
 #if PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 80000
 
 #include <WebCore/EventListener.h>
+#include <WebCore/HTMLMediaElement.h>
 #include <WebCore/PlatformLayer.h>
 #include <WebCore/WebVideoFullscreenInterface.h>
 #include <wtf/RefPtr.h>
 #include <wtf/RetainPtr.h>
+#include <wtf/ThreadSafeRefCounted.h>
 
 OBJC_CLASS WebAVPlayerController;
 OBJC_CLASS AVPlayerViewController;
@@ -58,12 +60,50 @@ public:
     virtual void didEnterFullscreen() = 0;
     virtual void didExitFullscreen() = 0;
     virtual void didCleanupFullscreen() = 0;
+    virtual void fullscreenMayReturnToInline() = 0;
 };
 
 class WebVideoFullscreenInterfaceAVKit
     : public WebVideoFullscreenInterface
-    , public RefCounted<WebVideoFullscreenInterfaceAVKit> {
-        
+    , public ThreadSafeRefCounted<WebVideoFullscreenInterfaceAVKit> {
+
+public:
+    WEBCORE_EXPORT WebVideoFullscreenInterfaceAVKit();
+    virtual ~WebVideoFullscreenInterfaceAVKit() { }
+    WEBCORE_EXPORT void setWebVideoFullscreenModel(WebVideoFullscreenModel*);
+    WEBCORE_EXPORT void setWebVideoFullscreenChangeObserver(WebVideoFullscreenChangeObserver*);
+    
+    WEBCORE_EXPORT virtual void resetMediaState() override;
+    WEBCORE_EXPORT virtual void setDuration(double) override;
+    WEBCORE_EXPORT virtual void setCurrentTime(double currentTime, double anchorTime) override;
+    WEBCORE_EXPORT virtual void setRate(bool isPlaying, float playbackRate) override;
+    WEBCORE_EXPORT virtual void setVideoDimensions(bool hasVideo, float width, float height) override;
+    WEBCORE_EXPORT virtual void setSeekableRanges(const TimeRanges&) override;
+    WEBCORE_EXPORT virtual void setCanPlayFastReverse(bool) override;
+    WEBCORE_EXPORT virtual void setAudioMediaSelectionOptions(const Vector<WTF::String>& options, uint64_t selectedIndex) override;
+    WEBCORE_EXPORT virtual void setLegibleMediaSelectionOptions(const Vector<WTF::String>& options, uint64_t selectedIndex) override;
+    WEBCORE_EXPORT virtual void setExternalPlayback(bool enabled, ExternalPlaybackTargetType, WTF::String localizedDeviceName) override;
+    
+    WEBCORE_EXPORT virtual void setupFullscreen(PlatformLayer&, IntRect initialRect, UIView *, HTMLMediaElement::VideoFullscreenMode, bool allowOptimizedFullscreen);
+    WEBCORE_EXPORT virtual void enterFullscreen();
+    WEBCORE_EXPORT virtual void exitFullscreen(IntRect finalRect);
+    WEBCORE_EXPORT virtual void cleanupFullscreen();
+    WEBCORE_EXPORT virtual void invalidate();
+    WEBCORE_EXPORT virtual void requestHideAndExitFullscreen();
+
+    HTMLMediaElement::VideoFullscreenMode mode() const { return m_mode; }
+    void setIsOptimized(bool);
+    bool mayAutomaticallyShowVideoOptimized();
+    bool fullscreenMayReturnToInline();
+
+protected:
+    void beginSession();
+    void setupFullscreenInternal(PlatformLayer&, IntRect initialRect, UIView *, HTMLMediaElement::VideoFullscreenMode, bool allowOptimizedFullscreen);
+    void enterFullscreenOptimized();
+    void enterFullscreenStandard();
+    void exitFullscreenInternal(IntRect finalRect);
+    void cleanupFullscreenInternal();
+
     RetainPtr<WebAVPlayerController> m_playerController;
     RetainPtr<AVPlayerViewController> m_playerViewController;
     RetainPtr<CALayer> m_videoLayer;
@@ -75,33 +115,13 @@ class WebVideoFullscreenInterfaceAVKit
     RetainPtr<UIWindow> m_window;
     RetainPtr<UIViewController> m_viewController;
     RetainPtr<UIView> m_parentView;
+    RetainPtr<UIWindow> m_parentWindow;
+    HTMLMediaElement::VideoFullscreenMode m_mode;
+    bool m_exitRequested;
+    bool m_exitCompleted;
+    bool m_enterRequested;
 
-    WebAVPlayerController *playerController();
-    
     void doEnterFullscreen();
-        
-public:
-    WEBCORE_EXPORT WebVideoFullscreenInterfaceAVKit();
-    virtual ~WebVideoFullscreenInterfaceAVKit() { }
-    WEBCORE_EXPORT void setWebVideoFullscreenModel(WebVideoFullscreenModel*);
-    WEBCORE_EXPORT void setWebVideoFullscreenChangeObserver(WebVideoFullscreenChangeObserver*);
-    
-    WEBCORE_EXPORT virtual void setDuration(double) override;
-    WEBCORE_EXPORT virtual void setCurrentTime(double currentTime, double anchorTime) override;
-    WEBCORE_EXPORT virtual void setRate(bool isPlaying, float playbackRate) override;
-    WEBCORE_EXPORT virtual void setVideoDimensions(bool hasVideo, float width, float height) override;
-    WEBCORE_EXPORT virtual void setSeekableRanges(const TimeRanges&) override;
-    WEBCORE_EXPORT virtual void setCanPlayFastReverse(bool) override;
-    WEBCORE_EXPORT virtual void setAudioMediaSelectionOptions(const Vector<WTF::String>& options, uint64_t selectedIndex) override;
-    WEBCORE_EXPORT virtual void setLegibleMediaSelectionOptions(const Vector<WTF::String>& options, uint64_t selectedIndex) override;
-    WEBCORE_EXPORT virtual void setExternalPlayback(bool enabled, ExternalPlaybackTargetType, WTF::String localizedDeviceName) override;
-
-    WEBCORE_EXPORT virtual void setupFullscreen(PlatformLayer&, IntRect initialRect, UIView *);
-    WEBCORE_EXPORT virtual void enterFullscreen();
-    WEBCORE_EXPORT virtual void exitFullscreen(IntRect finalRect);
-    WEBCORE_EXPORT virtual void cleanupFullscreen();
-    WEBCORE_EXPORT virtual void invalidate();
-    WEBCORE_EXPORT virtual void requestHideAndExitFullscreen();
 };
 
 }

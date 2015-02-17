@@ -274,6 +274,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case ProfileWillCall:
     case ProfileDidCall:
     case ProfileType:
+    case ProfileControlFlow:
     case StoreBarrier:
     case StoreBarrierWithNullCheck:
     case PutByOffsetHint:
@@ -362,8 +363,6 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case ArrayPop:
     case Call:
     case Construct:
-    case ProfiledCall:
-    case ProfiledConstruct:
     case NativeCall:
     case NativeConstruct:
     case ToPrimitive:
@@ -744,14 +743,6 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
             return;
         }
     }
-        
-    case GetMyScope:
-        if (graph.m_codeBlock->needsActivation()) {
-            read(AbstractHeap(Variables, JSStack::ScopeChain));
-            def(HeapLocation(VariableLoc, AbstractHeap(Variables, JSStack::ScopeChain)), node);
-        } else
-            def(PureValue(node));
-        return;
         
     case GetClosureRegisters:
         read(JSEnvironmentRecord_registers);

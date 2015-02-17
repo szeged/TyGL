@@ -99,12 +99,12 @@ void RenderLayer::FilterInfo::updateReferenceFilterClients(const FilterOperation
 {
     removeReferenceFilterClients();
     for (size_t i = 0, size = operations.size(); i < size; ++i) {
-        FilterOperation* filterOperation = operations.operations()[i].get();
-        if (filterOperation->type() != FilterOperation::REFERENCE)
+        FilterOperation& filterOperation = *operations.operations()[i];
+        if (!is<ReferenceFilterOperation>(filterOperation))
             continue;
-        ReferenceFilterOperation* referenceFilterOperation = toReferenceFilterOperation(filterOperation);
-        CachedSVGDocumentReference* documentReference = referenceFilterOperation->cachedSVGDocumentReference();
-        CachedSVGDocument* cachedSVGDocument = documentReference ? documentReference->document() : 0;
+        ReferenceFilterOperation& referenceFilterOperation = downcast<ReferenceFilterOperation>(filterOperation);
+        auto* documentReference = referenceFilterOperation.cachedSVGDocumentReference();
+        CachedSVGDocument* cachedSVGDocument = documentReference ? documentReference->document() : nullptr;
 
         if (cachedSVGDocument) {
             // Reference is external; wait for notifyFinished().
@@ -113,11 +113,11 @@ void RenderLayer::FilterInfo::updateReferenceFilterClients(const FilterOperation
         } else {
             // Reference is internal; add layer as a client so we can trigger
             // filter repaint on SVG attribute change.
-            Element* filter = m_layer.renderer().document().getElementById(referenceFilterOperation->fragment());
+            Element* filter = m_layer.renderer().document().getElementById(referenceFilterOperation.fragment());
 
-            if (!filter || !filter->renderer() || !filter->renderer()->isSVGResourceFilter())
+            if (!filter || !is<RenderSVGResourceFilter>(filter->renderer()))
                 continue;
-            toRenderSVGResourceContainer(*filter->renderer()).addClientRenderLayer(&m_layer);
+            downcast<RenderSVGResourceFilter>(*filter->renderer()).addClientRenderLayer(&m_layer);
             m_internalSVGReferences.append(filter);
         }
     }
@@ -125,14 +125,13 @@ void RenderLayer::FilterInfo::updateReferenceFilterClients(const FilterOperation
 
 void RenderLayer::FilterInfo::removeReferenceFilterClients()
 {
-    for (size_t i = 0, size = m_externalSVGReferences.size(); i < size; ++i)
-        m_externalSVGReferences[i]->removeClient(this);
+    for (auto& resourceHandle : m_externalSVGReferences)
+        resourceHandle->removeClient(this);
     m_externalSVGReferences.clear();
-    for (size_t i = 0, size = m_internalSVGReferences.size(); i < size; ++i) {
-        Element* filter = m_internalSVGReferences[i].get();
+    for (const auto& filter : m_internalSVGReferences) {
         if (!filter->renderer())
             continue;
-        toRenderSVGResourceContainer(*filter->renderer()).removeClientRenderLayer(&m_layer);
+        downcast<RenderSVGResourceContainer>(*filter->renderer()).removeClientRenderLayer(&m_layer);
     }
     m_internalSVGReferences.clear();
 }

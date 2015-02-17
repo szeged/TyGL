@@ -49,14 +49,14 @@ class HitTestResult {
 public:
     typedef ListHashSet<RefPtr<Node>> NodeSet;
 
-    HitTestResult();
+    WEBCORE_EXPORT HitTestResult();
     WEBCORE_EXPORT explicit HitTestResult(const LayoutPoint&);
     // Pass non-negative padding values to perform a rect-based hit test.
     WEBCORE_EXPORT HitTestResult(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
     explicit HitTestResult(const HitTestLocation&);
     WEBCORE_EXPORT HitTestResult(const HitTestResult&);
     WEBCORE_EXPORT ~HitTestResult();
-    HitTestResult& operator=(const HitTestResult&);
+    WEBCORE_EXPORT HitTestResult& operator=(const HitTestResult&);
 
     Node* innerNode() const { return m_innerNode.get(); }
     WEBCORE_EXPORT Element* innerElement() const;
@@ -86,7 +86,7 @@ public:
 
     const HitTestLocation& hitTestLocation() const { return m_hitTestLocation; }
 
-    void setInnerNode(Node*);
+    WEBCORE_EXPORT void setInnerNode(Node*);
     void setInnerNonSharedNode(Node*);
     void setURLElement(Element*);
     void setScrollbar(Scrollbar*);
@@ -124,6 +124,9 @@ public:
     WEBCORE_EXPORT bool mediaIsVideo() const;
     bool mediaMuted() const;
     void toggleMediaMuteState() const;
+    WEBCORE_EXPORT bool isDownloadableMedia() const;
+    WEBCORE_EXPORT bool isOverTextInsideFormControlElement() const;
+    WEBCORE_EXPORT bool allowsCopy() const;
 
     // Returns true if it is rect-based hit test and needs to continue until the rect is fully
     // enclosed by the boundaries of a node.

@@ -29,6 +29,7 @@
 #include "AsyncAudioDecoder.h"
 #include "AudioBus.h"
 #include "AudioDestinationNode.h"
+#include "AudioProducer.h"
 #include "EventListener.h"
 #include "EventTarget.h"
 #include "MediaCanStartListener.h"
@@ -73,24 +74,16 @@ class PeriodicWave;
 // AudioContext is the cornerstone of the web audio API and all AudioNodes are created from it.
 // For thread safety between the audio thread and the main thread, it has a rendering graph locking mechanism. 
 
-class AudioContext : public ActiveDOMObject, public ThreadSafeRefCounted<AudioContext>, public EventTargetWithInlineData, public MediaCanStartListener {
+class AudioContext : public ActiveDOMObject, public ThreadSafeRefCounted<AudioContext>, public EventTargetWithInlineData, public MediaCanStartListener, public AudioProducer {
 public:
     // Create an AudioContext for rendering to the audio hardware.
-    static PassRefPtr<AudioContext> create(Document&, ExceptionCode&);
-
-    // Create an AudioContext for offline (non-realtime) rendering.
-    static PassRefPtr<AudioContext> createOfflineContext(Document*, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate, ExceptionCode&);
+    static RefPtr<AudioContext> create(Document&, ExceptionCode&);
 
     virtual ~AudioContext();
 
     bool isInitialized() const;
     
     bool isOfflineContext() { return m_isOfflineContext; }
-
-    // Returns true when initialize() was called AND all asynchronous initialization has completed.
-    bool isRunnable() const;
-
-    HRTFDatabaseLoader* hrtfDatabaseLoader() const { return m_hrtfDatabaseLoader.get(); }
 
     // Document notification
     virtual void stop() override;
@@ -262,6 +255,8 @@ public:
     void addBehaviorRestriction(BehaviorRestrictions restriction) { m_restrictions |= restriction; }
     void removeBehaviorRestriction(BehaviorRestrictions restriction) { m_restrictions &= ~restriction; }
 
+    void isPlayingAudioDidChange();
+
 protected:
     explicit AudioContext(Document&);
     AudioContext(Document&, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate);
@@ -269,6 +264,8 @@ protected:
     static bool isSampleRateRangeGood(float sampleRate);
     
 private:
+    virtual const char* activeDOMObjectName() const override { return "AudioContext"; }
+
     void constructCommon();
 
     void lazyInitialize();
@@ -284,6 +281,10 @@ private:
     static void deleteMarkedNodesDispatch(void* userData);
 
     virtual void mediaCanStart() override;
+
+    // AudioProducer
+    virtual bool isPlayingAudio() override;
+    virtual void pageMutedStateDidChange() override;
 
     bool m_isInitialized;
     bool m_isAudioThreadFinished;
@@ -343,9 +344,6 @@ private:
     
     // Only accessed in the audio thread.
     Vector<AudioNode*> m_deferredFinishDerefList;
-    
-    // HRTF Database loader
-    RefPtr<HRTFDatabaseLoader> m_hrtfDatabaseLoader;
 
     // EventTarget
     virtual void refEventTarget() override { ref(); }

@@ -30,7 +30,7 @@
 #ifndef RenderFlowThread_h
 #define RenderFlowThread_h
 
-
+#include "LayerFragment.h"
 #include "RenderBlockFlow.h"
 #include <wtf/HashCountedSet.h>
 #include <wtf/ListHashSet.h>
@@ -39,8 +39,6 @@
 namespace WebCore {
 
 class CurrentRenderRegionMaintainer;
-struct LayerFragment;
-typedef Vector<LayerFragment, 1> LayerFragments;
 class RenderFlowThread;
 class RenderNamedFlowFragment;
 class RenderStyle;
@@ -65,7 +63,7 @@ public:
 
     virtual void removeFlowChildInfo(RenderObject*);
 #ifndef NDEBUG
-    bool hasChildInfo(RenderObject* child) const { return child && child->isBox() && m_regionRangeMap.contains(toRenderBox(child)); }
+    bool hasChildInfo(RenderObject* child) const { return is<RenderBox>(child) && m_regionRangeMap.contains(downcast<RenderBox>(child)); }
 #endif
 
 #if !ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
@@ -101,7 +99,7 @@ public:
     // Called when a descendant box's layout is finished and it has been positioned within its container.
     virtual void flowThreadDescendantBoxLaidOut(RenderBox*) { }
 
-    static PassRef<RenderStyle> createFlowThreadStyle(RenderStyle* parentStyle);
+    static Ref<RenderStyle> createFlowThreadStyle(RenderStyle* parentStyle);
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
 
@@ -231,6 +229,8 @@ public:
 
     ContainingRegionMap& containingRegionMap();
 
+    virtual bool cachedFlowThreadContainingBlockNeedsUpdate() const override { return false; }
+
     // FIXME: Eventually as column and region flow threads start nesting, this may end up changing.
     virtual bool shouldCheckColumnBreaks() const { return false; }
 
@@ -242,7 +242,9 @@ private:
     virtual bool requiresLayer() const override final { return true; }
 
 protected:
-    RenderFlowThread(Document&, PassRef<RenderStyle>);
+    RenderFlowThread(Document&, Ref<RenderStyle>&&);
+
+    virtual RenderFlowThread* locateFlowThreadContainingBlock() const override { return const_cast<RenderFlowThread*>(this); }
 
     virtual const char* renderName() const = 0;
 
@@ -370,28 +372,6 @@ protected:
     unsigned m_layoutPhase : 2;
     bool m_needsTwoPhasesLayout : 1;
     bool m_layersToRegionMappingsDirty : 1;
-};
-
-RENDER_OBJECT_TYPE_CASTS(RenderFlowThread, isRenderFlowThread())
-
-class CurrentRenderFlowThreadMaintainer {
-    WTF_MAKE_NONCOPYABLE(CurrentRenderFlowThreadMaintainer);
-public:
-    CurrentRenderFlowThreadMaintainer(RenderFlowThread*);
-    ~CurrentRenderFlowThreadMaintainer();
-private:
-    RenderFlowThread* m_renderFlowThread;
-    RenderFlowThread* m_previousRenderFlowThread;
-};
-
-class CurrentRenderFlowThreadDisabler {
-    WTF_MAKE_NONCOPYABLE(CurrentRenderFlowThreadDisabler);
-public:
-    CurrentRenderFlowThreadDisabler(RenderView*);
-    ~CurrentRenderFlowThreadDisabler();
-private:
-    RenderView* m_view;
-    RenderFlowThread* m_renderFlowThread;
 };
 
 // This structure is used by PODIntervalTree for debugging.

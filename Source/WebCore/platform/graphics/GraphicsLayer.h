@@ -31,14 +31,13 @@
 #include "FilterOperations.h"
 #include "FloatPoint.h"
 #include "FloatPoint3D.h"
-#include "FloatRect.h"
+#include "FloatRoundedRect.h"
 #include "FloatSize.h"
 #include "GraphicsLayerClient.h"
 #include "IntRect.h"
 #include "PlatformLayer.h"
 #include "TransformOperations.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include <wtf/TypeCasts.h>
 
 #if ENABLE(CSS_COMPOSITING)
 #include "GraphicsTypes.h"
@@ -65,7 +64,7 @@ public:
 
     double keyTime() const { return m_keyTime; }
     const TimingFunction* timingFunction() const { return m_timingFunction.get(); }
-    virtual PassOwnPtr<AnimationValue> clone() const = 0;
+    virtual std::unique_ptr<AnimationValue> clone() const = 0;
 
 protected:
     AnimationValue(double keyTime, TimingFunction* timingFunction = nullptr)
@@ -83,25 +82,20 @@ private:
 // FIXME: Should be moved to its own header file.
 class FloatAnimationValue : public AnimationValue {
 public:
-    static PassOwnPtr<FloatAnimationValue> create(double keyTime, float value, TimingFunction* timingFunction = nullptr)
-    {
-        return adoptPtr(new FloatAnimationValue(keyTime, value, timingFunction));
-    }
-
-    virtual PassOwnPtr<AnimationValue> clone() const override
-    {
-        return adoptPtr(new FloatAnimationValue(*this));
-    }
-
-    float value() const { return m_value; }
-
-private:
-    FloatAnimationValue(double keyTime, float value, TimingFunction* timingFunction)
+    FloatAnimationValue(double keyTime, float value, TimingFunction* timingFunction = nullptr)
         : AnimationValue(keyTime, timingFunction)
         , m_value(value)
     {
     }
 
+    virtual std::unique_ptr<AnimationValue> clone() const override
+    {
+        return std::make_unique<FloatAnimationValue>(*this);
+    }
+
+    float value() const { return m_value; }
+
+private:
     float m_value;
 };
 
@@ -109,25 +103,20 @@ private:
 // FIXME: Should be moved to its own header file.
 class TransformAnimationValue : public AnimationValue {
 public:
-    static PassOwnPtr<TransformAnimationValue> create(double keyTime, const TransformOperations& value, TimingFunction* timingFunction = nullptr)
-    {
-        return adoptPtr(new TransformAnimationValue(keyTime, value, timingFunction));
-    }
-
-    virtual PassOwnPtr<AnimationValue> clone() const override
-    {
-        return adoptPtr(new TransformAnimationValue(*this));
-    }
-
-    const TransformOperations& value() const { return m_value; }
-
-private:
-    TransformAnimationValue(double keyTime, const TransformOperations& value, TimingFunction* timingFunction)
+    TransformAnimationValue(double keyTime, const TransformOperations& value, TimingFunction* timingFunction = nullptr)
         : AnimationValue(keyTime, timingFunction)
         , m_value(value)
     {
     }
 
+    virtual std::unique_ptr<AnimationValue> clone() const override
+    {
+        return std::make_unique<TransformAnimationValue>(*this);
+    }
+
+    const TransformOperations& value() const { return m_value; }
+
+private:
     TransformOperations m_value;
 };
 
@@ -135,25 +124,20 @@ private:
 // FIXME: Should be moved to its own header file.
 class FilterAnimationValue : public AnimationValue {
 public:
-    static PassOwnPtr<FilterAnimationValue> create(double keyTime, const FilterOperations& value, TimingFunction* timingFunction = nullptr)
-    {
-        return adoptPtr(new FilterAnimationValue(keyTime, value, timingFunction));
-    }
-
-    virtual PassOwnPtr<AnimationValue> clone() const override
-    {
-        return adoptPtr(new FilterAnimationValue(*this));
-    }
-
-    const FilterOperations& value() const { return m_value; }
-
-private:
-    FilterAnimationValue(double keyTime, const FilterOperations& value, TimingFunction* timingFunction)
+    FilterAnimationValue(double keyTime, const FilterOperations& value, TimingFunction* timingFunction = nullptr)
         : AnimationValue(keyTime, timingFunction)
         , m_value(value)
     {
     }
 
+    virtual std::unique_ptr<AnimationValue> clone() const override
+    {
+        return std::make_unique<FilterAnimationValue>(*this);
+    }
+
+    const FilterOperations& value() const { return m_value; }
+
+private:
     FilterOperations m_value;
 };
 
@@ -197,10 +181,10 @@ public:
     const AnimationValue& at(size_t i) const { return *m_values.at(i); }
     
     // Insert, sorted by keyTime.
-    void insert(PassOwnPtr<const AnimationValue>);
+    WEBCORE_EXPORT void insert(std::unique_ptr<const AnimationValue>);
     
 protected:
-    Vector<OwnPtr<const AnimationValue>> m_values;
+    Vector<std::unique_ptr<const AnimationValue>> m_values;
     AnimatedPropertyID m_property;
 };
 
@@ -210,11 +194,18 @@ protected:
 class GraphicsLayer {
     WTF_MAKE_NONCOPYABLE(GraphicsLayer); WTF_MAKE_FAST_ALLOCATED;
 public:
-    WEBCORE_EXPORT static std::unique_ptr<GraphicsLayer> create(GraphicsLayerFactory*, GraphicsLayerClient&);
+
+    enum class Type {
+        Normal,
+        PageTiledBacking,
+        Scrolling
+    };
+    
+    WEBCORE_EXPORT static std::unique_ptr<GraphicsLayer> create(GraphicsLayerFactory*, GraphicsLayerClient&, Type = Type::Normal);
     
     WEBCORE_EXPORT virtual ~GraphicsLayer();
 
-    virtual void initialize() { }
+    virtual void initialize(Type) { }
 
     typedef uint64_t PlatformLayerID;
     virtual PlatformLayerID primaryLayerID() const { return 0; }
@@ -324,6 +315,8 @@ public:
     bool acceleratesDrawing() const { return m_acceleratesDrawing; }
     virtual void setAcceleratesDrawing(bool b) { m_acceleratesDrawing = b; }
 
+    bool needsBackdrop() const { return !m_backdropFilters.isEmpty(); }
+
     // The color used to paint the layer background. Pass an invalid color to remove it.
     // Note that this covers the entire layer. Use setContentsToSolidColor() if the color should
     // only cover the contentsRect.
@@ -341,9 +334,11 @@ public:
     virtual void setOpacity(float opacity) { m_opacity = opacity; }
 
     const FilterOperations& filters() const { return m_filters; }
-    
-    // Returns true if filter can be rendered by the compositor
+    // Returns true if filter can be rendered by the compositor.
     virtual bool setFilters(const FilterOperations& filters) { m_filters = filters; return true; }
+
+    const FilterOperations& backdropFilters() const { return m_backdropFilters; }
+    virtual bool setBackdropFilters(const FilterOperations& filters) { m_backdropFilters = filters; return true; }
 
 #if ENABLE(CSS_COMPOSITING)
     BlendMode blendMode() const { return m_blendMode; }
@@ -377,8 +372,14 @@ public:
     FloatRect contentsRect() const { return m_contentsRect; }
     virtual void setContentsRect(const FloatRect& r) { m_contentsRect = r; }
 
-    FloatRect contentsClippingRect() const { return m_contentsClippingRect; }
-    virtual void setContentsClippingRect(const FloatRect& r) { m_contentsClippingRect = r; }
+    // Set a rounded rect that will be used to clip the layer contents.
+    FloatRoundedRect contentsClippingRect() const { return m_contentsClippingRect; }
+    virtual void setContentsClippingRect(const FloatRoundedRect& roundedRect) { m_contentsClippingRect = roundedRect; }
+
+    // Set a rounded rect that is used to clip this layer and its descendants (implies setting masksToBounds).
+    // Returns false if the platform can't support this rounded clip, and we should fall back to painting a mask.
+    FloatRoundedRect maskToBoundsRect() const { return m_masksToBoundsRect; };
+    virtual bool setMasksToBoundsRect(const FloatRoundedRect& roundedRect) { m_masksToBoundsRect = roundedRect; return false; }
 
     // Transitions are identified by a special animation name that cannot clash with a keyframe identifier.
     static String animationNameForTransition(AnimatedPropertyID);
@@ -435,10 +436,6 @@ public:
     virtual void setCustomAppearance(CustomAppearance customAppearance) { m_customAppearance = customAppearance; }
     CustomAppearance customAppearance() const { return m_customAppearance; }
 
-    enum CustomBehavior { NoCustomBehavior, CustomScrollingBehavior, CustomScrolledContentsBehavior };
-    virtual void setCustomBehavior(CustomBehavior customBehavior) { m_customBehavior = customBehavior; }
-    CustomBehavior customBehavior() const { return m_customBehavior; }
-
     // z-position is the z-equivalent of position(). It's only used for debugging purposes.
     virtual float zPosition() const { return m_zPosition; }
     WEBCORE_EXPORT virtual void setZPosition(float);
@@ -472,7 +469,7 @@ public:
 
     // Return a string with a human readable form of the layer tree, If debug is true
     // pointers for the layers and timing data will be included in the returned string.
-    String layerTreeAsText(LayerTreeAsTextBehavior = LayerTreeAsTextBehaviorNormal) const;
+    WEBCORE_EXPORT String layerTreeAsText(LayerTreeAsTextBehavior = LayerTreeAsTextBehaviorNormal) const;
 
     // Return an estimate of the backing store memory cost (in bytes). May be incorrect for tiled layers.
     WEBCORE_EXPORT virtual double backingStoreMemoryEstimate() const;
@@ -508,8 +505,13 @@ public:
 
     virtual bool isGraphicsLayerCA() const { return false; }
     virtual bool isGraphicsLayerCARemote() const { return false; }
+    virtual bool isGraphicsLayerTextureMapper() const { return false; }
+
+    virtual bool needsClippingMaskLayer() { return true; };
 
 protected:
+    WEBCORE_EXPORT explicit GraphicsLayer(Type, GraphicsLayerClient&);
+
     // Should be called from derived class destructors. Should call willBeDestroyed() on super.
     WEBCORE_EXPORT virtual void willBeDestroyed();
 
@@ -517,6 +519,7 @@ protected:
     // when compositing is not done in hardware. It is not virtual, so the caller
     // needs to notifiy the change to the platform layer as needed.
     void clearFilters() { m_filters.clear(); }
+    void clearBackdropFilters() { m_backdropFilters.clear(); }
 
     // Given a KeyframeValueList containing filterOperations, return true if the operations are valid.
     static int validateFilterOperations(const KeyframeValueList&);
@@ -535,8 +538,6 @@ protected:
     // The layer being replicated.
     GraphicsLayer* replicatedLayer() const { return m_replicatedLayer; }
     virtual void setReplicatedLayer(GraphicsLayer* layer) { m_replicatedLayer = layer; }
-
-    WEBCORE_EXPORT explicit GraphicsLayer(GraphicsLayerClient&);
 
     void dumpProperties(TextStream&, int indent, LayerTreeAsTextBehavior) const;
     virtual void dumpAdditionalProperties(TextStream&, int /*indent*/, LayerTreeAsTextBehavior) const { }
@@ -563,6 +564,7 @@ protected:
     float m_zPosition;
     
     FilterOperations m_filters;
+    FilterOperations m_backdropFilters;
 
 #if ENABLE(CSS_COMPOSITING)
     BlendMode m_blendMode;
@@ -595,19 +597,21 @@ protected:
     FloatPoint m_replicatedLayerPosition; // For a replica layer, the position of the replica.
 
     FloatRect m_contentsRect;
-    FloatRect m_contentsClippingRect;
+    FloatRoundedRect m_contentsClippingRect;
+    FloatRoundedRect m_masksToBoundsRect;
     FloatPoint m_contentsTilePhase;
     FloatSize m_contentsTileSize;
 
     int m_repaintCount;
     CustomAppearance m_customAppearance;
-    CustomBehavior m_customBehavior;
 };
 
-#define GRAPHICSLAYER_TYPE_CASTS(ToValueTypeName, predicate) \
-    TYPE_CASTS_BASE(ToValueTypeName, WebCore::GraphicsLayer, value, value->predicate, value.predicate)
-
 } // namespace WebCore
+
+#define SPECIALIZE_TYPE_TRAITS_GRAPHICSLAYER(ToValueTypeName, predicate) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(ToValueTypeName) \
+    static bool isType(const WebCore::GraphicsLayer& layer) { return layer.predicate; } \
+SPECIALIZE_TYPE_TRAITS_END()
 
 #ifndef NDEBUG
 // Outside the WebCore namespace for ease of invocation from gdb.

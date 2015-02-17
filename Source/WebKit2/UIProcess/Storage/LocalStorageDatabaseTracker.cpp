@@ -125,6 +125,48 @@ void LocalStorageDatabaseTracker::deleteAllDatabases()
     deleteEmptyDirectory(m_localStorageDirectory);
 }
 
+static Optional<time_t> fileCreationTime(const String& filePath)
+{
+    time_t time;
+    return getFileCreationTime(filePath, time) ? time : Optional<time_t>(Nullopt);
+}
+
+static Optional<time_t> fileModificationTime(const String& filePath)
+{
+    time_t time;
+    if (!getFileModificationTime(filePath, time))
+        return Nullopt;
+
+    return time;
+}
+
+Vector<Ref<SecurityOrigin>> LocalStorageDatabaseTracker::deleteDatabasesModifiedSince(std::chrono::system_clock::time_point time)
+{
+    Vector<String> originIdentifiersToDelete;
+
+    for (const String& origin : m_origins) {
+        String filePath = pathForDatabaseWithOriginIdentifier(origin);
+
+        auto modificationTime = fileModificationTime(filePath);
+        if (!modificationTime)
+            continue;
+
+        if (modificationTime.value() >= std::chrono::system_clock::to_time_t(time))
+            originIdentifiersToDelete.append(origin);
+    }
+
+    Vector<Ref<SecurityOrigin>> deletedDatabaseOrigins;
+    deletedDatabaseOrigins.reserveInitialCapacity(originIdentifiersToDelete.size());
+
+    for (const auto& originIdentifier : originIdentifiersToDelete) {
+        removeDatabaseWithOriginIdentifier(originIdentifier);
+
+        deletedDatabaseOrigins.uncheckedAppend(SecurityOrigin::createFromDatabaseIdentifier(originIdentifier));
+    }
+
+    return deletedDatabaseOrigins;
+}
+
 Vector<RefPtr<WebCore::SecurityOrigin>> LocalStorageDatabaseTracker::origins() const
 {
     Vector<RefPtr<SecurityOrigin>> origins;
@@ -143,12 +185,11 @@ Vector<LocalStorageDetails> LocalStorageDatabaseTracker::details()
 
     for (const String& origin : m_origins) {
         String filePath = pathForDatabaseWithOriginIdentifier(origin);
-        time_t time;
 
         LocalStorageDetails details;
         details.originIdentifier = origin.isolatedCopy();
-        details.creationTime = getFileCreationTime(filePath, time) ? time : 0;
-        details.modificationTime = getFileModificationTime(filePath, time) ? time : 0;
+        details.creationTime = fileCreationTime(filePath);
+        details.modificationTime = fileModificationTime(filePath);
         result.uncheckedAppend(details);
     }
 

@@ -48,9 +48,9 @@ inline SVGStopElement::SVGStopElement(const QualifiedName& tagName, Document& do
     registerAnimatedPropertiesForSVGStopElement();
 }
 
-PassRefPtr<SVGStopElement> SVGStopElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGStopElement> SVGStopElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGStopElement(tagName, document));
+    return adoptRef(*new SVGStopElement(tagName, document));
 }
 
 bool SVGStopElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -86,7 +86,7 @@ void SVGStopElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::offsetAttr) {
         if (auto renderer = this->renderer())
@@ -97,7 +97,7 @@ void SVGStopElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderPtr<RenderElement> SVGStopElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGStopElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGGradientStop>(*this, WTF::move(style));
 }

@@ -36,9 +36,9 @@ typedef struct _CCRSACryptor *CCRSACryptorRef;
 typedef CCRSACryptorRef PlatformRSAKey;
 #endif
 
-#if PLATFORM(GTK)
-typedef struct _PlatformRSAKeyGtk PlatformRSAKeyGtk;
-typedef PlatformRSAKeyGtk *PlatformRSAKey;
+#if PLATFORM(GTK) || PLATFORM(EFL)
+typedef struct _PlatformRSAKeyGnuTLS PlatformRSAKeyGnuTLS;
+typedef PlatformRSAKeyGnuTLS *PlatformRSAKey;
 #endif
 
 namespace WebCore {
@@ -49,9 +49,9 @@ class PromiseWrapper;
 
 class CryptoKeyRSA final : public CryptoKey {
 public:
-    static PassRefPtr<CryptoKeyRSA> create(CryptoAlgorithmIdentifier identifier, CryptoKeyType type, PlatformRSAKey platformKey, bool extractable, CryptoKeyUsage usage)
+    static Ref<CryptoKeyRSA> create(CryptoAlgorithmIdentifier identifier, CryptoKeyType type, PlatformRSAKey platformKey, bool extractable, CryptoKeyUsage usage)
     {
-        return adoptRef(new CryptoKeyRSA(identifier, type, platformKey, extractable, usage));
+        return adoptRef(*new CryptoKeyRSA(identifier, type, platformKey, extractable, usage));
     }
     static PassRefPtr<CryptoKeyRSA> create(CryptoAlgorithmIdentifier, const CryptoKeyDataRSAComponents&, bool extractable, CryptoKeyUsage);
     virtual ~CryptoKeyRSA();

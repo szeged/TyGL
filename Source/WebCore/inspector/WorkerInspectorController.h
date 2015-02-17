@@ -31,8 +31,6 @@
 #ifndef WorkerInspectorController_h
 #define WorkerInspectorController_h
 
-#if ENABLE(INSPECTOR)
-
 #include "InspectorInstrumentationCookie.h"
 #include "InspectorWebAgentBase.h"
 #include <inspector/InspectorAgentRegistry.h>
@@ -60,7 +58,7 @@ class WorkerInspectorController final : public Inspector::InspectorEnvironment {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit WorkerInspectorController(WorkerGlobalScope&);
-    ~WorkerInspectorController();
+    virtual ~WorkerInspectorController();
 
     void connectFrontend();
     void disconnectFrontend(Inspector::InspectorDisconnectReason);
@@ -74,9 +72,10 @@ public:
     virtual void willCallInjectedScriptFunction(JSC::ExecState*, const String& scriptName, int scriptLine) override;
     virtual void didCallInjectedScriptFunction(JSC::ExecState*) override;
     virtual void frontendInitialized() override { }
+    virtual Ref<WTF::Stopwatch> executionStopwatch() override;
 
 private:
-    friend InstrumentingAgents* instrumentationForWorkerGlobalScope(WorkerGlobalScope*);
+    friend class InspectorInstrumentation;
 
     WorkerGlobalScope& m_workerGlobalScope;
     RefPtr<InstrumentingAgents> m_instrumentingAgents;
@@ -84,12 +83,11 @@ private:
     WorkerRuntimeAgent* m_runtimeAgent;
     Inspector::InspectorAgentRegistry m_agents;
     std::unique_ptr<InspectorFrontendChannel> m_frontendChannel;
+    Ref<WTF::Stopwatch> m_executionStopwatch;
     RefPtr<Inspector::InspectorBackendDispatcher> m_backendDispatcher;
     Vector<InspectorInstrumentationCookie, 2> m_injectedScriptInstrumentationCookies;
 };
 
 }
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(WorkerInspectorController_h)

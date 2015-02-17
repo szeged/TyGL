@@ -32,7 +32,6 @@
 #include "Timer.h"
 #include <wtf/Deque.h>
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
 
@@ -61,7 +60,7 @@ private:
 
     bool canReuseLayerWithSize(const IntSize& size) const { return m_maxBytesForPool && !size.isEmpty(); }
     void schedulePrune();
-    void pruneTimerFired(Timer<LayerPool>&);
+    void pruneTimerFired();
 
     typedef enum { LeaveUnchanged, MarkAsUsed } AccessType;
     LayerList& listOfLayersWithSize(const IntSize&, AccessType = LeaveUnchanged);
@@ -74,7 +73,7 @@ private:
     unsigned m_totalBytes;
     unsigned m_maxBytesForPool;
 
-    Timer<LayerPool> m_pruneTimer;
+    Timer m_pruneTimer;
 
     double m_lastAddTime;
 };

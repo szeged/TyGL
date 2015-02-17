@@ -30,11 +30,13 @@
 
 #include "CDM.h"
 #include "CDMSession.h"
+#include "Document.h"
 #include "Event.h"
 #include "GenericEventQueue.h"
 #include "MediaKeyError.h"
 #include "MediaKeyMessageEvent.h"
 #include "MediaKeys.h"
+#include "Settings.h"
 
 namespace WebCore {
 
@@ -51,8 +53,8 @@ MediaKeySession::MediaKeySession(ScriptExecutionContext* context, MediaKeys* key
     , m_keySystem(keySystem)
     , m_asyncEventQueue(*this)
     , m_session(keys->cdm()->createSession())
-    , m_keyRequestTimer(this, &MediaKeySession::keyRequestTimerFired)
-    , m_addKeyTimer(this, &MediaKeySession::addKeyTimerFired)
+    , m_keyRequestTimer(*this, &MediaKeySession::keyRequestTimerFired)
+    , m_addKeyTimer(*this, &MediaKeySession::addKeyTimerFired)
 {
     m_session->setClient(this);
 }
@@ -78,6 +80,11 @@ void MediaKeySession::close()
         m_session->releaseKeys();
 }
 
+RefPtr<ArrayBuffer> MediaKeySession::cachedKeyForKeyId(const String& keyId) const
+{
+    return m_session ? m_session->cachedKeyForKeyID(keyId) : nullptr;
+}
+
 const String& MediaKeySession::sessionId() const
 {
     return m_session->sessionId();
@@ -89,7 +96,7 @@ void MediaKeySession::generateKeyRequest(const String& mimeType, Uint8Array* ini
     m_keyRequestTimer.startOneShot(0);
 }
 
-void MediaKeySession::keyRequestTimerFired(Timer<MediaKeySession>&)
+void MediaKeySession::keyRequestTimerFired()
 {
     ASSERT(m_pendingKeyRequests.size());
     if (!m_session)
@@ -147,7 +154,7 @@ void MediaKeySession::update(Uint8Array* key, ExceptionCode& ec)
     m_addKeyTimer.startOneShot(0);
 }
 
-void MediaKeySession::addKeyTimerFired(Timer<MediaKeySession>&)
+void MediaKeySession::addKeyTimerFired()
 {
     ASSERT(m_pendingKeys.size());
     if (!m_session)
@@ -182,6 +189,8 @@ void MediaKeySession::addKeyTimerFired(Timer<MediaKeySession>&)
             RefPtr<Event> keyaddedEvent = Event::create(eventNames().webkitkeyaddedEvent, false, false);
             keyaddedEvent->setTarget(this);
             m_asyncEventQueue.enqueueEvent(keyaddedEvent.release());
+
+            keys()->keyAdded();
         }
 
         // 2.8. If any of the preceding steps in the task failed
@@ -218,6 +227,27 @@ void MediaKeySession::sendError(CDMSessionClient::MediaKeyErrorCode errorCode, u
     RefPtr<Event> keyerrorEvent = Event::create(eventNames().webkitkeyerrorEvent, false, false);
     keyerrorEvent->setTarget(this);
     m_asyncEventQueue.enqueueEvent(keyerrorEvent.release());
+}
+
+String MediaKeySession::mediaKeysStorageDirectory() const
+{
+    Document* document = downcast<Document>(scriptExecutionContext());
+    if (!document)
+        return emptyString();
+
+    Settings* settings = document->settings();
+    if (!settings)
+        return emptyString();
+
+    String storageDirectory = settings->mediaKeysStorageDirectory();
+    if (storageDirectory.isEmpty())
+        return emptyString();
+
+    SecurityOrigin* origin = document->securityOrigin();
+    if (!origin)
+        return emptyString();
+
+    return pathByAppendingComponent(storageDirectory, origin->databaseIdentifier());
 }
 
 }

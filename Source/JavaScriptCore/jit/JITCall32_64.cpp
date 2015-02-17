@@ -64,28 +64,6 @@ void JIT::emit_op_ret(Instruction* currentInstruction)
     ret();
 }
 
-void JIT::emit_op_ret_object_or_this(Instruction* currentInstruction)
-{
-    unsigned result = currentInstruction[1].u.operand;
-    unsigned thisReg = currentInstruction[2].u.operand;
-
-    emitLoad(result, regT1, regT0);
-    Jump notJSCell = branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag));
-    Jump notObject = emitJumpIfCellNotObject(regT0);
-
-    checkStackPointerAlignment();
-    emitFunctionEpilogue();
-    ret();
-
-    notJSCell.link(this);
-    notObject.link(this);
-    emitLoad(thisReg, regT1, regT0);
-
-    checkStackPointerAlignment();
-    emitFunctionEpilogue();
-    ret();
-}
-
 void JIT::emitSlow_op_call(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
     compileOpCallSlowCase(op_call, currentInstruction, iter, m_callLinkInfoIndex++);
@@ -264,12 +242,11 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
         - Initializes ArgumentCount; CallerFrame; Callee.
 
        For a JS call:
-        - Caller initializes ScopeChain.
         - Callee initializes ReturnPC; CodeBlock.
         - Callee restores callFrameRegister before return.
 
        For a non-JS call:
-        - Caller initializes ScopeChain; ReturnPC; CodeBlock.
+        - Caller initializes ReturnPC; CodeBlock.
         - Caller restores callFrameRegister after return.
     */
     
@@ -301,12 +278,6 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
 
     CallLinkInfo* info = m_codeBlock->addCallLinkInfo();
 
-    if (CallEdgeLog::isEnabled() && shouldEmitProfiling()
-        && Options::baselineDoesCallEdgeProfiling()) {
-        m_vm->ensureCallEdgeLog().emitLogCode(
-            *this, info->callEdgeProfile, JSValueRegs(regT1, regT0));
-    }
-
     if (opcodeID == op_call_eval) {
         compileCallEval(instruction);
         return;
@@ -326,10 +297,6 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     m_callCompilationInfo.append(CallCompilationInfo());
     m_callCompilationInfo[callLinkInfoIndex].hotPathBegin = addressOfLinkedFunctionCheck;
     m_callCompilationInfo[callLinkInfoIndex].callLinkInfo = info;
-
-    loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_scope)), regT2);
-    store32(regT2, Address(MacroAssembler::stackPointerRegister, JSStack::ScopeChain * sizeof(Register) + PayloadOffset - sizeof(CallerFrameAndPC)));
-    store32(TrustedImm32(JSValue::CellTag), Address(stackPointerRegister, JSStack::ScopeChain * sizeof(Register) + TagOffset - sizeof(CallerFrameAndPC)));
 
     checkStackPointerAlignment();
     m_callCompilationInfo[callLinkInfoIndex].hotPathOther = emitNakedCall();

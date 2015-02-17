@@ -380,6 +380,7 @@ sub GetGlibTypeName {
     my %types = ("DOMString", "gchar*",
                  "DOMTimeStamp", "guint32",
                  "CompareHow", "gushort",
+                 "SerializedScriptValue", "gchar*",
                  "float", "gfloat",
                  "unrestricted float", "gfloat",
                  "double", "gdouble",
@@ -406,7 +407,7 @@ sub GetGlibTypeName {
 sub IsGDOMClassType {
     my $type = shift;
 
-    return 0 if $codeGenerator->IsNonPointerType($type) || $codeGenerator->IsStringType($type);
+    return 0 if $codeGenerator->IsNonPointerType($type) || $codeGenerator->IsStringType($type) || $type eq "SerializedScriptValue";
     return 1;
 }
 
@@ -759,8 +760,10 @@ sub GenerateConstants {
             my $conditionalString = $codeGenerator->GenerateConditionalString($constant);
             my $constantName = $prefix . $constant->name;
             my $constantValue = $constant->value;
-            my $isStableSymbol = grep {$_ eq $constantName} @stableSymbols;
-            if ($isStableSymbol) {
+            my $stableSymbol = grep {$_ =~ /^\Q$constantName/} @stableSymbols;
+            my $stableSymbolVersion;
+            if ($stableSymbol) {
+                ($dummy, $stableSymbolVersion) = split('@', $stableSymbol, 2);
                 push(@symbols, "$constantName\n");
             }
 
@@ -768,12 +771,15 @@ sub GenerateConstants {
             push(@constantHeader, "#if ${conditionalString}") if $conditionalString;
             push(@constantHeader, "/**");
             push(@constantHeader, " * ${constantName}:");
+            if ($stableSymbolVersion) {
+                push(@constantHeader, " * Since: ${stableSymbolVersion}");
+            }
             push(@constantHeader, " */");
             push(@constantHeader, "#define $constantName $constantValue");
             push(@constantHeader, "#endif /* ${conditionalString} */") if $conditionalString;
             push(@constantHeader, "\n");
 
-            if ($isStableSymbol or !$isStableClass) {
+            if ($stableSymbol or !$isStableClass) {
                 push(@hBody, join("\n", @constantHeader));
             } else {
                 push(@hBodyUnstable, join("\n", @constantHeader));
@@ -989,6 +995,10 @@ sub GenerateFunction {
         if ($paramIDLType eq "NodeFilter" || $paramIDLType eq "XPathNSResolver") {
             $paramName = "WTF::getPtr(" . $paramName . ")";
         }
+        if ($paramIDLType eq "SerializedScriptValue") {
+            $implIncludes{"SerializedScriptValue.h"} = 1;
+            $paramName = "WebCore::SerializedScriptValue::create(WTF::String::fromUTF8(" . $paramName . "))";
+        }
         push(@callImplParams, $paramName);
     }
 
@@ -1001,8 +1011,10 @@ sub GenerateFunction {
 
     my $symbol = "$returnType $functionName($symbolSig)";
     my $isStableClass = scalar(@stableSymbols);
-    my $isStableSymbol = grep {$_ eq $symbol} @stableSymbols;
-    if ($isStableSymbol and $isStableClass) {
+    my ($stableSymbol) = grep {$_ =~ /^\Q$symbol/} @stableSymbols;
+    my $stableSymbolVersion;
+    if ($stableSymbol and $isStableClass) {
+        ($dummy, $stableSymbolVersion) = split('@', $stableSymbol, 2);
         push(@symbols, "$symbol\n");
     }
 
@@ -1038,17 +1050,22 @@ sub GenerateFunction {
         push(@functionHeader, " * Returns: A #${returnTypeName}");
         $hasReturnTag = 1;
     }
-    if (!$isStableSymbol) {
+    if (!$stableSymbol) {
         if ($hasReturnTag) {
             push(@functionHeader, " *");
         }
         push(@functionHeader, " * Stability: Unstable");
+    } elsif ($stableSymbolVersion) {
+        if ($hasReturnTag) {
+            push(@functionHeader, " *");
+        }
+        push(@functionHeader, " * Since: ${stableSymbolVersion}");
     }
     push(@functionHeader, "**/");
 
     push(@functionHeader, "WEBKIT_API $returnType\n$functionName($functionSig);");
     push(@functionHeader, "\n");
-    if ($isStableSymbol or !$isStableClass) {
+    if ($stableSymbol or !$isStableClass) {
         push(@hBody, join("\n", @functionHeader));
     } else {
         push(@hBodyUnstable, join("\n", @functionHeader));
@@ -1120,6 +1137,11 @@ sub GenerateFunction {
             $assignPost = ")";
         } else {
             $assign = "${returnType} result = ";
+        }
+
+        if ($functionSigType eq "SerializedScriptValue") {
+            $assignPre = "convertToUTF8String(";
+            $assignPost = "->toString())";
         }
     }
 
@@ -1194,7 +1216,7 @@ EOF
             } else {
                 $functionName = "item->${functionName}";
             }
-            $contentHead = "${assign}${assignPre}${functionName}(" . join(", ", @arguments) . "${assignPost});\n";
+            $contentHead = "${assign}${assignPre}${functionName}(" . join(", ", @arguments) . ")${assignPost};\n";
         } elsif ($prefix eq "set_") {
             my ($functionName, @arguments) = $codeGenerator->SetterExpression(\%implIncludes, $interfaceName, $function);
             push(@arguments, @callImplParams);
@@ -1203,10 +1225,10 @@ EOF
                 $implIncludes{"${implementedBy}.h"} = 1;
                 unshift(@arguments, "item");
                 $functionName = "WebCore::${implementedBy}::${functionName}";
-                $contentHead = "${assign}${assignPre}${functionName}(" . join(", ", @arguments) . "${assignPost});\n";
+                $contentHead = "${assign}${assignPre}${functionName}(" . join(", ", @arguments) . ")${assignPost};\n";
             } else {
                 $functionName = "item->${functionName}";
-                $contentHead = "${assign}${assignPre}${functionName}(" . join(", ", @arguments) . "${assignPost});\n";
+                $contentHead = "${assign}${assignPre}${functionName}(" . join(", ", @arguments) . ")${assignPost};\n";
             }
         } else {
             my @arguments = @callImplParams;
@@ -1214,9 +1236,9 @@ EOF
                 my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
                 $implIncludes{"${implementedBy}.h"} = 1;
                 unshift(@arguments, "item");
-                $contentHead = "${assign}${assignPre}WebCore::${implementedBy}::${functionImplementationName}(" . join(", ", @arguments) . "${assignPost});\n";
+                $contentHead = "${assign}${assignPre}WebCore::${implementedBy}::${functionImplementationName}(" . join(", ", @arguments) . ")${assignPost};\n";
             } else {
-                $contentHead = "${assign}${assignPre}item->${functionImplementationName}(" . join(", ", @arguments) . "${assignPost});\n";
+                $contentHead = "${assign}${assignPre}item->${functionImplementationName}(" . join(", ", @arguments) . ")${assignPost};\n";
             }
         }
         push(@cBody, "    ${contentHead}");
@@ -1570,6 +1592,12 @@ sub Generate {
     $object->GenerateEndHeader();
 }
 
+sub HasUnstableCustomAPI {
+    my $domClassName = shift;
+
+    return scalar(grep {$_ eq $domClassName} qw(WebKitDOMDOMWindow WebKitDOMUserMessageHandlersNamespace WebKitDOMHTMLLinkElement));
+}
+
 sub WriteData {
     my $object = shift;
     my $interface = shift;
@@ -1637,6 +1665,9 @@ EOF
     if ($isStableClass) {
         print HEADER "#include <webkitdom/webkitdomdefines.h>\n\n";
     } else {
+        if (HasUnstableCustomAPI($className)) {
+            print HEADER "#include <webkitdom/WebKitDOMCustomUnstable.h>\n";
+        }
         print HEADER "#include <webkitdom/webkitdomdefines-unstable.h>\n\n";
     }
     print HEADER @hBodyPre;
@@ -1660,11 +1691,13 @@ EOF
 
 #ifdef WEBKIT_DOM_USE_UNSTABLE_API
 
-#include <webkitdom/webkitdomdefines-unstable.h>
 EOF
-
         print UNSTABLE $text;
-        print UNSTABLE "\n";
+        if (HasUnstableCustomAPI($className)) {
+            print UNSTABLE "#include <webkitdom/WebKitDOMCustomUnstable.h>\n";
+        }
+        print UNSTABLE "#include <webkitdom/webkitdomdefines-unstable.h>\n\n";
+
         print UNSTABLE "#if ${conditionalString}\n\n" if $conditionalString;
         print UNSTABLE "G_BEGIN_DECLS\n";
         print UNSTABLE "\n";
@@ -1762,17 +1795,19 @@ sub ReadStableSymbols {
     foreach $line (@lines) {
         $line =~ s/\n$//;
 
-        if ($line eq "GType ${lowerCaseIfaceName}_get_type(void)") {
+        my ($symbol) = split('@', $line, 2);
+
+        if ($symbol eq "GType ${lowerCaseIfaceName}_get_type(void)") {
             push(@stableSymbols, $line);
             next;
         }
 
-        if (scalar(@stableSymbols) and IsInterfaceSymbol($line, $lowerCaseIfaceName) and $line !~ /^GType/) {
+        if (scalar(@stableSymbols) and IsInterfaceSymbol($symbol, $lowerCaseIfaceName) and $symbol !~ /^GType/) {
             push(@stableSymbols, $line);
             next;
         }
 
-        if (scalar(@stableSymbols) and $line !~ /^GType/) {
+        if (scalar(@stableSymbols) and $symbol !~ /^GType/) {
             warn "Symbol %line found, but a get_type was expected";
         }
 

@@ -33,7 +33,7 @@
 #include "Color.h"
 #include "ColorSpace.h"
 #include "FloatSize.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "GraphicsTypes.h"
 #include "ImageBuffer.h"
 #include "Path.h"
@@ -57,7 +57,7 @@ class TextMetrics;
 
 typedef int ExceptionCode;
 
-class CanvasRenderingContext2D : public CanvasRenderingContext, public CanvasPathMethods {
+class CanvasRenderingContext2D final : public CanvasRenderingContext, public CanvasPathMethods {
 public:
     CanvasRenderingContext2D(HTMLCanvasElement*, bool usesCSSCompatibilityParseMode, bool usesDashboardCompatibilityMode);
     virtual ~CanvasRenderingContext2D();
@@ -235,7 +235,7 @@ private:
         LTR
     };
 
-    struct State : FontSelectorClient {
+    struct State final : FontSelectorClient {
         State();
         virtual ~State();
 
@@ -270,7 +270,7 @@ private:
         Direction m_direction;
 
         String m_unparsedFont;
-        Font m_font;
+        FontCascade m_font;
         bool m_realizedFont;
     };
 
@@ -308,7 +308,7 @@ private:
 
     void drawTextInternal(const String& text, float x, float y, bool fill, float maxWidth = 0, bool useMaxWidth = false);
 
-    const Font& accessFont();
+    const FontCascade& accessFont();
 
 #if ENABLE(DASHBOARD_SUPPORT)
     void clearPathForDashboardBackwardCompatibilityMode();

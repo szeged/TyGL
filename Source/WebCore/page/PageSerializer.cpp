@@ -216,7 +216,7 @@ void PageSerializer::serializeFrame(Frame* frame)
         // FIXME: iframes used as images trigger this. We should deal with them correctly.
         return;
     }
-    String text = accumulator.serializeNodes(*document->documentElement(), 0, IncludeNode);
+    String text = accumulator.serializeNodes(*document->documentElement(), IncludeNode);
     CString frameHTML = textEncoding.encode(text, EntitiesForUnencodables);
     m_resources->append(Resource(url, document->suggestedMIMEType(), SharedBuffer::create(frameHTML.data(), frameHTML.length())));
     m_resourceURLs.add(url);
@@ -312,9 +312,9 @@ void PageSerializer::addImageToResources(CachedImage* image, RenderElement* imag
     m_resourceURLs.add(url);
 }
 
-void PageSerializer::retrieveResourcesForRule(StyleRule* rule, Document* document)
+void PageSerializer::retrieveResourcesForRule(StyleRule& rule, Document* document)
 {
-    retrieveResourcesForProperties(&rule->properties(), document);
+    retrieveResourcesForProperties(&rule.properties(), document);
 }
 
 void PageSerializer::retrieveResourcesForProperties(const StyleProperties* styleDeclaration, Document* document)
@@ -333,13 +333,13 @@ void PageSerializer::retrieveResourcesForProperties(const StyleProperties* style
 
         StyleImage* styleImage = downcast<CSSImageValue>(*cssValue).cachedOrPendingImage();
         // Non cached-images are just place-holders and do not contain data.
-        if (!styleImage || !styleImage->isCachedImage())
+        if (!is<StyleCachedImage>(styleImage))
             continue;
 
-        CachedImage* image = toStyleCachedImage(styleImage)->cachedImage();
+        CachedImage* image = downcast<StyleCachedImage>(*styleImage).cachedImage();
 
         URL url = document->completeURL(image->url());
-        addImageToResources(image, 0, url);
+        addImageToResources(image, nullptr, url);
     }
 }
 

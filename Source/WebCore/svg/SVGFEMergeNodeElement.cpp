@@ -46,9 +46,9 @@ inline SVGFEMergeNodeElement::SVGFEMergeNodeElement(const QualifiedName& tagName
     registerAnimatedPropertiesForSVGFEMergeNodeElement();
 }
 
-PassRefPtr<SVGFEMergeNodeElement> SVGFEMergeNodeElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEMergeNodeElement> SVGFEMergeNodeElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEMergeNodeElement(tagName, document));
+    return adoptRef(*new SVGFEMergeNodeElement(tagName, document));
 }
 
 bool SVGFEMergeNodeElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -81,7 +81,7 @@ void SVGFEMergeNodeElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::inAttr) {
         invalidateFilterPrimitiveParent(this);

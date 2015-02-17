@@ -45,12 +45,12 @@ MathMLMencloseElement::MathMLMencloseElement(const QualifiedName& tagName, Docum
 {
 }
 
-PassRefPtr<MathMLMencloseElement> MathMLMencloseElement::create(const QualifiedName& tagName, Document& document)
+Ref<MathMLMencloseElement> MathMLMencloseElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new MathMLMencloseElement(tagName, document));
+    return adoptRef(*new MathMLMencloseElement(tagName, document));
 }
 
-RenderPtr<RenderElement> MathMLMencloseElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> MathMLMencloseElement::createElementRenderer(Ref<RenderStyle>&& style)
 {    
     return createRenderer<RenderMathMLMenclose>(*this, WTF::move(style));
 }
@@ -133,7 +133,7 @@ String MathMLMencloseElement::longDivLeftPadding() const
     TextRun run(closingBrace.impl(), closingBrace.length());
     Node* node = parentNode();
     if (node && node->renderer()) {
-        const Font& font = node->renderer()->style().font();
+        const FontCascade& font = node->renderer()->style().fontCascade();
         padding.appendNumber(font.width(run));
         padding.appendLiteral("px");
     }

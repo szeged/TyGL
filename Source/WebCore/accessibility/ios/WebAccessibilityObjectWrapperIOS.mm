@@ -34,7 +34,7 @@
 #import "AccessibilityTableCell.h"
 #import "Chrome.h"
 #import "ChromeClient.h"
-#import "Font.h"
+#import "FontCascade.h"
 #import "Frame.h"
 #import "FrameSelection.h"
 #import "FrameView.h"
@@ -360,7 +360,7 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
     if (![self _prepareAccessibilityCall])
         return 0;
 
-    if ([self isAttachment])
+    if ([self isAttachment] && [self attachmentView])
         return [[self attachmentView] accessibilityElementCount];
     
     return m_object->children().size();
@@ -371,7 +371,7 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
     if (![self _prepareAccessibilityCall])
         return nil;
 
-    if ([self isAttachment])
+    if ([self isAttachment] && [self attachmentView])
         return [[self attachmentView] accessibilityElementAtIndex:index];
     
     const auto& children = m_object->children();
@@ -391,7 +391,7 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
     if (![self _prepareAccessibilityCall])
         return NSNotFound;
     
-    if ([self isAttachment])
+    if ([self isAttachment] && [self attachmentView])
         return [[self attachmentView] indexOfAccessibilityElement:element];
     
     const auto& children = m_object->children();
@@ -750,6 +750,14 @@ static void appendStringToResult(NSMutableString *result, NSString *string)
     [result appendString:string];
 }
 
+- (BOOL)_accessibilityValueIsAutofilled
+{
+    if (![self _prepareAccessibilityCall])
+        return NO;
+
+    return m_object->isValueAutofilled();
+}
+
 - (CGFloat)_accessibilityMinValue
 {
     return m_object->minValueForRange();
@@ -772,8 +780,8 @@ static void appendStringToResult(NSMutableString *result, NSString *string)
 
     // iOS doesn't distinguish between a title and description field,
     // so concatentation will yield the best result.
-    NSString *axTitle = [self accessibilityTitle];
-    NSString *axDescription = [self accessibilityDescription];
+    NSString *axTitle = [self baseAccessibilityTitle];
+    NSString *axDescription = [self baseAccessibilityDescription];
     NSString *landmarkDescription = [self ariaLandmarkRoleDescription];
     
     NSMutableString *result = [NSMutableString string];
@@ -1003,7 +1011,7 @@ static void appendStringToResult(NSMutableString *result, NSString *string)
     if (![self _prepareAccessibilityCall])
         return nil;
 
-    return [self accessibilityHelpText];
+    return [self baseAccessibilityHelpText];
 }
 
 - (NSURL *)accessibilityURL
@@ -1114,8 +1122,8 @@ static void appendStringToResult(NSMutableString *result, NSString *string)
         ScrollView* scrollView = nullptr;
         AccessibilityObject* parent = nullptr;
         for (parent = m_object->parentObject(); parent; parent = parent->parentObject()) {
-            if (parent->isAccessibilityScrollView()) {
-                scrollView = toAccessibilityScrollView(parent)->scrollView();
+            if (is<AccessibilityScrollView>(*parent)) {
+                scrollView = downcast<AccessibilityScrollView>(*parent).scrollView();
                 break;
             }
         }
@@ -1168,8 +1176,8 @@ static void appendStringToResult(NSMutableString *result, NSString *string)
         ScrollView* scrollView = nullptr;
         AccessibilityObject* parent = nullptr;
         for (parent = m_object->parentObject(); parent; parent = parent->parentObject()) {
-            if (parent->isAccessibilityScrollView()) {
-                scrollView = toAccessibilityScrollView(parent)->scrollView();
+            if (is<AccessibilityScrollView>(*parent)) {
+                scrollView = downcast<AccessibilityScrollView>(*parent).scrollView();
                 break;
             }
         }
@@ -1262,7 +1270,11 @@ static void appendStringToResult(NSMutableString *result, NSString *string)
     if (parent)
         return parent->wrapper();
 
-    // The only object without a parent wrapper should be a scroll view.
+    // Mock objects can have their parents detached but still exist in the cache.
+    if (m_object->isDetachedFromParent())
+        return nil;
+    
+    // The only object without a parent wrapper at this point should be a scroll view.
     ASSERT(m_object->isAccessibilityScrollView());
     
     // Verify this is the top document. If not, we might need to go through the platform widget.
@@ -1625,6 +1637,13 @@ static RenderObject* rendererForView(WAKView* view)
     return YES;
 }
 
+- (void)_accessibilitySetValue:(NSString *)string
+{
+    if (![self _prepareAccessibilityCall])
+        return;
+    m_object->setValue(string);
+}
+
 - (NSString *)stringForTextMarkers:(NSArray *)markers
 {
     if (![self _prepareAccessibilityCall])
@@ -1739,7 +1758,7 @@ static void AXAttributeStringSetStyle(NSMutableAttributedString* attrString, Ren
     RenderStyle& style = renderer->style();
     
     // set basic font info
-    AXAttributeStringSetFont(attrString, style.font().primaryFont()->getCTFont(), range);
+    AXAttributeStringSetFont(attrString, style.fontCascade().primaryFont().getCTFont(), range);
                 
     int decor = style.textDecorationsInEffect();
     if ((decor & (TextDecorationUnderline | TextDecorationLineThrough)) != 0) {
@@ -2025,7 +2044,7 @@ static void AXAttributedStringAppendText(NSMutableAttributedString* attrString, 
     
     NSArray* array = [self arrayOfTextForTextMarkers:[NSArray arrayWithObjects:startMarker, endMarker, nil] attributed:attributed];
     Class returnClass = attributed ? [NSMutableAttributedString class] : [NSMutableString class];
-    id returnValue = [[[returnClass alloc] init] autorelease];
+    id returnValue = [[(NSString *)[returnClass alloc] init] autorelease];
     
     NSInteger count = [array count];
     for (NSInteger k = 0; k < count; ++k) {

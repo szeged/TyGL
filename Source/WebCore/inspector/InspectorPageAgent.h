@@ -31,13 +31,11 @@
 #ifndef InspectorPageAgent_h
 #define InspectorPageAgent_h
 
-#if ENABLE(INSPECTOR)
-
 #include "InspectorWebAgentBase.h"
-#include "InspectorWebBackendDispatchers.h"
-#include "InspectorWebFrontendDispatchers.h"
 #include "IntSize.h"
 #include "LayoutRect.h"
+#include <inspector/InspectorBackendDispatchers.h>
+#include <inspector/InspectorFrontendDispatchers.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
@@ -66,7 +64,7 @@ class TextResourceDecoder;
 
 typedef String ErrorString;
 
-class InspectorPageAgent : public InspectorAgentBase, public Inspector::InspectorPageBackendDispatcherHandler {
+class InspectorPageAgent final : public InspectorAgentBase, public Inspector::InspectorPageBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorPageAgent);
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -109,12 +107,6 @@ public:
     virtual void searchInResources(ErrorString&, const String&, const bool* caseSensitive, const bool* isRegex, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Page::SearchResult>>&) override;
     virtual void setDocumentContent(ErrorString&, const String& frameId, const String& html) override;
     virtual void setShowPaintRects(ErrorString&, bool show) override;
-    virtual void canShowDebugBorders(ErrorString&, bool*) override;
-    virtual void setShowDebugBorders(ErrorString&, bool show) override;
-    virtual void canShowFPSCounter(ErrorString&, bool*) override;
-    virtual void setShowFPSCounter(ErrorString&, bool show) override;
-    virtual void canContinuouslyPaint(ErrorString&, bool*) override;
-    virtual void setContinuousPaintingEnabled(ErrorString&, bool enabled) override;
     virtual void getScriptExecutionStatus(ErrorString&, Inspector::InspectorPageBackendDispatcherHandler::Result*) override;
     virtual void setScriptExecutionDisabled(ErrorString&, bool) override;
     virtual void setTouchEmulationEnabled(ErrorString&, bool) override;
@@ -126,20 +118,20 @@ public:
     virtual void handleJavaScriptDialog(ErrorString&, bool accept, const String* promptText) override;
     virtual void archive(ErrorString&, String* data) override;
 
-    // InspectorInstrumentation API
+    // InspectorInstrumentation callbacks.
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld&);
     void domContentEventFired();
     void loadEventFired();
     void frameNavigated(DocumentLoader*);
-    void frameDetached(Frame*);
-    void loaderDetachedFromFrame(DocumentLoader*);
+    void frameDetached(Frame&);
+    void loaderDetachedFromFrame(DocumentLoader&);
     void frameStartedLoading(Frame&);
     void frameStoppedLoading(Frame&);
     void frameScheduledNavigation(Frame&, double delay);
     void frameClearedScheduledNavigation(Frame&);
     void willRunJavaScriptDialog(const String& message);
     void didRunJavaScriptDialog();
-    void applyEmulatedMedia(String*);
+    void applyEmulatedMedia(String&);
     void didPaint(RenderObject*, const LayoutRect&);
     void didLayout();
     void didScroll();
@@ -167,11 +159,13 @@ private:
     void updateTouchEventEmulationInPage(bool);
 #endif
 
+    double timestamp();
+
     static bool mainResourceContent(Frame*, bool withBase64Encode, String* result);
     static bool dataContent(const char* data, unsigned size, const String& textEncodingName, bool withBase64Encode, String* result);
 
-    PassRefPtr<Inspector::Protocol::Page::Frame> buildObjectForFrame(Frame*);
-    PassRefPtr<Inspector::Protocol::Page::FrameResourceTree> buildObjectForFrameTree(Frame*);
+    Ref<Inspector::Protocol::Page::Frame> buildObjectForFrame(Frame*);
+    Ref<Inspector::Protocol::Page::FrameResourceTree> buildObjectForFrameTree(Frame*);
     Page* m_page;
     InspectorClient* m_client;
     std::unique_ptr<Inspector::InspectorPageFrontendDispatcher> m_frontendDispatcher;
@@ -194,7 +188,5 @@ private:
 
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(InspectorPagerAgent_h)

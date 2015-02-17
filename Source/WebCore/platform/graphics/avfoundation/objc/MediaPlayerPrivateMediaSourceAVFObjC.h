@@ -38,6 +38,7 @@ OBJC_CLASS AVAsset;
 OBJC_CLASS AVSampleBufferAudioRenderer;
 OBJC_CLASS AVSampleBufferDisplayLayer;
 OBJC_CLASS AVSampleBufferRenderSynchronizer;
+OBJC_CLASS AVStreamSession;
 
 typedef struct OpaqueCMTimebase* CMTimebaseRef;
 
@@ -80,8 +81,11 @@ public:
 
     void effectiveRateChanged();
     void sizeChanged();
+    void characteristicsChanged();
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
+    bool hasStreamSession() { return m_streamSession; }
+    AVStreamSession *streamSession();
     virtual void setCDMSession(CDMSession*) override;
     void keyNeeded(Uint8Array*);
 #endif
@@ -164,7 +168,7 @@ private:
     void ensureLayer();
     void destroyLayer();
     bool shouldBePlaying() const;
-    void seekTimerFired(Timer<MediaPlayerPrivateMediaSourceAVFObjC>&);
+    void seekTimerFired();
 
     friend class MediaSourcePrivateAVFObjC;
 
@@ -190,7 +194,8 @@ private:
     RetainPtr<AVSampleBufferRenderSynchronizer> m_synchronizer;
     RetainPtr<id> m_timeJumpedObserver;
     RetainPtr<id> m_durationObserver;
-    Timer<MediaPlayerPrivateMediaSourceAVFObjC> m_seekTimer;
+    RetainPtr<AVStreamSession> m_streamSession;
+    Timer m_seekTimer;
     CDMSessionMediaSourceAVFObjC* m_session;
     MediaPlayer::NetworkState m_networkState;
     MediaPlayer::ReadyState m_readyState;

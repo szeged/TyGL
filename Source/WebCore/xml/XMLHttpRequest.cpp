@@ -43,6 +43,7 @@
 #include "ResourceError.h"
 #include "ResourceRequest.h"
 #include "ScriptController.h"
+#include "SecurityOriginPolicy.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
 #include "TextResourceDecoder.h"
@@ -111,12 +112,11 @@ static void logConsoleError(ScriptExecutionContext* context, const String& messa
     context->addConsoleMessage(MessageSource::JS, MessageLevel::Error, message);
 }
 
-PassRefPtr<XMLHttpRequest> XMLHttpRequest::create(ScriptExecutionContext& context)
+Ref<XMLHttpRequest> XMLHttpRequest::create(ScriptExecutionContext& context)
 {
-    RefPtr<XMLHttpRequest> xmlHttpRequest(adoptRef(new XMLHttpRequest(context)));
+    Ref<XMLHttpRequest> xmlHttpRequest = adoptRef(*new XMLHttpRequest(context));
     xmlHttpRequest->suspendIfNeeded();
-
-    return xmlHttpRequest.release();
+    return xmlHttpRequest;
 }
 
 XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext& context)
@@ -206,7 +206,8 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
         return nullptr;
 
     if (!m_createdDocument) {
-        bool isHTML = equalIgnoringCase(responseMIMEType(), "text/html");
+        String mimeType = responseMIMEType();
+        bool isHTML = equalIgnoringCase(mimeType, "text/html");
 
         // The W3C spec requires the final MIME type to be some valid XML type, or text/html.
         // If it is text/html, then the responseType of "document" must have been supplied explicitly.
@@ -221,7 +222,9 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
                 m_responseDocument = Document::create(0, m_url);
             // FIXME: Set Last-Modified.
             m_responseDocument->setContent(m_responseBuilder.toStringPreserveCapacity());
-            m_responseDocument->setSecurityOrigin(securityOrigin());
+            m_responseDocument->setSecurityOriginPolicy(scriptExecutionContext()->securityOriginPolicy());
+            m_responseDocument->overrideMIMEType(mimeType);
+
             if (!m_responseDocument->wellFormed())
                 m_responseDocument = 0;
         }
@@ -335,6 +338,14 @@ String XMLHttpRequest::responseType()
     return "";
 }
 
+String XMLHttpRequest::responseURL() const
+{
+    URL responseURL(m_response.url());
+    responseURL.removeFragmentIdentifier();
+
+    return responseURL.string();
+}
+
 void XMLHttpRequest::setLastSendLineAndColumnNumber(unsigned lineNumber, unsigned columnNumber)
 {
     m_lastSendLineNumber = lineNumber;
@@ -361,14 +372,14 @@ void XMLHttpRequest::callReadyStateChangeListener()
     if (!scriptExecutionContext())
         return;
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchXHRReadyStateChangeEvent(scriptExecutionContext(), this);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchXHRReadyStateChangeEvent(scriptExecutionContext(), *this);
 
     if (m_async || (m_state <= OPENED || m_state == DONE))
         m_progressEventThrottle.dispatchReadyStateChangeEvent(Event::create(eventNames().readystatechangeEvent, false, false), m_state == DONE ? FlushProgressEvent : DoNotFlushProgressEvent);
 
     InspectorInstrumentation::didDispatchXHRReadyStateChangeEvent(cookie);
     if (m_state == DONE && !m_error) {
-        InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchXHRLoadEvent(scriptExecutionContext(), this);
+        InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchXHRLoadEvent(scriptExecutionContext(), *this);
         m_progressEventThrottle.dispatchProgressEvent(eventNames().loadEvent);
         InspectorInstrumentation::didDispatchXHRLoadEvent(cookie);
         m_progressEventThrottle.dispatchProgressEvent(eventNames().loadendEvent);
@@ -463,7 +474,9 @@ void XMLHttpRequest::open(const String& method, const URL& url, ExceptionCode& e
 
 void XMLHttpRequest::open(const String& method, const URL& url, bool async, ExceptionCode& ec)
 {
-    internalAbort();
+    if (!internalAbort())
+        return;
+
     State previousState = m_state;
     m_state = UNSENT;
     m_error = false;
@@ -805,7 +818,8 @@ void XMLHttpRequest::abort()
 
     bool sendFlag = m_loader;
 
-    internalAbort();
+    if (!internalAbort())
+        return;
 
     clearResponseBuffers();
 
@@ -823,26 +837,35 @@ void XMLHttpRequest::abort()
     dispatchErrorEvents(eventNames().abortEvent);
 }
 
-void XMLHttpRequest::internalAbort()
+bool XMLHttpRequest::internalAbort()
 {
-    bool hadLoader = m_loader;
-
     m_error = true;
 
     // FIXME: when we add the support for multi-part XHR, we will have to think be careful with this initialization.
     m_receivedLength = 0;
 
-    if (hadLoader) {
-        m_loader->cancel();
-        m_loader = 0;
-    }
-
     m_decoder = 0;
 
     InspectorInstrumentation::didFailXHRLoading(scriptExecutionContext(), this);
 
-    if (hadLoader)
-        dropProtection();
+    if (!m_loader)
+        return true;
+
+    // Cancelling m_loader may trigger a window.onload callback which can call open() on the same xhr.
+    // This would create internalAbort reentrant call.
+    // m_loader is set to null before being cancelled to exit early in any reentrant internalAbort() call.
+    RefPtr<ThreadableLoader> loader = m_loader.release();
+    loader->cancel();
+
+    // If window.onload callback calls open() and send() on the same xhr, m_loader is now set to a new value.
+    // The function calling internalAbort() should abort to let the open() and send() calls continue properly.
+    // We ask the function calling internalAbort() to exit by returning false.
+    // Save this information to a local variable since we are going to drop protection.
+    bool newLoadStarted = m_loader;
+
+    dropProtection();
+
+    return !newLoadStarted;
 }
 
 void XMLHttpRequest::clearResponse()
@@ -1218,7 +1241,8 @@ void XMLHttpRequest::didTimeout()
 {
     // internalAbort() calls dropProtection(), which may release the last reference.
     Ref<XMLHttpRequest> protect(*this);
-    internalAbort();
+    if (!internalAbort())
+        return;
 
     clearResponse();
     clearRequest();

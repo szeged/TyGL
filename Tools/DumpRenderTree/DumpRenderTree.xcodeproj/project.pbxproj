@@ -59,7 +59,6 @@
 		2CE88FA217124D8C00734FC0 /* JavaScriptThreading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2CE88FA117124CEE00734FC0 /* JavaScriptThreading.cpp */; };
 		2D403F1B15087209005358D2 /* LayoutTestHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D403EA215087142005358D2 /* LayoutTestHelper.m */; };
 		31117B3D15D9A56A00163BC8 /* MockWebNotificationProvider.mm in Sources */ = {isa = PBXBuildFile; fileRef = 31117B3B15D9A56A00163BC8 /* MockWebNotificationProvider.mm */; };
-		3A5626CB131CA02A002BE6D9 /* StorageTrackerDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3A5626C1131C8B17002BE6D9 /* StorageTrackerDelegate.mm */; };
 		440590711268453800CFD48D /* WebArchiveDumpSupportMac.mm in Sources */ = {isa = PBXBuildFile; fileRef = 440590701268453800CFD48D /* WebArchiveDumpSupportMac.mm */; };
 		4437730E125CBC3600AAE02C /* WebArchiveDumpSupport.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 44A997830FCDE86400580F10 /* WebArchiveDumpSupport.cpp */; };
 		4AD6A11413C8124000EA9737 /* FormValue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4AD6A11313C8124000EA9737 /* FormValue.cpp */; };
@@ -70,6 +69,7 @@
 		515F429C15C07872007C8F90 /* PluginScriptableObjectOverridesAllProperties.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 515F429B15C07872007C8F90 /* PluginScriptableObjectOverridesAllProperties.cpp */; };
 		5185F6B210714E07007AA393 /* HistoryDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5185F69F10714A57007AA393 /* HistoryDelegate.mm */; };
 		51CACBD815D96FD000EB53A2 /* EvaluateJSWithinNPP_New.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51CACBD715D96FD000EB53A2 /* EvaluateJSWithinNPP_New.cpp */; };
+		520206CF1A0ADA5900AD5154 /* SetMuted.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 520206CE1A0ADA5900AD5154 /* SetMuted.cpp */; };
 		53CBB832134E42F3001CE6A4 /* CyclicRedundancyCheck.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 53CBB830134E42F3001CE6A4 /* CyclicRedundancyCheck.cpp */; };
 		5DB9AC970F722C3600684641 /* AHEM____.TTF in Copy Font Files */ = {isa = PBXBuildFile; fileRef = AA7F10C20CB3C1030003BDC9 /* AHEM____.TTF */; };
 		5DB9AC980F722C3600684641 /* WebKitWeightWatcher100.ttf in Copy Font Files */ = {isa = PBXBuildFile; fileRef = 375F09710DAC3CB600C8B4E5 /* WebKitWeightWatcher100.ttf */; };
@@ -249,8 +249,6 @@
 		375F09770DAC3CB600C8B4E5 /* WebKitWeightWatcher700.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = WebKitWeightWatcher700.ttf; path = fonts/WebKitWeightWatcher700.ttf; sourceTree = "<group>"; };
 		375F09780DAC3CB600C8B4E5 /* WebKitWeightWatcher800.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = WebKitWeightWatcher800.ttf; path = fonts/WebKitWeightWatcher800.ttf; sourceTree = "<group>"; };
 		375F09790DAC3CB600C8B4E5 /* WebKitWeightWatcher900.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = WebKitWeightWatcher900.ttf; path = fonts/WebKitWeightWatcher900.ttf; sourceTree = "<group>"; };
-		3A5626C0131C8B17002BE6D9 /* StorageTrackerDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StorageTrackerDelegate.h; sourceTree = "<group>"; };
-		3A5626C1131C8B17002BE6D9 /* StorageTrackerDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = StorageTrackerDelegate.mm; sourceTree = "<group>"; };
 		417DAA1C137B3E24007C57FB /* WebCoreTestSupport.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = WebCoreTestSupport.h; path = WebCoreTestSupport/WebCoreTestSupport.h; sourceTree = BUILT_PRODUCTS_DIR; };
 		440590701268453800CFD48D /* WebArchiveDumpSupportMac.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = WebArchiveDumpSupportMac.mm; path = mac/WebArchiveDumpSupportMac.mm; sourceTree = "<group>"; };
 		44A997820FCDE86400580F10 /* WebArchiveDumpSupport.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = WebArchiveDumpSupport.h; path = cf/WebArchiveDumpSupport.h; sourceTree = "<group>"; };
@@ -264,6 +262,7 @@
 		5185F69E10714A57007AA393 /* HistoryDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HistoryDelegate.h; path = mac/HistoryDelegate.h; sourceTree = "<group>"; };
 		5185F69F10714A57007AA393 /* HistoryDelegate.mm */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; fileEncoding = 4; name = HistoryDelegate.mm; path = mac/HistoryDelegate.mm; sourceTree = "<group>"; };
 		51CACBD715D96FD000EB53A2 /* EvaluateJSWithinNPP_New.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = EvaluateJSWithinNPP_New.cpp; path = TestNetscapePlugIn/Tests/EvaluateJSWithinNPP_New.cpp; sourceTree = SOURCE_ROOT; };
+		520206CE1A0ADA5900AD5154 /* SetMuted.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SetMuted.cpp; sourceTree = "<group>"; };
 		53CBB830134E42F3001CE6A4 /* CyclicRedundancyCheck.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CyclicRedundancyCheck.cpp; sourceTree = "<group>"; };
 		53CBB831134E42F3001CE6A4 /* CyclicRedundancyCheck.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CyclicRedundancyCheck.h; sourceTree = "<group>"; };
 		5DE8AE4313A2C15800D6A37D /* libWebCoreTestSupport.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libWebCoreTestSupport.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -529,8 +528,6 @@
 				BCA18B5C0C9B08C200114369 /* PolicyDelegate.mm */,
 				BCA18B5D0C9B08C200114369 /* ResourceLoadDelegate.h */,
 				BCA18B5E0C9B08C200114369 /* ResourceLoadDelegate.mm */,
-				3A5626C0131C8B17002BE6D9 /* StorageTrackerDelegate.h */,
-				3A5626C1131C8B17002BE6D9 /* StorageTrackerDelegate.mm */,
 				BCA18B5F0C9B08C200114369 /* UIDelegate.h */,
 				BCA18B600C9B08C200114369 /* UIDelegate.mm */,
 			);
@@ -573,6 +570,7 @@
 			children = (
 				1A66C34F14576A920099A115 /* ContentsScaleFactor.cpp */,
 				1A31EB3713466AC100017372 /* ConvertPoint.cpp */,
+				520206CE1A0ADA5900AD5154 /* SetMuted.cpp */,
 				1A14C8A31406DE0400B254F7 /* SupportsCarbonEventModel.cpp */,
 			);
 			path = mac;
@@ -900,6 +898,7 @@
 				51CACBD815D96FD000EB53A2 /* EvaluateJSWithinNPP_New.cpp in Sources */,
 				4AD6A11413C8124000EA9737 /* FormValue.cpp in Sources */,
 				1AFF66BC137DEFD200791696 /* GetURLNotifyWithURLThatFailsToLoad.cpp in Sources */,
+				520206CF1A0ADA5900AD5154 /* SetMuted.cpp in Sources */,
 				1A5CC1F5137DD2EC00A5D7E7 /* GetURLWithJavaScriptURL.cpp in Sources */,
 				1A3E28AA1311D73B00501349 /* GetURLWithJavaScriptURLDestroyingPlugin.cpp in Sources */,
 				1AD4CB2212A6D1350027A7AF /* GetUserAgentWithNullNPPFromNPPNew.cpp in Sources */,
@@ -978,7 +977,6 @@
 				BCB284D60CFA83D1007E533E /* PixelDumpSupportMac.mm in Sources */,
 				BCA18B660C9B08C200114369 /* PolicyDelegate.mm in Sources */,
 				BCA18B680C9B08C200114369 /* ResourceLoadDelegate.mm in Sources */,
-				3A5626CB131CA02A002BE6D9 /* StorageTrackerDelegate.mm in Sources */,
 				BC0131DA0C9772010087317D /* TestRunner.cpp in Sources */,
 				BCA18B240C9B014B00114369 /* TestRunnerMac.mm in Sources */,
 				BCA18B490C9B02C400114369 /* TextInputController.m in Sources */,
@@ -1217,7 +1215,6 @@
 				COPY_PHASE_STRIP = NO;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				OTHER_CFLAGS = "";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = All;
 				SECTORDER_FLAGS = "";
@@ -1235,7 +1232,6 @@
 				COPY_PHASE_STRIP = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				OTHER_CFLAGS = "";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = All;
 				SECTORDER_FLAGS = "";

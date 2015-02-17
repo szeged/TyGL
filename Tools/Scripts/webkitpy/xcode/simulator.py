@@ -1,6 +1,7 @@
 import itertools
 import logging
 import os
+import plistlib
 import re
 import subprocess
 import time
@@ -13,7 +14,6 @@ Minimally wraps CoreSimulator functionality through simctl.
 If possible, use real CoreSimulator.framework functionality by linking to the framework itself.
 Do not use PyObjC to dlopen the framework.
 """
-
 
 class DeviceType(object):
     """
@@ -83,21 +83,24 @@ class Runtime(object):
     Represents a CoreSimulator runtime associated with an iOS SDK.
     """
 
-    def __init__(self, version, identifier, available, devices=None):
+    def __init__(self, version, identifier, available, devices=None, is_internal_runtime=False):
         """
         :param version: The iOS SDK version
         :type version: tuple
-        :param identifier: The CoreSimualtor runtime identifier
+        :param identifier: The CoreSimulator runtime identifier
         :type identifier: str
         :param availability: Whether the runtime is available for use.
         :type availability: bool
         :param devices: A list of devices under this runtime
         :type devices: list or None
+        :param is_internal_runtime: Whether the runtime is an Apple internal runtime
+        :type is_internal_runtime: bool
         """
         self.version = version
         self.identifier = identifier
         self.available = available
         self.devices = devices or []
+        self.is_internal_runtime = is_internal_runtime
 
     @classmethod
     def from_identifier(cls, identifier):
@@ -107,23 +110,23 @@ class Runtime(object):
         :returns: A `Runtime` object with the specified identifier or throws a TypeError if it doesn't exist.
         :rtype: Runtime
         """
-        runtime = None
         for runtime in Simulator().runtimes:
             if runtime.identifier == identifier:
-                break
-        if runtime is None:
-            raise TypeError('A runtime with identifier "{identifier}" does not exist.'.format(identifier=identifier))
-        return runtime
+                return runtime
+        raise TypeError('A runtime with identifier "{identifier}" does not exist.'.format(identifier=identifier))
 
     def __eq__(self, other):
-        return (self.version == other.version) and (self.identifier == other.identifier)
+        return (self.version == other.version) and (self.identifier == other.identifier) and (self.is_internal_runtime == other.is_internal_runtime)
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __repr__(self):
+        version_suffix = ""
+        if self.is_internal_runtime:
+            version_suffix = " Internal"
         return '<Runtime {version}: {identifier}. Available: {available}, {num_devices} devices>'.format(
-            version='.'.join(map(str, self.version)),
+            version='.'.join(map(str, self.version)) + version_suffix,
             identifier=self.identifier,
             available=self.available,
             num_devices=len(self.devices))
@@ -134,14 +137,12 @@ class Device(object):
     Represents a CoreSimulator device underneath a runtime
     """
 
-    def __init__(self, name, udid, state, available, runtime):
+    def __init__(self, name, udid, available, runtime):
         """
         :param name: The device name
         :type name: str
         :param udid: The device UDID (a UUID string)
         :type udid: str
-        :param state: The last known device state
-        :type state: str
         :param available: Whether the device is available for use.
         :type available: bool
         :param runtime: The iOS Simulator runtime that hosts this device
@@ -149,9 +150,16 @@ class Device(object):
         """
         self.name = name
         self.udid = udid
-        self.state = state
         self.available = available
         self.runtime = runtime
+
+    @property
+    def state(self):
+        """
+        :returns: The current state of the device.
+        :rtype: Simulator.DeviceState
+        """
+        return Simulator.device_state(self.udid)
 
     @property
     def path(self):
@@ -159,9 +167,7 @@ class Device(object):
         :returns: The filesystem path that contains the simulator device's data.
         :rtype: str
         """
-        return os.path.realpath(
-            os.path.expanduser(
-                os.path.join('~/Library/Developer/CoreSimulator/Devices', self.udid)))
+        return Simulator.device_directory(self.udid)
 
     @classmethod
     def create(cls, name, device_type, runtime):
@@ -176,18 +182,9 @@ class Device(object):
         :return: The new device or raises a CalledProcessError if ``simctl create`` failed.
         :rtype: Device
         """
-        sim = Simulator()
-        subprocess.check_call(['xcrun', 'simctl', 'create', name, device_type.identifier, runtime.identifier])
-
-        device = None
-        while device is None:
-            sim.refresh()
-            device = sim.device(name, runtime)
-            if device is None or device.state == 'Creating':
-                time.sleep(2)
-            else:
-                break
-        return device
+        device_udid = subprocess.check_output(['xcrun', 'simctl', 'create', name, device_type.identifier, runtime.identifier]).rstrip()
+        Simulator.wait_until_device_is_in_state(device_udid, Simulator.DeviceState.SHUTDOWN)
+        return Simulator().find_device_by_udid(device_udid)
 
     def __eq__(self, other):
         return self.udid == other.udid
@@ -204,14 +201,18 @@ class Device(object):
             runtime=self.runtime.identifier)
 
 
+# FIXME: This class is fragile because it parses the output of the simctl command line utility, which may change.
+#        We should find a better way to query for simulator device state and capabilities. Maybe take a similiar
+#        approach as in webkitdirs.pm and utilize the parsed output from the device.plist files in the sub-
+#        directories of ~/Library/Developer/CoreSimulator/Devices?
 class Simulator(object):
     """
     Represents the iOS Simulator infrastructure under the currently select Xcode.app bundle.
     """
     device_type_re = re.compile('(?P<name>[^(]+)\((?P<identifier>[^)]+)\)')
     runtime_re = re.compile(
-        'iOS (?P<version>[0-9]+\.[0-9]) \([0-9]+\.[0-9]+ - (?P<build_version>[^)]+)\) \((?P<identifier>[^)]+)\)( \((?P<availability>[^)]+)\))?')
-    version_re = re.compile('-- iOS (?P<version>[0-9]+\.[0-9]+) --')
+        'iOS (?P<version>[0-9]+\.[0-9])(?P<internal> Internal)? \([0-9]+\.[0-9]+ - (?P<build_version>[^)]+)\) \((?P<identifier>[^)]+)\)( \((?P<availability>[^)]+)\))?')
+    version_re = re.compile('-- iOS (?P<version>[0-9]+\.[0-9]+)(?P<internal> Internal)? --')
     devices_re = re.compile(
         '\s*(?P<name>[^(]+ )\((?P<udid>[^)]+)\) \((?P<state>[^)]+)\)( \((?P<availability>[^)]+)\))?')
 
@@ -219,6 +220,32 @@ class Simulator(object):
         self.runtimes = []
         self.device_types = []
         self.refresh()
+
+    # Keep these constants synchronized with the SimDeviceState constants in CoreSimulator/SimDevice.h.
+    class DeviceState:
+        DOES_NOT_EXIST = -1
+        CREATING = 0
+        SHUTDOWN = 1
+        BOOTING = 2
+        BOOTED = 3
+        SHUTTING_DOWN = 4
+
+    @staticmethod
+    def wait_until_device_is_in_state(udid, wait_until_state):
+        # FIXME: Implement support for a timed wait.
+        while (Simulator.device_state(udid) != wait_until_state):
+            time.sleep(0.5)
+
+    @staticmethod
+    def device_state(udid):
+        device_plist = os.path.join(Simulator.device_directory(udid), 'device.plist')
+        if not os.path.isfile(device_plist):
+            return Simulator.DeviceState.DOES_NOT_EXIST
+        return plistlib.readPlist(device_plist)['state']
+
+    @staticmethod
+    def device_directory(udid):
+        return os.path.realpath(os.path.expanduser(os.path.join('~/Library/Developer/CoreSimulator/Devices', udid)))
 
     def refresh(self):
         """
@@ -272,7 +299,8 @@ class Simulator(object):
             version = tuple(map(int, runtime_match.group('version').split('.')))
             runtime = Runtime(version=version,
                               identifier=runtime_match.group('identifier'),
-                              available=runtime_match.group('availability') is None)
+                              available=runtime_match.group('availability') is None,
+                              is_internal_runtime=bool(runtime_match.group('internal')))
             self.runtimes.append(runtime)
         self._parse_devices(lines)
 
@@ -288,7 +316,7 @@ class Simulator(object):
             version_match = self.version_re.match(line)
             if version_match:
                 version = tuple(map(int, version_match.group('version').split('.')))
-                current_runtime = self.runtime(version=version)
+                current_runtime = self.runtime(version=version, is_internal_runtime=bool(version_match.group('internal')))
                 assert current_runtime
                 continue
             device_match = self.devices_re.match(line)
@@ -296,7 +324,6 @@ class Simulator(object):
                 raise RuntimeError('Expected an iOS Simulator device line, got "{}"'.format(line))
             device = Device(name=device_match.group('name').rstrip(),
                             udid=device_match.group('udid'),
-                            state=device_match.group('state'),
                             available=device_match.group('availability') is None,
                             runtime=current_runtime)
             current_runtime.devices.append(device)
@@ -318,7 +345,7 @@ class Simulator(object):
             return device_type
         return None
 
-    def runtime(self, version=None, identifier=None):
+    def runtime(self, version=None, identifier=None, is_internal_runtime=None):
         """
         :param version: The iOS version of the desired runtime.
         :type version: tuple
@@ -333,12 +360,27 @@ class Simulator(object):
         for runtime in self.runtimes:
             if version and runtime.version != version:
                 continue
+            if is_internal_runtime and runtime.is_internal_runtime != is_internal_runtime:
+                continue
             if identifier and runtime.identifier != identifier:
                 continue
             return runtime
         return None
 
-    def device(self, name=None, runtime=None):
+    def find_device_by_udid(self, udid):
+        """
+        :param udid: The UDID of the device to find.
+        :type udid: str
+        :return: The `Device` with the specified UDID.
+        :rtype: Device
+        """
+        for device in self.devices:
+            if device.udid == udid:
+                return device
+        return None
+
+    # FIXME: We should find an existing device with respect to its name, device type and runtime.
+    def device(self, name=None, runtime=None, should_ignore_unavailable_devices=False):
         """
         :param name: The name of the desired device.
         :type name: str
@@ -351,12 +393,22 @@ class Simulator(object):
             raise TypeError('Must supply name and/or runtime.')
 
         for device in self.devices:
+            if should_ignore_unavailable_devices and not device.available:
+                continue
             if name and device.name != name:
                 continue
             if runtime and device.runtime != runtime:
                 continue
             return device
         return None
+
+    @property
+    def available_runtimes(self):
+        """
+        :return: An iterator of all available runtimes.
+        :rtype: iter
+        """
+        return itertools.ifilter(lambda runtime: runtime.available, self.runtimes)
 
     @property
     def devices(self):
@@ -367,18 +419,24 @@ class Simulator(object):
         return itertools.chain(*[runtime.devices for runtime in self.runtimes])
 
     @property
-    def latest_runtime(self):
+    def latest_available_runtime(self):
         """
         :return: Returns a Runtime object with the highest version.
         :rtype: Runtime or None
         """
         if not self.runtimes:
             return None
-        return sorted(self.runtimes, key=lambda runtime: runtime.version)[-1]
+        return sorted(self.available_runtimes, key=lambda runtime: runtime.version, reverse=True)[0]
 
-    def testing_device(self, device_type, runtime):
+    def lookup_or_create_device(self, name, device_type, runtime):
         """
-        Get an iOS Simulator device for testing.
+        Returns an available iOS Simulator device for testing.
+
+        This function will create a new simulator device with the specified name,
+        device type and runtime if one does not already exist.
+
+        :param name: The name of the simulator device to lookup or create.
+        :type name: str
         :param device_type: The CoreSimulator device type.
         :type device_type: DeviceType
         :param runtime: The CoreSimulator runtime.
@@ -386,9 +444,13 @@ class Simulator(object):
         :return: A dictionary describing the device.
         :rtype: Device
         """
-        # Check to see if the testing device already exists
-        name = device_type.name + ' WebKit Tester'
-        return self.device(name=name, runtime=runtime) or Device.create(name, device_type, runtime)
+        assert(runtime.available)
+        testing_device = self.device(name=name, runtime=runtime, should_ignore_unavailable_devices=True)
+        if testing_device:
+            return testing_device
+        testing_device = Device.create(name, device_type, runtime)
+        assert(testing_device.available)
+        return testing_device
 
     def __repr__(self):
         return '<iOS Simulator: {num_runtimes} runtimes, {num_device_types} device types>'.format(

@@ -77,7 +77,7 @@ inline static bool hasVerticalAppearance(HTMLInputElement* input)
 
 // --------------------------------
 
-RenderSliderThumb::RenderSliderThumb(SliderThumbElement& element, PassRef<RenderStyle> style)
+RenderSliderThumb::RenderSliderThumb(SliderThumbElement& element, Ref<RenderStyle>&& style)
     : RenderBlockFlow(element, WTF::move(style))
 {
 }
@@ -109,9 +109,9 @@ bool RenderSliderThumb::isSliderThumb() const
 
 // FIXME: Find a way to cascade appearance and adjust heights, and get rid of this class.
 // http://webkit.org/b/62535
-class RenderSliderContainer : public RenderFlexibleBox {
+class RenderSliderContainer final : public RenderFlexibleBox {
 public:
-    RenderSliderContainer(SliderContainerElement& element, PassRef<RenderStyle> style)
+    RenderSliderContainer(SliderContainerElement& element, Ref<RenderStyle>&& style)
         : RenderFlexibleBox(element, WTF::move(style))
     {
     }
@@ -214,7 +214,7 @@ void SliderThumbElement::setPositionFromValue()
         renderer()->setNeedsLayout();
 }
 
-RenderPtr<RenderElement> SliderThumbElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SliderThumbElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSliderThumb>(*this, WTF::move(style));
 }
@@ -256,7 +256,7 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& absolutePoint)
         return;
 
     // Do all the tracking math relative to the input's renderer's box.
-    RenderBox& inputRenderer = *toRenderBox(input->renderer());
+    RenderBox& inputRenderer = downcast<RenderBox>(*input->renderer());
     RenderBox& trackRenderer = *trackElement->renderBox();
 
     bool isVertical = hasVerticalAppearance(input.get());
@@ -598,9 +598,9 @@ const AtomicString& SliderThumbElement::shadowPseudoId() const
     }
 }
 
-PassRefPtr<Element> SliderThumbElement::cloneElementWithoutAttributesAndChildren()
+RefPtr<Element> SliderThumbElement::cloneElementWithoutAttributesAndChildren(Document& targetDocument)
 {
-    return create(document());
+    return create(targetDocument);
 }
 
 // --------------------------------
@@ -615,7 +615,7 @@ PassRefPtr<SliderContainerElement> SliderContainerElement::create(Document& docu
     return adoptRef(new SliderContainerElement(document));
 }
 
-RenderPtr<RenderElement> SliderContainerElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SliderContainerElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSliderContainer>(*this, WTF::move(style));
 }

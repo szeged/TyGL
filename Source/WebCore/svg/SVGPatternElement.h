@@ -45,7 +45,7 @@ class SVGPatternElement final : public SVGElement,
                                 public SVGExternalResourcesRequired,
                                 public SVGFitToViewBox {
 public:
-    static PassRefPtr<SVGPatternElement> create(const QualifiedName&, Document&);
+    static Ref<SVGPatternElement> create(const QualifiedName&, Document&);
 
     void collectPatternAttributes(PatternAttributes&) const;
 
@@ -62,7 +62,7 @@ private:
     virtual void svgAttributeChanged(const QualifiedName&) override;
     virtual void childrenChanged(const ChildChange&) override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     virtual bool selfHasRelativeLengths() const override { return true; }
 

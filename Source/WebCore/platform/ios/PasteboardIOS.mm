@@ -121,14 +121,14 @@ Pasteboard::Pasteboard()
 {
 }
 
-PassOwnPtr<Pasteboard> Pasteboard::createForCopyAndPaste()
+std::unique_ptr<Pasteboard> Pasteboard::createForCopyAndPaste()
 {
-    return adoptPtr(new Pasteboard);
+    return std::make_unique<Pasteboard>();
 }
 
-PassOwnPtr<Pasteboard> Pasteboard::createPrivate()
+std::unique_ptr<Pasteboard> Pasteboard::createPrivate()
 {
-    return adoptPtr(new Pasteboard);
+    return std::make_unique<Pasteboard>();
 }
 
 void Pasteboard::write(const PasteboardWebContent& content)
@@ -169,6 +169,8 @@ void Pasteboard::read(PasteboardPlainText& text)
 {
     PasteboardStrategy& strategy = *platformStrategies()->pasteboardStrategy();
     text.text = strategy.readStringFromPasteboard(0, kUTTypeText);
+    if (text.text.isEmpty())
+        text.text = strategy.readStringFromPasteboard(0, kUTTypeURL);
 }
 
 static NSArray* supportedImageTypes()

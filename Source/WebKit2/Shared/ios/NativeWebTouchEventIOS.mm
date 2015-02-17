@@ -26,13 +26,13 @@
 #import "config.h"
 #import "NativeWebTouchEvent.h"
 
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) && ENABLE(TOUCH_EVENTS)
 
+#import "UIKitSPI.h"
 #import "WebEvent.h"
-#import <Foundation/NSGeometry.h>
 #import <UIKit/UITouch.h>
-#import <UIKit/UIWebTouchEventsGestureRecognizer.h>
 #import <WebCore/IntPoint.h>
+#import <WebCore/WAKAppKitStubs.h>
 #import <wtf/CurrentTime.h>
 
 namespace WebKit {
@@ -98,4 +98,4 @@ NativeWebTouchEvent::NativeWebTouchEvent(const _UIWebTouchEvent* event)
 
 } // namespace WebKit
 
-#endif // PLATFORM(IOS)
+#endif // PLATFORM(IOS) && ENABLE(TOUCH_EVENTS)

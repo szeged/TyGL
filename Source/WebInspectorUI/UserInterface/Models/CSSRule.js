@@ -139,11 +139,6 @@ WebInspector.CSSRule.prototype = {
         return this._selectors;
     },
 
-    set selectors(selectors)
-    {
-        this.selectorText = (selectors || []).join(", ");
-    },
-
     get matchedSelectorIndices()
     {
         return this._matchedSelectorIndices;
@@ -178,7 +173,7 @@ WebInspector.CSSRule.prototype = {
         if ("_matchedSelectorText" in this)
             return this._matchedSelectorText;
 
-        this._matchedSelectorText = this.matchedSelectors.join(", ");
+        this._matchedSelectorText = this.matchedSelectors.map(function(x) { return x.text; }).join(", ");
 
         return this._matchedSelectorText;
     },
@@ -191,6 +186,14 @@ WebInspector.CSSRule.prototype = {
     get mediaList()
     {
         return this._mediaList;
+    },
+
+    isEqualTo: function(rule)
+    {
+        if (!rule)
+            return false;
+
+        return Object.shallowEqual(this._id, rule.id);
     },
 
     // Protected

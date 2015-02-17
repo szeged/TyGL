@@ -32,7 +32,7 @@ namespace WebCore {
 class SVGRectElement final : public SVGGraphicsElement,
                              public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGRectElement> create(const QualifiedName&, Document&);
+    static Ref<SVGRectElement> create(const QualifiedName&, Document&);
 
 private:
     SVGRectElement(const QualifiedName&, Document&);
@@ -45,7 +45,7 @@ private:
 
     virtual bool selfHasRelativeLengths() const override { return true; }
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGRectElement)
         DECLARE_ANIMATED_LENGTH(X, x)

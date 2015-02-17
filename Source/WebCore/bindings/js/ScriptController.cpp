@@ -39,11 +39,10 @@
 #include "Page.h"
 #include "PageConsoleClient.h"
 #include "PageGroup.h"
-#include "PluginView.h"
+#include "PluginViewBase.h"
 #include "ScriptSourceCode.h"
 #include "ScriptableDocumentParser.h"
 #include "Settings.h"
-#include "StorageNamespace.h"
 #include "UserGestureIndicator.h"
 #include "WebCoreJSClientData.h"
 #include "npruntime_impl.h"
@@ -145,13 +144,13 @@ Deprecated::ScriptValue ScriptController::evaluateInWorld(const ScriptSourceCode
 
     Ref<Frame> protect(m_frame);
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willEvaluateScript(&m_frame, sourceURL, sourceCode.startLine());
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willEvaluateScript(m_frame, sourceURL, sourceCode.startLine());
 
     JSValue evaluationException;
 
     JSValue returnValue = JSMainThreadExecState::evaluate(exec, jsSourceCode, shell, &evaluationException);
 
-    InspectorInstrumentation::didEvaluateScript(cookie, &m_frame);
+    InspectorInstrumentation::didEvaluateScript(cookie, m_frame);
 
     if (evaluationException) {
         reportException(exec, evaluationException, sourceCode.cachedScript());
@@ -360,7 +359,6 @@ PassRefPtr<Bindings::RootObject> ScriptController::createRootObject(void* native
     return rootObject.release();
 }
 
-#if ENABLE(INSPECTOR)
 void ScriptController::collectIsolatedContexts(Vector<std::pair<JSC::ExecState*, SecurityOrigin*>>& result)
 {
     for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter) {
@@ -369,7 +367,6 @@ void ScriptController::collectIsolatedContexts(Vector<std::pair<JSC::ExecState*,
         result.append(std::pair<JSC::ExecState*, SecurityOrigin*>(exec, origin));
     }
 }
-#endif
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
 
@@ -409,10 +406,10 @@ NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement
 #if !PLATFORM(COCOA)
 PassRefPtr<JSC::Bindings::Instance> ScriptController::createScriptInstanceForWidget(Widget* widget)
 {
-    if (!widget->isPluginView())
-        return 0;
+    if (!is<PluginViewBase>(*widget))
+        return nullptr;
 
-    return toPluginView(widget)->bindingInstance();
+    return downcast<PluginViewBase>(*widget).bindingInstance();
 }
 #endif
 

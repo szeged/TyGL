@@ -29,49 +29,14 @@
 
 #import "WebContextMenuClient.h"
 #import "WebViewInternal.h"
-#import <AppKit/NSSharingService.h>
 #import <WebCore/BitmapImage.h>
+#import <WebCore/ContextMenuController.h>
 #import <WebCore/Document.h>
 #import <WebCore/Editor.h>
 #import <WebCore/FocusController.h>
 #import <WebCore/Frame.h>
 #import <WebCore/FrameSelection.h>
-#import <WebCore/ContextMenuController.h>
 #import <WebCore/Page.h>
-
-#if __has_include(<AppKit/NSSharingService_Private.h>)
-#import <AppKit/NSSharingService_Private.h>
-#else
-typedef enum {
-    NSSharingServicePickerStyleRollover = 1
-} NSSharingServicePickerStyle;
-
-typedef enum {
-    NSSharingServiceTypeEditor = 2
-} NSSharingServiceType;
-
-typedef NSUInteger NSSharingServiceMask;
-#endif
-
-@interface NSSharingServicePicker (Private)
-@property NSSharingServicePickerStyle style;
-- (NSMenu *)menu;
-@end
-
-@interface NSSharingService (Private)
-@property (readonly) NSSharingServiceType type;
-@end
-
-#if __has_include(<AppKit/NSItemProvider.h>)
-#import <AppKit/NSItemProvider.h>
-#else
-// FIXME: We should properly disable code that interacts with NSItemProvider/NSSharingServicePicker in 32-bit.
-@interface NSItemProvider : NSObject
-@property (copy, readonly) NSArray *registeredTypeIdentifiers;
-- (instancetype)initWithItem:(id <NSSecureCoding>)item typeIdentifier:(NSString *)typeIdentifier;
-- (void)loadItemForTypeIdentifier:(NSString *)typeIdentifier options:(NSDictionary *)options completionHandler:(void (^)(id <NSSecureCoding> item, NSError *error))completionHandler;
-@end
-#endif
 
 static NSString *serviceControlsPasteboardName = @"WebKitServiceControlsPasteboard";
 
@@ -79,7 +44,7 @@ using namespace WebCore;
 
 @implementation WebSharingServicePickerController
 
-- (instancetype)initWithData:(NSData *)data includeEditorServices:(BOOL)includeEditorServices menuClient:(WebContextMenuClient*)menuClient
+- (instancetype)initWithItems:(NSArray *)items includeEditorServices:(BOOL)includeEditorServices client:(WebSharingServicePickerClient*)pickerClient style:(NSSharingServicePickerStyle)style
 {
 #ifndef __LP64__
     return nil;
@@ -87,14 +52,12 @@ using namespace WebCore;
     if (!(self = [super init]))
         return nil;
 
-    RetainPtr<NSItemProvider> itemProvider = adoptNS([[NSItemProvider alloc] initWithItem:data typeIdentifier:@"public.data"]);
-
-    _picker = adoptNS([[NSSharingServicePicker alloc] initWithItems:@[ itemProvider.get() ]]);
-    [_picker setStyle:NSSharingServicePickerStyleRollover];
+    _picker = adoptNS([[NSSharingServicePicker alloc] initWithItems:items]);
+    [_picker setStyle:style];
     [_picker setDelegate:self];
 
     _includeEditorServices = includeEditorServices;
-    _menuClient = menuClient;
+    _pickerClient = pickerClient;
 
     return self;
 #endif
@@ -105,11 +68,11 @@ using namespace WebCore;
     // Protect self from being dealloc'ed partway through this method.
     RetainPtr<WebSharingServicePickerController> protector(self);
 
-    if (_menuClient)
-        _menuClient->clearSharingServicePickerController();
+    if (_pickerClient)
+        _pickerClient->sharingServicePickerWillBeDestroyed(*self);
 
     _picker = nullptr;
-    _menuClient = nullptr;
+    _pickerClient = nullptr;
 }
 
 - (NSMenu *)menu
@@ -119,7 +82,7 @@ using namespace WebCore;
 
 - (void)didShareImageData:(NSData *)data confirmDataIsValidTIFFData:(BOOL)confirmData
 {
-    Page* page = [_menuClient->webView() page];
+    Page* page = _pickerClient->pageForSharingServicePicker(*self);
     if (!page)
         return;
 
@@ -170,13 +133,18 @@ using namespace WebCore;
 - (void)sharingServicePicker:(NSSharingServicePicker *)sharingServicePicker didChooseSharingService:(NSSharingService *)service
 {
     if (!service)
-        _menuClient->clearSharingServicePickerController();
+        _pickerClient->sharingServicePickerWillBeDestroyed(*self);
 }
 
 #pragma mark NSSharingServiceDelegate methods
 
 - (void)sharingService:(NSSharingService *)sharingService didShareItems:(NSArray *)items
 {
+    // We only care about what item was shared if we were interested in editor services
+    // (i.e., if we plan on replacing the selection with the returned item)
+    if (!_includeEditorServices)
+        return;
+
     // We only send one item, so we should only get one item back.
     if ([items count] != 1)
         return;
@@ -208,8 +176,11 @@ using namespace WebCore;
         }];
     }
 #endif
-    else
-        LOG_ERROR("sharingService:didShareItems: - Unknown item type returned");
+    else if ([item isKindOfClass:[NSAttributedString class]]) {
+        Frame& frame = _pickerClient->pageForSharingServicePicker(*self)->focusController().focusedOrMainFrame();
+        frame.editor().replaceSelectionWithAttributedString(item);
+    } else
+        LOG_ERROR("sharingService:didShareItems: - Unknown item type returned\n");
 }
 
 - (void)sharingService:(NSSharingService *)sharingService didFailToShareItems:(NSArray *)items error:(NSError *)error
@@ -219,23 +190,23 @@ using namespace WebCore;
 
 - (NSRect)sharingService:(NSSharingService *)sharingService sourceFrameOnScreenForShareItem:(id <NSPasteboardWriting>)item
 {
-    if (!_menuClient)
+    if (!_pickerClient)
         return NSZeroRect;
 
-    return _menuClient->screenRectForHitTestNode();
+    return _pickerClient->screenRectForCurrentSharingServicePickerItem(*self);
 }
 
 - (NSImage *)sharingService:(NSSharingService *)sharingService transitionImageForShareItem:(id <NSPasteboardWriting>)item contentRect:(NSRect *)contentRect
 {
-    if (!_menuClient)
+    if (!_pickerClient)
         return nil;
 
-    return _menuClient->renderedImageForControlledImage();
+    return _pickerClient->imageForCurrentSharingServicePickerItem(*self).get();
 }
 
 - (NSWindow *)sharingService:(NSSharingService *)sharingService sourceWindowForShareItems:(NSArray *)items sharingContentScope:(NSSharingContentScope *)sharingContentScope
 {
-    return [_menuClient->webView() window];
+    return _pickerClient->windowForSharingServicePicker(*self).get();
 }
 
 @end

@@ -29,6 +29,7 @@
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
+#include "HTMLVideoElement.h"
 #include "Settings.h"
 
 #include "JSDOMWindowBase.h"
@@ -48,9 +49,11 @@ HTMLImageLoader::~HTMLImageLoader()
 
 void HTMLImageLoader::dispatchLoadEvent()
 {
+#if ENABLE(VIDEO)
     // HTMLVideoElement uses this class to load the poster image, but it should not fire events for loading or failure.
     if (is<HTMLVideoElement>(element()))
         return;
+#endif
 
     bool errorOccurred = image()->errorOccurred();
     if (!errorOccurred && image()->response().httpStatusCode() >= 400)
@@ -69,12 +72,15 @@ String HTMLImageLoader::sourceURI(const AtomicString& attr) const
     return stripLeadingAndTrailingHTMLSpaces(attr);
 }
 
-void HTMLImageLoader::notifyFinished(CachedResource*)
+void HTMLImageLoader::imageChanged(CachedImage* cachedImage, const IntRect*)
 {
-    CachedImage* cachedImage = image();
+    ASSERT(cachedImage == image());
+
+    if (!cachedImage->isLoaded())
+        return;
 
     Ref<Element> protect(element());
-    ImageLoader::notifyFinished(cachedImage);
+    ImageLoader::imageChanged(cachedImage);
 
     bool loadError = cachedImage->errorOccurred() || cachedImage->response().httpStatusCode() >= 400;
     if (!loadError) {

@@ -31,9 +31,9 @@ namespace WebCore {
 class JSTestInterface : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestInterface* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestInterface> impl)
+    static JSTestInterface* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestInterface>&& impl)
     {
-        JSTestInterface* ptr = new (NotNull, JSC::allocateCell<JSTestInterface>(globalObject->vm().heap)) JSTestInterface(structure, globalObject, impl);
+        JSTestInterface* ptr = new (NotNull, JSC::allocateCell<JSTestInterface>(globalObject->vm().heap)) JSTestInterface(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -92,7 +92,7 @@ public:
 private:
     TestInterface* m_impl;
 protected:
-    JSTestInterface(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestInterface>);
+    JSTestInterface(JSC::Structure*, JSDOMGlobalObject*, Ref<TestInterface>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -115,12 +115,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestInterface*)
     return &jsTestInterfaceOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestInterface*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestInterface*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestInterface& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

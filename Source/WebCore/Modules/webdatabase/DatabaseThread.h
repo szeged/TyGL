@@ -28,20 +28,17 @@
 #ifndef DatabaseThread_h
 #define DatabaseThread_h
 
-#if ENABLE(SQL_DATABASE)
-
 #include <memory>
 #include <wtf/Deque.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/MessageQueue.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Threading.h>
 
 namespace WebCore {
 
-class DatabaseBackend;
+class Database;
 class DatabaseTask;
 class DatabaseTaskSynchronizer;
 class Document;
@@ -50,7 +47,7 @@ class SQLTransactionCoordinator;
 
 class DatabaseThread : public ThreadSafeRefCounted<DatabaseThread> {
 public:
-    static PassRefPtr<DatabaseThread> create() { return adoptRef(new DatabaseThread); }
+    static Ref<DatabaseThread> create() { return adoptRef(*new DatabaseThread); }
     ~DatabaseThread();
 
     bool start();
@@ -59,10 +56,10 @@ public:
 
     void scheduleTask(std::unique_ptr<DatabaseTask>);
     void scheduleImmediateTask(std::unique_ptr<DatabaseTask>); // This just adds the task to the front of the queue - the caller needs to be extremely careful not to create deadlocks when waiting for completion.
-    void unscheduleDatabaseTasks(DatabaseBackend*);
+    void unscheduleDatabaseTasks(Database*);
 
-    void recordDatabaseOpen(DatabaseBackend*);
-    void recordDatabaseClosed(DatabaseBackend*);
+    void recordDatabaseOpen(Database*);
+    void recordDatabaseClosed(Database*);
     ThreadIdentifier getThreadID() { return m_threadID; }
 
     SQLTransactionClient* transactionClient() { return m_transactionClient.get(); }
@@ -91,7 +88,7 @@ private:
 #endif
 
     // This set keeps track of the open databases that have been used on this thread.
-    typedef HashSet<RefPtr<DatabaseBackend>> DatabaseSet;
+    typedef HashSet<RefPtr<Database>> DatabaseSet;
     DatabaseSet m_openDatabaseSet;
 
     std::unique_ptr<SQLTransactionClient> m_transactionClient;
@@ -101,5 +98,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SQL_DATABASE)
 #endif // DatabaseThread_h

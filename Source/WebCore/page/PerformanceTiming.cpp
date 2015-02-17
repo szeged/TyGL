@@ -165,7 +165,7 @@ unsigned long long PerformanceTiming::connectStart() const
     // connectStart will be -1 when a network request is not made.
     // Rather than exposing a special value that indicates no new connection, we "backfill" with domainLookupEnd.
     int connectStart = timing.connectStart;
-    if (connectStart < 0 || loader->response().connectionReused())
+    if (connectStart < 0)
         return domainLookupEnd();
 
     // ResourceLoadTiming's connect phase includes DNS, however Navigation Timing's
@@ -186,7 +186,7 @@ unsigned long long PerformanceTiming::connectEnd() const
     
     // connectEnd will be -1 when a network request is not made.
     // Rather than exposing a special value that indicates no new connection, we "backfill" with connectStart.
-    if (timing.connectEnd < 0 || loader->response().connectionReused())
+    if (timing.connectEnd < 0)
         return connectStart();
 
     return resourceLoadTimeRelativeToAbsolute(timing.connectEnd);
@@ -328,7 +328,7 @@ DocumentLoadTiming* PerformanceTiming::documentLoadTiming() const
     if (!loader)
         return 0;
 
-    return loader->timing();
+    return &loader->timing();
 }
 
 unsigned long long PerformanceTiming::resourceLoadTimeRelativeToAbsolute(int relativeMilliseconds) const

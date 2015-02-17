@@ -78,6 +78,10 @@ static bool shouldUseThreadedScrolling(const char* pathOrURL)
     return strstr(pathOrURL, "tiled-drawing/");
 }
 
+void TestController::platformResetPreferencesToConsistentValues()
+{
+}
+
 void TestController::platformConfigureViewForTest(const TestInvocation& test)
 {
     auto viewOptions = adoptWK(WKMutableDictionaryCreate());
@@ -102,6 +106,14 @@ void TestController::platformRunUntil(bool& done, double timeout)
 
 void TestController::platformInitializeContext()
 {
+    // Testing uses a private session, which is memory only. However creating one instantiates a shared NSURLCache,
+    // and if we haven't created one yet, the default one will be created on disk.
+    // Making the shared cache memory-only avoids touching the file system.
+    RetainPtr<NSURLCache> sharedCache =
+        adoptNS([[NSURLCache alloc] initWithMemoryCapacity:1024 * 1024
+                                      diskCapacity:0
+                                          diskPath:nil]);
+    [NSURLCache setSharedURLCache:sharedCache.get()];
 }
 
 void TestController::setHidden(bool hidden)

@@ -28,7 +28,7 @@
 
 namespace WebCore {
 
-RenderFrame::RenderFrame(HTMLFrameElement& frame, PassRef<RenderStyle> style)
+RenderFrame::RenderFrame(HTMLFrameElement& frame, Ref<RenderStyle>&& style)
     : RenderFrameBase(frame, WTF::move(style))
 {
 }
@@ -45,8 +45,8 @@ FrameEdgeInfo RenderFrame::edgeInfo() const
 
 void RenderFrame::updateFromElement()
 {
-    if (parent() && parent()->isFrameSet())
-        toRenderFrameSet(parent())->notifyFrameEdgeInfoChanged();
+    if (is<RenderFrameSet>(parent()))
+        downcast<RenderFrameSet>(*parent()).notifyFrameEdgeInfoChanged();
 }
 
 } // namespace WebCore

@@ -26,6 +26,8 @@
 #include "CSSValue.h"
 #include "CSSValueKeywords.h"
 #include "Color.h"
+#include "LayoutUnit.h"
+#include <utility>
 #include <wtf/Forward.h>
 #include <wtf/MathExtras.h>
 #include <wtf/PassRefPtr.h>
@@ -47,8 +49,14 @@ class CSSBasicShape;
 class LengthRepeat;
 #endif
 
+struct CSSFontFamily;
 struct Length;
 struct LengthSize;
+
+// Max/min values for CSS, needs to slightly smaller/larger than the true max/min values to allow for rounding without overflowing.
+// Subtract two (rather than one) to allow for values to be converted to float and back without exceeding the LayoutUnit::max.
+const int maxValueForCssLength = intMaxForLayoutUnit - 2;
+const int minValueForCssLength = intMinForLayoutUnit + 2;
 
 // Dimension calculations are imprecise, often resulting in values of e.g.
 // 44.99998. We need to go ahead and round if we're really close to the next
@@ -143,6 +151,8 @@ public:
         CSS_CALC_PERCENTAGE_WITH_NUMBER = 114,
         CSS_CALC_PERCENTAGE_WITH_LENGTH = 115,
 
+        CSS_FONT_FAMILY = 116,
+
         CSS_PROPERTY_ID = 117,
         CSS_VALUE_ID = 118
     };
@@ -194,6 +204,7 @@ public:
     bool isRGBColor() const { return m_primitiveUnitType == CSS_RGBCOLOR; }
     bool isShape() const { return m_primitiveUnitType == CSS_SHAPE; }
     bool isString() const { return m_primitiveUnitType == CSS_STRING; }
+    bool isFontFamily() const { return m_primitiveUnitType == CSS_FONT_FAMILY; }
     bool isTime() const { return m_primitiveUnitType == CSS_S || m_primitiveUnitType == CSS_MS; }
     bool isURI() const { return m_primitiveUnitType == CSS_URI; }
     bool isCalculated() const { return m_primitiveUnitType == CSS_CALC; }
@@ -216,26 +227,26 @@ public:
     bool isValueID() const { return m_primitiveUnitType == CSS_VALUE_ID; }
     bool isFlex() const { return primitiveType() == CSS_FR; }
 
-    static PassRef<CSSPrimitiveValue> createIdentifier(CSSValueID valueID) { return adoptRef(*new CSSPrimitiveValue(valueID)); }
-    static PassRef<CSSPrimitiveValue> createIdentifier(CSSPropertyID propertyID) { return adoptRef(*new CSSPrimitiveValue(propertyID)); }
-    static PassRef<CSSPrimitiveValue> createParserOperator(int parserOperator) { return adoptRef(*new CSSPrimitiveValue(parserOperator)); }
+    static Ref<CSSPrimitiveValue> createIdentifier(CSSValueID valueID) { return adoptRef(*new CSSPrimitiveValue(valueID)); }
+    static Ref<CSSPrimitiveValue> createIdentifier(CSSPropertyID propertyID) { return adoptRef(*new CSSPrimitiveValue(propertyID)); }
+    static Ref<CSSPrimitiveValue> createParserOperator(int parserOperator) { return adoptRef(*new CSSPrimitiveValue(parserOperator)); }
 
-    static PassRef<CSSPrimitiveValue> createColor(unsigned rgbValue) { return adoptRef(*new CSSPrimitiveValue(rgbValue)); }
-    static PassRef<CSSPrimitiveValue> create(double value, UnitTypes type) { return adoptRef(*new CSSPrimitiveValue(value, type)); }
-    static PassRef<CSSPrimitiveValue> create(const String& value, UnitTypes type) { return adoptRef(*new CSSPrimitiveValue(value, type)); }
-    static PassRef<CSSPrimitiveValue> create(const Length& value, const RenderStyle* style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
-    static PassRef<CSSPrimitiveValue> create(const LengthSize& value, const RenderStyle* style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
+    static Ref<CSSPrimitiveValue> createColor(unsigned rgbValue) { return adoptRef(*new CSSPrimitiveValue(rgbValue)); }
+    static Ref<CSSPrimitiveValue> create(double value, UnitTypes type) { return adoptRef(*new CSSPrimitiveValue(value, type)); }
+    static Ref<CSSPrimitiveValue> create(const String& value, UnitTypes type) { return adoptRef(*new CSSPrimitiveValue(value, type)); }
+    static Ref<CSSPrimitiveValue> create(const Length& value, const RenderStyle* style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
+    static Ref<CSSPrimitiveValue> create(const LengthSize& value, const RenderStyle* style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
 
-    template<typename T> static PassRef<CSSPrimitiveValue> create(T value)
+    template<typename T> static Ref<CSSPrimitiveValue> create(T&& value)
     {
-        return adoptRef(*new CSSPrimitiveValue(value));
+        return adoptRef(*new CSSPrimitiveValue(std::forward<T>(value)));
     }
 
     // This value is used to handle quirky margins in reflow roots (body, td, and th) like WinIE.
     // The basic idea is that a stylesheet can use the value __qem (for quirky em) instead of em.
     // When the quirky value is used, if you're in quirks mode, the margin will collapse away
     // inside a table cell.
-    static PassRef<CSSPrimitiveValue> createAllowingMarginQuirk(double value, UnitTypes type)
+    static Ref<CSSPrimitiveValue> createAllowingMarginQuirk(double value, UnitTypes type)
     {
         CSSPrimitiveValue* quirkValue = new CSSPrimitiveValue(value, type);
         quirkValue->m_isQuirkValue = true;
@@ -253,13 +264,13 @@ public:
     enum TimeUnit { Seconds, Milliseconds };
     template <typename T, TimeUnit timeUnit> T computeTime()
     {
-        if (timeUnit == Seconds && m_primitiveUnitType == CSS_S)
+        if (timeUnit == Seconds && primitiveType() == CSS_S)
             return getValue<T>();
-        if (timeUnit == Seconds && m_primitiveUnitType == CSS_MS)
+        if (timeUnit == Seconds && primitiveType() == CSS_MS)
             return getValue<T>() / 1000;
-        if (timeUnit == Milliseconds && m_primitiveUnitType == CSS_MS)
+        if (timeUnit == Milliseconds && primitiveType() == CSS_MS)
             return getValue<T>();
-        if (timeUnit == Milliseconds && m_primitiveUnitType == CSS_S)
+        if (timeUnit == Milliseconds && primitiveType() == CSS_S)
             return getValue<T>() * 1000;
         ASSERT_NOT_REACHED();
         return 0;
@@ -322,15 +333,17 @@ public:
     RGBA32 getRGBA32Value() const { return m_primitiveUnitType != CSS_RGBCOLOR ? 0 : m_value.rgbcolor; }
 
     Pair* getPairValue(ExceptionCode&) const;
-    Pair* getPairValue() const { return m_primitiveUnitType != CSS_PAIR ? 0 : m_value.pair; }
+    Pair* getPairValue() const { return m_primitiveUnitType != CSS_PAIR ? nullptr : m_value.pair; }
 
 #if ENABLE(DASHBOARD_SUPPORT)
-    DashboardRegion* getDashboardRegionValue() const { return m_primitiveUnitType != CSS_DASHBOARD_REGION ? 0 : m_value.region; }
+    DashboardRegion* getDashboardRegionValue() const { return m_primitiveUnitType != CSS_DASHBOARD_REGION ? nullptr : m_value.region; }
 #endif
 
-    CSSBasicShape* getShapeValue() const { return m_primitiveUnitType != CSS_SHAPE ? 0 : m_value.shape; }
+    CSSBasicShape* getShapeValue() const { return m_primitiveUnitType != CSS_SHAPE ? nullptr : m_value.shape; }
 
-    CSSCalcValue* cssCalcValue() const { return m_primitiveUnitType != CSS_CALC ? 0 : m_value.calc; }
+    const CSSFontFamily& fontFamily() const { ASSERT(m_primitiveUnitType == CSS_FONT_FAMILY); return *m_value.fontFamily; }
+
+    CSSCalcValue* cssCalcValue() const { return m_primitiveUnitType != CSS_CALC ? nullptr : m_value.calc; }
 
     CSSPropertyID getPropertyID() const { return m_primitiveUnitType == CSS_PROPERTY_ID ? m_value.propertyID : CSSPropertyInvalid; }
     CSSValueID getValueID() const { return m_primitiveUnitType == CSS_VALUE_ID ? m_value.valueID : CSSValueInvalid; }
@@ -370,10 +383,16 @@ private:
         init(PassRefPtr<T>(val));
     }
 
-    template<typename T> CSSPrimitiveValue(PassRefPtr<T> val)
+    template<typename T> CSSPrimitiveValue(PassRefPtr<T> value)
         : CSSValue(PrimitiveClass)
     {
-        init(val);
+        init(value);
+    }
+
+    template<typename T> CSSPrimitiveValue(Ref<T>&& value)
+        : CSSValue(PrimitiveClass)
+    {
+        init(WTF::move(value));
     }
 
     static void create(int); // compile-time guard
@@ -382,7 +401,7 @@ private:
 
     void init(const Length&);
     void init(const LengthSize&, const RenderStyle*);
-    void init(PassRefPtr<Counter>);
+    void init(Ref<Counter>&&);
     void init(PassRefPtr<Rect>);
     void init(PassRefPtr<Pair>);
     void init(PassRefPtr<Quad>);
@@ -398,8 +417,8 @@ private:
 
     ALWAYS_INLINE String formatNumberForCustomCSSText() const;
     template <unsigned characterCount>
-    ALWAYS_INLINE PassRef<StringImpl> formatNumberValue(const char (&characters)[characterCount]) const;
-    NEVER_INLINE PassRef<StringImpl> formatNumberValue(const char* suffix, unsigned suffixLength) const;
+    ALWAYS_INLINE Ref<StringImpl> formatNumberValue(const char (&characters)[characterCount]) const;
+    NEVER_INLINE Ref<StringImpl> formatNumberValue(const char* suffix, unsigned suffixLength) const;
 
     union {
         CSSPropertyID propertyID;
@@ -418,6 +437,7 @@ private:
         DashboardRegion* region;
         CSSBasicShape* shape;
         CSSCalcValue* calc;
+        const CSSFontFamily* fontFamily;
     } m_value;
 };
 

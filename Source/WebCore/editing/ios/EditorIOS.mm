@@ -35,7 +35,7 @@
 #include "DocumentFragment.h"
 #include "DocumentLoader.h"
 #include "EditorClient.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "Frame.h"
 #include "FrameLoaderClient.h"
 #include "HTMLConverter.h"
@@ -49,7 +49,6 @@
 #include "Pasteboard.h"
 #include "RenderBlock.h"
 #include "RenderImage.h"
-#include "ResourceBuffer.h"
 #include "SharedBuffer.h"
 #include "SoftLinking.h"
 #include "StyleProperties.h"
@@ -204,7 +203,7 @@ bool Editor::insertParagraphSeparatorInQuotedContent()
     return true;
 }
 
-const SimpleFontData* Editor::fontForSelection(bool& hasMultipleFonts) const
+const Font* Editor::fontForSelection(bool& hasMultipleFonts) const
 {
     hasMultipleFonts = false;
 
@@ -212,9 +211,9 @@ const SimpleFontData* Editor::fontForSelection(bool& hasMultipleFonts) const
         Node* nodeToRemove;
         RenderStyle* style = styleForSelectionStart(&m_frame, nodeToRemove); // sets nodeToRemove
 
-        const SimpleFontData* result = 0;
+        const Font* result = nullptr;
         if (style)
-            result = style->font().primaryFont();
+            result = &style->fontCascade().primaryFont();
 
         if (nodeToRemove) {
             ExceptionCode ec;
@@ -225,21 +224,21 @@ const SimpleFontData* Editor::fontForSelection(bool& hasMultipleFonts) const
         return result;
     }
 
-    const SimpleFontData* font = 0;
+    const Font* font = 0;
     RefPtr<Range> range = m_frame.selection().toNormalizedRange();
     if (Node* startNode = adjustedSelectionStartForStyleComputation(m_frame.selection().selection()).deprecatedNode()) {
         Node* pastEnd = range->pastLastNode();
         // In the loop below, n should eventually match pastEnd and not become nil, but we've seen at least one
         // unreproducible case where this didn't happen, so check for null also.
-        for (Node* node = startNode; node && node != pastEnd; node = NodeTraversal::next(node)) {
+        for (Node* node = startNode; node && node != pastEnd; node = NodeTraversal::next(*node)) {
             auto renderer = node->renderer();
             if (!renderer)
                 continue;
             // FIXME: Are there any node types that have renderers, but that we should be skipping?
-            const SimpleFontData* primaryFont = renderer->style().font().primaryFont();
+            const Font& primaryFont = renderer->style().fontCascade().primaryFont();
             if (!font)
-                font = primaryFont;
-            else if (font != primaryFont) {
+                font = &primaryFont;
+            else if (font != &primaryFont) {
                 hasMultipleFonts = true;
                 break;
             }
@@ -258,7 +257,7 @@ NSDictionary* Editor::fontAttributesForSelectionStart() const
 
     NSMutableDictionary* result = [NSMutableDictionary dictionary];
     
-    CTFontRef font = style->font().primaryFont()->getCTFont();
+    CTFontRef font = style->fontCascade().primaryFont().getCTFont();
     if (font)
         [result setObject:(id)font forKey:NSFontAttributeName];
 
@@ -281,7 +280,7 @@ void Editor::removeUnchangeableStyles()
 {
     // This function removes styles that the user cannot modify by applying their default values.
     
-    RefPtr<EditingStyle> editingStyle = EditingStyle::create(m_frame.document()->body());
+    RefPtr<EditingStyle> editingStyle = EditingStyle::create(m_frame.document()->bodyOrFrameset());
     RefPtr<MutableStyleProperties> defaultStyle = editingStyle.get()->style()->mutableCopy();
     
     // Text widgets implement background color via the UIView property. Their body element will not have one.
@@ -357,15 +356,13 @@ void Editor::writeSelectionToPasteboard(Pasteboard& pasteboard)
 
 static void getImage(Element& imageElement, RefPtr<Image>& image, CachedImage*& cachedImage)
 {
-    auto renderer = imageElement.renderer();
-    if (!renderer || !renderer->isRenderImage())
+    auto* renderer = imageElement.renderer();
+    if (!is<RenderImage>(renderer))
         return;
 
-    CachedImage* tentativeCachedImage = toRenderImage(renderer)->cachedImage();
-    if (!tentativeCachedImage || tentativeCachedImage->errorOccurred()) {
-        tentativeCachedImage = 0;
+    CachedImage* tentativeCachedImage = downcast<RenderImage>(*renderer).cachedImage();
+    if (!tentativeCachedImage || tentativeCachedImage->errorOccurred())
         return;
-    }
 
     image = tentativeCachedImage->imageForRenderer(renderer);
     if (!image)
@@ -387,7 +384,7 @@ void Editor::writeImageToPasteboard(Pasteboard& pasteboard, Element& imageElemen
     pasteboardImage.url.url = imageElement.document().completeURL(stripLeadingAndTrailingHTMLSpaces(imageElement.imageSourceURL()));
     pasteboardImage.url.title = title;
     pasteboardImage.resourceMIMEType = pasteboard.resourceMIMEType(cachedImage->response().mimeType());
-    pasteboardImage.resourceData = cachedImage->resourceBuffer()->sharedBuffer();
+    pasteboardImage.resourceData = cachedImage->resourceBuffer();
 
     pasteboard.write(pasteboardImage);
 }
@@ -625,6 +622,22 @@ PassRefPtr<DocumentFragment> Editor::createFragmentForImageResourceAndAddResourc
     fragment->appendChild(imageElement.release());
 
     return fragment.release();
+}
+
+void Editor::replaceSelectionWithAttributedString(NSAttributedString *attributedString, MailBlockquoteHandling mailBlockquoteHandling)
+{
+    if (m_frame.selection().isNone())
+        return;
+
+    if (m_frame.selection().selection().isContentRichlyEditable()) {
+        RefPtr<DocumentFragment> fragment = createFragmentAndAddResources(attributedString);
+        if (fragment && shouldInsertFragment(fragment, selectedRange(), EditorInsertActionPasted))
+            pasteAsFragment(fragment, false, false, mailBlockquoteHandling);
+    } else {
+        String text = [attributedString string];
+        if (shouldInsertText(text, selectedRange().get(), EditorInsertActionPasted))
+            pasteAsPlainText(text, false);
+    }
 }
 
 } // namespace WebCore

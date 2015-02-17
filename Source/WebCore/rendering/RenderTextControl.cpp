@@ -37,7 +37,7 @@
 
 namespace WebCore {
 
-RenderTextControl::RenderTextControl(HTMLTextFormControlElement& element, PassRef<RenderStyle> style)
+RenderTextControl::RenderTextControl(HTMLTextFormControlElement& element, Ref<RenderStyle>&& style)
     : RenderBlockFlow(element, WTF::move(style))
 {
 }
@@ -73,36 +73,36 @@ void RenderTextControl::styleDidChange(StyleDifference diff, const RenderStyle* 
     textFormControlElement().updatePlaceholderVisibility();
 }
 
-void RenderTextControl::adjustInnerTextStyle(const RenderStyle* startStyle, RenderStyle* textBlockStyle) const
+void RenderTextControl::adjustInnerTextStyle(const RenderStyle* startStyle, RenderStyle& textBlockStyle) const
 {
     // The inner block, if present, always has its direction set to LTR,
     // so we need to inherit the direction and unicode-bidi style from the element.
-    textBlockStyle->setDirection(style().direction());
-    textBlockStyle->setUnicodeBidi(style().unicodeBidi());
+    textBlockStyle.setDirection(style().direction());
+    textBlockStyle.setUnicodeBidi(style().unicodeBidi());
 
     HTMLTextFormControlElement& control = textFormControlElement();
     if (HTMLElement* innerText = control.innerTextElement()) {
         if (const StyleProperties* properties = innerText->presentationAttributeStyle()) {
             RefPtr<CSSValue> value = properties->getPropertyCSSValue(CSSPropertyWebkitUserModify);
             if (is<CSSPrimitiveValue>(value.get()))
-                textBlockStyle->setUserModify(downcast<CSSPrimitiveValue>(*value));
+                textBlockStyle.setUserModify(downcast<CSSPrimitiveValue>(*value));
         }
     }
 
     if (control.isDisabledFormControl())
-        textBlockStyle->setColor(theme().disabledTextColor(textBlockStyle->visitedDependentColor(CSSPropertyColor), startStyle->visitedDependentColor(CSSPropertyBackgroundColor)));
+        textBlockStyle.setColor(theme().disabledTextColor(textBlockStyle.visitedDependentColor(CSSPropertyColor), startStyle->visitedDependentColor(CSSPropertyBackgroundColor)));
 #if PLATFORM(IOS)
-    if (textBlockStyle->textSecurity() != TSNONE && !textBlockStyle->isLeftToRightDirection()) {
+    if (textBlockStyle.textSecurity() != TSNONE && !textBlockStyle.isLeftToRightDirection()) {
         // Preserve the alignment but force the direction to LTR so that the last-typed, unmasked character
         // (which cannot have RTL directionality) will appear to the right of the masked characters. See <rdar://problem/7024375>.
         
-        switch (textBlockStyle->textAlign()) {
+        switch (textBlockStyle.textAlign()) {
         case TASTART:
         case JUSTIFY:
-            textBlockStyle->setTextAlign(RIGHT);
+            textBlockStyle.setTextAlign(RIGHT);
             break;
         case TAEND:
-            textBlockStyle->setTextAlign(LEFT);
+            textBlockStyle.setTextAlign(LEFT);
             break;
         case LEFT:
         case RIGHT:
@@ -113,7 +113,7 @@ void RenderTextControl::adjustInnerTextStyle(const RenderStyle* startStyle, Rend
             break;
         }
 
-        textBlockStyle->setDirection(LTR);
+        textBlockStyle.setDirection(LTR);
     }
 #endif
 }
@@ -174,12 +174,12 @@ void RenderTextControl::hitInnerTextElement(HitTestResult& result, const LayoutP
 float RenderTextControl::getAverageCharWidth()
 {
     float width;
-    if (style().font().fastAverageCharWidthIfAvailable(width))
+    if (style().fontCascade().fastAverageCharWidthIfAvailable(width))
         return width;
 
     const UChar ch = '0';
     const String str = String(&ch, 1);
-    const Font& font = style().font();
+    const FontCascade& font = style().fontCascade();
     TextRun textRun = constructTextRun(this, font, str, style(), TextRun::AllowTrailingExpansion);
     textRun.disableRoundingHacks();
     return font.width(textRun);
@@ -189,7 +189,7 @@ float RenderTextControl::scaleEmToUnits(int x) const
 {
     // This matches the unitsPerEm value for MS Shell Dlg and Courier New from the "head" font table.
     float unitsPerEm = 2048.0f;
-    return roundf(style().font().size() * x / unitsPerEm);
+    return roundf(style().fontCascade().size() * x / unitsPerEm);
 }
 
 void RenderTextControl::computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const

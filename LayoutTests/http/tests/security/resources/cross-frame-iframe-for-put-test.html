@@ -120,7 +120,6 @@
         var MutationEventOld = window.MutationEvent;
         var NodeFilterOld = window.NodeFilter;
         var NodeOld = window.Node;
-        var NotationOld = window.Notation;
         var ProcessingInstructionOld = window.ProcessingInstruction;
         var RangeErrorOld = window.RangeError;
         var RangeExceptionOld = window.RangeException;
@@ -216,16 +215,13 @@
         var addEventListenerOld = window.addEventListener;
         var alertOld = window.alert;
         var atobOld = window.atob;
-        var blurOld = window.blur;
         var btoaOld = window.btoa;
         var captureEventsOld = window.captureEvents;
         var clearIntervalOld = window.clearInterval;
         var clearTimeoutOld = window.clearTimeout;
-        var closeOld = window.close;
         var confirmOld = window.confirm;
         var evalOld = window.eval;
         var findOld = window.find;
-        var focusOld = window.focus;
         var getComputedStyleOld = window.getComputedStyle;
         var getMatchedCSSRulesOld = window.getMatchedCSSRules;
         var getSelectionOld = window.getSelection;
@@ -246,6 +242,8 @@
         var showModalDialogOld = window.showModalDialog;
         var stopOld = window.stop;
 
+        // The test runs on a timer and not in a load event handler because we want both
+        // window.onload and window.event to be undefined.
         setTimeout(function() {
             // Constructors
             shouldBe("window.Attr", "AttrOld");
@@ -325,7 +323,6 @@
             shouldBe("window.MutationEvent", "MutationEventOld");
             shouldBe("window.Node", "NodeOld");
             shouldBe("window.NodeFilter", "NodeFilterOld");
-            shouldBe("window.Notation", "NotationOld");
             shouldBe("window.ProcessingInstruction", "ProcessingInstructionOld");
             shouldBe("window.Range", "RangeOld");
             shouldBe("window.RangeError", "RangeErrorOld");
@@ -432,16 +429,13 @@
             shouldBe("window.addEventListener", "addEventListenerOld");
             shouldBe("window.alert", "alertOld");
             shouldBe("window.atob", "atobOld");
-            shouldBe("window.blur", "blurOld");
             shouldBe("window.btoa", "btoaOld");
             shouldBe("window.captureEvents", "captureEventsOld");
             shouldBe("window.clearInterval", "clearIntervalOld");
             shouldBe("window.clearTimeout", "clearTimeoutOld");
-            shouldBe("window.close", "closeOld");
             shouldBe("window.confirm", "confirmOld");
             shouldBe("window.eval", "evalOld");
             shouldBe("window.find", "findOld");
-            shouldBe("window.focus", "focusOld");
             shouldBe("window.getComputedStyle", "getComputedStyleOld");
             shouldBe("window.getMatchedCSSRules", "getMatchedCSSRulesOld");
             shouldBe("window.getSelection", "getSelectionOld");

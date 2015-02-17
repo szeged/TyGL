@@ -44,7 +44,7 @@ class SVGSVGElement final : public SVGGraphicsElement,
                             public SVGFitToViewBox,
                             public SVGZoomAndPan {
 public:
-    static PassRefPtr<SVGSVGElement> create(const QualifiedName&, Document&);
+    static Ref<SVGSVGElement> create(const QualifiedName&, Document&);
 
     using SVGGraphicsElement::ref;
     using SVGGraphicsElement::deref;
@@ -135,7 +135,7 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
 
     virtual bool rendererIsNeeded(const RenderStyle&) override;
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
     virtual void removedFrom(ContainerNode&) override;

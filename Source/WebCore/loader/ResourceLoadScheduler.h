@@ -75,8 +75,6 @@ protected:
     WEBCORE_EXPORT ResourceLoadScheduler();
     WEBCORE_EXPORT virtual ~ResourceLoadScheduler();
 
-    WEBCORE_EXPORT void notifyDidScheduleResourceRequest(ResourceLoader*);
-
 #if USE(QUICK_LOOK)
     WEBCORE_EXPORT bool maybeLoadQuickLookResource(ResourceLoader&);
 #endif
@@ -84,7 +82,7 @@ protected:
 private:
     void scheduleLoad(ResourceLoader*);
     void scheduleServePendingRequests();
-    void requestTimerFired(Timer<ResourceLoadScheduler>&);
+    void requestTimerFired();
 
     bool isSuspendingPendingRequests() const { return !!m_suspendPendingRequestsCount; }
 
@@ -124,7 +122,7 @@ private:
     HostMap m_hosts;
     HostInformation* m_nonHTTPProtocolHost;
         
-    Timer<ResourceLoadScheduler> m_requestTimer;
+    Timer m_requestTimer;
 
     unsigned m_suspendPendingRequestsCount;
     bool m_isSerialLoadingEnabled;

@@ -78,16 +78,13 @@ void WebApplicationCacheManager::getApplicationCacheOrigins(uint64_t callbackID)
 
 void WebApplicationCacheManager::deleteEntriesForOrigin(const SecurityOriginData& originData)
 {
-    RefPtr<SecurityOrigin> origin = SecurityOrigin::create(originData.protocol, originData.host, originData.port);
-    if (!origin)
-        return;
-    
-    ApplicationCache::deleteCacheForOrigin(origin.get());
+    Ref<SecurityOrigin> origin(SecurityOrigin::create(originData.protocol, originData.host, originData.port));
+    ApplicationCache::deleteCacheForOrigin(&origin.get());
 }
 
 void WebApplicationCacheManager::deleteAllEntries()
 {
-    cacheStorage().deleteAllEntries();
+    ApplicationCache::deleteAllCaches();
 }
 
 void WebApplicationCacheManager::setAppCacheMaximumSize(uint64_t size)

@@ -28,7 +28,6 @@
 #include "WKPreferencesRef.h"
 #include "WKPreferencesRefPrivate.h"
 #include "WKAPICast.h"
-#include "WebContext.h"
 #include "WebPreferences.h"
 #include <WebCore/Settings.h>
 #include <wtf/PassRefPtr.h>
@@ -299,15 +298,6 @@ uint32_t WKPreferencesGetMinimumFontSize(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->minimumFontSize();
 }
 
-void WKPreferencesSetScreenFontSubstitutionEnabled(WKPreferencesRef preferencesRef, bool enabled)
-{
-    toImpl(preferencesRef)->setScreenFontSubstitutionEnabled(enabled);
-}
-
-bool WKPreferencesGetScreenFontSubstitutionEnabled(WKPreferencesRef preferencesRef)
-{
-    return toImpl(preferencesRef)->screenFontSubstitutionEnabled();
-}
 
 void WKPreferencesSetCookieEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
@@ -579,6 +569,16 @@ bool WKPreferencesGetShouldPrintBackgrounds(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->shouldPrintBackgrounds();
 }
 
+void WKPreferencesSetDOMTimersThrottlingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setDOMTimersThrottlingEnabled(enabled);
+}
+
+bool WKPreferencesGetDOMTimersThrottlingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->domTimersThrottlingEnabled();
+}
+
 void WKPreferencesSetWebArchiveDebugModeEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
     toImpl(preferencesRef)->setWebArchiveDebugModeEnabled(enabled);
@@ -738,6 +738,16 @@ bool WKPreferencesGetMediaPlaybackAllowsInline(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->mediaPlaybackAllowsInline();
 }
 
+void WKPreferencesSetAllowsAlternateFullscreen(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setAllowsAlternateFullscreen(flag);
+}
+
+bool WKPreferencesGetAllowsAlternateFullscreen(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->allowsAlternateFullscreen();
+}
+
 void WKPreferencesSetShowsToolTipOverTruncatedText(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setShowsToolTipOverTruncatedText(flag);
@@ -768,14 +778,15 @@ bool WKPreferencesGetWebAudioEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->webAudioEnabled();
 }
 
-void WKPreferencesSetApplicationChromeModeEnabled(WKPreferencesRef preferencesRef, bool enabled)
+void WKPreferencesSetApplicationChromeModeEnabled(WKPreferencesRef, bool)
 {
-    toImpl(preferencesRef)->setApplicationChromeModeEnabled(enabled);
+    // FIXME: Remove once WebKit nightlies don't need to support Safari 8.
 }
 
-bool WKPreferencesGetApplicationChromeModeEnabled(WKPreferencesRef preferencesRef)
+bool WKPreferencesGetApplicationChromeModeEnabled(WKPreferencesRef)
 {
-    return toImpl(preferencesRef)->applicationChromeMode();
+    // FIXME: Remove once WebKit nightlies don't need to support Safari 8.
+    return false;
 }
 
 void WKPreferencesSetInspectorUsesWebKitUserInterface(WKPreferencesRef, bool)
@@ -1284,4 +1295,34 @@ void WKPreferencesSetLongMousePressEnabled(WKPreferencesRef preferencesRef, bool
 bool WKPreferencesGetLongMousePressEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->longMousePressEnabled();
+}
+
+void WKPreferencesSetMinimumZoomFontSize(WKPreferencesRef preferencesRef, double size)
+{
+    toImpl(preferencesRef)->setMinimumZoomFontSize(size);
+}
+
+double WKPreferencesGetMinimumZoomFontSize(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->minimumZoomFontSize();
+}
+
+void WKPreferencesSetVisibleDebugOverlayRegions(WKPreferencesRef preferencesRef, WKDebugOverlayRegions visibleRegions)
+{
+    toImpl(preferencesRef)->setVisibleDebugOverlayRegions(visibleRegions);
+}
+
+WKDebugOverlayRegions WKPreferencesGetVisibleDebugOverlayRegions(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->visibleDebugOverlayRegions();
+}
+
+void WKPreferencesSetIgnoreViewportScalingConstraints(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setIgnoreViewportScalingConstraints(enabled);
+}
+
+bool WKPreferencesGetIgnoreViewportScalingConstraints(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->ignoreViewportScalingConstraints();
 }

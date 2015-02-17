@@ -26,7 +26,7 @@
 #include "RenderListMarker.h"
 
 #include "Document.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "GraphicsContext.h"
 #include "InlineElementBox.h"
 #include "RenderLayer.h"
@@ -1117,7 +1117,7 @@ String listMarkerText(EListStyleType type, int value)
     return builder.toString();
 }
 
-RenderListMarker::RenderListMarker(RenderListItem& listItem, PassRef<RenderStyle> style)
+RenderListMarker::RenderListMarker(RenderListItem& listItem, Ref<RenderStyle>&& style)
     : RenderBox(listItem.document(), WTF::move(style), 0)
     , m_listItem(listItem)
 {
@@ -1128,6 +1128,7 @@ RenderListMarker::RenderListMarker(RenderListItem& listItem, PassRef<RenderStyle
 
 RenderListMarker::~RenderListMarker()
 {
+    m_listItem.didDestroyListMarker();
     if (m_image)
         m_image->removeClient(this);
 }
@@ -1313,7 +1314,7 @@ void RenderListMarker::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffse
     if (m_text.isEmpty())
         return;
 
-    const Font& font = style().font();
+    const FontCascade& font = style().fontCascade();
     TextRun textRun = RenderBlock::constructTextRun(this, font, m_text, style());
 
     GraphicsContextStateSaver stateSaver(*context, false);
@@ -1341,7 +1342,7 @@ void RenderListMarker::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffse
             StringBuilder buffer;
             buffer.reserveCapacity(length);
             for (unsigned i = 0; i < length; ++i)
-                buffer.append(m_text[length - i]);
+                buffer.append(m_text[length - i - 1]);
             reversedText = buffer.toString();
             textRun.setText(StringView(reversedText));
         }
@@ -1528,7 +1529,7 @@ void RenderListMarker::computePreferredLogicalWidths()
         return;
     }
 
-    const Font& font = style().font();
+    const FontCascade& font = style().fontCascade();
 
     LayoutUnit logicalWidth = 0;
     EListStyleType type = style().listStyleType();
@@ -1756,7 +1757,7 @@ IntRect RenderListMarker::getRelativeMarkerRect()
     switch (type) {
         case Asterisks:
         case Footnotes: {
-            const Font& font = style().font();
+            const FontCascade& font = style().fontCascade();
             TextRun run = RenderBlock::constructTextRun(this, font, m_text, style(), TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion, DefaultTextRunFlags);
             relativeRect = IntRect(0, 0, font.width(run), font.fontMetrics().height());
             break;
@@ -1850,7 +1851,7 @@ IntRect RenderListMarker::getRelativeMarkerRect()
         case Urdu:
             if (m_text.isEmpty())
                 return IntRect();
-            const Font& font = style().font();
+            const FontCascade& font = style().fontCascade();
             TextRun run = RenderBlock::constructTextRun(this, font, m_text, style(), TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion, DefaultTextRunFlags);
             int itemWidth = font.width(run);
             UChar suffixSpace[2] = { listMarkerSuffix(type, m_listItem.value()), ' ' };

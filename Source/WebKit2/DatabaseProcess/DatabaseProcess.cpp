@@ -39,6 +39,7 @@
 #include "WebOriginDataManagerMessages.h"
 #include "WebOriginDataManagerProxyMessages.h"
 #include <WebCore/FileSystem.h>
+#include <WebCore/NotImplemented.h>
 #include <WebCore/TextEncoding.h>
 #include <wtf/MainThread.h>
 
@@ -46,7 +47,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-DatabaseProcess& DatabaseProcess::shared()
+DatabaseProcess& DatabaseProcess::singleton()
 {
     static NeverDestroyed<DatabaseProcess> databaseProcess;
     return databaseProcess;
@@ -54,7 +55,7 @@ DatabaseProcess& DatabaseProcess::shared()
 
 DatabaseProcess::DatabaseProcess()
     : m_queue(adoptRef(*WorkQueue::create("com.apple.WebKit.DatabaseProcess").leakRef()))
-    , m_webOriginDataManager(std::make_unique<WebOriginDataManager>(this))
+    , m_webOriginDataManager(std::make_unique<WebOriginDataManager>(*this, *this))
 {
     // Make sure the UTF8Encoding encoding and the text encoding maps have been built on the main thread before a background thread needs it.
     // FIXME: https://bugs.webkit.org/show_bug.cgi?id=135365 - Need a more explicit way of doing this besides accessing the UTF8Encoding.
@@ -75,12 +76,12 @@ bool DatabaseProcess::shouldTerminate()
     return true;
 }
 
-void DatabaseProcess::didClose(IPC::Connection*)
+void DatabaseProcess::didClose(IPC::Connection&)
 {
     RunLoop::current().stop();
 }
 
-void DatabaseProcess::didReceiveMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder)
+void DatabaseProcess::didReceiveMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
 {
     if (messageReceiverMap().dispatchMessage(connection, decoder))
         return;
@@ -91,7 +92,7 @@ void DatabaseProcess::didReceiveMessage(IPC::Connection* connection, IPC::Messag
     }
 }
 
-void DatabaseProcess::didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference, IPC::StringReference)
+void DatabaseProcess::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
 {
     RunLoop::current().stop();
 }
@@ -156,7 +157,9 @@ void DatabaseProcess::postDatabaseTask(std::unique_ptr<AsyncTask> task)
 
     m_databaseTasks.append(WTF::move(task));
 
-    m_queue->dispatch(bind(&DatabaseProcess::performNextDatabaseTask, this));
+    m_queue->dispatch([this] {
+        performNextDatabaseTask();
+    });
 }
 
 void DatabaseProcess::performNextDatabaseTask()
@@ -186,23 +189,21 @@ void DatabaseProcess::createDatabaseToWebProcessConnection()
 
     IPC::Attachment clientPort(listeningPort, MACH_MSG_TYPE_MAKE_SEND);
     parentProcessConnection()->send(Messages::DatabaseProcessProxy::DidCreateDatabaseToWebProcessConnection(clientPort), 0);
+#elif USE(UNIX_DOMAIN_SOCKETS)
+    IPC::Connection::SocketPair socketPair = IPC::Connection::createPlatformConnection();
+    m_databaseToWebProcessConnections.append(DatabaseToWebProcessConnection::create(socketPair.server));
+    parentProcessConnection()->send(Messages::DatabaseProcessProxy::DidCreateDatabaseToWebProcessConnection(IPC::Attachment(socketPair.client)), 0);
 #else
     notImplemented();
 #endif
 }
 
-void DatabaseProcess::getIndexedDatabaseOrigins(uint64_t callbackID)
-{
-    postDatabaseTask(createAsyncTask(*this, &DatabaseProcess::doGetIndexedDatabaseOrigins, callbackID));
-}
-
-void DatabaseProcess::doGetIndexedDatabaseOrigins(uint64_t callbackID)
+Vector<SecurityOriginData> DatabaseProcess::getIndexedDatabaseOrigins()
 {
     Vector<SecurityOriginData> results;
 
     if (m_indexedDatabaseDirectory.isEmpty()) {
-        send(Messages::WebOriginDataManagerProxy::DidGetOrigins(results, callbackID), 0);
-        return;
+        return results;
     }
 
     Vector<String> originPaths = listDirectory(m_indexedDatabaseDirectory, "*");
@@ -220,7 +221,7 @@ void DatabaseProcess::doGetIndexedDatabaseOrigins(uint64_t callbackID)
         results.append(SecurityOriginData::fromSecurityOrigin(securityOrigin.get()));
     }
 
-    send(Messages::WebOriginDataManagerProxy::DidGetOrigins(results, callbackID), 0);
+    return results;
 }
 
 static void removeAllDatabasesForOriginPath(const String& originPath, double startDate, double endDate)
@@ -252,63 +253,87 @@ static void removeAllDatabasesForOriginPath(const String& originPath, double sta
     deleteEmptyDirectory(originPath);
 }
 
-void DatabaseProcess::deleteIndexedDatabaseEntriesForOrigin(const SecurityOriginData& origin, uint64_t callbackID)
+void DatabaseProcess::deleteIndexedDatabaseEntriesForOrigin(const SecurityOriginData& originData)
 {
-    postDatabaseTask(createAsyncTask(*this, &DatabaseProcess::doDeleteIndexedDatabaseEntriesForOrigin, origin, callbackID));
-}
-
-void DatabaseProcess::doDeleteIndexedDatabaseEntriesForOrigin(const SecurityOriginData& originData, uint64_t callbackID)
-{
-    if (m_indexedDatabaseDirectory.isEmpty()) {
-        send(Messages::WebOriginDataManagerProxy::DidDeleteEntries(callbackID), 0);
+    if (m_indexedDatabaseDirectory.isEmpty())
         return;
-    }
 
     RefPtr<SecurityOrigin> origin = originData.securityOrigin();
     String databaseIdentifier = origin->databaseIdentifier();
     String originPath = pathByAppendingComponent(m_indexedDatabaseDirectory, databaseIdentifier);
 
     removeAllDatabasesForOriginPath(originPath, std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max());
-
-    send(Messages::WebOriginDataManagerProxy::DidDeleteEntries(callbackID), 0);
 }
 
-void DatabaseProcess::deleteIndexedDatabaseEntriesModifiedBetweenDates(double startDate, double endDate, uint64_t callbackID)
+void DatabaseProcess::deleteIndexedDatabaseEntriesModifiedBetweenDates(double startDate, double endDate)
 {
-    postDatabaseTask(createAsyncTask(*this, &DatabaseProcess::doDeleteIndexedDatabaseEntriesModifiedBetweenDates, startDate, endDate, callbackID));
-}
-
-void DatabaseProcess::doDeleteIndexedDatabaseEntriesModifiedBetweenDates(double startDate, double endDate, uint64_t callbackID)
-{
-    if (m_indexedDatabaseDirectory.isEmpty()) {
-        send(Messages::WebOriginDataManagerProxy::DidDeleteEntries(callbackID), 0);
+    if (m_indexedDatabaseDirectory.isEmpty())
         return;
-    }
 
     Vector<String> originPaths = listDirectory(m_indexedDatabaseDirectory, "*");
     for (auto& originPath : originPaths)
         removeAllDatabasesForOriginPath(originPath, startDate, endDate);
-
-    send(Messages::WebOriginDataManagerProxy::DidDeleteEntries(callbackID), 0);
 }
 
-void DatabaseProcess::deleteAllIndexedDatabaseEntries(uint64_t callbackID)
+void DatabaseProcess::deleteAllIndexedDatabaseEntries()
 {
-    postDatabaseTask(createAsyncTask(*this, &DatabaseProcess::doDeleteAllIndexedDatabaseEntries, callbackID));
-}
-
-void DatabaseProcess::doDeleteAllIndexedDatabaseEntries(uint64_t callbackID)
-{
-    if (m_indexedDatabaseDirectory.isEmpty()) {
-        send(Messages::WebOriginDataManagerProxy::DidDeleteAllEntries(callbackID), 0);
+    if (m_indexedDatabaseDirectory.isEmpty())
         return;
-    }
 
     Vector<String> originPaths = listDirectory(m_indexedDatabaseDirectory, "*");
     for (auto& originPath : originPaths)
         removeAllDatabasesForOriginPath(originPath, std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max());
+}
 
-    send(Messages::WebOriginDataManagerProxy::DidDeleteAllEntries(callbackID), 0);
+void DatabaseProcess::getOrigins(WKOriginDataTypes types, std::function<void (const Vector<SecurityOriginData>&)> completion)
+{
+    if (!(types & kWKWebSQLDatabaseOriginData)) {
+        completion(Vector<SecurityOriginData>());
+        return;
+    }
+
+    postDatabaseTask(std::make_unique<AsyncTask>([completion, this] {
+        completion(getIndexedDatabaseOrigins());
+    }));
+}
+
+void DatabaseProcess::deleteEntriesForOrigin(WKOriginDataTypes types, const SecurityOriginData& origin, std::function<void ()> completion)
+{
+    if (!(types & kWKWebSQLDatabaseOriginData)) {
+        completion();
+        return;
+    }
+
+    postDatabaseTask(std::make_unique<AsyncTask>([this, origin, completion] {
+        deleteIndexedDatabaseEntriesForOrigin(origin);
+        completion();
+    }));
+}
+
+void DatabaseProcess::deleteEntriesModifiedBetweenDates(WKOriginDataTypes types, double startDate, double endDate, std::function<void ()> completion)
+{
+    if (!(types & kWKWebSQLDatabaseOriginData)) {
+        completion();
+        return;
+    }
+
+    postDatabaseTask(std::make_unique<AsyncTask>([this, startDate, endDate, completion] {
+        deleteIndexedDatabaseEntriesModifiedBetweenDates(startDate, endDate);
+        completion();
+    }));
+}
+
+void DatabaseProcess::deleteAllEntries(WKOriginDataTypes types, std::function<void ()> completion)
+{
+    if (!(types & kWKWebSQLDatabaseOriginData)) {
+        completion();
+        return;
+    }
+
+    postDatabaseTask(std::make_unique<AsyncTask>([this, completion] {
+        deleteAllIndexedDatabaseEntries();
+        completion();
+    }));
 }
 
 #if !PLATFORM(COCOA)

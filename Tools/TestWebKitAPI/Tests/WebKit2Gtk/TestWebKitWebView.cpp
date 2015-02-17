@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Igalia S.L.
+ * Copyright (C) 2014 Collabora Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,19 +19,49 @@
  */
 
 #include "config.h"
+#include "WebKitTestServer.h"
 #include "WebViewTest.h"
 #include <JavaScriptCore/JSStringRef.h>
 #include <JavaScriptCore/JSValueRef.h>
 #include <glib/gstdio.h>
 #include <wtf/gobject/GRefPtr.h>
 
-static void testWebViewDefaultContext(WebViewTest* test, gconstpointer)
+class IsPlayingAudioWebViewTest : public WebViewTest {
+public:
+    MAKE_GLIB_TEST_FIXTURE(IsPlayingAudioWebViewTest);
+
+    static void isPlayingAudioChanged(GObject*, GParamSpec*, IsPlayingAudioWebViewTest* test)
+    {
+        g_signal_handlers_disconnect_by_func(test->m_webView, reinterpret_cast<void*>(isPlayingAudioChanged), test);
+        g_main_loop_quit(test->m_mainLoop);
+    }
+
+    void waitUntilIsPlayingAudioChanged()
+    {
+        g_signal_connect(m_webView, "notify::is-playing-audio", G_CALLBACK(isPlayingAudioChanged), this);
+        g_main_loop_run(m_mainLoop);
+    }
+};
+
+static WebKitTestServer* gServer;
+
+static void testWebViewWebContext(WebViewTest* test, gconstpointer)
 {
-    g_assert(webkit_web_view_get_context(test->m_webView) == webkit_web_context_get_default());
+    g_assert(webkit_web_view_get_context(test->m_webView) == test->m_webContext.get());
+    g_assert(webkit_web_context_get_default() != test->m_webContext.get());
 
     // Check that a web view created with g_object_new has the default context.
-    GRefPtr<WebKitWebView> webView = WEBKIT_WEB_VIEW(g_object_new(WEBKIT_TYPE_WEB_VIEW, NULL));
+    GRefPtr<WebKitWebView> webView = WEBKIT_WEB_VIEW(g_object_new(WEBKIT_TYPE_WEB_VIEW, nullptr));
     g_assert(webkit_web_view_get_context(webView.get()) == webkit_web_context_get_default());
+
+    // Check that a web view created with a related view has the related view context.
+    webView = WEBKIT_WEB_VIEW(webkit_web_view_new_with_related_view(test->m_webView));
+    g_assert(webkit_web_view_get_context(webView.get()) == test->m_webContext.get());
+
+    // Check that a web context given as construct parameter is ignored if a related view is also provided.
+    webView = WEBKIT_WEB_VIEW(g_object_new(WEBKIT_TYPE_WEB_VIEW,
+        "web-context", webkit_web_context_get_default(), "related-view", test->m_webView, nullptr));
+    g_assert(webkit_web_view_get_context(webView.get()) == test->m_webContext.get());
 }
 
 static void testWebViewCustomCharset(WebViewTest* test, gconstpointer)
@@ -424,7 +455,7 @@ static void testWebViewSave(SaveWebViewTest* test, gconstpointer)
     g_assert_cmpint(g_file_info_get_size(fileInfo.get()), ==, totalBytesFromStream);
 }
 
-// To test page visibility API. Currently only 'visible' and 'hidden' states are implemented fully in WebCore.
+// To test page visibility API. Currently only 'visible', 'hidden' and 'prerender' states are implemented fully in WebCore.
 // See also http://www.w3.org/TR/2011/WD-page-visibility-20110602/ and https://developers.google.com/chrome/whitepapers/pagevisibility
 static void testWebViewPageVisibility(WebViewTest* test, gconstpointer)
 {
@@ -439,7 +470,7 @@ static void testWebViewPageVisibility(WebViewTest* test, gconstpointer)
         "</body></html>",
         0);
 
-    // Wait untill the page is loaded. Initial visibility should be 'hidden'.
+    // Wait until the page is loaded. Initial visibility should be 'prerender'.
     test->waitUntilLoadFinished();
 
     GUniqueOutPtr<GError> error;
@@ -447,7 +478,7 @@ static void testWebViewPageVisibility(WebViewTest* test, gconstpointer)
     g_assert(javascriptResult);
     g_assert(!error.get());
     GUniquePtr<char> valueString(WebViewTest::javascriptResultToCString(javascriptResult));
-    g_assert_cmpstr(valueString.get(), ==, "hidden");
+    g_assert_cmpstr(valueString.get(), ==, "prerender");
 
     javascriptResult = test->runJavaScriptAndWaitUntilFinished("document.hidden;", &error.outPtr());
     g_assert(javascriptResult);
@@ -515,65 +546,241 @@ public:
 
 static void testWebViewSnapshot(SnapshotWebViewTest* test, gconstpointer)
 {
-    test->loadHtml("<html><body><p>Whatever</p></body></html>", 0);
+    test->loadHtml("<html><head><style>html { width: 200px; height: 100px; } ::-webkit-scrollbar { display: none; }</style></head><body><p>Whatever</p></body></html>", nullptr);
     test->waitUntilLoadFinished();
 
-    // WebView not visible.
+    // WEBKIT_SNAPSHOT_REGION_VISIBLE returns a null surface when the view is not visible.
     cairo_surface_t* surface1 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE);
     g_assert(!surface1);
 
-    // Show surface, resize to 50x50, try again.
-    test->showInWindowAndWaitUntilMapped();
-    test->resizeView(50, 50);
-    surface1 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE);
+    // WEBKIT_SNAPSHOT_REGION_FULL_DOCUMENT works even if the window is not visible.
+    surface1 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_FULL_DOCUMENT, WEBKIT_SNAPSHOT_OPTIONS_NONE);
     g_assert(surface1);
+    g_assert_cmpuint(cairo_surface_get_type(surface1), ==, CAIRO_SURFACE_TYPE_IMAGE);
+    g_assert_cmpint(cairo_image_surface_get_width(surface1), ==, 200);
+    g_assert_cmpint(cairo_image_surface_get_height(surface1), ==, 100);
 
-    // obtained surface should be at the most 50x50. Store the size
-    // for comparison later.
-    int width = cairo_image_surface_get_width(surface1);
-    int height = cairo_image_surface_get_height(surface1);
-    g_assert_cmpint(width, <=, 50);
-    g_assert_cmpint(height, <=, 50);
+    // Show the WebView in a popup widow of 50x50 and try again with WEBKIT_SNAPSHOT_REGION_VISIBLE.
+    test->showInWindowAndWaitUntilMapped(GTK_WINDOW_POPUP, 50, 50);
+    surface1 = cairo_surface_reference(test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE));
+    g_assert(surface1);
+    g_assert_cmpuint(cairo_surface_get_type(surface1), ==, CAIRO_SURFACE_TYPE_IMAGE);
+    g_assert_cmpint(cairo_image_surface_get_width(surface1), ==, 50);
+    g_assert_cmpint(cairo_image_surface_get_height(surface1), ==, 50);
 
     // Select all text in the WebView, request a snapshot ignoring selection.
     test->selectAll();
-    surface1 = cairo_surface_reference(test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE));
-    g_assert(surface1);
-    g_assert_cmpint(cairo_image_surface_get_width(surface1), ==, width);
-    g_assert_cmpint(cairo_image_surface_get_height(surface1), ==, height);
-
-    // Create identical surface.
     cairo_surface_t* surface2 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE);
     g_assert(surface2);
-
-    // Compare these two, they should be identical.
     g_assert(Test::cairoSurfacesEqual(surface1, surface2));
 
-    // Request a new snapshot, including the selection this time. The
-    // size should be the same but the result must be different to the
-    // one previously obtained.
+    // Request a new snapshot, including the selection this time. The size should be the same but the result
+    // must be different to the one previously obtained.
     surface2 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_INCLUDE_SELECTION_HIGHLIGHTING);
-    g_assert(surface2);
-    g_assert_cmpint(cairo_image_surface_get_width(surface2), ==, width);
-    g_assert_cmpint(cairo_image_surface_get_height(surface2), ==, height);
+    g_assert_cmpuint(cairo_surface_get_type(surface2), ==, CAIRO_SURFACE_TYPE_IMAGE);
+    g_assert_cmpint(cairo_image_surface_get_width(surface1), ==, cairo_image_surface_get_width(surface2));
+    g_assert_cmpint(cairo_image_surface_get_height(surface1), ==, cairo_image_surface_get_height(surface2));
     g_assert(!Test::cairoSurfacesEqual(surface1, surface2));
 
-    // Request a snapshot of the whole document in the WebView. The
-    // result should be different from the size obtained previously.
-    surface2 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_FULL_DOCUMENT, WEBKIT_SNAPSHOT_OPTIONS_NONE);
-    g_assert(surface2);
-    g_assert_cmpint(cairo_image_surface_get_width(surface2),  >, width);
-    g_assert_cmpint(cairo_image_surface_get_height(surface2), >, height);
+    // Get a snpashot with a transparent background, the result must be different.
+    surface2 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_TRANSPARENT_BACKGROUND);
+    g_assert_cmpuint(cairo_surface_get_type(surface2), ==, CAIRO_SURFACE_TYPE_IMAGE);
+    g_assert_cmpint(cairo_image_surface_get_width(surface1), ==, cairo_image_surface_get_width(surface2));
+    g_assert_cmpint(cairo_image_surface_get_height(surface1), ==, cairo_image_surface_get_height(surface2));
     g_assert(!Test::cairoSurfacesEqual(surface1, surface2));
-
     cairo_surface_destroy(surface1);
 
+    // Test that cancellation works.
     g_assert(test->getSnapshotAndCancel());
+}
+
+class NotificationWebViewTest: public WebViewTest {
+public:
+    MAKE_GLIB_TEST_FIXTURE(NotificationWebViewTest);
+
+    enum NotificationEvent {
+        None,
+        Permission,
+        Shown,
+        Cancelled
+    };
+
+    static gboolean permissionRequestCallback(WebKitWebView*, WebKitPermissionRequest *request, NotificationWebViewTest* test)
+    {
+        g_assert(WEBKIT_IS_NOTIFICATION_PERMISSION_REQUEST(request));
+        test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(request));
+
+        test->m_event = Permission;
+
+        webkit_permission_request_allow(request);
+
+        g_main_loop_quit(test->m_mainLoop);
+
+        return TRUE;
+    }
+
+    static gboolean showNotificationCallback(WebKitWebView*, WebKitNotification* notification, NotificationWebViewTest* test)
+    {
+        test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(notification));
+        test->m_notification = notification;
+        test->m_event = Shown;
+        g_main_loop_quit(test->m_mainLoop);
+        return TRUE;
+    }
+
+    static gboolean closeNotificationCallback(WebKitWebView*, WebKitNotification*, NotificationWebViewTest* test)
+    {
+        test->m_notification = nullptr;
+        test->m_event = Cancelled;
+        g_main_loop_quit(test->m_mainLoop);
+        return TRUE;
+    }
+
+    NotificationWebViewTest()
+        : m_event(None)
+    {
+        g_signal_connect(m_webView, "permission-request", G_CALLBACK(permissionRequestCallback), this);
+        g_signal_connect(m_webView, "show-notification", G_CALLBACK(showNotificationCallback), this);
+        g_signal_connect(m_webView, "close-notification", G_CALLBACK(closeNotificationCallback), this);
+
+    }
+
+    ~NotificationWebViewTest()
+    {
+        g_signal_handlers_disconnect_matched(m_webView, G_SIGNAL_MATCH_DATA, 0, 0, 0, 0, this);
+    }
+
+   void requestPermissionAndWaitUntilGiven()
+    {
+        m_event = None;
+        webkit_web_view_run_javascript(m_webView, "Notification.requestPermission();", nullptr, nullptr, nullptr);
+        g_main_loop_run(m_mainLoop);
+    }
+
+    void requestNotificationAndWaitUntilShown(const char* title, const char* body)
+    {
+        m_event = None;
+
+        GUniquePtr<char> jscode(g_strdup_printf("n = new Notification('%s', { body: '%s'});", title, body));
+        webkit_web_view_run_javascript(m_webView, jscode.get(), nullptr, nullptr, nullptr);
+
+        g_main_loop_run(m_mainLoop);
+    }
+
+    void closeNotificationAndWaitUntilCancelled()
+    {
+        m_event = None;
+        webkit_web_view_run_javascript(m_webView, "n.close()", nullptr, nullptr, nullptr);
+        g_main_loop_run(m_mainLoop);
+    }
+
+    NotificationEvent m_event;
+    WebKitNotification* m_notification;
+};
+
+static void testWebViewNotification(NotificationWebViewTest* test, gconstpointer)
+{
+    // Notifications don't work with local or special schemes.
+    test->loadURI(gServer->getURIForPath("/").data());
+    test->waitUntilLoadFinished();
+
+    test->requestPermissionAndWaitUntilGiven();
+
+    g_assert(test->m_event == NotificationWebViewTest::Permission);
+
+    static const char* title = "This is a notification";
+    static const char* body = "This is the body.";
+    test->requestNotificationAndWaitUntilShown(title, body);
+
+    g_assert(test->m_event == NotificationWebViewTest::Shown);
+    g_assert(test->m_notification);
+    g_assert_cmpstr(webkit_notification_get_title(test->m_notification), ==, title);
+    g_assert_cmpstr(webkit_notification_get_body(test->m_notification), ==, body);
+
+    test->closeNotificationAndWaitUntilCancelled();
+
+    g_assert(test->m_event == NotificationWebViewTest::Cancelled);
+
+    test->requestNotificationAndWaitUntilShown(title, body);
+
+    g_assert(test->m_event == NotificationWebViewTest::Shown);
+
+    test->loadURI(gServer->getURIForPath("/").data());
+    test->waitUntilLoadFinished();
+
+    g_assert(test->m_event == NotificationWebViewTest::Cancelled);
+}
+
+static void testWebViewIsPlayingAudio(IsPlayingAudioWebViewTest* test, gconstpointer)
+{
+    // The web view must be realized for the video to start playback and
+    // trigger changes in WebKitWebView::is-playing-audio.
+    test->showInWindowAndWaitUntilMapped(GTK_WINDOW_TOPLEVEL);
+
+    // Initially, web views should always report no audio being played.
+    g_assert(!webkit_web_view_is_playing_audio(test->m_webView));
+
+    GUniquePtr<char> resourcePath(g_build_filename(Test::getResourcesDir(Test::WebKit2Resources).data(), "file-with-video.html", nullptr));
+    GUniquePtr<char> resourceURL(g_filename_to_uri(resourcePath.get(), nullptr, nullptr));
+    webkit_web_view_load_uri(test->m_webView, resourceURL.get());
+    test->waitUntilLoadFinished();
+    g_assert(!webkit_web_view_is_playing_audio(test->m_webView));
+
+    webkit_web_view_run_javascript(test->m_webView, "playVideo();", nullptr, nullptr, nullptr);
+    test->waitUntilIsPlayingAudioChanged();
+    g_assert(webkit_web_view_is_playing_audio(test->m_webView));
+
+    // Pause the video, and check again.
+    webkit_web_view_run_javascript(test->m_webView, "document.getElementById('test-video').pause();", nullptr, nullptr, nullptr);
+    test->waitUntilIsPlayingAudioChanged();
+    g_assert(!webkit_web_view_is_playing_audio(test->m_webView));
+}
+
+static void testWebViewBackgroundColor(WebViewTest* test, gconstpointer)
+{
+    // White is the default background.
+    GdkRGBA rgba;
+    webkit_web_view_get_background_color(test->m_webView, &rgba);
+    g_assert_cmpfloat(rgba.red, ==, 1);
+    g_assert_cmpfloat(rgba.green, ==, 1);
+    g_assert_cmpfloat(rgba.blue, ==, 1);
+    g_assert_cmpfloat(rgba.alpha, ==, 1);
+
+    // Set a different (semi-transparent red).
+    rgba.red = 1;
+    rgba.green = 0;
+    rgba.blue = 0;
+    rgba.alpha = 0.5;
+    webkit_web_view_set_background_color(test->m_webView, &rgba);
+    g_assert_cmpfloat(rgba.red, ==, 1);
+    g_assert_cmpfloat(rgba.green, ==, 0);
+    g_assert_cmpfloat(rgba.blue, ==, 0);
+    g_assert_cmpfloat(rgba.alpha, ==, 0.5);
+
+    // The actual rendering can't be tested using unit tests, use
+    // MiniBrowser --bg-color="<color-value>" for manually testing this API.
+}
+
+static void serverCallback(SoupServer* server, SoupMessage* message, const char* path, GHashTable*, SoupClientContext*, gpointer)
+{
+    if (message->method != SOUP_METHOD_GET) {
+        soup_message_set_status(message, SOUP_STATUS_NOT_IMPLEMENTED);
+        return;
+    }
+
+    if (g_str_equal(path, "/")) {
+        soup_message_set_status(message, SOUP_STATUS_OK);
+        soup_message_body_complete(message->response_body);
+    } else
+        soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
 }
 
 void beforeAll()
 {
-    WebViewTest::add("WebKitWebView", "default-context", testWebViewDefaultContext);
+    gServer = new WebKitTestServer();
+    gServer->run(serverCallback);
+
+    WebViewTest::add("WebKitWebView", "web-context", testWebViewWebContext);
     WebViewTest::add("WebKitWebView", "custom-charset", testWebViewCustomCharset);
     WebViewTest::add("WebKitWebView", "settings", testWebViewSettings);
     WebViewTest::add("WebKitWebView", "zoom-level", testWebViewZoomLevel);
@@ -584,6 +791,9 @@ void beforeAll()
     SaveWebViewTest::add("WebKitWebView", "save", testWebViewSave);
     SnapshotWebViewTest::add("WebKitWebView", "snapshot", testWebViewSnapshot);
     WebViewTest::add("WebKitWebView", "page-visibility", testWebViewPageVisibility);
+    NotificationWebViewTest::add("WebKitWebView", "notification", testWebViewNotification);
+    IsPlayingAudioWebViewTest::add("WebKitWebView", "is-playing-audio", testWebViewIsPlayingAudio);
+    WebViewTest::add("WebKitWebView", "background-color", testWebViewBackgroundColor);
 }
 
 void afterAll()

@@ -32,14 +32,21 @@
 #include "PerProcess.h"
 #include "SmallChunk.h"
 #include <algorithm>
+#include <cstdlib>
 #include <sys/mman.h>
 
 using namespace std;
 
 namespace bmalloc {
 
-Deallocator::Deallocator()
+Deallocator::Deallocator(Heap* heap)
+    : m_isBmallocEnabled(heap->environment().isBmallocEnabled())
 {
+    if (!m_isBmallocEnabled) {
+        // Fill the object log in order to disable the fast path.
+        while (m_objectLog.size() != m_objectLog.capacity())
+            m_objectLog.push(nullptr);
+    }
 }
 
 Deallocator::~Deallocator()
@@ -49,7 +56,8 @@ Deallocator::~Deallocator()
     
 void Deallocator::scavenge()
 {
-    processObjectLog();
+    if (m_isBmallocEnabled)
+        processObjectLog();
 }
 
 void Deallocator::deallocateLarge(void* object)
@@ -60,7 +68,7 @@ void Deallocator::deallocateLarge(void* object)
 
 void Deallocator::deallocateXLarge(void* object)
 {
-    std::lock_guard<StaticMutex> lock(PerProcess<Heap>::mutex());
+    std::unique_lock<StaticMutex> lock(PerProcess<Heap>::mutex());
     PerProcess<Heap>::getFastCase()->deallocateXLarge(lock, object);
 }
 
@@ -86,6 +94,11 @@ void Deallocator::processObjectLog()
 void Deallocator::deallocateSlowCase(void* object)
 {
     BASSERT(!deallocateFastCase(object));
+    
+    if (!m_isBmallocEnabled) {
+        free(object);
+        return;
+    }
 
     if (!object)
         return;
@@ -96,8 +109,7 @@ void Deallocator::deallocateSlowCase(void* object)
         return;
     }
 
-    BeginTag* beginTag = LargeChunk::beginTag(object);
-    if (!beginTag->isXLarge())
+    if (!isXLarge(object))
         return deallocateLarge(object);
     
     return deallocateXLarge(object);

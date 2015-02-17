@@ -48,12 +48,8 @@ EventLoopInputDispatcher::EventLoopInputDispatcher(Page& page, ReplayingInputCur
     : m_page(page)
     , m_client(client)
     , m_cursor(cursor)
-    , m_timer(this, &EventLoopInputDispatcher::timerFired)
-    , m_dispatching(false)
-    , m_running(false)
+    , m_timer(*this, &EventLoopInputDispatcher::timerFired)
     , m_speed(DispatchSpeed::FastForward)
-    , m_previousDispatchStartTime(0.0)
-    , m_previousInputTimestamp(0.0)
 {
     m_currentWork.input = nullptr;
     m_currentWork.timestamp = 0.0;
@@ -79,7 +75,7 @@ void EventLoopInputDispatcher::pause()
         m_timer.stop();
 }
 
-void EventLoopInputDispatcher::timerFired(Timer<EventLoopInputDispatcher>*)
+void EventLoopInputDispatcher::timerFired()
 {
     dispatchInput();
 }

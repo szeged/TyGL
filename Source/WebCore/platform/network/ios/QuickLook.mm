@@ -31,6 +31,8 @@
 #import "DocumentLoader.h"
 #import "FileSystemIOS.h"
 #import "Logging.h"
+#import "NSFileManagerSPI.h"
+#import "QuickLookSPI.h"
 #import "ResourceError.h"
 #import "ResourceHandle.h"
 #import "ResourceLoader.h"
@@ -39,9 +41,6 @@
 #import "SynchronousResourceHandleCFURLConnectionDelegate.h"
 #import "WebCoreURLResponseIOS.h"
 #import <Foundation/Foundation.h>
-#import <Foundation/NSFileManager_NSURLExtras.h>
-#import <QuickLook/QLPreviewConverter.h>
-#import <QuickLook/QuickLookPrivate.h>
 #import <wtf/NeverDestroyed.h>
 #import <wtf/StdLibExtras.h>
 #import <wtf/Threading.h>
@@ -196,7 +195,7 @@ PassOwnPtr<ResourceRequest> WebCore::registerQLPreviewConverterIfNeeded(NSURL *u
     if ([WebCore::QLPreviewGetSupportedMIMETypesSet() containsObject:updatedMIMEType.get()]) {
         RetainPtr<NSString> uti = adoptNS(WebCore::QLTypeCopyUTIForURLAndMimeType(url, updatedMIMEType.get()));
 
-        RetainPtr<id> converter = adoptNS([[QLPreviewConverterClass() alloc] initWithData:data name:nil uti:uti.get() options:nil]);
+        RetainPtr<id> converter = adoptNS([allocQLPreviewConverterInstance() initWithData:data name:nil uti:uti.get() options:nil]);
         NSURLRequest *request = [converter previewRequest];
 
         // We use [request URL] here instead of url since it will be
@@ -448,7 +447,7 @@ static inline QuickLookHandleClient* emptyClient()
 
 QuickLookHandle::QuickLookHandle(NSURL *firstRequestURL, NSURLConnection *connection, NSURLResponse *nsResponse, id delegate)
     : m_firstRequestURL(firstRequestURL)
-    , m_converter(adoptNS([[QLPreviewConverterClass() alloc] initWithConnection:connection delegate:delegate response:nsResponse options:nil]))
+    , m_converter(adoptNS([allocQLPreviewConverterInstance() initWithConnection:connection delegate:delegate response:nsResponse options:nil]))
     , m_delegate(delegate)
     , m_finishedLoadingDataIntoConverter(false)
     , m_nsResponse([m_converter previewResponse])
@@ -488,21 +487,19 @@ CFURLResponseRef QuickLookHandle::cfResponse()
 }
 #endif
 
-static inline bool isMainResourceLoader(ResourceLoader* loader)
+bool QuickLookHandle::shouldCreateForMIMEType(const String& mimeType)
 {
-    return loader->documentLoader()->mainResourceLoader() == loader;
+    return [WebCore::QLPreviewGetSupportedMIMETypesSet() containsObject:mimeType];
 }
 
-std::unique_ptr<QuickLookHandle> QuickLookHandle::create(ResourceLoader* loader, NSURLResponse *response)
+std::unique_ptr<QuickLookHandle> QuickLookHandle::create(ResourceLoader& loader, const ResourceResponse& response)
 {
-    ASSERT_ARG(loader, loader);
-    if (!isMainResourceLoader(loader) || ![WebCore::QLPreviewGetSupportedMIMETypesSet() containsObject:[response MIMEType]])
-        return nullptr;
+    ASSERT(shouldCreateForMIMEType(response.mimeType()));
 
-    RetainPtr<WebResourceLoaderQuickLookDelegate> delegate = adoptNS([[WebResourceLoaderQuickLookDelegate alloc] initWithResourceLoader:loader]);
-    std::unique_ptr<QuickLookHandle> quickLookHandle(new QuickLookHandle([loader->originalRequest().nsURLRequest(DoNotUpdateHTTPBody) URL], nil, response, delegate.get()));
+    RetainPtr<WebResourceLoaderQuickLookDelegate> delegate = adoptNS([[WebResourceLoaderQuickLookDelegate alloc] initWithResourceLoader:&loader]);
+    std::unique_ptr<QuickLookHandle> quickLookHandle(new QuickLookHandle([loader.originalRequest().nsURLRequest(DoNotUpdateHTTPBody) URL], nil, response.nsURLResponse(), delegate.get()));
     [delegate setQuickLookHandle:quickLookHandle.get()];
-    loader->didCreateQuickLookHandle(*quickLookHandle);
+    loader.didCreateQuickLookHandle(*quickLookHandle);
     return WTF::move(quickLookHandle);
 }
 

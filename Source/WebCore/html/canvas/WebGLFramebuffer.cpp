@@ -32,7 +32,7 @@
 #include "Extensions3D.h"
 #include "WebGLContextGroup.h"
 #include "WebGLDrawBuffers.h"
-#include "WebGLRenderingContext.h"
+#include "WebGLRenderingContextBase.h"
 
 namespace WebCore {
 
@@ -269,12 +269,12 @@ WebGLFramebuffer::WebGLAttachment::~WebGLAttachment()
 {
 }
 
-PassRefPtr<WebGLFramebuffer> WebGLFramebuffer::create(WebGLRenderingContext* ctx)
+PassRefPtr<WebGLFramebuffer> WebGLFramebuffer::create(WebGLRenderingContextBase* ctx)
 {
     return adoptRef(new WebGLFramebuffer(ctx));
 }
 
-WebGLFramebuffer::WebGLFramebuffer(WebGLRenderingContext* ctx)
+WebGLFramebuffer::WebGLFramebuffer(WebGLRenderingContextBase* ctx)
     : WebGLContextObject(ctx)
     , m_hasEverBeenBound(false)
 {
@@ -431,7 +431,13 @@ GC3Denum WebGLFramebuffer::checkStatus(const char** reason) const
             *reason = "attachment is not valid";
             return GraphicsContext3D::FRAMEBUFFER_UNSUPPORTED;
         }
-        if (!attachment->getFormat()) {
+        GC3Denum attachmentFormat = attachment->getFormat();
+
+        // Attaching an SRGB_EXT format attachment to a framebuffer is invalid.
+        if (attachmentFormat == Extensions3D::SRGB_EXT)
+            attachmentFormat = 0;
+
+        if (!attachmentFormat) {
             *reason = "attachment is an unsupported format";
             return GraphicsContext3D::FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
         }

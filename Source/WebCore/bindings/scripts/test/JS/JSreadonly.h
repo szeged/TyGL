@@ -29,9 +29,9 @@ namespace WebCore {
 class JSreadonly : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSreadonly* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<readonly> impl)
+    static JSreadonly* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<readonly>&& impl)
     {
-        JSreadonly* ptr = new (NotNull, JSC::allocateCell<JSreadonly>(globalObject->vm().heap)) JSreadonly(structure, globalObject, impl);
+        JSreadonly* ptr = new (NotNull, JSC::allocateCell<JSreadonly>(globalObject->vm().heap)) JSreadonly(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -64,7 +64,7 @@ public:
 private:
     readonly* m_impl;
 protected:
-    JSreadonly(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<readonly>);
+    JSreadonly(JSC::Structure*, JSDOMGlobalObject*, Ref<readonly>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -86,12 +86,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, readonly*)
     return &jsreadonlyOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, readonly*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, readonly*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, readonly& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

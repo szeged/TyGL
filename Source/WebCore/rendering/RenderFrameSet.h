@@ -55,7 +55,7 @@ private:
 
 class RenderFrameSet final : public RenderBox {
 public:
-    RenderFrameSet(HTMLFrameSetElement&, PassRef<RenderStyle>);
+    RenderFrameSet(HTMLFrameSetElement&, Ref<RenderStyle>&&);
     virtual ~RenderFrameSet();
 
     HTMLFrameSetElement& frameSetElement() const;
@@ -125,8 +125,6 @@ private:
     bool m_isResizing;
     bool m_isChildResizing;
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderFrameSet, isFrameSet())
 
 } // namespace WebCore
 

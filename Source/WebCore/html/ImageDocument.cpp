@@ -45,7 +45,6 @@
 #include "Page.h"
 #include "RawDataDocumentParser.h"
 #include "RenderElement.h"
-#include "ResourceBuffer.h"
 #include "Settings.h"
 
 namespace WebCore {
@@ -55,7 +54,7 @@ using namespace HTMLNames;
 #if !PLATFORM(IOS)
 class ImageEventListener final : public EventListener {
 public:
-    static PassRefPtr<ImageEventListener> create(ImageDocument& document) { return adoptRef(new ImageEventListener(document)); }
+    static Ref<ImageEventListener> create(ImageDocument& document) { return adoptRef(*new ImageEventListener(document)); }
 
 private:
     ImageEventListener(ImageDocument& document)
@@ -73,9 +72,9 @@ private:
 
 class ImageDocumentParser final : public RawDataDocumentParser {
 public:
-    static PassRefPtr<ImageDocumentParser> create(ImageDocument& document)
+    static Ref<ImageDocumentParser> create(ImageDocument& document)
     {
-        return adoptRef(new ImageDocumentParser(document));
+        return adoptRef(*new ImageDocumentParser(document));
     }
 
 private:
@@ -92,7 +91,7 @@ private:
 
 class ImageDocumentElement final : public HTMLImageElement {
 public:
-    static PassRefPtr<ImageDocumentElement> create(ImageDocument&);
+    static RefPtr<ImageDocumentElement> create(ImageDocument&);
 
 private:
     ImageDocumentElement(ImageDocument& document)
@@ -107,7 +106,7 @@ private:
     ImageDocument* m_imageDocument;
 };
 
-inline PassRefPtr<ImageDocumentElement> ImageDocumentElement::create(ImageDocument& document)
+inline RefPtr<ImageDocumentElement> ImageDocumentElement::create(ImageDocument& document)
 {
     return adoptRef(new ImageDocumentElement(document));
 }
@@ -134,7 +133,8 @@ void ImageDocument::updateDuringParsing()
     if (!m_imageElement)
         createDocumentStructure();
 
-    m_imageElement->cachedImage()->addDataBuffer(loader()->mainResourceData().get());
+    if (RefPtr<SharedBuffer> buffer = loader()->mainResourceData())
+        m_imageElement->cachedImage()->addDataBuffer(*buffer);
 
     imageUpdated();
 }
@@ -143,11 +143,11 @@ void ImageDocument::finishedParsing()
 {
     if (!parser()->isStopped() && m_imageElement) {
         CachedImage& cachedImage = *m_imageElement->cachedImage();
-        RefPtr<ResourceBuffer> data = loader()->mainResourceData();
+        RefPtr<SharedBuffer> data = loader()->mainResourceData();
 
         // If this is a multipart image, make a copy of the current part, since the resource data
         // will be overwritten by the next part.
-        if (loader()->isLoadingMultipartContent())
+        if (data && loader()->isLoadingMultipartContent())
             data = data->copy();
 
         cachedImage.finishLoading(data.get());
@@ -202,7 +202,7 @@ ImageDocument::ImageDocument(Frame& frame, const URL& url)
     lockCompatibilityMode();
 }
     
-PassRefPtr<DocumentParser> ImageDocument::createParser()
+Ref<DocumentParser> ImageDocument::createParser()
 {
     return ImageDocumentParser::create(*this);
 }

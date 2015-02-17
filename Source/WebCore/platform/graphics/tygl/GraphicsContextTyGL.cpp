@@ -311,6 +311,13 @@ void GraphicsContext::drawFocusRing(const Path& path, int width, int offset, con
  * It is still handled here for links.
  */
 
+FloatRect GraphicsContext::computeLineBoundsForText(const FloatPoint& origin, float width, bool printing)
+{
+    bool dummyBool;
+    Color dummyColor;
+    return computeLineBoundsAndAntialiasingModeForText(origin, width, printing, dummyBool, dummyColor);
+}
+
 //void GraphicsContext::drawLineForText(const FloatRect& bounds, bool printing)
 void GraphicsContext::drawLineForText(const FloatPoint& bounds, float width, bool printing, bool doubleLines)
 {
@@ -326,6 +333,16 @@ void GraphicsContext::drawLineForText(const FloatPoint& bounds, float width, boo
 
 
     drawLineOnTyGLContext(this, platformContext(), startPoint, endPoint);
+}
+
+void GraphicsContext::drawLinesForText(const FloatPoint& point, const DashArray& widths, bool printing, bool doubleLines)
+{
+    //FIXME: Implement as soon as possible, see same function in GraphicsContextCairo.cpp.
+    UNUSED_PARAM(point);
+    UNUSED_PARAM(widths);
+    UNUSED_PARAM(printing);
+    UNUSED_PARAM(doubleLines);
+    return;
 }
 
 void GraphicsContext::updateDocumentMarkerResources()

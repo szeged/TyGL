@@ -11,7 +11,7 @@ applet constructorNeedsCreatedByParser
 area
 article interfaceName=HTMLElement
 aside interfaceName=HTMLElement
-audio wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedByParser
+audio wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedByParser, customTypeHelper
 b interfaceName=HTMLElement
 base
 basefont interfaceName=HTMLBaseFontElement
@@ -127,6 +127,7 @@ textarea interfaceName=HTMLTextAreaElement, constructorNeedsFormElement
 tfoot interfaceName=HTMLTableSectionElement
 th interfaceName=HTMLTableCellElement
 thead interfaceName=HTMLTableSectionElement
+time interfaceName=HTMLElement
 title
 tr interfaceName=HTMLTableRowElement
 track wrapperOnlyIfMediaIsAvailable, conditional=VIDEO_TRACK
@@ -134,7 +135,7 @@ tt interfaceName=HTMLElement
 u interfaceName=HTMLElement
 ul interfaceName=HTMLUListElement
 var interfaceName=HTMLElement
-video wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedByParser
-wbr interfaceName=HTMLElement
+video wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedByParser, customTypeHelper
+wbr interfaceName=HTMLWBRElement, JSInterfaceName=HTMLElement
 xmp interfaceName=HTMLPreElement
 noscript interfaceName=HTMLElement

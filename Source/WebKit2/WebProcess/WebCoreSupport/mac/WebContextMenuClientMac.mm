@@ -35,6 +35,7 @@
 #import <WebCore/FrameView.h>
 #import <WebCore/MainFrame.h>
 #import <WebCore/Page.h>
+#import <WebCore/TextIndicator.h>
 #import <wtf/text/WTFString.h>
 
 using namespace WebCore;
@@ -43,7 +44,7 @@ namespace WebKit {
 
 void WebContextMenuClient::lookUpInDictionary(Frame* frame)
 {
-    m_page->performDictionaryLookupForSelection(frame, frame->selection().selection());
+    m_page->performDictionaryLookupForSelection(frame, frame->selection().selection(), TextIndicatorPresentationTransition::BounceAndCrossfade);
 }
 
 bool WebContextMenuClient::isSpeaking()
@@ -78,7 +79,7 @@ void WebContextMenuClient::searchWithSpotlight()
     Frame& mainFrame = m_page->corePage()->mainFrame();
     
     Frame* selectionFrame = &mainFrame;
-    for (; selectionFrame; selectionFrame = selectionFrame->tree().traverseNext(&mainFrame)) {
+    for (; selectionFrame; selectionFrame = selectionFrame->tree().traverseNext()) {
         if (selectionFrame->selection().isRange())
             break;
     }

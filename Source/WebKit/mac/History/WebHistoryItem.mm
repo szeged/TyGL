@@ -65,7 +65,6 @@ NSString *WebViewportMaximumScaleKey = @"maximum-scale";
 NSString *WebViewportUserScalableKey = @"user-scalable";
 NSString *WebViewportWidthKey        = @"width";
 NSString *WebViewportHeightKey       = @"height";
-NSString *WebViewportMinimalUIKey    = @"minimal-ui";
 
 static NSString *scaleKey = @"scale";
 static NSString *scaleIsInitialKey = @"scaleIsInitial";
@@ -259,7 +258,7 @@ void WKNotifyHistoryItemChanged(HistoryItem*)
         int currPos = [result length];
         unsigned size = children.size();        
         for (unsigned i = 0; i < size; ++i) {
-            WebHistoryItem *child = kit(children[i].get());
+            WebHistoryItem *child = kit(const_cast<HistoryItem*>(children[i].ptr()));
             [result appendString:@"\n"];
             [result appendString:[child description]];
         }
@@ -381,7 +380,7 @@ WebHistoryItem *kit(HistoryItem* item)
     if (childDicts) {
         for (int i = [childDicts count] - 1; i >= 0; i--) {
             WebHistoryItem *child = [[WebHistoryItem alloc] initFromDictionaryRepresentation:[childDicts objectAtIndex:i]];
-            core(_private)->addChildItem(core(child->_private));
+            core(_private)->addChildItem(*core(child->_private));
             [child release];
         }
     }
@@ -482,7 +481,7 @@ WebHistoryItem *kit(HistoryItem* item)
         NSMutableArray *childDicts = [NSMutableArray arrayWithCapacity:children.size()];
         
         for (int i = children.size() - 1; i >= 0; i--)
-            [childDicts addObject:[kit(children[i].get()) dictionaryRepresentation]];
+            [childDicts addObject:[kit(const_cast<HistoryItem*>(children[i].ptr())) dictionaryRepresentation]];
         [dict setObject: childDicts forKey:childrenKey];
     }
 
@@ -542,7 +541,7 @@ WebHistoryItem *kit(HistoryItem* item)
     NSMutableArray *result = [[[NSMutableArray alloc] initWithCapacity:size] autorelease];
     
     for (unsigned i = 0; i < size; ++i)
-        [result addObject:kit(children[i].get())];
+        [result addObject:kit(const_cast<HistoryItem*>(children[i].ptr()))];
     
     return result;
 }
@@ -623,7 +622,6 @@ WebHistoryItem *kit(HistoryItem* item)
     [argumentsDictionary setObject:[NSNumber numberWithFloat:viewportArguments.width] forKey:WebViewportWidthKey];
     [argumentsDictionary setObject:[NSNumber numberWithFloat:viewportArguments.height] forKey:WebViewportHeightKey];
     [argumentsDictionary setObject:[NSNumber numberWithFloat:viewportArguments.userZoom] forKey:WebViewportUserScalableKey];
-    [argumentsDictionary setObject:[NSNumber numberWithBool:viewportArguments.minimalUI] forKey:WebViewportMinimalUIKey];
     return argumentsDictionary;
 }
 
@@ -636,7 +634,6 @@ WebHistoryItem *kit(HistoryItem* item)
     viewportArguments.width = [[arguments objectForKey:WebViewportWidthKey] floatValue];
     viewportArguments.height = [[arguments objectForKey:WebViewportHeightKey] floatValue];
     viewportArguments.userZoom = [[arguments objectForKey:WebViewportUserScalableKey] floatValue];
-    viewportArguments.minimalUI = [[arguments objectForKey:WebViewportMinimalUIKey] boolValue];
     core(_private)->setViewportArguments(viewportArguments);
 }
 

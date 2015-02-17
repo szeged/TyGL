@@ -37,7 +37,7 @@
 #import "DOMPrivate.h"
 #import "DOMRangeInternal.h"
 #import "DragImage.h"
-#import "Font.h"
+#import "FontCascade.h"
 #import "Frame.h"
 #import "HTMLElement.h"
 #import "HTMLNames.h"
@@ -326,8 +326,6 @@ Class kitClass(WebCore::Node* impl)
             return [DOMDocumentType class];
         case WebCore::Node::DOCUMENT_FRAGMENT_NODE:
             return [DOMDocumentFragment class];
-        case WebCore::Node::NOTATION_NODE:
-            return [DOMNotation class];
         case WebCore::Node::XPATH_NAMESPACE_NODE:
             // FIXME: Create an XPath objective C wrapper
             // See http://bugs.webkit.org/show_bug.cgi?id=8755
@@ -651,12 +649,12 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
 {
     // FIXME: Could we move this function to WebCore::Node and autogenerate?
     WebCore::RenderObject* renderer = core(self)->renderer();
-    if (!renderer || !renderer->isRenderImage())
+    if (!is<RenderImage>(renderer))
         return nil;
-    WebCore::CachedImage* cachedImage = toRenderImage(renderer)->cachedImage();
+    WebCore::CachedImage* cachedImage = downcast<RenderImage>(*renderer).cachedImage();
     if (!cachedImage || cachedImage->errorOccurred())
         return nil;
-    return cachedImage->imageForRenderer(toRenderImage(renderer))->getNSImage();
+    return cachedImage->imageForRenderer(renderer)->getNSImage();
 }
 #endif
 
@@ -671,7 +669,7 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
     auto renderer = core(self)->renderer();
     if (!renderer)
         return nil;
-    return renderer->style().font().primaryFont()->getNSFont();
+    return renderer->style().fontCascade().primaryFont().getNSFont();
 }
 #else
 - (CTFontRef)_font
@@ -679,7 +677,7 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
     RenderObject* renderer = core(self)->renderer();
     if (!renderer)
         return nil;
-    return renderer->style().font().primaryFont()->getCTFont();
+    return renderer->style().fontCascade().primaryFont().getCTFont();
 }
 #endif
 
@@ -687,10 +685,10 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
 - (NSData *)_imageTIFFRepresentation
 {
     // FIXME: Could we move this function to WebCore::Element and autogenerate?
-    auto renderer = core(self)->renderer();
-    if (!renderer || !renderer->isRenderImage())
+    auto* renderer = core(self)->renderer();
+    if (!is<RenderImage>(renderer))
         return nil;
-    WebCore::CachedImage* cachedImage = toRenderImage(renderer)->cachedImage();
+    WebCore::CachedImage* cachedImage = downcast<RenderImage>(*renderer).cachedImage();
     if (!cachedImage || cachedImage->errorOccurred())
         return nil;
     return (NSData *)cachedImage->imageForRenderer(renderer)->getTIFFRepresentation();

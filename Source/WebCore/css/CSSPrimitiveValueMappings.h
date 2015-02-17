@@ -31,6 +31,7 @@
 #define CSSPrimitiveValueMappings_h
 
 #include "CSSCalculationValue.h"
+#include "CSSFontFamily.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSReflectionDirection.h"
 #include "CSSToLengthConversionData.h"
@@ -82,8 +83,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(unsigned short i)
 
 template<> inline CSSPrimitiveValue::operator unsigned short() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return clampTo<unsigned short>(m_value.num);
+    if (primitiveType() == CSS_NUMBER)
+        return getValue<unsigned short>();
 
     ASSERT_NOT_REACHED();
     return 0;
@@ -91,8 +92,8 @@ template<> inline CSSPrimitiveValue::operator unsigned short() const
 
 template<> inline CSSPrimitiveValue::operator int() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return clampTo<int>(m_value.num);
+    if (primitiveType() == CSS_NUMBER)
+        return getValue<int>();
 
     ASSERT_NOT_REACHED();
     return 0;
@@ -100,8 +101,8 @@ template<> inline CSSPrimitiveValue::operator int() const
 
 template<> inline CSSPrimitiveValue::operator unsigned() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return clampTo<unsigned>(m_value.num);
+    if (primitiveType() == CSS_NUMBER)
+        return getValue<unsigned>();
 
     ASSERT_NOT_REACHED();
     return 0;
@@ -117,8 +118,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(float i)
 
 template<> inline CSSPrimitiveValue::operator float() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return clampTo<float>(m_value.num);
+    if (primitiveType() == CSS_NUMBER)
+        return getValue<float>();
 
     ASSERT_NOT_REACHED();
     return 0.0f;
@@ -133,11 +134,11 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineClampValue i)
 
 template<> inline CSSPrimitiveValue::operator LineClampValue() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return LineClampValue(clampTo<int>(m_value.num), LineClampLineCount);
+    if (primitiveType() == CSS_NUMBER)
+        return LineClampValue(getValue<int>(), LineClampLineCount);
 
-    if (m_primitiveUnitType == CSS_PERCENTAGE)
-        return LineClampValue(clampTo<int>(m_value.num), LineClampPercentage);
+    if (primitiveType() == CSS_PERCENTAGE)
+        return LineClampValue(getValue<int>(), LineClampPercentage);
 
     ASSERT_NOT_REACHED();
     return LineClampValue();
@@ -4103,6 +4104,9 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(BlendMode blendMode)
     case BlendModeLuminosity:
         m_value.valueID = CSSValueLuminosity;
         break;
+    case BlendModePlusDarker:
+        m_value.valueID = CSSValuePlusDarker;
+        break;
     }
 }
 
@@ -4143,6 +4147,8 @@ template<> inline CSSPrimitiveValue::operator BlendMode() const
         return BlendModeColor;
     case CSSValueLuminosity:
         return BlendModeLuminosity;
+    case CSSValuePlusDarker:
+        return BlendModePlusDarker;
     default:
         break;
     }
@@ -4911,6 +4917,13 @@ template<> inline CSSPrimitiveValue::operator SVGWritingMode() const
 
     ASSERT_NOT_REACHED();
     return WM_LRTB;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CSSFontFamily fontFamily)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_FONT_FAMILY;
+    m_value.fontFamily = new CSSFontFamily(WTF::move(fontFamily));
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EVectorEffect e)

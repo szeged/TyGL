@@ -29,9 +29,9 @@ namespace WebCore {
 class JSTestNamedConstructor : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestNamedConstructor* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestNamedConstructor> impl)
+    static JSTestNamedConstructor* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestNamedConstructor>&& impl)
     {
-        JSTestNamedConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestNamedConstructor>(globalObject->vm().heap)) JSTestNamedConstructor(structure, globalObject, impl);
+        JSTestNamedConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestNamedConstructor>(globalObject->vm().heap)) JSTestNamedConstructor(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -65,7 +65,7 @@ public:
 private:
     TestNamedConstructor* m_impl;
 protected:
-    JSTestNamedConstructor(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestNamedConstructor>);
+    JSTestNamedConstructor(JSC::Structure*, JSDOMGlobalObject*, Ref<TestNamedConstructor>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -87,12 +87,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestNamedConstructor
     return &jsTestNamedConstructorOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestNamedConstructor*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestNamedConstructor*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestNamedConstructor& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

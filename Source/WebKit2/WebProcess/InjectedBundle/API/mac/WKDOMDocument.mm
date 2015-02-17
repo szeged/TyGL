@@ -44,12 +44,12 @@
 
 - (WKDOMText *)createTextNode:(NSString *)data
 {
-    return WebKit::toWKDOMText(downcast<WebCore::Document>(*_impl).createTextNode(data).get());
+    return WebKit::toWKDOMText(downcast<WebCore::Document>(*_impl).createTextNode(data).ptr());
 }
 
 - (WKDOMElement *)body
 {
-    return WebKit::toWKDOMElement(downcast<WebCore::Document>(*_impl).body());
+    return WebKit::toWKDOMElement(downcast<WebCore::Document>(*_impl).bodyOrFrameset());
 }
 
 @end

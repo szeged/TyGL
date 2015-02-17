@@ -40,7 +40,7 @@ class SecurityOrigin;
 class URLRegistry;
 class URLRegistrable;
 
-class PublicURLManager : public ActiveDOMObject {
+class PublicURLManager final : public ActiveDOMObject {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit PublicURLManager(ScriptExecutionContext*);
@@ -53,6 +53,7 @@ public:
     // ActiveDOMObject interface.
     virtual void stop() override;
 private:
+    virtual const char* activeDOMObjectName() const override { return "PublicURLManager"; }
     
     typedef HashSet<String> URLSet;
     typedef HashMap<URLRegistry*, URLSet > RegistryURLMap;

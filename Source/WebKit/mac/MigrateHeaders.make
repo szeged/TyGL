@@ -156,7 +156,6 @@ all : \
     $(PRIVATE_HEADERS_DIR)/DOMNodeFilter.h \
     $(PRIVATE_HEADERS_DIR)/DOMNodeIterator.h \
     $(PRIVATE_HEADERS_DIR)/DOMNodeList.h \
-    $(PRIVATE_HEADERS_DIR)/DOMNotation.h \
     $(PRIVATE_HEADERS_DIR)/DOMObject.h \
     $(PRIVATE_HEADERS_DIR)/DOMOverflowEvent.h \
     $(PRIVATE_HEADERS_DIR)/DOMPrivate.h \
@@ -191,12 +190,11 @@ all : \
     $(PRIVATE_HEADERS_DIR)/nptypes.h \
 #
 
-ifneq ($(filter iphoneos iphonesimulator, $(PLATFORM_NAME)), )
+ifneq ($(PLATFORM_NAME), macosx)
 all : \
     $(PRIVATE_HEADERS_DIR)/DOMHTMLTextAreaElementPrivate.h \
     $(PRIVATE_HEADERS_DIR)/DOMUIKitExtensions.h \
     $(PRIVATE_HEADERS_DIR)/KeyEventCodesIOS.h \
-    $(PRIVATE_HEADERS_DIR)/MediaPlayerProxy.h \
     $(PRIVATE_HEADERS_DIR)/PluginData.h \
     $(PRIVATE_HEADERS_DIR)/ScrollTypes.h \
     $(PRIVATE_HEADERS_DIR)/SystemMemory.h \

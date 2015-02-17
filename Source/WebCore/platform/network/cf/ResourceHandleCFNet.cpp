@@ -178,13 +178,6 @@ void ResourceHandle::createCFURLConnection(bool shouldUseCredentialStorage, bool
     if (sslProps)
         CFURLRequestSetSSLProperties(request.get(), sslProps.get());
 
-#if PLATFORM(WIN)
-    if (CFHTTPCookieStorageRef cookieStorage = overridenCookieStorage()) {
-        // Overridden cookie storage doesn't come from a session, so the request does not have it yet.
-        CFURLRequestSetHTTPCookieStorage(request.get(), cookieStorage);
-    }
-#endif
-
     CFMutableDictionaryRef streamProperties  = CFDictionaryCreateMutable(0, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
     if (!shouldUseCredentialStorage) {
@@ -201,7 +194,7 @@ void ResourceHandle::createCFURLConnection(bool shouldUseCredentialStorage, bool
         CFDictionarySetValue(streamProperties, CFSTR("_WebKitSynchronousRequest"), kCFBooleanTrue);
     }
 
-#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
+#if PLATFORM(COCOA)
     RetainPtr<CFDataRef> sourceApplicationAuditData = d->m_context->sourceApplicationAuditData();
     if (sourceApplicationAuditData)
         CFDictionarySetValue(streamProperties, CFSTR("kCFStreamPropertySourceApplication"), sourceApplicationAuditData.get());
@@ -424,20 +417,22 @@ void ResourceHandle::receivedCredential(const AuthenticationChallenge& challenge
     if (credential.persistence() == CredentialPersistenceForSession && challenge.protectionSpace().authenticationScheme() != ProtectionSpaceAuthenticationSchemeServerTrustEvaluationRequested) {
         // Manage per-session credentials internally, because once NSURLCredentialPersistencePerSession is used, there is no way
         // to ignore it for a particular request (short of removing it altogether).
-        Credential webCredential(credential.user(), credential.password(), CredentialPersistenceNone);
+        Credential webCredential(credential, CredentialPersistenceNone);
 
         URL urlToStore;
         if (challenge.failureResponse().httpStatusCode() == 401)
             urlToStore = challenge.failureResponse().url();      
         CredentialStorage::set(webCredential, challenge.protectionSpace(), urlToStore);
 
+        if (d->m_connection) {
 #if PLATFORM(COCOA)
-        CFURLConnectionUseCredential(d->m_connection.get(), webCredential.cfCredential(), challenge.cfURLAuthChallengeRef());
+            CFURLConnectionUseCredential(d->m_connection.get(), webCredential.cfCredential(), challenge.cfURLAuthChallengeRef());
 #else
-        RetainPtr<CFURLCredentialRef> cfCredential = adoptCF(createCF(webCredential));
-        CFURLConnectionUseCredential(d->m_connection.get(), cfCredential.get(), challenge.cfURLAuthChallengeRef());
+            RetainPtr<CFURLCredentialRef> cfCredential = adoptCF(createCF(webCredential));
+            CFURLConnectionUseCredential(d->m_connection.get(), cfCredential.get(), challenge.cfURLAuthChallengeRef());
 #endif
-    } else {
+        }
+    } else if (d->m_connection) {
 #if PLATFORM(COCOA)
         CFURLConnectionUseCredential(d->m_connection.get(), credential.cfCredential(), challenge.cfURLAuthChallengeRef());
 #else
@@ -457,7 +452,8 @@ void ResourceHandle::receivedRequestToContinueWithoutCredential(const Authentica
     if (challenge != d->m_currentWebChallenge)
         return;
 
-    CFURLConnectionUseCredential(d->m_connection.get(), 0, challenge.cfURLAuthChallengeRef());
+    if (d->m_connection)
+        CFURLConnectionUseCredential(d->m_connection.get(), 0, challenge.cfURLAuthChallengeRef());
 
     clearAuthentication();
 }
@@ -480,7 +476,8 @@ void ResourceHandle::receivedRequestToPerformDefaultHandling(const Authenticatio
     if (challenge != d->m_currentWebChallenge)
         return;
 
-    CFURLConnectionPerformDefaultHandlingForChallenge(d->m_connection.get(), challenge.cfURLAuthChallengeRef());
+    if (d->m_connection)
+        CFURLConnectionPerformDefaultHandlingForChallenge(d->m_connection.get(), challenge.cfURLAuthChallengeRef());
 
     clearAuthentication();
 }
@@ -493,7 +490,8 @@ void ResourceHandle::receivedChallengeRejection(const AuthenticationChallenge& c
     if (challenge != d->m_currentWebChallenge)
         return;
 
-    CFURLConnectionRejectChallenge(d->m_connection.get(), challenge.cfURLAuthChallengeRef());
+    if (d->m_connection)
+        CFURLConnectionRejectChallenge(d->m_connection.get(), challenge.cfURLAuthChallengeRef());
 
     clearAuthentication();
 }
@@ -579,11 +577,6 @@ void ResourceHandle::platformSetDefersLoading(bool defers)
         CFURLConnectionHalt(d->m_connection.get());
     else
         CFURLConnectionResume(d->m_connection.get());
-}
-
-bool ResourceHandle::loadsBlocked()
-{
-    return false;
 }
 
 #if PLATFORM(COCOA)

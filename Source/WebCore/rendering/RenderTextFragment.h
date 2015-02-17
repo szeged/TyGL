@@ -39,8 +39,6 @@ public:
 
     virtual ~RenderTextFragment();
 
-    virtual bool isTextFragment() const override { return true; }
-
     virtual bool canBeSelectionLeaf() const override;
 
     unsigned start() const { return m_start; }
@@ -51,6 +49,7 @@ public:
     
     RenderBlock* blockForAccompanyingFirstLetter();
 
+    void setContentString(const String& text);
     StringImpl* contentString() const { return m_contentString.impl(); }
 
     virtual void setText(const String&, bool force = false) override;
@@ -59,6 +58,7 @@ public:
     void setAltText(const String& altText) { m_altText = altText; }
     
 private:
+    virtual bool isTextFragment() const override { return true; }
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
     virtual void willBeDestroyed() override;
 

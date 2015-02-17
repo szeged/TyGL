@@ -31,6 +31,7 @@
 #include "Plugin.h"
 #include "PluginController.h"
 #include "WebFrame.h"
+#include <WebCore/AudioProducer.h>
 #include <WebCore/FindOptions.h>
 #include <WebCore/Image.h>
 #include <WebCore/MediaCanStartListener.h>
@@ -48,6 +49,7 @@
 namespace WebCore {
 class Frame;
 class HTMLPlugInElement;
+class MachSendRight;
 class MouseEvent;
 class RenderBoxModelObject;
 }
@@ -56,7 +58,7 @@ namespace WebKit {
 
 class WebEvent;
 
-class PluginView : public WebCore::PluginViewBase, public PluginController, private WebCore::MediaCanStartListener, private WebFrame::LoadListener {
+class PluginView : public WebCore::PluginViewBase, public PluginController, private WebCore::MediaCanStartListener, private WebFrame::LoadListener, private WebCore::AudioProducer {
 public:
     static PassRefPtr<PluginView> create(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters&);
 
@@ -179,6 +181,10 @@ private:
     // WebCore::MediaCanStartListener
     virtual void mediaCanStart() override;
 
+    // WebCore::AudioProducer
+    virtual bool isPlayingAudio() override { return m_pluginIsPlayingAudio; }
+    virtual void pageMutedStateDidChange() override;
+
     // PluginController
     virtual bool isPluginVisible() override;
     virtual void invalidate(const WebCore::IntRect&) override;
@@ -190,6 +196,8 @@ private:
     virtual NPObject* windowScriptNPObject() override;
     virtual NPObject* pluginElementNPObject() override;
     virtual bool evaluate(NPObject*, const String& scriptString, NPVariant* result, bool allowPopups) override;
+    virtual void setPluginIsPlayingAudio(bool) override;
+    virtual bool isMuted() const override;
 #endif
     virtual void setStatusbarText(const String&) override;
     virtual bool isAcceleratedCompositingEnabled() override;
@@ -198,7 +206,7 @@ private:
 #if PLATFORM(COCOA)
     virtual void pluginFocusOrWindowFocusChanged(bool pluginHasFocusAndWindowHasFocus) override;
     virtual void setComplexTextInputState(PluginComplexTextInputState) override;
-    virtual mach_port_t compositingRenderServerPort() override;
+    virtual const WebCore::MachSendRight& compositingRenderServerPort() override;
     virtual void openPluginPreferencePane() override;
 #endif
     virtual float contentsScaleFactor() override;
@@ -278,6 +286,8 @@ private:
     bool m_didReceiveUserInteraction;
 
     double m_pageScaleFactor;
+
+    bool m_pluginIsPlayingAudio;
 };
 
 } // namespace WebKit

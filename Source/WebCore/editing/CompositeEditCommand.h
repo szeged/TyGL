@@ -40,7 +40,7 @@ class Text;
 
 class EditCommandComposition : public UndoStep {
 public:
-    static PassRefPtr<EditCommandComposition> create(Document&, const VisibleSelection&, const VisibleSelection&, EditAction);
+    static Ref<EditCommandComposition> create(Document&, const VisibleSelection&, const VisibleSelection&, EditAction);
 
     virtual void unapply() override;
     virtual void reapply() override;
@@ -128,7 +128,7 @@ protected:
     void removeNodePreservingChildren(PassRefPtr<Node>, ShouldAssumeContentIsAlwaysEditable = DoNotAssumeContentIsAlwaysEditable);
     void removeNodeAndPruneAncestors(PassRefPtr<Node>);
     void moveRemainingSiblingsToNewParent(Node*, Node* pastLastNodeToMove, PassRefPtr<Element> prpNewParent);
-    void updatePositionForNodeRemovalPreservingChildren(Position&, Node*);
+    void updatePositionForNodeRemovalPreservingChildren(Position&, Node&);
     void prune(PassRefPtr<Node>);
     void replaceTextInNode(PassRefPtr<Text>, unsigned offset, unsigned count, const String& replacementText);
     Position replaceSelectedTextInNode(const String&);

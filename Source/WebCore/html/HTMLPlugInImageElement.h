@@ -77,7 +77,7 @@ public:
     void subframeLoaderDidCreatePlugIn(const Widget&);
 
     WEBCORE_EXPORT void setIsPrimarySnapshottedPlugIn(bool);
-    bool partOfSnapshotOverlay(Node*);
+    bool partOfSnapshotOverlay(const Node*) const;
 
     bool needsCheckForSizeChange() const { return m_needsCheckForSizeChange; }
     void setNeedsCheckForSizeChange() { m_needsCheckForSizeChange = true; }
@@ -117,7 +117,8 @@ private:
     virtual void finishParsingChildren() override final;
     virtual void didAddUserAgentShadowRoot(ShadowRoot*) override final;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
+    virtual bool childShouldCreateRenderer(const Node&) const override;
     virtual bool willRecalcStyle(Style::Change) override final;
     virtual void didAttachRenderers() override final;
     virtual void willDetachRenderers() override final;
@@ -136,7 +137,7 @@ private:
     void simulatedMouseClickTimerFired();
 
     void restartSimilarPlugIns();
-    void removeSnapshotTimerFired(Timer<HTMLPlugInImageElement>&);
+    void removeSnapshotTimerFired();
     bool isTopLevelFullPagePlugin(const RenderEmbeddedObject&) const;
 
     URL m_loadedUrl;
@@ -145,7 +146,7 @@ private:
     bool m_needsDocumentActivationCallbacks;
     RefPtr<MouseEvent> m_pendingClickEventFromSnapshot;
     DeferrableOneShotTimer m_simulatedMouseClickTimer;
-    Timer<HTMLPlugInImageElement> m_removeSnapshotTimer;
+    Timer m_removeSnapshotTimer;
     RefPtr<Image> m_snapshotImage;
     bool m_createdDuringUserGesture;
     bool m_isRestartedPlugin;

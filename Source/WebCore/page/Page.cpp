@@ -29,6 +29,8 @@
 #include "ClientRectList.h"
 #include "ContextMenuClient.h"
 #include "ContextMenuController.h"
+#include "DatabaseProvider.h"
+#include "DocumentLoader.h"
 #include "DocumentMarkerController.h"
 #include "DocumentStyleSheetCollection.h"
 #include "DragController.h"
@@ -55,8 +57,8 @@
 #include "MediaCanStartListener.h"
 #include "Navigator.h"
 #include "NetworkStateNotifier.h"
-#include "PageActivityAssertionToken.h"
 #include "PageCache.h"
+#include "PageConfiguration.h"
 #include "PageConsoleClient.h"
 #include "PageDebuggable.h"
 #include "PageGroup.h"
@@ -64,7 +66,7 @@
 #include "PageThrottler.h"
 #include "PlugInClient.h"
 #include "PluginData.h"
-#include "PluginView.h"
+#include "PluginViewBase.h"
 #include "PointerLockController.h"
 #include "ProgressTracker.h"
 #include "RenderLayerCompositor.h"
@@ -79,6 +81,7 @@
 #include "SharedBuffer.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
+#include "StorageNamespaceProvider.h"
 #include "StyleResolver.h"
 #include "SubframeLoader.h"
 #include "TextResourceDecoder.h"
@@ -124,34 +127,32 @@ static void networkStateChanged(bool isOnLine)
 
 static const ViewState::Flags PageInitialViewState = ViewState::IsVisible | ViewState::IsInWindow;
 
-Page::Page(PageClients& pageClients)
-    : m_chrome(std::make_unique<Chrome>(*this, *pageClients.chromeClient))
+Page::Page(PageConfiguration& pageConfiguration)
+    : m_chrome(std::make_unique<Chrome>(*this, *pageConfiguration.chromeClient))
     , m_dragCaretController(std::make_unique<DragCaretController>())
 #if ENABLE(DRAG_SUPPORT)
-    , m_dragController(std::make_unique<DragController>(*this, *pageClients.dragClient))
+    , m_dragController(std::make_unique<DragController>(*this, *pageConfiguration.dragClient))
 #endif
     , m_focusController(std::make_unique<FocusController>(*this, PageInitialViewState))
 #if ENABLE(CONTEXT_MENUS)
-    , m_contextMenuController(std::make_unique<ContextMenuController>(*this, *pageClients.contextMenuClient))
+    , m_contextMenuController(std::make_unique<ContextMenuController>(*this, *pageConfiguration.contextMenuClient))
 #endif
     , m_userInputBridge(std::make_unique<UserInputBridge>(*this))
 #if ENABLE(WEB_REPLAY)
     , m_replayController(std::make_unique<ReplayController>(*this))
 #endif
-#if ENABLE(INSPECTOR)
-    , m_inspectorController(std::make_unique<InspectorController>(*this, pageClients.inspectorClient))
-#endif
+    , m_inspectorController(std::make_unique<InspectorController>(*this, pageConfiguration.inspectorClient))
 #if ENABLE(POINTER_LOCK)
     , m_pointerLockController(std::make_unique<PointerLockController>(*this))
 #endif
     , m_settings(Settings::create(this))
-    , m_progress(std::make_unique<ProgressTracker>(*pageClients.progressTrackerClient))
-    , m_backForwardController(std::make_unique<BackForwardController>(*this, pageClients.backForwardClient))
-    , m_mainFrame(MainFrame::create(*this, *pageClients.loaderClientForMainFrame))
+    , m_progress(std::make_unique<ProgressTracker>(*pageConfiguration.progressTrackerClient))
+    , m_backForwardController(std::make_unique<BackForwardController>(*this, pageConfiguration.backForwardClient))
+    , m_mainFrame(MainFrame::create(*this, pageConfiguration))
     , m_theme(RenderTheme::themeForPage(this))
-    , m_editorClient(pageClients.editorClient)
-    , m_plugInClient(pageClients.plugInClient)
-    , m_validationMessageClient(pageClients.validationMessageClient)
+    , m_editorClient(*pageConfiguration.editorClient)
+    , m_plugInClient(pageConfiguration.plugInClient)
+    , m_validationMessageClient(pageConfiguration.validationMessageClient)
     , m_subframeCount(0)
     , m_openedByDOM(false)
     , m_tabKeyCyclesThroughElements(true)
@@ -160,6 +161,7 @@ Page::Page(PageClients& pageClients)
     , m_inLowQualityInterpolationMode(false)
     , m_areMemoryCacheClientCallsEnabled(true)
     , m_mediaVolume(1)
+    , m_muted(false)
     , m_pageScaleFactor(1)
     , m_zoomedOutPageScaleFactor(0)
     , m_deviceScaleFactor(1)
@@ -191,30 +193,31 @@ Page::Page(PageClients& pageClients)
 #ifndef NDEBUG
     , m_isPainting(false)
 #endif
-    , m_alternativeTextClient(pageClients.alternativeTextClient)
+    , m_alternativeTextClient(pageConfiguration.alternativeTextClient)
     , m_scriptedAnimationsSuspended(false)
-    , m_pageThrottler(*this, m_viewState)
+    , m_pageThrottler(*this)
     , m_consoleClient(std::make_unique<PageConsoleClient>(*this))
 #if ENABLE(REMOTE_INSPECTOR)
     , m_inspectorDebuggable(std::make_unique<PageDebuggable>(*this))
 #endif
     , m_lastSpatialNavigationCandidatesCount(0) // NOTE: Only called from Internals for Spatial Navigation testing.
     , m_framesHandlingBeforeUnloadEvent(0)
-    , m_userContentController(WTF::move(pageClients.userContentController))
-    , m_visitedLinkStore(WTF::move(pageClients.visitedLinkStore))
+    , m_databaseProvider(*WTF::move(pageConfiguration.databaseProvider))
+    , m_storageNamespaceProvider(*WTF::move(pageConfiguration.storageNamespaceProvider))
+    , m_userContentController(WTF::move(pageConfiguration.userContentController))
+    , m_visitedLinkStore(*WTF::move(pageConfiguration.visitedLinkStore))
     , m_sessionID(SessionID::defaultSessionID())
     , m_isClosing(false)
     , m_isPlayingAudio(false)
 {
-    ASSERT(m_editorClient);
-    
     setTimerThrottlingEnabled(m_viewState & ViewState::IsVisuallyIdle);
+
+    m_storageNamespaceProvider->addPage(*this);
 
     if (m_userContentController)
         m_userContentController->addPage(*this);
 
-    if (m_visitedLinkStore)
-        m_visitedLinkStore->addPage(*this);
+    m_visitedLinkStore->addPage(*this);
 
     if (!allPages) {
         allPages = new HashSet<Page*>;
@@ -240,20 +243,20 @@ Page::~Page()
     setGroupName(String());
     allPages->remove(this);
     
+    m_settings->pageDestroyed();
+
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         frame->willDetachPage();
         frame->detachFromPage();
     }
 
-    m_editorClient->pageDestroyed();
+    m_editorClient.pageDestroyed();
     if (m_plugInClient)
         m_plugInClient->pageDestroyed();
     if (m_alternativeTextClient)
         m_alternativeTextClient->pageDestroyed();
 
-#if ENABLE(INSPECTOR)
     m_inspectorController->inspectedPageDestroyed();
-#endif
 
     if (m_scrollingCoordinator)
         m_scrollingCoordinator->pageDestroyed();
@@ -264,10 +267,38 @@ Page::~Page()
     pageCounter.decrement();
 #endif
 
+    m_storageNamespaceProvider->removePage(*this);
+
     if (m_userContentController)
         m_userContentController->removePage(*this);
-    if (m_visitedLinkStore)
-        m_visitedLinkStore->removePage(*this);
+    m_visitedLinkStore->removePage(*this);
+}
+
+std::unique_ptr<Page> Page::createPageFromBuffer(PageConfiguration& pageConfiguration, const SharedBuffer* buffer, const String& mimeType, bool canHaveScrollbars, bool transparent)
+{
+    ASSERT(buffer);
+    
+    std::unique_ptr<Page> newPage = std::make_unique<Page>(pageConfiguration);
+    newPage->settings().setMediaEnabled(false);
+    newPage->settings().setScriptEnabled(false);
+    newPage->settings().setPluginsEnabled(false);
+    
+    Frame& frame = newPage->mainFrame();
+    frame.setView(FrameView::create(frame));
+    frame.init();
+    FrameLoader& loader = frame.loader();
+    loader.forceSandboxFlags(SandboxAll);
+    
+    frame.view()->setCanHaveScrollbars(canHaveScrollbars);
+    frame.view()->setTransparent(transparent);
+    
+    ASSERT(loader.activeDocumentLoader()); // DocumentLoader should have been created by frame->init().
+    loader.activeDocumentLoader()->writer().setMIMEType(mimeType);
+    loader.activeDocumentLoader()->writer().begin(URL()); // create the empty document
+    loader.activeDocumentLoader()->writer().addData(buffer->data(), buffer->size());
+    loader.activeDocumentLoader()->writer().end();
+    
+    return newPage;
 }
 
 void Page::clearPreviousItemFromAllPages(HistoryItem* item)
@@ -333,7 +364,7 @@ String Page::synchronousScrollingReasonsAsText()
     return String();
 }
 
-PassRefPtr<ClientRectList> Page::nonFastScrollableRects(const Frame* frame)
+Ref<ClientRectList> Page::nonFastScrollableRects(const Frame* frame)
 {
     if (Document* document = m_mainFrame->document())
         document->updateLayout();
@@ -399,11 +430,11 @@ void Page::setOpenedByDOM()
     m_openedByDOM = true;
 }
 
-void Page::goToItem(HistoryItem* item, FrameLoadType type)
+void Page::goToItem(HistoryItem& item, FrameLoadType type)
 {
     // stopAllLoaders may end up running onload handlers, which could cause further history traversals that may lead to the passed in HistoryItem
     // being deref()-ed. Make sure we can still use it with HistoryController::goToItem later.
-    RefPtr<HistoryItem> protector(item);
+    Ref<HistoryItem> protector(item);
 
     if (m_mainFrame->loader().history().shouldStopLoadingForHistoryItem(item))
         m_mainFrame->loader().stopAllLoaders();
@@ -600,20 +631,20 @@ void Page::findStringMatchingRanges(const String& target, FindOptions options, i
     }
 }
 
-PassRefPtr<Range> Page::rangeOfString(const String& target, Range* referenceRange, FindOptions options)
+RefPtr<Range> Page::rangeOfString(const String& target, Range* referenceRange, FindOptions options)
 {
     if (target.isEmpty())
-        return 0;
+        return nullptr;
 
     if (referenceRange && referenceRange->ownerDocument().page() != this)
-        return 0;
+        return nullptr;
 
     bool shouldWrap = options & WrapAround;
     Frame* frame = referenceRange ? referenceRange->ownerDocument().frame() : &mainFrame();
     Frame* startFrame = frame;
     do {
         if (RefPtr<Range> resultRange = frame->editor().rangeOfString(target, frame == startFrame ? referenceRange : 0, options & ~WrapAround))
-            return resultRange.release();
+            return resultRange;
 
         frame = incrementFrame(frame, !(options & Backwards), shouldWrap);
     } while (frame && frame != startFrame);
@@ -622,10 +653,10 @@ PassRefPtr<Range> Page::rangeOfString(const String& target, Range* referenceRang
     // We cheat a bit and just search again with wrap on.
     if (shouldWrap && referenceRange) {
         if (RefPtr<Range> resultRange = startFrame->editor().rangeOfString(target, referenceRange, options | WrapAround | StartInSelection))
-            return resultRange.release();
+            return resultRange;
     }
 
-    return 0;
+    return nullptr;
 }
 
 unsigned Page::findMatchesForText(const String& target, FindOptions options, unsigned maxMatchCount, ShouldHighlightMatches shouldHighlightMatches, ShouldMarkMatches shouldMarkMatches)
@@ -694,7 +725,7 @@ void Page::setDefersLoading(bool defers)
 
 void Page::clearUndoRedoOperations()
 {
-    m_editorClient->clearUndoRedoOperations();
+    m_editorClient.clearUndoRedoOperations();
 }
 
 bool Page::inLowQualityImageInterpolationMode() const
@@ -808,12 +839,9 @@ void Page::setDeviceScaleFactor(float scaleFactor)
     setNeedsRecalcStyleInAllFrames();
 
     mainFrame().deviceOrPageScaleFactorChanged();
-    pageCache()->markPagesForDeviceScaleChanged(this);
+    PageCache::singleton().markPagesForDeviceScaleChanged(*this);
 
-    for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext())
-        frame->editor().deviceScaleFactorChanged();
-
-    pageCache()->markPagesForFullStyleRecalc(this);
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
     GraphicsContext::updateDocumentMarkerResources();
 
     mainFrame().pageOverlayController().didChangeDeviceScaleFactor();
@@ -893,7 +921,7 @@ void Page::setPagination(const Pagination& pagination)
     m_pagination = pagination;
 
     setNeedsRecalcStyleInAllFrames();
-    pageCache()->markPagesForFullStyleRecalc(this);
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 unsigned Page::pageCount() const
@@ -1033,21 +1061,6 @@ const String& Page::userStyleSheet() const
     return m_userStyleSheet;
 }
 
-void Page::removeAllVisitedLinks()
-{
-    if (!allPages)
-        return;
-    HashSet<PageGroup*> groups;
-    HashSet<Page*>::iterator pagesEnd = allPages->end();
-    for (HashSet<Page*>::iterator it = allPages->begin(); it != pagesEnd; ++it) {
-        if (PageGroup* group = (*it)->groupPtr())
-            groups.add(group);
-    }
-    HashSet<PageGroup*>::iterator groupsEnd = groups.end();
-    for (HashSet<PageGroup*>::iterator it = groups.begin(); it != groupsEnd; ++it)
-        (*it)->removeVisitedLinks();
-}
-
 void Page::invalidateStylesForAllLinks()
 {
     for (Frame* frame = m_mainFrame.get(); frame; frame = frame->tree().traverseNext())
@@ -1074,14 +1087,14 @@ void Page::setDebugger(JSC::Debugger* debugger)
 StorageNamespace* Page::sessionStorage(bool optionalCreate)
 {
     if (!m_sessionStorage && optionalCreate)
-        m_sessionStorage = StorageNamespace::sessionStorageNamespace(this);
+        m_sessionStorage = m_storageNamespaceProvider->createSessionStorageNamespace(*this, m_settings->sessionStorageQuota());
 
     return m_sessionStorage.get();
 }
 
-void Page::setSessionStorage(PassRefPtr<StorageNamespace> newStorage)
+void Page::setSessionStorage(RefPtr<StorageNamespace>&& newStorage)
 {
-    m_sessionStorage = newStorage;
+    m_sessionStorage = WTF::move(newStorage);
 }
 
 bool Page::hasCustomHTMLTokenizerTimeDelay() const
@@ -1211,6 +1224,17 @@ void Page::updateIsPlayingAudio()
     chrome().client().isPlayingAudioDidChange(m_isPlayingAudio);
 }
 
+void Page::setMuted(bool muted)
+{
+    if (m_muted == muted)
+        return;
+
+    m_muted = muted;
+
+    for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext())
+        frame->document()->pageMutedStateDidChange();
+}
+
 #if !ASSERT_DISABLED
 void Page::checkSubframeCountConsistency() const
 {
@@ -1232,11 +1256,6 @@ void Page::resumeAnimatingImages()
         view->resumeVisibleImageAnimationsIncludingSubframes();
 }
 
-void Page::enablePageThrottler()
-{
-    m_pageThrottler.createUserActivity();
-}
-
 void Page::setViewState(ViewState::Flags viewState)
 {
     ViewState::Flags changed = m_viewState ^ viewState;
@@ -1247,7 +1266,6 @@ void Page::setViewState(ViewState::Flags viewState)
 
     m_viewState = viewState;
     m_focusController->setViewState(viewState);
-    m_pageThrottler.setViewState(viewState);
 
     if (changed & ViewState::IsVisible)
         setIsVisibleInternal(viewState & ViewState::IsVisible);
@@ -1258,6 +1276,11 @@ void Page::setViewState(ViewState::Flags viewState)
 
     for (auto* observer : m_viewStateChangeObservers)
         observer->viewStateDidChange(oldViewState, m_viewState);
+}
+
+void Page::setPageActivityState(PageActivityState::Flags activityState)
+{
+    chrome().client().setPageActivityState(activityState);
 }
 
 void Page::setIsVisible(bool isVisible)
@@ -1608,14 +1631,37 @@ void Page::setUserContentController(UserContentController* userContentController
 
     if (m_userContentController)
         m_userContentController->addPage(*this);
+
+    for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        if (Document *document = frame->document()) {
+            document->styleSheetCollection().invalidateInjectedStyleSheetCache();
+            document->styleResolverChanged(DeferRecalcStyle);
+        }
+    }
+}
+
+void Page::setStorageNamespaceProvider(Ref<StorageNamespaceProvider>&& storageNamespaceProvider)
+{
+    m_storageNamespaceProvider->removePage(*this);
+    m_storageNamespaceProvider = WTF::move(storageNamespaceProvider);
+    m_storageNamespaceProvider->addPage(*this);
+
+    // This needs to reset all the local storage namespaces of all the pages.
 }
 
 VisitedLinkStore& Page::visitedLinkStore()
 {
-    if (m_visitedLinkStore)
-        return *m_visitedLinkStore;
+    return m_visitedLinkStore;
+}
 
-    return group().visitedLinkStore();
+void Page::setVisitedLinkStore(Ref<VisitedLinkStore>&& visitedLinkStore)
+{
+    m_visitedLinkStore->removePage(*this);
+    m_visitedLinkStore = WTF::move(visitedLinkStore);
+    m_visitedLinkStore->addPage(*this);
+
+    invalidateStylesForAllLinks();
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 SessionID Page::sessionID() const
@@ -1642,26 +1688,6 @@ void Page::setSessionID(SessionID sessionID)
 
     for (auto& view : pluginViews())
         view->privateBrowsingStateChanged(sessionID.isEphemeral());
-}
-
-Page::PageClients::PageClients()
-    : alternativeTextClient(nullptr)
-    , chromeClient(nullptr)
-#if ENABLE(CONTEXT_MENUS)
-    , contextMenuClient(nullptr)
-#endif
-    , editorClient(nullptr)
-    , dragClient(nullptr)
-    , inspectorClient(nullptr)
-    , plugInClient(nullptr)
-    , progressTrackerClient(nullptr)
-    , validationMessageClient(nullptr)
-    , loaderClientForMainFrame(nullptr)
-{
-}
-
-Page::PageClients::~PageClients()
-{
 }
 
 } // namespace WebCore

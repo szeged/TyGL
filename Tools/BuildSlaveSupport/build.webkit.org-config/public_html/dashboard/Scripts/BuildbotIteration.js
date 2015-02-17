@@ -71,6 +71,7 @@ BuildbotIteration.RETRY = 5;
 BuildbotIteration.ProductiveSteps = {
     "compile-webkit": 1,
     "build archive": 1,
+    "build ASAN archive": 1,
     "Build" : 1,
     "layout-test": 1,
     "jscore-test": 1,
@@ -96,12 +97,14 @@ function isMultiCodebaseGotRevisionProperty(property)
     return property[0] === "got_revision" && typeof property[1] === "object";
 }
 
-function parseRevisionProperty(property, key)
+function parseRevisionProperty(property, key, fallbackKey)
 {
     if (!property)
         return null;
     var value = property[1];
-    return parseInt(isMultiCodebaseGotRevisionProperty(property) ? value[key] : value, 10);
+    if (isMultiCodebaseGotRevisionProperty(property))
+        value = (key in value) ? value[key] : value[fallbackKey];
+    return parseInt(value);
 }
 
 BuildbotIteration.prototype = {
@@ -225,6 +228,7 @@ BuildbotIteration.prototype = {
             testResults.uniqueLeakCount = testStep.results[1].reduce(resultSummarizer.bind(null, "unique leak"), undefined);
             testResults.newPassesCount = testStep.results[1].reduce(resultSummarizer.bind(null, "new pass"), undefined);
             testResults.missingCount = testStep.results[1].reduce(resultSummarizer.bind(null, "missing"), undefined);
+            testResults.crashCount = testStep.results[1].reduce(resultSummarizer.bind(null, "crash"), undefined);
 
             if (!testResults.failureCount && !testResults.flakyCount && !testResults.totalLeakCount && !testResults.uniqueLeakCount && !testResults.newPassesCount && !testResults.missingCount) {
                 // This step exited with a non-zero exit status, but we didn't find any output about the number of failed tests.
@@ -242,8 +246,6 @@ BuildbotIteration.prototype = {
         //
         // ["got_revision",{"Internal":"1357","WebKitOpenSource":"2468"},"Source"]
         // OR
-        // ["got_revision","2468_1357","Source"]
-        // OR
         // ["got_revision","2468","Source"]
         //
         // When extracting the OpenSource revision from property got_revision we don't need to check whether the
@@ -252,11 +254,11 @@ BuildbotIteration.prototype = {
         // revision. Therefore, we only look at got_revision to extract the Internal revision when it's
         // a dictionary.
 
-        var openSourceRevisionProperty = data.properties.findFirst(function(property) { return property[0] === "got_revision" || property[0] === "revision" || property[0] === "opensource_got_revision"; });
-        this.openSourceRevision = parseRevisionProperty(openSourceRevisionProperty, "WebKit");
+        var openSourceRevisionProperty = data.properties.findFirst(function(property) { return property[0] === "got_revision"; });
+        this.openSourceRevision = parseRevisionProperty(openSourceRevisionProperty, "WebKit", "opensource");
 
-        var internalRevisionProperty = data.properties.findFirst(function(property) { return property[0] === "internal_got_revision" || isMultiCodebaseGotRevisionProperty(property); });
-        this.internalRevision = parseRevisionProperty(internalRevisionProperty, "Internal");
+        var internalRevisionProperty = data.properties.findFirst(function(property) { return isMultiCodebaseGotRevisionProperty(property); });
+        this.internalRevision = parseRevisionProperty(internalRevisionProperty, "Internal", "internal");
 
         function sourceStampChanges(sourceStamp) {
             var result = [];
@@ -304,6 +306,14 @@ BuildbotIteration.prototype = {
 
         var bindingTestResults = collectTestResults.call(this, data, "bindings-generation-tests");
         this.bindingTestResults = bindingTestResults ? new BuildbotTestResults(this, bindingTestResults) : null;
+
+        var masterShellCommandStep = data.steps.findFirst(function(step) { return step.name === "MasterShellCommand"; });
+        this.resultURLs = masterShellCommandStep ? masterShellCommandStep.urls : null;
+        for (var linkName in this.resultURLs) {
+            var url = this.resultURLs[linkName];
+            if (!url.startsWith("http"))
+                this.resultURLs[linkName] = this.queue.buildbot.baseURL + url;
+        }
 
         this.loaded = true;
 

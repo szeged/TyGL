@@ -134,11 +134,9 @@ void ContextMenuController::showContextMenu(Event* event, PassRefPtr<ContextMenu
 static Image* imageFromImageElementNode(Node& node)
 {
     RenderObject* renderer = node.renderer();
-    if (!renderer)
+    if (!is<RenderImage>(renderer))
         return nullptr;
-    if (!renderer->isRenderImage())
-        return nullptr;
-    CachedImage* image = toRenderImage(*renderer).cachedImage();
+    CachedImage* image = downcast<RenderImage>(*renderer).cachedImage();
     if (!image || image->errorOccurred())
         return nullptr;
 
@@ -180,10 +178,8 @@ std::unique_ptr<ContextMenu> ContextMenuController::maybeCreateContextMenu(Event
 
 void ContextMenuController::showContextMenu(Event* event)
 {
-#if ENABLE(INSPECTOR)
     if (m_page.inspectorController().enabled())
         addInspectElementItem();
-#endif
 
 #if USE(CROSS_PLATFORM_CONTEXT_MENUS)
     m_contextMenu = m_client.customizeMenu(WTF::move(m_contextMenu));
@@ -201,9 +197,8 @@ static void openNewWindow(const URL& urlToLoad, Frame* frame)
         return;
     
     FrameLoadRequest request(frame->document()->securityOrigin(), ResourceRequest(urlToLoad, frame->loader().outgoingReferrer()));
-    Page* newPage = oldPage;
 
-    newPage = oldPage->chrome().createWindow(frame, request, WindowFeatures(), NavigationAction(request.resourceRequest()));
+    Page* newPage = oldPage->chrome().createWindow(frame, request, WindowFeatures(), NavigationAction(request.resourceRequest()));
     if (!newPage)
         return;
     newPage->chrome().show();
@@ -524,12 +519,10 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
         frame->editor().toggleAutomaticSpellingCorrection();
         break;
 #endif
-#if ENABLE(INSPECTOR)
     case ContextMenuItemTagInspectElement:
         if (Page* page = frame->page())
             page->inspectorController().inspect(m_context.hitTestResult().innerNonSharedNode());
         break;
-#endif
     case ContextMenuItemTagDictationAlternative:
         frame->editor().applyDictationAlternativelternative(item->title());
         break;
@@ -893,7 +886,7 @@ void ContextMenuController::populate()
             appendItem(*separatorItem(), m_contextMenu.get());
             appendItem(CopyMediaLinkItem, m_contextMenu.get());
             appendItem(OpenMediaInNewWindowItem, m_contextMenu.get());
-            if (loader.client().canHandleRequest(ResourceRequest(mediaURL)))
+            if (m_context.hitTestResult().isDownloadableMedia() && loader.client().canHandleRequest(ResourceRequest(mediaURL)))
                 appendItem(DownloadMediaItem, m_contextMenu.get());
         }
 
@@ -922,9 +915,7 @@ void ContextMenuController::populate()
                 appendItem(SpeechMenuItem, m_contextMenu.get());
 #endif                
             } else {
-#if ENABLE(INSPECTOR)
                 if (!(frame->page() && (frame->page()->inspectorController().hasInspectorFrontendClient() || frame->page()->inspectorController().hasRemoteFrontend()))) {
-#endif
 
                 // In GTK+ unavailable items are not hidden but insensitive.
 #if PLATFORM(GTK)
@@ -946,9 +937,7 @@ void ContextMenuController::populate()
                 else
                     appendItem(ReloadItem, m_contextMenu.get());
 #endif
-#if ENABLE(INSPECTOR)
                 }
-#endif
 
                 if (frame->page() && !frame->isMainFrame())
                     appendItem(OpenFrameItem, m_contextMenu.get());
@@ -1116,7 +1105,6 @@ void ContextMenuController::populate()
     }
 }
 
-#if ENABLE(INSPECTOR)
 void ContextMenuController::addInspectElementItem()
 {
     Node* node = m_context.hitTestResult().innerNonSharedNode();
@@ -1140,7 +1128,6 @@ void ContextMenuController::addInspectElementItem()
         appendItem(*separatorItem(), m_contextMenu.get());
     appendItem(InspectElementItem, m_contextMenu.get());
 }
-#endif // ENABLE(INSPECTOR)
 
 void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
 {
@@ -1407,9 +1394,7 @@ void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
         case ContextMenuItemTagTextDirectionMenu:
         case ContextMenuItemTagPDFSinglePageScrolling:
         case ContextMenuItemTagPDFFacingPagesScrolling:
-#if ENABLE(INSPECTOR)
         case ContextMenuItemTagInspectElement:
-#endif
         case ContextMenuItemBaseCustomTag:
         case ContextMenuItemCustomTagNoAction:
         case ContextMenuItemLastCustomTag:

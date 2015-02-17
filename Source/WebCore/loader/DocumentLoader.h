@@ -68,7 +68,6 @@ namespace WebCore {
     class Frame;
     class FrameLoader;
     class Page;
-    class ResourceBuffer;
     class ResourceLoader;
     class SharedBuffer;
     class SubstituteResource;
@@ -79,9 +78,9 @@ namespace WebCore {
     class DocumentLoader : public RefCounted<DocumentLoader>, private CachedRawResourceClient {
         WTF_MAKE_FAST_ALLOCATED;
     public:
-        static PassRefPtr<DocumentLoader> create(const ResourceRequest& request, const SubstituteData& data)
+        static Ref<DocumentLoader> create(const ResourceRequest& request, const SubstituteData& data)
         {
-            return adoptRef(new DocumentLoader(request, data));
+            return adoptRef(*new DocumentLoader(request, data));
         }
         WEBCORE_EXPORT virtual ~DocumentLoader();
 
@@ -93,7 +92,7 @@ namespace WebCore {
 
         WEBCORE_EXPORT FrameLoader* frameLoader() const;
         WEBCORE_EXPORT ResourceLoader* mainResourceLoader() const;
-        WEBCORE_EXPORT PassRefPtr<ResourceBuffer> mainResourceData() const;
+        WEBCORE_EXPORT PassRefPtr<SharedBuffer> mainResourceData() const;
         
         DocumentWriter& writer() const { return m_writer; }
 
@@ -103,7 +102,7 @@ namespace WebCore {
         WEBCORE_EXPORT const ResourceRequest& request() const;
         WEBCORE_EXPORT ResourceRequest& request();
 
-        CachedResourceLoader& cachedResourceLoader() { return m_cachedResourceLoader.get(); }
+        CachedResourceLoader& cachedResourceLoader() { return m_cachedResourceLoader; }
 
         const SubstituteData& substituteData() const { return m_substituteData; }
 
@@ -119,7 +118,7 @@ namespace WebCore {
         // FIXME: This method seems to violate the encapsulation of this class.
         WEBCORE_EXPORT void setResponseMIMEType(const String&);
 #endif
-
+        const String& currentContentType() const;
         void replaceRequestURLForSameDocumentNavigation(const URL&);
         bool isStopping() const { return m_isStopping; }
         void stopLoading();
@@ -249,7 +248,7 @@ namespace WebCore {
         void recordMemoryCacheLoadForFutureClientNotification(const ResourceRequest&);
         void takeMemoryCacheLoadsForClientNotification(Vector<ResourceRequest>& loads);
 
-        DocumentLoadTiming* timing() { return &m_documentLoadTiming; }
+        DocumentLoadTiming& timing() { return m_documentLoadTiming; }
         void resetTiming() { m_documentLoadTiming = DocumentLoadTiming(); }
 
         // The WebKit layer calls this function when it's ready for the data to
@@ -314,14 +313,14 @@ namespace WebCore {
 #if HAVE(RUNLOOP_TIMER)
         typedef RunLoopTimer<DocumentLoader> DocumentLoaderTimer;
 #else
-        typedef Timer<DocumentLoader> DocumentLoaderTimer;
+        typedef Timer DocumentLoaderTimer;
 #endif
         void handleSubstituteDataLoadSoon();
-        void handleSubstituteDataLoadNow(DocumentLoaderTimer*);
+        void handleSubstituteDataLoadNow();
         void startDataLoadTimer();
 
         void deliverSubstituteResourcesAfterDelay();
-        void substituteResourceDeliveryTimerFired(Timer<DocumentLoader>&);
+        void substituteResourceDeliveryTimerFired();
 
         void clearMainResource();
 
@@ -387,7 +386,7 @@ namespace WebCore {
         
         typedef HashMap<RefPtr<ResourceLoader>, RefPtr<SubstituteResource>> SubstituteResourceMap;
         SubstituteResourceMap m_pendingSubstituteResources;
-        Timer<DocumentLoader> m_substituteResourceDeliveryTimer;
+        Timer m_substituteResourceDeliveryTimer;
 
         OwnPtr<ArchiveResourceCollection> m_archiveResourceCollection;
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)

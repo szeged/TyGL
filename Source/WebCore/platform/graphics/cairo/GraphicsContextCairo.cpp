@@ -41,6 +41,7 @@
 #include "FloatConversion.h"
 #include "FloatRect.h"
 #include "FloatRoundedRect.h"
+#include "Font.h"
 #include "GraphicsContextPlatformPrivateCairo.h"
 #include "IntRect.h"
 #include "NotImplemented.h"
@@ -51,7 +52,6 @@
 #include "PlatformPathCairo.h"
 #include "RefPtrCairo.h"
 #include "ShadowBlur.h"
-#include "SimpleFontData.h"
 #include "TransformationMatrix.h"
 #include <cairo.h>
 #include <math.h>
@@ -742,8 +742,8 @@ void GraphicsContext::setPlatformStrokeThickness(float strokeThickness)
 
 void GraphicsContext::setPlatformStrokeStyle(StrokeStyle strokeStyle)
 {
-    static double dashPattern[] = {5.0, 5.0};
-    static double dotPattern[] = {1.0, 1.0};
+    static const double dashPattern[] = { 5.0, 5.0 };
+    static const double dotPattern[] = { 1.0, 1.0 };
 
     if (paintingDisabled())
         return;
@@ -1106,7 +1106,7 @@ void GraphicsContext::set3DTransform(const TransformationMatrix& transform)
 {
     setCTM(transform.toAffineTransform());
 }
-#endif
+#endif // ENABLE(3D_RENDERING) && USE(TEXTURE_MAPPER)
 
 } // namespace WebCore
 

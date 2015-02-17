@@ -60,9 +60,9 @@ inline SVGEllipseElement::SVGEllipseElement(const QualifiedName& tagName, Docume
     registerAnimatedPropertiesForSVGEllipseElement();
 }    
 
-PassRefPtr<SVGEllipseElement> SVGEllipseElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGEllipseElement> SVGEllipseElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGEllipseElement(tagName, document));
+    return adoptRef(*new SVGEllipseElement(tagName, document));
 }
 
 bool SVGEllipseElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -108,7 +108,7 @@ void SVGEllipseElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::cxAttr
         || attrName == SVGNames::cyAttr
@@ -118,7 +118,7 @@ void SVGEllipseElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    RenderSVGShape* renderer = toRenderSVGShape(this->renderer());
+    auto* renderer = downcast<RenderSVGShape>(this->renderer());
     if (!renderer)
         return;
 
@@ -130,7 +130,7 @@ void SVGEllipseElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderPtr<RenderElement> SVGEllipseElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGEllipseElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGEllipse>(*this, WTF::move(style));
 }

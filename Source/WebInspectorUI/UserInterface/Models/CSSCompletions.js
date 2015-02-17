@@ -76,12 +76,17 @@ WebInspector.CSSCompletions.cssNameCompletions = null;
 
 WebInspector.CSSCompletions.requestCSSNameCompletions = function()
 {
+    if (WebInspector.CSSCompletions.cssNameCompletions)
+        return;
+
     function propertyNamesCallback(error, names)
     {
         if (error)
             return;
 
         WebInspector.CSSCompletions.cssNameCompletions = new WebInspector.CSSCompletions(names, false);
+
+        WebInspector.CSSKeywordCompletions.addCustomCompletions(names);
 
         // CodeMirror is not included by tests so we shouldn't assume it always exists.
         // If it isn't available we skip MIME type associations.

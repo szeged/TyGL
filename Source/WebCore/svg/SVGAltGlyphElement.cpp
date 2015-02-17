@@ -50,9 +50,9 @@ inline SVGAltGlyphElement::SVGAltGlyphElement(const QualifiedName& tagName, Docu
     registerAnimatedPropertiesForSVGAltGlyphElement();
 }
 
-PassRefPtr<SVGAltGlyphElement> SVGAltGlyphElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGAltGlyphElement> SVGAltGlyphElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGAltGlyphElement(tagName, document));
+    return adoptRef(*new SVGAltGlyphElement(tagName, document));
 }
 
 void SVGAltGlyphElement::setGlyphRef(const AtomicString&, ExceptionCode& ec)
@@ -82,7 +82,7 @@ bool SVGAltGlyphElement::childShouldCreateRenderer(const Node& child) const
     return false;
 }
 
-RenderPtr<RenderElement> SVGAltGlyphElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGAltGlyphElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGTSpan>(*this, WTF::move(style));
 }

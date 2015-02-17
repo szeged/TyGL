@@ -46,7 +46,7 @@ class HIDGamepadProvider : public GamepadProvider {
     WTF_MAKE_NONCOPYABLE(HIDGamepadProvider);
     friend class NeverDestroyed<HIDGamepadProvider>;
 public:
-    WEBCORE_EXPORT static HIDGamepadProvider& shared();
+    WEBCORE_EXPORT static HIDGamepadProvider& singleton();
 
     virtual void startMonitoringGamepads(GamepadProviderClient*);
     virtual void stopMonitoringGamepads(GamepadProviderClient*);
@@ -64,8 +64,8 @@ private:
     void openAndScheduleManager();
     void closeAndUnscheduleManager();
 
-    void connectionDelayTimerFired(Timer<HIDGamepadProvider>&);
-    void inputNotificationTimerFired(Timer<HIDGamepadProvider>&);
+    void connectionDelayTimerFired();
+    void inputNotificationTimerFired();
 
     unsigned indexForNewlyConnectedDevice();
 
@@ -77,8 +77,8 @@ private:
     HashSet<GamepadProviderClient*> m_clients;
     bool m_shouldDispatchCallbacks;
 
-    Timer<HIDGamepadProvider> m_connectionDelayTimer;
-    Timer<HIDGamepadProvider> m_inputNotificationTimer;
+    Timer m_connectionDelayTimer;
+    Timer m_inputNotificationTimer;
 };
 
 } // namespace WebCore

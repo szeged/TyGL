@@ -35,8 +35,6 @@
 #include "RoundedRect.h"
 #include "TextRun.h"
 
-#include "stdio.h"
-
 namespace WebCore {
 
 class TextRunIterator {
@@ -335,25 +333,25 @@ const GraphicsContextState& GraphicsContext::state() const
     return m_state;
 }
 
-void GraphicsContext::setStrokePattern(PassRef<Pattern> pattern)
+void GraphicsContext::setStrokePattern(Ref<Pattern>&& pattern)
 {
     m_state.strokeGradient.clear();
     m_state.strokePattern = WTF::move(pattern);
 }
 
-void GraphicsContext::setFillPattern(PassRef<Pattern> pattern)
+void GraphicsContext::setFillPattern(Ref<Pattern>&& pattern)
 {
     m_state.fillGradient.clear();
     m_state.fillPattern = WTF::move(pattern);
 }
 
-void GraphicsContext::setStrokeGradient(PassRef<Gradient> gradient)
+void GraphicsContext::setStrokeGradient(Ref<Gradient>&& gradient)
 {
     m_state.strokeGradient = WTF::move(gradient);
     m_state.strokePattern.clear();
 }
 
-void GraphicsContext::setFillGradient(PassRef<Gradient> gradient)
+void GraphicsContext::setFillGradient(Ref<Gradient>&& gradient)
 {
     m_state.fillGradient = WTF::move(gradient);
     m_state.fillPattern.clear();
@@ -428,37 +426,23 @@ bool GraphicsContext::paintingDisabled() const
     return m_state.paintingDisabled;
 }
 
-// FIXME: Replace the non-iOS implementation with the iOS implementation since the latter computes returns
-// the width of the drawn text. Ensure that there aren't noticeable differences in layout.
-#if !PLATFORM(IOS)
-#if !USE(WINGDI)
-void GraphicsContext::drawText(const Font& font, const TextRun& run, const FloatPoint& point, int from, int to)
-{
-    if (paintingDisabled())
-        return;
-
-    font.drawText(this, run, point, from, to);
-}
-#endif
-#else
-float GraphicsContext::drawText(const Font& font, const TextRun& run, const FloatPoint& point, int from, int to)
+float GraphicsContext::drawText(const FontCascade& font, const TextRun& run, const FloatPoint& point, int from, int to)
 {
     if (paintingDisabled())
         return 0;
 
     return font.drawText(this, run, point, from, to);
 }
-#endif // !PLATFORM(IOS)
 
-void GraphicsContext::drawGlyphs(const Font& font, const SimpleFontData& fontData, const GlyphBuffer& buffer, int from, int numGlyphs, const FloatPoint& point)
+void GraphicsContext::drawGlyphs(const FontCascade& fontCascade, const Font& font, const GlyphBuffer& buffer, int from, int numGlyphs, const FloatPoint& point)
 {
     if (paintingDisabled())
         return;
 
-    font.drawGlyphs(this, &fontData, buffer, from, numGlyphs, point);
+    fontCascade.drawGlyphs(this, &font, buffer, from, numGlyphs, point);
 }
 
-void GraphicsContext::drawEmphasisMarks(const Font& font, const TextRun& run, const AtomicString& mark, const FloatPoint& point, int from, int to)
+void GraphicsContext::drawEmphasisMarks(const FontCascade& font, const TextRun& run, const AtomicString& mark, const FloatPoint& point, int from, int to)
 {
     if (paintingDisabled())
         return;
@@ -466,44 +450,22 @@ void GraphicsContext::drawEmphasisMarks(const Font& font, const TextRun& run, co
     font.drawEmphasisMarks(this, run, mark, point, from, to);
 }
 
-// FIXME: Better merge the iOS and non-iOS differences. In particular, make this method use the
-// returned width of the drawn text, Font::drawText(), instead of computing it. Ensure that there
-// aren't noticeable differences in layout with such a change.
-#if !PLATFORM(IOS)
-void GraphicsContext::drawBidiText(const Font& font, const TextRun& run, const FloatPoint& point, Font::CustomFontNotReadyAction customFontNotReadyAction)
-#else
-float GraphicsContext::drawBidiText(const Font& font, const TextRun& run, const FloatPoint& point, Font::CustomFontNotReadyAction customFontNotReadyAction, BidiStatus* status, int length)
-#endif
+void GraphicsContext::drawBidiText(const FontCascade& font, const TextRun& run, const FloatPoint& point, FontCascade::CustomFontNotReadyAction customFontNotReadyAction)
 {
     if (paintingDisabled())
-#if !PLATFORM(IOS)
         return;
-#else
-        return 0;
-#endif
 
     BidiResolver<TextRunIterator, BidiCharacterRun> bidiResolver;
-#if !PLATFORM(IOS)
     bidiResolver.setStatus(BidiStatus(run.direction(), run.directionalOverride()));
-#else
-    bidiResolver.setStatus(status ? *status : BidiStatus(run.direction(), run.directionalOverride()));
-#endif
     bidiResolver.setPositionIgnoringNestedIsolates(TextRunIterator(&run, 0));
 
     // FIXME: This ownership should be reversed. We should pass BidiRunList
     // to BidiResolver in createBidiRunsForLine.
     BidiRunList<BidiCharacterRun>& bidiRuns = bidiResolver.runs();
-#if !PLATFORM(IOS)
     bidiResolver.createBidiRunsForLine(TextRunIterator(&run, run.length()));
-#else
-    bidiResolver.createBidiRunsForLine(TextRunIterator(&run, length < 0 ? run.length() : length));
-#endif    
+
     if (!bidiRuns.runCount())
-#if !PLATFORM(IOS)
         return;
-#else
-        return 0;
-#endif
 
     FloatPoint currPoint = point;
     BidiCharacterRun* bidiRun = bidiRuns.firstRun();
@@ -513,30 +475,13 @@ float GraphicsContext::drawBidiText(const Font& font, const TextRun& run, const 
         subrun.setDirection(isRTL ? RTL : LTR);
         subrun.setDirectionalOverride(bidiRun->dirOverride(false));
 
-#if !PLATFORM(IOS)
-        font.drawText(this, subrun, currPoint, 0, -1, customFontNotReadyAction);
-
-        bidiRun = bidiRun->next();
-        // FIXME: Have Font::drawText return the width of what it drew so that we don't have to re-measure here.
-        if (bidiRun)
-            currPoint.move(font.width(subrun), 0);
-#else
         float width = font.drawText(this, subrun, currPoint, 0, -1, customFontNotReadyAction);
         currPoint.move(width, 0);
 
         bidiRun = bidiRun->next();
-#endif
     }
 
-#if PLATFORM(IOS)
-    if (status)
-        *status = bidiResolver.status();
-#endif
     bidiRuns.deleteRuns();
-
-#if PLATFORM(IOS)
-    return currPoint.x() - static_cast<float>(point.x());
-#endif
 }
 
 void GraphicsContext::drawImage(Image* image, ColorSpace colorSpace, const FloatPoint& destination, const ImagePaintingOptions& imagePaintingOptions)
@@ -752,18 +697,6 @@ BlendMode GraphicsContext::blendModeOperation() const
 {
     return m_state.blendMode;
 }
-
-#if PLATFORM(IOS)
-bool GraphicsContext::emojiDrawingEnabled()
-{
-    return m_state.emojiDrawingEnabled;
-}
-
-void GraphicsContext::setEmojiDrawingEnabled(bool emojiDrawingEnabled)
-{
-    m_state.emojiDrawingEnabled = emojiDrawingEnabled;
-}
-#endif
 
 void GraphicsContext::setDrawLuminanceMask(bool drawLuminanceMask)
 {

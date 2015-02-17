@@ -44,7 +44,7 @@ namespace WebCore {
 
     class DataTransfer : public RefCounted<DataTransfer> {
     public:
-        static PassRefPtr<DataTransfer> createForCopyAndPaste(DataTransferAccessPolicy);
+        static Ref<DataTransfer> createForCopyAndPaste(DataTransferAccessPolicy);
 
         WEBCORE_EXPORT ~DataTransfer();
 
@@ -82,8 +82,8 @@ namespace WebCore {
         Pasteboard& pasteboard() { return *m_pasteboard; }
 
 #if ENABLE(DRAG_SUPPORT)
-        static PassRefPtr<DataTransfer> createForDragAndDrop();
-        static PassRefPtr<DataTransfer> createForDragAndDrop(DataTransferAccessPolicy, const DragData&);
+        static Ref<DataTransfer> createForDragAndDrop();
+        static Ref<DataTransfer> createForDragAndDrop(DataTransferAccessPolicy, const DragData&);
 
         bool dropEffectIsUninitialized() const { return m_dropEffect == "uninitialized"; }
 
@@ -99,14 +99,14 @@ namespace WebCore {
 
     private:
         enum Type { CopyAndPaste, DragAndDrop };
-        DataTransfer(DataTransferAccessPolicy, PassOwnPtr<Pasteboard>, Type = CopyAndPaste, bool forFileDrag = false);
+        DataTransfer(DataTransferAccessPolicy, std::unique_ptr<Pasteboard>, Type = CopyAndPaste, bool forFileDrag = false);
 
 #if ENABLE(DRAG_SUPPORT)
         bool canSetDragImage() const;
 #endif
 
         DataTransferAccessPolicy m_policy;
-        OwnPtr<Pasteboard> m_pasteboard;
+        std::unique_ptr<Pasteboard> m_pasteboard;
 
         mutable RefPtr<FileList> m_fileList;
 

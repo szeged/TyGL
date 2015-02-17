@@ -10,6 +10,9 @@ webkit.org/b/116293 media/video-seek-after-end.html [ Pass Failure ]
 
 webkit.org/b/116473 editing/selection/user-drag-element-and-user-select-none.html [ Failure ]
 
+webkit.org/b/139862 editing/spelling/editing-multiple-words-with-markers.html [ Timeout Pass ]
+webkit.org/b/139903 editing/spelling/grammar-paste.html [ Timeout Pass ]
+
 # media/W3C/video/networkState/networkState_during_progress.html is flaky
 webkit.org/b/76280 media/W3C/video/networkState/networkState_during_progress.html [ Pass Failure ]
 
@@ -19,9 +22,6 @@ webkit.org/b/119094 fast/forms/color/input-color-onchange-event.html [ Crash Pas
 
 # This test will run slowly in debug mode, but is plenty fast in release.
 [ Debug ] js/slow-stress/emscripten-memops.html [ Skip ]
-
-# Skip tests for the old inspector UI that will be ported or removed soon.
-inspector-obsolete [ Skip ]
 
 webkit.org/b/112521 [ Release ] webaudio/javascriptaudionode.html [ Pass Failure ]
 webkit.org/b/112521 [ Debug ] webaudio/javascriptaudionode.html [ Skip ]
@@ -35,6 +35,9 @@ webkit.org/b/137359 webaudio/distance-linear.html [ Pass Failure ]
 
 webkit.org/b/124342 fast/hidpi/image-srcset-svg-canvas-2x.html [ ImageOnlyFailure ]
 webkit.org/b/124349 fast/hidpi/image-srcset-relative-svg-canvas-2x.html [ ImageOnlyFailure ]
+webkit.org/b/124349 fast/hidpi/image-srcset-relative-svg-canvas.html [ Pass ImageOnlyFailure ]
+
+webkit.org/b/139590 animations/cross-fade-webkit-mask-image.html [ Pass Failure ]
 
 # The test frequently times out, and is just unsuccessful at detecting incorrect behavior when it passes.
 webkit.org/b/72698 media/audio-garbage-collect.html [ Skip ]
@@ -63,6 +66,10 @@ webkit.org/b/126166 [ Debug ] js/dfg-uint32array-overflow-values.html [ Skip ]
 
 webkit.org/b/127860 [ Debug ] js/function-apply-aliased.html [ Skip ]
 
+# ES6 class syntax hasn't been enabled yet.
+webkit.org/b/140491 js/class-syntax-declaration.html [ Failure ]
+webkit.org/b/140491 js/class-syntax-expression.html [ Failure ]
+
 # This test verifies dynamic manipulation of the mroot and msqrt elements.
 mathml/roots-removeChild.html [ ImageOnlyFailure ]
 
@@ -74,9 +81,6 @@ webkit.org/b/127697 fast/writing-mode/ruby-text-logical-left.html [ Skip ]
 webkit.org/b/83618 fast/dom/inline-event-attributes-release.html [ Failure ]
 
 webkit.org/b/129057 media/controls-styling-strict.html [ Pass Failure ]
-
-#subpixel failure on non-retina displays.
-webkit.org/b/129050 fast/sub-pixel/compositing-layers-on-subpixel-position.html [ ImageOnlyFailure ]
 
 webkit.org/b/133761 inspector-protocol/debugger/breakpoint-action-detach.html [ Skip ]
 webkit.org/b/129639 inspector-protocol/dom/dom-search-crash.html [ Skip ]
@@ -94,6 +98,9 @@ webkit.org/b/131919 inspector/dom [ Skip ]
 webkit.org/b/137131 inspector/debugger [ Skip ]
 webkit.org/b/137130 inspector/replay [ Skip ]
 webkit.org/b/137131 inspector/timeline [ Skip ]
+inspector/model/remote-object-get-properties.html [ Skip ]
+inspector/model/remote-object-weak-collection.html [ Skip ]
+inspector/model/remote-object.html [ Skip ]
 
 # Doesn't work yet, relies on network replay functionality (webkit.org/b/130728, webkit.org/b/129391)
 webkit.org/b/131318 http/tests/inspector/replay/document-last-modified-fallback-value.html [ Skip ]
@@ -106,8 +113,6 @@ webkit.org/b/74144 fast/regions/region-content-flown-into-region.html [ Skip ]
 # Expando properties on attribute nodes disappear
 webkit.org/b/88045 fast/dom/gc-attribute-node.html [ Failure Pass ]
 
-webkit.org/b/137316 fast/multicol/newmulticol/spanner-crash.html [ Crash Pass ]
-
 # These tests are incorrect in the CSS test suite and should be fixed there first.
 css2.1/20110323/replaced-intrinsic-001.htm [ Failure ]
 css2.1/20110323/replaced-intrinsic-002.htm [ Failure ]
@@ -117,9 +122,6 @@ webkit.org/b/132791 svg/as-object/sizing/svg-in-object-placeholder-height-percen
 webkit.org/b/132791 svg/as-object/sizing/svg-in-object-placeholder-height-auto.html [ Skip ]
 
 webkit.org/b/133057 fast/table/border-collapsing/collapsed-borders-adjoining-sections.html [ ImageOnlyFailure ]
-
-# Failing on some bots due to using resource load callbacks
-webkit.org/b/134769 fast/dom/HTMLImageElement/sizes/image-sizes-js-change.html [ Skip ]
 
 webkit.org/b/128736 inspector-protocol/debugger/setBreakpoint-dfg.html [ Failure Pass ]
 webkit.org/b/134982 inspector-protocol/debugger/setBreakpoint-dfg-and-modify-local.html [ Failure Pass ]
@@ -136,20 +138,8 @@ webkit.org/b/135390 http/tests/webfont/fontloader-loading-attribute.html [ Skip 
 
 # Various failures from the W3C CSS Shapes test suite import
 
-webkit.org/b/135923 css3/shapes/shape-outside/shape-image/gradients/shape-outside-radial-gradient-001.html [ ImageOnlyFailure ]
-webkit.org/b/135923 css3/shapes/shape-outside/shape-image/gradients/shape-outside-radial-gradient-002.html [ ImageOnlyFailure ]
-webkit.org/b/135923 css3/shapes/shape-outside/shape-image/gradients/shape-outside-radial-gradient-003.html [ ImageOnlyFailure ]
-webkit.org/b/135923 css3/shapes/shape-outside/shape-image/gradients/shape-outside-radial-gradient-004.html [ ImageOnlyFailure ]
-
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-010.html [ ImageOnlyFailure ]
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-011.html [ ImageOnlyFailure ]
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-012.html [ ImageOnlyFailure ]
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-013.html [ ImageOnlyFailure ]
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-014.html [ ImageOnlyFailure ]
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-015.html [ ImageOnlyFailure ]
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-016.html [ ImageOnlyFailure ]
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-017.html [ ImageOnlyFailure ]
-webkit.org/b/135927 css3/shapes/spec-examples/shape-outside-019.html [ ImageOnlyFailure ]
+webkit.org/b/137788 css3/shapes/shape-outside/shape-image/shape-image-010.html [ ImageOnlyFailure ]
+webkit.org/b/137788 css3/shapes/shape-outside/shape-image/shape-image-024.html [ ImageOnlyFailure ]
 
 # border painting diff (Path vs. drawLine)
 webkit.org/b/136078 fast/borders/border-painting-dashed.html [ ImageOnlyFailure ]
@@ -190,36 +180,294 @@ webkit.org/b/136754 css3/flexbox/csswg/ttwf-reftest-flex-wrap.html [ ImageOnlyFa
 # nth-child tests takes long time and Debug build sometimes timeouts because there are many test cases.
 webkit.org/b/137149 fast/selectors/nth-child-of-basics.html [ Slow ]
 
-# Deprecated tests for function.arguments. These tests need to stay in the tree because the RJST
-# harness will run these after forcibly reenabling the function.arguments feature. We want to
-# keep testing the feature for as long as we haven't achieved confidence that it is safe to
-# remove it entirely.
-webkit.org/b/137167 js/dfg-arguments-unexpected-escape.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-become-double.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-become-int32.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-int32.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-osr-exit-and-capture.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-reset-changetype.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-reset.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-simple.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-use-directly-from-inlined-code.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-use-from-all-the-places.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-use-from-getter.html [ Failure ]
-webkit.org/b/137167 js/dfg-inline-arguments-use-from-uninlined-code.html [ Failure ]
-webkit.org/b/137167 js/dfg-tear-off-arguments-not-activation.html [ Failure ]
-webkit.org/b/137167 js/dfg-tear-off-function-dot-arguments.html [ Failure ]
-webkit.org/b/137167 js/dom/exception-thrown-from-function-with-lazy-activation.html [ Failure ]
-webkit.org/b/137167 js/dom/function-dot-arguments2.html [ Failure ]
-webkit.org/b/137167 js/function-dot-arguments.html [ Failure ]
-webkit.org/b/137167 js/kde/function.html [ Failure ]
-webkit.org/b/137167 js/kde/function_arguments.html [ Failure ]
-
-# Promises/A+ 2.3.3 has many tests and it sometimes exceeds the time limit.
-webkit.org/b/136878 js/promises-tests/promises-tests-2-3-3.html [ Slow ]
-
-# Intentional breaking of :not(:link) and :not(:visited) for the development of the extended :not() from CSS Selector Level 4.
-fast/history/link-inside-not.html [ Failure ]
-
 # @supports W3C Failures
 webkit.org/b/137566 css3/conditional/w3c/at-supports-010.html [ ImageOnlyFailure ]
 webkit.org/b/137568 css3/conditional/w3c/at-supports-014.html [ ImageOnlyFailure ]
+
+transitions/svg-text-shadow-transition.html [ Failure ]
+webkit.org/b/137883 transitions/background-transitions.html [ Failure Pass ]
+webkit.org/b/137883 transitions/border-radius-transition.html [ Failure Pass ]
+webkit.org/b/137883 transitions/change-values-during-transition.html [ Failure Pass ]
+webkit.org/b/137883 transitions/clip-transition.html [ Failure Pass ]
+webkit.org/b/137883 transitions/color-transition-all.html [ Failure Pass ]
+webkit.org/b/137883 transitions/color-transition-premultiplied.html [ Failure Pass ]
+webkit.org/b/137883 transitions/color-transition-rounding.html [ Failure Pass ]
+webkit.org/b/137883 transitions/created-while-suspended.html [ Failure Pass ]
+webkit.org/b/137883 transitions/cross-fade-background-image.html [ Pass Failure ]
+webkit.org/b/137883 transitions/cross-fade-border-image.html [ Pass Failure ]
+webkit.org/b/137883 transitions/cubic-bezier-overflow-color.html [ Pass Failure ]
+webkit.org/b/137883 transitions/cubic-bezier-overflow-length.html [ Pass Failure ]
+webkit.org/b/137883 transitions/cubic-bezier-overflow-shadow.html [ Pass Failure ]
+webkit.org/b/137883 transitions/cubic-bezier-overflow-svg-length.html [ Pass Failure ]
+webkit.org/b/137883 transitions/cubic-bezier-overflow-transform.html [ Pass Failure ]
+webkit.org/b/137883 transitions/delay.html [ Pass Failure ]
+webkit.org/b/137883 transitions/equivalent-background-image-no-transition.html [ Pass Failure ]
+webkit.org/b/137883 transitions/flex-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/interrupt-transform-transition.html [ Pass Failure ]
+webkit.org/b/137883 transitions/interrupt-zero-duration.html [ Pass Failure ]
+webkit.org/b/137883 transitions/interrupted-accelerated-transition.html [ Pass Failure ]
+webkit.org/b/137883 transitions/longhand-vs-shorthand-initial.html [ Pass Failure ]
+webkit.org/b/137883 transitions/mask-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/matched-transform-functions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/mismatched-shadow-styles.html [ Pass Failure ]
+webkit.org/b/137883 transitions/mismatched-shadow-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/mixed-type.html [ Pass Failure ]
+webkit.org/b/137883 transitions/move-after-transition.html [ Pass Failure ]
+webkit.org/b/137883 transitions/multiple-background-size-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/multiple-background-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/multiple-mask-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/multiple-shadow-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/negative-delay.html [ Pass Failure ]
+webkit.org/b/137883 transitions/opacity-transition-zindex.html [ Pass Failure ]
+webkit.org/b/137883 transitions/repeated-firing-background-color.html [ Pass Failure ]
+webkit.org/b/137883 transitions/retargetted-transition.html [ Pass Failure ]
+webkit.org/b/137883 transitions/rounded-rect-becomes-non-renderable-while-transitioning.html [ Pass Failure ]
+webkit.org/b/137883 transitions/shorthand-border-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/shorthand-transitions.html [ Pass Failure ]
+webkit.org/b/137883 transitions/started-while-suspended.html [ Pass Failure ]
+webkit.org/b/137883 transitions/transition-shorthand-delay.html
+webkit.org/b/137883 transitions/transition-timing-function.html [ Pass Failure ]
+
+# W3C web platform tests infrastructure directories are skipped as they may contain html files
+imported/w3c/web-platform-tests/common [ Skip ]
+imported/w3c/web-platform-tests/fonts [ Skip ]
+imported/w3c/web-platform-tests/images [ Skip ]
+imported/w3c/web-platform-tests/tools [ Skip ]
+
+# W3C domparsing test suite
+# Bug 141235: Tests marked as Skip until being able to relaunch wpt server properly
+imported/w3c/web-platform-tests [ Skip ]
+
+# Imported W3C canvas failed tests
+webkit.org/b/138676 imported/w3c/canvas/2d.pattern.image.null.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.pattern.image.incomplete.omitted.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.drawImage.null.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.path.rect.winding.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.drawImage.image.incomplete.omitted.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/security.pattern.canvas.fillStyle.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/security.reset.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/security.pattern.cross.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.pattern.image.incomplete.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.drawImage.animated.poster.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.fillStyle.parse.rgb-eof.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.imageData.put.null.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/security.pattern.image.strokeStyle.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.imageData.get.nonfinite.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.line.cap.round.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.gradient.object.invalidoffset.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/security.pattern.canvas.strokeStyle.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.gradient.radial.nonfinite.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.imageData.object.ctor.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.drawImage.incomplete.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.imageData.create2.nonfinite.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.composite.operation.clear.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.composite.operation.darker.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/security.drawImage.image.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.drawImage.broken.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.imageData.create1.zero.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.gradient.linear.nonfinite.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.fillStyle.parse.rgba-eof.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/security.drawImage.canvas.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/security.pattern.image.fillStyle.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.imageData.put.nonfinite.html [ Failure ]
+webkit.org/b/138676 imported/w3c/canvas/2d.pattern.image.incomplete.empty.html [ Failure ]
+
+# Imported W3C canvas tests need to be changed such that they can be automatically verified
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fontface.repeat.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fill.maxWidth.small.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fill.rtl.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.stroke.basic.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.align.end.rtl.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.align.left.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.align.right.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/toDataURL.png.complexcolours.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.shadow.blur.high.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.space.collapse.nonspace.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fontface.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.space.basic.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.scaled.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.measure.width.basic.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fontface.notinpage.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.coordinatespace.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/toDataURL.jpeg.primarycolours.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fill.maxWidth.fontface.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fill.maxWidth.zero.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/security.dataURI.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fill.maxWidth.bound.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.drawImage.animated.gif.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.pattern.animated.gif.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.pattern.modify.image1.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.pattern.modify.image2.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.align.center.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fill.basic.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.baseline.alphabetic.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.kern.consistent.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.fill.maxWidth.large.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/toDataURL.jpeg.alpha.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/toDataURL.png.primarycolours.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.shadow.blur.low.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.align.start.ltr.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.drawImage.animated.apng.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.align.start.rtl.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/2d.text.draw.align.end.ltr.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/toDataURL.jpeg.quality.basic.html [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_colorsandstyles_createlineargradient_001.htm [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_compositing_globalcompositeoperation_001.htm [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_complexshapes_beziercurveto_001.htm [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_shadows_001.htm [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_state_restore_001.htm [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_text_font_001.htm [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_complexshapes_arcto_001.htm [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_linestyles_linecap_001.htm [ Skip ]
+webkit.org/b/138676 imported/w3c/canvas/canvas_transformations_scale_001.htm [ Skip ]
+
+webkit.org/b/137316 fast/multicol/newmulticol/spanner-crash.html [ Skip ]
+
+webkit.org/b/139595 http/tests/xmlhttprequest/workers/abort-exception-assert.html [ Pass Failure Timeout ]
+
+# Debug assertions are tracked as <rdar://problem/18216390>.
+[ Debug ] fast/history/go-back-to-iframe-with-plugin.html [ Skip ]
+[ Debug ] fast/history/history-back-while-pdf-in-pagecache.html [ Skip ]
+webkit.org/b/121628 [ Release ] fast/history/history-back-while-pdf-in-pagecache.html [ Pass ImageOnlyFailure ]
+[ Debug ] fullscreen/full-screen-iframe-legacy.html [ Pass Crash ]
+
+webkit.org/b/139634 [ Debug ] fast/selectors/matches-backtracking.html [ Slow ]
+webkit.org/b/139634 [ Debug ] fast/selectors/nth-child-of-register-requirement.html [ Slow ]
+webkit.org/b/139634 [ Debug ] fast/selectors/not-backtracking.html [ Slow ]
+
+webkit.org/b/61932 [ Debug ] jquery/manipulation.html [ Slow ]
+[ Debug ] jquery/core.html [ Slow ]
+[ Debug ] jquery/event.html [ Slow ]
+[ Debug ] jquery/offset.html [ Slow ]
+[ Debug ] jquery/traversing.html [ Slow ]
+
+webkit.org/b/139638 [ Debug ] svg/filters/svg-deeply-nested-crash.html [ Slow ]
+
+webkit.org/b/139639 [ Debug ] cssom/non-subpixel-scroll-top-left-values.html [ Slow ]
+
+webkit.org/b/139640 [ Debug ] webgl/1.0.2/conformance/glsl/misc/shader-uniform-packing-restrictions.html [ Slow ]
+
+[ Debug ] fast/workers/worker-cloneport.html [ Slow ]
+
+# Imported Mozilla SVG tests
+webkit.org/b/5968 imported/mozilla/svg/linearGradient-basic-03.svg [ ImageOnlyFailure ]
+webkit.org/b/32177 imported/mozilla/svg/as-image/background-image-rect-1png.html [ ImageOnlyFailure ]
+webkit.org/b/32177 imported/mozilla/svg/as-image/background-image-rect-2.html [ ImageOnlyFailure ]
+webkit.org/b/32177 imported/mozilla/svg/text-white-space-01.svg [ ImageOnlyFailure ]
+webkit.org/b/72401 imported/mozilla/svg/pathLength-01.svg [ ImageOnlyFailure ] 
+webkit.org/b/112032 imported/mozilla/svg/text-layout-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139107 imported/mozilla/svg/clip-02a.svg [ ImageOnlyFailure ]
+webkit.org/b/139107 imported/mozilla/svg/clip-02b.svg [ ImageOnlyFailure ]
+webkit.org/b/139115 imported/mozilla/svg/conditions-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139115 imported/mozilla/svg/conditions-06.svg [ ImageOnlyFailure ]
+webkit.org/b/139115 imported/mozilla/svg/dynamic-conditions-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139115 imported/mozilla/svg/dynamic-conditions-03.svg [ ImageOnlyFailure ]
+webkit.org/b/139115 imported/mozilla/svg/switch-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139115 imported/mozilla/svg/svg-integration/dynamic-conditions-outer-svg-02.xhtml [ ImageOnlyFailure ]
+webkit.org/b/139115 imported/mozilla/svg/svg-integration/dynamic-conditions-outer-svg-03.xhtml [ ImageOnlyFailure ]
+webkit.org/b/139116 imported/mozilla/svg/conditions-07.svg [ ImageOnlyFailure ]
+webkit.org/b/139117 imported/mozilla/svg/conditions-08.svg [ ImageOnlyFailure ]
+webkit.org/b/139118 imported/mozilla/svg/cssComment-in-attribute-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-holes-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-multiple-dx-anchor-end-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-holes-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-holes-multiple-dx-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-multiple-dx-anchor-end-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-anchor-end-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-anchor-end-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-multiple-dx-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-x-multiple-dx-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/simple-multiple-dx-anchor-end-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/simple-multiple-dx-anchor-end-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/simple-multiple-dx-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/simple-multiple-dx-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/simple-multiple-dx-anchor-middle-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-chunks-multiple-dx-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-chunks-multiple-dx-different-anchor-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-chunks-multiple-dx-different-anchor-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-chunks-multiple-dx-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-chunks-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-chunks-different-anchor-rtl.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-chunks-different-anchor-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139119 imported/mozilla/svg/text/multiple-chunks-bidi.svg [ ImageOnlyFailure ]
+webkit.org/b/139132 imported/mozilla/svg/dynamic-switch-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139154 imported/mozilla/svg/dynamic-marker-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139155 imported/mozilla/svg/dynamic-textPath-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139155 imported/mozilla/svg/dynamic-textPath-02.svg [ ImageOnlyFailure ]
+webkit.org/b/139155 imported/mozilla/svg/dynamic-textPath-03.svg [ ImageOnlyFailure ]
+webkit.org/b/139155 imported/mozilla/svg/dynamic-pattern-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139155 imported/mozilla/svg/dynamic-use-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139155 imported/mozilla/svg/dynamic-use-02.svg [ ImageOnlyFailure ]
+webkit.org/b/139155 imported/mozilla/svg/dynamic-use-03.svg [ ImageOnlyFailure ]
+webkit.org/b/139155 imported/mozilla/svg/dynamic-use-07.svg [ ImageOnlyFailure ]
+webkit.org/b/139183 imported/mozilla/svg/text/pseudo-first-letter.svg [ ImageOnlyFailure ]
+webkit.org/b/139184 imported/mozilla/svg/text/pseudo-first-line.svg [ ImageOnlyFailure ]
+webkit.org/b/139184 imported/mozilla/svg/text/simple-multiline-anchor-end.svg [ ImageOnlyFailure ]
+webkit.org/b/139184 imported/mozilla/svg/text/simple-multiline-number.svg [ ImageOnlyFailure ]
+webkit.org/b/139184 imported/mozilla/svg/text/simple-multiline-pc.svg [ ImageOnlyFailure ]
+webkit.org/b/139184 imported/mozilla/svg/text/simple-multiline.svg [ ImageOnlyFailure ]
+webkit.org/b/139186 imported/mozilla/svg/text/pseudo-first-line-2.svg [ ImageOnlyFailure ]
+webkit.org/b/139186 imported/mozilla/svg/text/textpath-multiline.svg [ ImageOnlyFailure ]
+webkit.org/b/139186 imported/mozilla/svg/text/textpath-multiline-2.svg [ ImageOnlyFailure ]
+webkit.org/b/139186 imported/mozilla/svg/text/ignore-text-align-2.svg [ ImageOnlyFailure ]
+webkit.org/b/139192 imported/mozilla/svg/smil/transform/rotate-angle-4.svg [ ImageOnlyFailure ]
+webkit.org/b/139192 imported/mozilla/svg/smil/transform/rotate-angle-5.svg [ ImageOnlyFailure ]
+webkit.org/b/139199 imported/mozilla/svg/as-image/img-content-outside-viewBox-1.html [ ImageOnlyFailure ]
+webkit.org/b/131354 imported/mozilla/svg/blend-color.svg [ ImageOnlyFailure ]
+webkit.org/b/131354 imported/mozilla/svg/blend-difference-stacking.html [ ImageOnlyFailure ]
+webkit.org/b/131354 imported/mozilla/svg/blend-hard-light.svg [ ImageOnlyFailure ]
+webkit.org/b/131354 imported/mozilla/svg/blend-hue.svg [ ImageOnlyFailure ]
+webkit.org/b/131354 imported/mozilla/svg/blend-luminosity.svg [ ImageOnlyFailure ]
+webkit.org/b/131354 imported/mozilla/svg/blend-saturation.svg [ ImageOnlyFailure ]
+webkit.org/b/139210 imported/mozilla/svg/text/textLength-5.svg [ ImageOnlyFailure ]
+webkit.org/b/139210 imported/mozilla/svg/text/textLength-6.svg [ ImageOnlyFailure ]
+webkit.org/b/139237 imported/mozilla/svg/filters/feComposite-1.svg [ ImageOnlyFailure ]
+webkit.org/b/139258 imported/mozilla/svg/text-layout-05.svg [ ImageOnlyFailure ]
+webkit.org/b/139266 imported/mozilla/svg/text/dynamic-multiple-x.svg [ ImageOnlyFailure ]
+webkit.org/b/139282 imported/mozilla/svg/image/image-filter-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139322 imported/mozilla/svg/text/dynamic-non-scaling-stroke.svg [ ImageOnlyFailure ]
+webkit.org/b/139407 imported/mozilla/svg/as-image/border-image-simple-1.html [ ImageOnlyFailure ]
+webkit.org/b/139405 imported/mozilla/svg/as-image/border-image-simple-2.html [ ImageOnlyFailure ]
+webkit.org/b/139412 imported/mozilla/svg/filters/svg-filter-chains/clip-input.svg [ ImageOnlyFailure ]
+webkit.org/b/139412 imported/mozilla/svg/filters/svg-filter-chains/clip-output.svg [ ImageOnlyFailure ]
+webkit.org/b/139414 imported/mozilla/svg/filters/feColorMatrix-1.svg [ ImageOnlyFailure ]
+webkit.org/b/139414 imported/mozilla/svg/filters/feColorMatrix-2.svg [ ImageOnlyFailure ]
+webkit.org/b/139414 imported/mozilla/svg/filters/feConvolveMatrix-bias-01.svg [ ImageOnlyFailure ]
+webkit.org/b/139417 imported/mozilla/svg/filters/filter-marked-line-02.svg [ ImageOnlyFailure ]
+webkit.org/b/139417 imported/mozilla/svg/filters/filter-marked-line-03.svg [ ImageOnlyFailure ]
+webkit.org/b/139417 imported/mozilla/svg/filters/filter-marked-line-04.svg [ ImageOnlyFailure ]
+webkit.org/b/139417 imported/mozilla/svg/filters/filter-marked-line-05.svg [ ImageOnlyFailure ]
+webkit.org/b/139417 imported/mozilla/svg/filters/filter-marked-line-06.svg [ ImageOnlyFailure ]
+webkit.org/b/139417 imported/mozilla/svg/filters/filter-marked-line-07.svg [ ImageOnlyFailure ]
+webkit.org/b/139417 imported/mozilla/svg/filters/filter-marked-line-08.svg [ ImageOnlyFailure ]
+webkit.org/b/139417 imported/mozilla/svg/filters/filter-marked-line-09.svg [ ImageOnlyFailure ]
+
+[ Debug ] fast/loader/document-with-fragment-url-3.html [ Pass Timeout ]
+[ Debug ] fast/loader/document-with-fragment-url-4.html [ Pass Timeout ]
+
+webkit.org/b/110546 [ Debug ] fast/parser/document-write-fighting-eof.html [ Skip ]
+webkit.org/b/110546 [ Debug ] fast/parser/document-write-partial-entity-before-load.html [ Skip ]
+
+webkit.org/b/85902 [ Debug ] fast/overflow/lots-of-sibling-inline-boxes.html [ Slow ]
+webkit.org/b/121452 [ Debug ] fast/frames/lots-of-objects.html [ Slow ]
+webkit.org/b/121452 [ Debug ] fast/frames/lots-of-iframes.html [ Slow ]
+webkit.org/b/135053 [ Debug ] html5lib/webkit-resumer.html [ Slow ]
+[ Debug ] js/dfg-double-vote-fuzz.html [ Slow ]
+[ Debug ] js/dom/string-replacement-outofmemory.html [ Slow ]
+[ Debug ] js/regress-139548.html [ Slow ]
+[ Debug ] webgl/1.0.2/conformance/uniforms/gl-uniform-arrays.html [ Slow ]
+[ Debug ] js/dfg-osr-entry-hoisted-clobbered-structure-check.html [ Slow ]
+[ Debug ] editing/selection/move-by-character-brute-force.html [ Slow ]
+[ Debug ] fast/workers/dedicated-worker-lifecycle.html [ Slow ]
+
+webkit.org/b/139865 js/promises-tests/promises-tests-2-3-3.html [ Skip ]
+
+webkit.org/b/139840 fast/xmlhttprequest/xmlhttprequest-recursive-sync-event.html [ Pass Failure ]
+
+webkit.org/b/140043 [ Debug ] js/dom/Promise.html [ Pass Failure ]
+
+webkit.org/b/140309 css3/background/background-repeat-space-content.html [ ImageOnlyFailure ]
+
+webkit.org/b/141267 http/tests/misc/detached-frame-console.html [ Pass Failure ]

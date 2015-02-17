@@ -102,6 +102,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)automaticallyDetectsCacheModel;
 - (void)setAutomaticallyDetectsCacheModel:(BOOL)automaticallyDetectsCacheModel;
 
+- (BOOL)domTimersThrottlingEnabled;
+- (void)setDOMTimersThrottlingEnabled:(BOOL)domTimersThrottlingEnabled;
+
 - (BOOL)webArchiveDebugModeEnabled;
 - (void)setWebArchiveDebugModeEnabled:(BOOL)webArchiveDebugModeEnabled;
 
@@ -208,6 +211,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)showDebugBorders;
 - (void)setShowDebugBorders:(BOOL)show;
 
+- (BOOL)simpleLineLayoutDebugBordersEnabled;
+- (void)setSimpleLineLayoutDebugBordersEnabled:(BOOL)enabled;
+
 - (BOOL)showRepaintCounter;
 - (void)setShowRepaintCounter:(BOOL)show;
 
@@ -237,6 +243,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 
 - (void)setMediaPlaybackAllowsInline:(BOOL)flag;
 - (BOOL)mediaPlaybackAllowsInline;
+
+- (void)setAllowsAlternateFullscreen:(BOOL)flag;
+- (BOOL)allowsAlternateFullscreen;
 
 - (NSString *)pictographFontFamily;
 - (void)setPictographFontFamily:(NSString *)family;
@@ -284,8 +293,6 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (void)_setStandalone:(BOOL)flag;
 - (void)_setTelephoneNumberParsingEnabled:(BOOL)flag;
 - (BOOL)_telephoneNumberParsingEnabled;
-- (void)_setAlwaysUseBaselineOfPrimaryFont:(BOOL)flag;
-- (BOOL)_alwaysUseBaselineOfPrimaryFont;
 - (void)_setAllowMultiElementImplicitFormSubmission:(BOOL)flag;
 - (BOOL)_allowMultiElementImplicitFormSubmission;
 - (void)_setAlwaysRequestGeolocationPermission:(BOOL)flag;
@@ -314,6 +321,7 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 // For DumpRenderTree use only.
 + (void)_switchNetworkLoaderToNewTestingSession;
 + (void)_setCurrentNetworkLoaderSessionCookieAcceptPolicy:(NSHTTPCookieAcceptPolicy)cookieAcceptPolicy;
++ (void)_clearNetworkLoaderSession;
 
 + (void)setWebKitLinkTimeVersion:(int)version;
 
@@ -386,9 +394,6 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)diagnosticLoggingEnabled;
 - (void)setDiagnosticLoggingEnabled:(BOOL)enabled;
 
-- (BOOL)screenFontSubstitutionEnabled;
-- (void)setScreenFontSubstitutionEnabled:(BOOL)enabled;
-
 - (void)setStorageBlockingPolicy:(WebStorageBlockingPolicy)storageBlockingPolicy;
 - (WebStorageBlockingPolicy)storageBlockingPolicy;
 
@@ -421,6 +426,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 
 - (void)setGamepadsEnabled:(BOOL)flag;
 - (BOOL)gamepadsEnabled;
+
+- (void)setMediaKeysStorageDirectory:(NSString *)directory;
+- (NSString *)mediaKeysStorageDirectory;
 
 #if TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED < 80000
 - (void)_setAllowCompositingLayerVisualDegradation:(BOOL)flag;

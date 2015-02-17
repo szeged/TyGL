@@ -31,7 +31,7 @@ struct RadialGradientAttributes;
 
 class SVGRadialGradientElement final : public SVGGradientElement {
 public:
-    static PassRefPtr<SVGRadialGradientElement> create(const QualifiedName&, Document&);
+    static Ref<SVGRadialGradientElement> create(const QualifiedName&, Document&);
 
     bool collectGradientAttributes(RadialGradientAttributes&);
 
@@ -42,7 +42,7 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     virtual bool selfHasRelativeLengths() const override;
 

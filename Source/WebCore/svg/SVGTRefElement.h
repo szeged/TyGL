@@ -31,7 +31,7 @@ class SVGTRefTargetEventListener;
 class SVGTRefElement final : public SVGTextPositioningElement,
                              public SVGURIReference {
 public:
-    static PassRefPtr<SVGTRefElement> create(const QualifiedName&, Document&);
+    static Ref<SVGTRefElement> create(const QualifiedName&, Document&);
 
 protected:
     virtual void didNotifySubtreeInsertions(ContainerNode*) override;
@@ -46,7 +46,7 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
     virtual bool childShouldCreateRenderer(const Node&) const override;
     virtual bool rendererIsNeeded(const RenderStyle&) override;
 

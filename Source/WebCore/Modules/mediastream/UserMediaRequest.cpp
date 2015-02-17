@@ -40,6 +40,7 @@
 #include "Dictionary.h"
 #include "Document.h"
 #include "ExceptionCode.h"
+#include "Frame.h"
 #include "MediaConstraintsImpl.h"
 #include "MediaStream.h"
 #include "MediaStreamCenter.h"
@@ -113,32 +114,27 @@ void UserMediaRequest::start()
 {
     // 1 - make sure the system is capable of supporting the audio and video constraints. We don't want to ask for
     // user permission if the constraints can not be suported.
-    MediaStreamCenter::shared().validateRequestConstraints(this, m_audioConstraints, m_videoConstraints);
+    MediaStreamCenter::singleton().validateRequestConstraints(this, m_audioConstraints, m_videoConstraints);
 }
 
     
 void UserMediaRequest::constraintsValidated()
 {
-    if (m_controller)
-        callOnMainThread(bind(&UserMediaRequest::requestPermission, this));
-}
-
-void UserMediaRequest::requestPermission()
-{
-    // 2 - The constraints are valid, ask the user for access to media.
-    if (m_controller)
-        m_controller->requestPermission(this);
+    RefPtr<UserMediaRequest> protectedThis(this);
+    callOnMainThread([protectedThis] {
+        // 2 - The constraints are valid, ask the user for access to media.
+        if (UserMediaController* controller = protectedThis->m_controller)
+            controller->requestPermission(*protectedThis.get());
+    });
 }
 
 void UserMediaRequest::userMediaAccessGranted()
 {
-    callOnMainThread(bind(&UserMediaRequest::createMediaStream, this));
-}
-
-void UserMediaRequest::createMediaStream()
-{
-    // 3 - the user granted access, ask platform to create the media stream descriptors.
-    MediaStreamCenter::shared().createMediaStream(this, m_audioConstraints, m_videoConstraints);
+    RefPtr<UserMediaRequest> protectedThis(this);
+    callOnMainThread([protectedThis] {
+        // 3 - the user granted access, ask platform to create the media stream descriptors.
+        MediaStreamCenter::singleton().createMediaStream(protectedThis.get(), protectedThis->m_audioConstraints, protectedThis->m_videoConstraints);
+    });
 }
 
 void UserMediaRequest::userMediaAccessDenied()
@@ -156,25 +152,18 @@ void UserMediaRequest::didCreateStream(PassRefPtr<MediaStreamPrivate> privateStr
     if (!m_scriptExecutionContext || !m_successCallback)
         return;
 
-    callOnMainThread(bind(&UserMediaRequest::callSuccessHandler, this, privateStream));
-}
+    RefPtr<UserMediaRequest> protectedThis(this);
+    callOnMainThread([protectedThis, privateStream] {
+        // 4 - Create the MediaStream and pass it to the success callback.
+        RefPtr<MediaStream> stream = MediaStream::create(*protectedThis->m_scriptExecutionContext, privateStream);
+        for (auto& track : stream->getAudioTracks())
+            track->applyConstraints(protectedThis->m_audioConstraints);
+        for (auto& track : stream->getVideoTracks())
+            track->applyConstraints(protectedThis->m_videoConstraints);
 
-void UserMediaRequest::callSuccessHandler(PassRefPtr<MediaStreamPrivate> privateStream)
-{
-    // 4 - Create the MediaStream and pass it to the success callback.
-    ASSERT(m_successCallback);
-
-    RefPtr<MediaStream> stream = MediaStream::create(*m_scriptExecutionContext, privateStream);
-
-    Vector<RefPtr<MediaStreamTrack>> tracks = stream->getAudioTracks();
-    for (auto iter = tracks.begin(); iter != tracks.end(); ++iter)
-        (*iter)->applyConstraints(m_audioConstraints);
-
-    tracks = stream->getVideoTracks();
-    for (auto iter = tracks.begin(); iter != tracks.end(); ++iter)
-        (*iter)->applyConstraints(m_videoConstraints);
-
-    m_successCallback->handleEvent(stream.get());
+        ASSERT(protectedThis->m_successCallback);
+        protectedThis->m_successCallback->handleEvent(stream.get());
+    });
 }
 
 void UserMediaRequest::failedToCreateStreamWithConstraintsError(const String& constraintName)
@@ -186,8 +175,11 @@ void UserMediaRequest::failedToCreateStreamWithConstraintsError(const String& co
     if (!m_errorCallback)
         return;
 
+    RefPtr<UserMediaRequest> protectedThis(this);
     RefPtr<NavigatorUserMediaError> error = NavigatorUserMediaError::create(NavigatorUserMediaError::constraintNotSatisfiedErrorName(), constraintName);
-    callOnMainThread(bind(&UserMediaRequest::callErrorHandler, this, error.release()));
+    callOnMainThread([protectedThis, error] {
+        protectedThis->m_errorCallback->handleEvent(error.get());
+    });
 }
 
 void UserMediaRequest::failedToCreateStreamWithPermissionError()
@@ -198,17 +190,11 @@ void UserMediaRequest::failedToCreateStreamWithPermissionError()
     if (!m_errorCallback)
         return;
 
+    RefPtr<UserMediaRequest> protectedThis(this);
     RefPtr<NavigatorUserMediaError> error = NavigatorUserMediaError::create(NavigatorUserMediaError::permissionDeniedErrorName(), emptyString());
-    callOnMainThread(bind(&UserMediaRequest::callErrorHandler, this, error.release()));
-}
-
-void UserMediaRequest::callErrorHandler(PassRefPtr<NavigatorUserMediaError> prpError)
-{
-    RefPtr<NavigatorUserMediaError> error = prpError;
-
-    ASSERT(error);
-    
-    m_errorCallback->handleEvent(error.get());
+    callOnMainThread([protectedThis, error] {
+        protectedThis->m_errorCallback->handleEvent(error.get());
+    });
 }
 
 void UserMediaRequest::contextDestroyed()
@@ -216,7 +202,7 @@ void UserMediaRequest::contextDestroyed()
     Ref<UserMediaRequest> protect(*this);
 
     if (m_controller) {
-        m_controller->cancelRequest(this);
+        m_controller->cancelRequest(*this);
         m_controller = 0;
     }
 

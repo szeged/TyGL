@@ -536,8 +536,11 @@ Position VisiblePosition::canonicalPosition(const Position& passedPosition)
 
     // The new position must be in the same editable element. Enforce that first.
     // Unless the descent is from a non-editable html element to an editable body.
-    if (node && node->hasTagName(htmlTag) && !node->hasEditableStyle() && node->document().body() && node->document().body()->hasEditableStyle())
-        return next.isNotNull() ? next : prev;
+    if (is<HTMLHtmlElement>(node) && !node->hasEditableStyle()) {
+        auto* body = node->document().bodyOrFrameset();
+        if (body && body->hasEditableStyle())
+            return next.isNotNull() ? next : prev;
+    }
 
     Node* editingRoot = editableRootForPosition(position);
         
@@ -618,7 +621,7 @@ LayoutRect VisiblePosition::localCaretRect(RenderObject*& renderer) const
 
 IntRect VisiblePosition::absoluteCaretBounds() const
 {
-    RenderObject* renderer = nullptr;
+    RenderBlock* renderer = nullptr;
     LayoutRect localRect = localCaretRectInRendererForCaretPainting(*this, renderer);
     return absoluteBoundsForLocalCaretRect(renderer, localRect);
 }

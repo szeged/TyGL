@@ -32,10 +32,10 @@
 #import <wtf/RetainPtr.h>
 
 #if PLATFORM(IOS)
+#import "UIKitSPI.h"
 #import "WKContentView.h"
 #import "WKContentViewInteraction.h"
 #import <WebCore/FloatRect.h>
-#import <UIKit/UIScrollView_Private.h>
 #endif
 
 #if PLATFORM(IOS)
@@ -67,9 +67,6 @@ struct PrintInfo;
 }
 
 #if PLATFORM(IOS)
-
-@property (nonatomic, setter=_setUsesMinimalUI:) BOOL _usesMinimalUI;
-
 - (void)_processDidExit;
 
 - (void)_didCommitLoadForMainFrame;
@@ -98,8 +95,14 @@ struct PrintInfo;
 
 - (void)_didSameDocumentNavigationForMainFrame:(WebKit::SameDocumentNavigationType)navigationType;
 
+- (BOOL)_isShowingVideoOptimized;
+- (BOOL)_mayAutomaticallyShowVideoOptimized;
+
 @property (nonatomic, readonly) UIEdgeInsets _computedContentInset;
+#else
+@property (nonatomic, setter=_setIgnoresNonWheelEvents:) BOOL _ignoresNonWheelEvents;
 #endif
+
 @end
 
 WKWebView* fromWebPageProxy(WebKit::WebPageProxy&);

@@ -28,8 +28,7 @@
 class WebViewTest: public Test {
 public:
     MAKE_GLIB_TEST_FIXTURE(WebViewTest);
-    WebViewTest(WebKitWebView*);
-    WebViewTest();
+    WebViewTest(WebKitUserContentManager* = nullptr);
     virtual ~WebViewTest();
 
     virtual void loadURI(const char* uri);
@@ -49,10 +48,13 @@ public:
     void waitUntilTitleChangedTo(const char* expectedTitle);
     void waitUntilTitleChanged();
     void showInWindow(GtkWindowType = GTK_WINDOW_POPUP);
-    void showInWindowAndWaitUntilMapped(GtkWindowType = GTK_WINDOW_POPUP);
+    void showInWindowAndWaitUntilMapped(GtkWindowType = GTK_WINDOW_POPUP, int width = 0, int height = 0);
     void resizeView(int width, int height);
     void selectAll();
     const char* mainResourceData(size_t& mainResourceDataSize);
+
+    bool isEditable();
+    void setEditable(bool);
 
     void mouseMoveTo(int x, int y, unsigned mouseModifiers = 0);
     void clickMouseButton(int x, int y, unsigned button = 1, unsigned mouseModifiers = 0);
@@ -69,6 +71,12 @@ public:
     static bool javascriptResultIsUndefined(WebKitJavascriptResult*);
 
     cairo_surface_t* getSnapshotAndWaitUntilReady(WebKitSnapshotRegion, WebKitSnapshotOptions);
+
+    bool runWebProcessTest(const char* suiteName, const char* testName);
+
+    // Prohibit overrides because this is called when the web view is created
+    // in our constructor, before a derived class's vtable is ready.
+    void initializeWebExtensions() override final { Test::initializeWebExtensions(); }
 
     WebKitWebView* m_webView;
     GMainLoop* m_mainLoop;

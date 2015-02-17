@@ -32,7 +32,7 @@ class HTMLMeterElement;
 
 class RenderMeter final : public RenderBlockFlow {
 public:
-    RenderMeter(HTMLElement&, PassRef<RenderStyle>);
+    RenderMeter(HTMLElement&, Ref<RenderStyle>&&);
     virtual ~RenderMeter();
 
     HTMLMeterElement* meterElement() const;
@@ -46,8 +46,6 @@ private:
     virtual bool isMeter() const override { return true; }
     virtual bool requiresForcedStyleRecalcPropagation() const override { return true; }
 };
-
-RENDER_OBJECT_TYPE_CASTS(RenderMeter, isMeter())
 
 } // namespace WebCore
 

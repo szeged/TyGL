@@ -30,14 +30,7 @@
 #import "NetworkProcessConnectionMessages.h"
 #import "NetworkResourceLoader.h"
 #import "WebCoreArgumentCoders.h"
-
-#ifdef __has_include
-#if __has_include(<CFNetwork/CFURLCachePriv.h>)
-#include <CFNetwork/CFURLCachePriv.h>
-#endif
-#endif
-
-#if (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 80000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
+#import <WebCore/CFNetworkSPI.h>
 
 using namespace WebCore;
 
@@ -59,10 +52,10 @@ NetworkDiskCacheMonitor::NetworkDiskCacheMonitor(CFCachedURLResponseRef cachedRe
 {
 }
 
-void NetworkDiskCacheMonitor::resourceBecameFileBacked(PassRefPtr<SharedBuffer> fileBackedBuffer)
+void NetworkDiskCacheMonitor::resourceBecameFileBacked(SharedBuffer& fileBackedBuffer)
 {
     ShareableResource::Handle handle;
-    NetworkResourceLoader::tryGetShareableHandleFromSharedBuffer(handle, fileBackedBuffer.get());
+    NetworkResourceLoader::tryGetShareableHandleFromSharedBuffer(handle, fileBackedBuffer);
     if (handle.isNull())
         return;
 
@@ -80,5 +73,3 @@ uint64_t NetworkDiskCacheMonitor::messageSenderDestinationID()
 }
 
 } // namespace WebKit
-
-#endif

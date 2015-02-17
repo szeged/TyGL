@@ -29,9 +29,9 @@ namespace WebCore {
 class JSTestTypedefs : public JSDOMWrapper {
 public:
     typedef JSDOMWrapper Base;
-    static JSTestTypedefs* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestTypedefs> impl)
+    static JSTestTypedefs* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestTypedefs>&& impl)
     {
-        JSTestTypedefs* ptr = new (NotNull, JSC::allocateCell<JSTestTypedefs>(globalObject->vm().heap)) JSTestTypedefs(structure, globalObject, impl);
+        JSTestTypedefs* ptr = new (NotNull, JSC::allocateCell<JSTestTypedefs>(globalObject->vm().heap)) JSTestTypedefs(structure, globalObject, WTF::move(impl));
         ptr->finishCreation(globalObject->vm());
         return ptr;
     }
@@ -65,7 +65,7 @@ public:
 private:
     TestTypedefs* m_impl;
 protected:
-    JSTestTypedefs(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestTypedefs>);
+    JSTestTypedefs(JSC::Structure*, JSDOMGlobalObject*, Ref<TestTypedefs>&&);
 
     void finishCreation(JSC::VM& vm)
     {
@@ -88,12 +88,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestTypedefs*)
     return &jsTestTypedefsOwner;
 }
 
-inline void* wrapperContext(DOMWrapperWorld& world, TestTypedefs*)
-{
-    return &world;
-}
-
 WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestTypedefs*);
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestTypedefs& impl) { return toJS(exec, globalObject, &impl); }
 
 
 } // namespace WebCore

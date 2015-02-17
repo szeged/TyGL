@@ -38,7 +38,7 @@ namespace WebCore {
 
 using namespace MathMLNames;
     
-RenderMathMLUnderOver::RenderMathMLUnderOver(Element& element, PassRef<RenderStyle> style)
+RenderMathMLUnderOver::RenderMathMLUnderOver(Element& element, Ref<RenderStyle>&& style)
     : RenderMathMLBlock(element, WTF::move(style))
 {
     // Determine what kind of under/over expression we have by element name
@@ -85,13 +85,13 @@ void RenderMathMLUnderOver::layout()
                 }
             }
 
-            toRenderElement(child)->layout();
+            downcast<RenderElement>(*child).layout();
         }
 
         // Skipping the embellished op does not work for nested structures like
         // <munder><mover><mo>_</mo>...</mover> <mo>_</mo></munder>.
-        if (child->isBox())
-            stretchWidth = std::max<LayoutUnit>(stretchWidth, toRenderBox(child)->logicalWidth());
+        if (is<RenderBox>(*child))
+            stretchWidth = std::max<LayoutUnit>(stretchWidth, downcast<RenderBox>(*child).logicalWidth());
     }
 
     // Set the sizes of (possibly embellished) stretchy operator children.

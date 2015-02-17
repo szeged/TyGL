@@ -31,10 +31,8 @@
 #ifndef InspectorDOMDebuggerAgent_h
 #define InspectorDOMDebuggerAgent_h
 
-#if ENABLE(INSPECTOR)
-
 #include "InspectorWebAgentBase.h"
-#include "InspectorWebBackendDispatchers.h"
+#include <inspector/InspectorBackendDispatchers.h>
 #include <inspector/agents/InspectorDebuggerAgent.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
@@ -53,7 +51,7 @@ class Node;
 
 typedef String ErrorString;
 
-class InspectorDOMDebuggerAgent : public InspectorAgentBase, public Inspector::InspectorDebuggerAgent::Listener, public Inspector::InspectorDOMDebuggerBackendDispatcherHandler {
+class InspectorDOMDebuggerAgent final : public InspectorAgentBase, public Inspector::InspectorDebuggerAgent::Listener, public Inspector::InspectorDOMDebuggerBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorDOMDebuggerAgent);
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -70,13 +68,13 @@ public:
     virtual void setDOMBreakpoint(ErrorString&, int nodeId, const String& type) override;
     virtual void removeDOMBreakpoint(ErrorString&, int nodeId, const String& type) override;
 
-    // InspectorInstrumentation API
-    void willInsertDOMNode(Node* parent);
-    void didInvalidateStyleAttr(Node*);
-    void didInsertDOMNode(Node*);
-    void willRemoveDOMNode(Node*);
-    void didRemoveDOMNode(Node*);
-    void willModifyDOMAttr(Element*);
+    // InspectorInstrumentation callbacks.
+    void willInsertDOMNode(Node& parent);
+    void didInvalidateStyleAttr(Node&);
+    void didInsertDOMNode(Node&);
+    void willRemoveDOMNode(Node&);
+    void didRemoveDOMNode(Node&);
+    void willModifyDOMAttr(Element&);
     void willSendXMLHttpRequest(const String& url);
     void pauseOnNativeEventIfNeeded(bool isDOMEvent, const String& eventName, bool synchronous);
 
@@ -92,7 +90,7 @@ private:
     virtual void didPause() override;
     void disable();
 
-    void descriptionForDOMEvent(Node* target, int breakpointType, bool insertion, Inspector::InspectorObject* description);
+    void descriptionForDOMEvent(Node& target, int breakpointType, bool insertion, Inspector::InspectorObject& description);
     void updateSubtreeBreakpoints(Node*, uint32_t rootMask, bool set);
     bool hasBreakpoint(Node*, int type);
     void discardBindings();
@@ -112,7 +110,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(InspectorDOMDebuggerAgent_h)

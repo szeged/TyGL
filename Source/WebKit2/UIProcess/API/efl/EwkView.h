@@ -46,6 +46,7 @@
 
 #if USE(CAIRO)
 typedef struct _cairo_surface cairo_surface_t;
+typedef struct _Evas_GL Evas_GL;
 #endif
 
 namespace WebKit {
@@ -63,6 +64,10 @@ class WebPageProxy;
 #if ENABLE(VIBRATION)
 class VibrationClientEfl;
 #endif
+
+#if HAVE(ACCESSIBILITY) && defined(HAVE_ECORE_X)
+class WebAccessibility;
+#endif
 }
 
 namespace WebCore {
@@ -70,6 +75,7 @@ class AffineTransform;
 class Color;
 class CoordinatedGraphicsScene;
 class Cursor;
+class FloatPoint;
 class EvasGLContext;
 class EvasGLSurface;
 class Image;
@@ -143,6 +149,7 @@ public:
     void setCursor(const WebCore::Cursor& cursor);
 
     void scheduleUpdateDisplay();
+    void setViewportPosition(const WebCore::FloatPoint& contentsPosition);
 
 #if ENABLE(FULLSCREEN_API)
     void enterFullScreen();
@@ -190,6 +197,8 @@ public:
     // FIXME: needs refactoring (split callback invoke)
     void informURLChange();
 
+    void updateScaleToPageViewportController(double scaleFactor, int x, int y);
+
 #if USE(CAIRO)
     PassRefPtr<cairo_surface_t> takeSnapshot();
 #endif
@@ -199,13 +208,11 @@ public:
 
     void didFindZoomableArea(const WKPoint&, const WKRect&);
 
-    // FIXME: PageViewportController needs to fix a problem that current page is shown in (0,0) position when starting to load new page.
-    // Below functions are to fix this problem for now.
-    void setWaitingForNewPage() { m_isWaitingForNewPage = true; }
-    bool waitingForNewPage() { return m_isWaitingForNewPage; }
-    void didCommitNewPage() { m_isWaitingForNewPage = false; }
-
     static const char smartClassName[];
+
+#if HAVE(ACCESSIBILITY) && defined(HAVE_ECORE_X)
+    WebKit::WebAccessibility* webAccessibility() { return m_webAccessibility.get(); }
+#endif
 
 private:
     EwkView(WKViewRef, Evas_Object*);
@@ -217,7 +224,7 @@ private:
     WebCore::IntSize size() const;
     WebCore::IntSize deviceSize() const;
 
-    void displayTimerFired(WebCore::Timer<EwkView>*);
+    void displayTimerFired();
 
     // Evas_Smart_Class callback interface:
     static void handleEvasObjectAdd(Evas_Object*);
@@ -256,7 +263,7 @@ private:
     Evas_Object* m_evasObject;
     RefPtr<EwkContext> m_context;
     RefPtr<EwkPageGroup> m_pageGroup;
-    EflUniquePtr<Evas_GL> m_evasGL;
+    Evas_GL* m_evasGL;
     std::unique_ptr<WebCore::EvasGLContext> m_evasGLContext;
     std::unique_ptr<WebCore::EvasGLSurface> m_evasGLSurface;
     bool m_pendingSurfaceResize;
@@ -299,12 +306,16 @@ private:
     bool m_touchEventsEnabled;
     std::unique_ptr<WebKit::GestureRecognizer> m_gestureRecognizer;
 #endif
-    WebCore::Timer<EwkView> m_displayTimer;
+    WebCore::Timer m_displayTimer;
     RefPtr<EwkContextMenu> m_contextMenu;
     std::unique_ptr<EwkPopupMenu> m_popupMenu;
     std::unique_ptr<WebKit::InputMethodContextEfl> m_inputMethodContext;
 #if ENABLE(INPUT_TYPE_COLOR)
     std::unique_ptr<EwkColorPicker> m_colorPicker;
+#endif
+
+#if HAVE(ACCESSIBILITY) && defined(HAVE_ECORE_X)
+    std::unique_ptr<WebKit::WebAccessibility> m_webAccessibility;
 #endif
 
     WebKit::PageViewportControllerClientEfl m_pageViewportControllerClient;
