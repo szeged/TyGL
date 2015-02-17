@@ -46,6 +46,9 @@
 
 namespace WebCore {
 
+// Initialize default font size.
+float RenderThemeTyGL::defaultFontSize = 16.0f;
+
 static void setSizeIfAuto(RenderStyle& style, const IntSize& size)
 {
     if (style.width().isIntrinsicOrAuto())
@@ -154,8 +157,13 @@ void RenderThemeTyGL::systemFont(WebCore::CSSValueID, FontDescription&) const
 {
 }
 
-void RenderThemeTyGL::updateCachedSystemFontDescription(CSSValueID systemFontID, FontDescription&) const
+void RenderThemeTyGL::updateCachedSystemFontDescription(CSSValueID systemFontID, FontDescription& fontDescription) const
 {
+    fontDescription.setOneFamily("Sans");
+    fontDescription.setSpecifiedSize(defaultFontSize);
+    fontDescription.setIsAbsoluteSize(true);
+    fontDescription.setWeight(FontWeightNormal);
+    fontDescription.setItalic(FontItalicOff);
 }
 
 bool RenderThemeTyGL::paintButton(const RenderObject& object, const PaintInfo& info, const IntRect& rect)
